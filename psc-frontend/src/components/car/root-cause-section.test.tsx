@@ -5,11 +5,24 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const rootCauseSectionMocks = vi.hoisted(() => ({
+  useCLCItems: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-masters', () => ({
+  useCLCItems: () => rootCauseSectionMocks.useCLCItems(),
+}));
 
 import { RootCauseSection } from './root-cause-section';
 
 describe('RootCauseSection', () => {
+  beforeEach(() => {
+    rootCauseSectionMocks.useCLCItems.mockReset();
+    rootCauseSectionMocks.useCLCItems.mockReturnValue({ data: [] });
+  });
+
   it('test_feat_car_002_empty_state_shows_placeholder_when_no_summary_or_clc', () => {
     render(<RootCauseSection rootCauseSummary={null} clcItems={[]} />);
     expect(
@@ -17,7 +30,34 @@ describe('RootCauseSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('test_feat_car_002_displays_clc_codes_and_custom_cause_text', () => {
+  it('test_feat_car_002_displays_clc_code_with_description_and_custom_cause_text', () => {
+    rootCauseSectionMocks.useCLCItems.mockReturnValue({
+      data: [
+        {
+          clc_code: 'CLC001',
+          item_name: 'Leadership gap',
+          item_description: null,
+          category_id: 1,
+          category_code: '1',
+          category_name: 'Following Procedures',
+          category_type: 'ROOT',
+          display_text: 'CLC001 - Leadership gap',
+          sort_order: 1,
+        },
+        {
+          clc_code: 'CLC002',
+          item_name: 'Training breakdown',
+          item_description: null,
+          category_id: 2,
+          category_code: '2',
+          category_name: 'Training',
+          category_type: 'ROOT',
+          display_text: 'CLC002 - Training breakdown',
+          sort_order: 2,
+        },
+      ],
+    });
+
     render(
       <RootCauseSection
         rootCauseSummary={null}
@@ -31,8 +71,8 @@ describe('RootCauseSection', () => {
     );
 
     expect(screen.getByText('CLC Codes:')).toBeInTheDocument();
-    expect(screen.getByText('CLC001')).toBeInTheDocument();
-    expect(screen.getByText('CLC002')).toBeInTheDocument();
+    expect(screen.getByText('CLC001 - Leadership gap')).toBeInTheDocument();
+    expect(screen.getByText('CLC002 - Training breakdown')).toBeInTheDocument();
     expect(screen.getByText(': Lack of training')).toBeInTheDocument();
   });
 
@@ -52,4 +92,3 @@ describe('RootCauseSection', () => {
     ).toBeInTheDocument();
   });
 });
-

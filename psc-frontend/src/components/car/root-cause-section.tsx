@@ -1,6 +1,7 @@
-import type { FC } from 'react';
+import { useMemo, type FC } from 'react';
 import { FileWarning } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui';
+import { useCLCItems } from '@/hooks/use-masters';
 import type { CarClcMapping } from '@/types';
 
 export interface RootCauseSectionProps {
@@ -14,7 +15,15 @@ export const RootCauseSection: FC<RootCauseSectionProps> = ({
   clcItems,
   className,
 }) => {
+  const { data: masterClcItems } = useCLCItems();
   const hasContent = rootCauseSummary || clcItems.length > 0;
+  const clcDisplayMap = useMemo(
+    () =>
+      Object.fromEntries(
+        (masterClcItems ?? []).map((item) => [item.clc_code, item.display_text])
+      ),
+    [masterClcItems]
+  );
 
   return (
     <Card className={className}>
@@ -42,7 +51,9 @@ export const RootCauseSection: FC<RootCauseSectionProps> = ({
                       key={item.id}
                       className="list-disc text-sm text-gray-600"
                     >
-                      <span className="font-medium">{item.clc_item_id}</span>
+                      <span className="font-medium">
+                        {clcDisplayMap[item.clc_item_id] || item.clc_item_id}
+                      </span>
                       {item.custom_cause_text && (
                         <span>: {item.custom_cause_text}</span>
                       )}

@@ -3,8 +3,8 @@
  *
  * Per APP_FLOW.md Section 2.3 and FEAT-CAR-002, FEAT-CAR-011
  * Allows editing a CAR based on status and role:
- * - DRAFT/REWORK_REQUESTED: Vessel Master can edit
- * - Any status: Office can edit-assist
+ * - Vessel workflow statuses: Vessel Master can edit
+ * - Any non-closed status: Office can edit-assist
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -26,7 +26,8 @@ import type { EvidenceType } from '@/types';
 
 /**
  * Check if user can edit the CAR based on status and role.
- * Per BACKEND_STRUCTURE.md: Vessel (DRAFT/REWORK), Office (any status).
+ * Per current CAR workflow: Office can edit any non-closed CAR, vessel edit is
+ * limited to Master in vessel-side statuses.
  */
 function canEditCAR(
   status: string,
@@ -45,17 +46,18 @@ function canEditCAR(
     CAR_STATUS.RETURNED_FOR_REWORK,
   ];
 
-  // Office cannot edit vessel-side CARs
   if (isOffice) {
-    return { canEdit: false, reason: 'Office cannot edit CARs' };
+    return status === CAR_STATUS.CLOSED
+      ? { canEdit: false, reason: 'Closed CARs are read-only' }
+      : { canEdit: true };
   }
 
-  // Vessel users (Master + Crew): vessel-side editable statuses
   if (isVessel) {
+    if (!isMaster) {
+      return { canEdit: false, reason: 'Only Master can edit CARs' };
+    }
     if (status === CAR_STATUS.PENDING_MASTER_REVIEW) {
-      return isMaster
-        ? { canEdit: true }
-        : { canEdit: false, reason: 'Only Master can edit CARs in Pending Master Review' };
+      return { canEdit: true };
     }
     if (VESSEL_EDITABLE.includes(status)) {
       return { canEdit: true };

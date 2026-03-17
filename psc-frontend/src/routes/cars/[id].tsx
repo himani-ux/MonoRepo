@@ -46,7 +46,7 @@ export default function CARDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isVessel, isOffice, isDPA } = useAuth();
+  const { user, isOffice, isDPA, isPIC, isMaster } = useAuth();
 
   // Query
   const { data: car, isLoading, error, refetch } = useCAR(id);
@@ -69,7 +69,7 @@ export default function CARDetailPage() {
 
   // Vessel-editable statuses
   const vesselEditable = isAllotted || isInProgress || isPendingCE || isPendingMaster || isReturnedForRework;
-  const canEdit = vesselEditable && (isVessel || isOffice);
+  const canEdit = (isOffice && !isClosed) || (isMaster && vesselEditable);
   const canUploadEvidence = isAllotted || isInProgress || isReturnedForRework;
 
   // PV permissions per BACKEND_STRUCTURE.md permission matrix
@@ -83,7 +83,7 @@ export default function CARDetailPage() {
   );
   const canCreatePV = isClosed && isOfficeOrDPA && !pv;
   const canClosePV =
-    pv?.status === 'OPEN' && (isDPA || (isOffice && isAssignedVerifier));
+    pv?.status === 'OPEN' && (isDPA || isPIC || (isOffice && isAssignedVerifier));
 
   // PDF Export handlers — FEAT-RPT-001
   const handleExportPDF = useCallback(async (audience: 'internal' | 'external') => {

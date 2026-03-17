@@ -803,6 +803,29 @@ class DeficiencyListFilteredView(APIView):
                 DefStatus.UNDER_REVIEW,
             ])
 
+        def_code = request.query_params.get('def_code')
+        if def_code:
+            qs = qs.filter(def_code_id=def_code)
+
+        vessel_id = request.query_params.get('vessel_id')
+        if vessel_id:
+            try:
+                vessel_uuid = uuid.UUID(vessel_id)
+            except (ValueError, AttributeError):
+                return Response(
+                    {'error': 'Invalid vessel_id parameter'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(inspection__vessel_id=vessel_uuid)
+
+        date_from = request.query_params.get('date_from')
+        if date_from:
+            qs = qs.filter(inspection__inspection_date__gte=date_from)
+
+        date_to = request.query_params.get('date_to')
+        if date_to:
+            qs = qs.filter(inspection__inspection_date__lte=date_to)
+
         # Pagination
         page = int(request.query_params.get('page', 1))
         page_size = int(request.query_params.get('page_size', self.DEFAULT_PAGE_SIZE))

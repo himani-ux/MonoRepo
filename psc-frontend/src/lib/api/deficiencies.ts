@@ -25,6 +25,8 @@ export interface DeficiencyFilters {
   awaiting_review?: boolean;
   def_code?: string;
   vessel_id?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 // ============================================================================
@@ -61,6 +63,12 @@ export async function getDeficiencies(
   }
   if (filters?.vessel_id) {
     params.set('vessel_id', filters.vessel_id);
+  }
+  if (filters?.date_from) {
+    params.set('date_from', filters.date_from);
+  }
+  if (filters?.date_to) {
+    params.set('date_to', filters.date_to);
   }
 
   const response = await apiClient.get<PaginatedResponse<DeficiencyDetail>>(

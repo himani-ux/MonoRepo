@@ -12,7 +12,6 @@
 
 import { useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
 import { RootLayout } from '@/components/layout/root-layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui';
@@ -53,6 +52,10 @@ function parseFiltersFromParams(params: URLSearchParams): DeficiencyFilters {
   if (defCode) filters.def_code = defCode;
   const vesselId = params.get('vessel_id');
   if (vesselId) filters.vessel_id = vesselId;
+  const dateFrom = params.get('date_from');
+  if (dateFrom) filters.date_from = dateFrom;
+  const dateTo = params.get('date_to');
+  if (dateTo) filters.date_to = dateTo;
   return filters;
 }
 
@@ -62,6 +65,8 @@ function filtersToParams(filters: DeficiencyFilters): URLSearchParams {
   if (filters.awaiting_review) params.set('awaiting_review', 'true');
   if (filters.def_code) params.set('def_code', filters.def_code);
   if (filters.vessel_id) params.set('vessel_id', filters.vessel_id);
+  if (filters.date_from) params.set('date_from', filters.date_from);
+  if (filters.date_to) params.set('date_to', filters.date_to);
   return params;
 }
 
@@ -71,9 +76,6 @@ export function DeficiencyDashboardPage() {
   const [selectedDef, setSelectedDef] = useState<DeficiencyDetail | null>(null);
 
   const filters = parseFiltersFromParams(searchParams);
-  const showDashboardFilterPendingBanner =
-    searchParams.get('dashboard_source') === 'repeat_deficiencies' &&
-    searchParams.get('filter_pending') === 'repeat_filters';
 
   const { data, isLoading, isError, error, refetch } = useDeficiencies({
     filters,
@@ -112,16 +114,6 @@ export function DeficiencyDashboardPage() {
   return (
     <RootLayout>
       <PageHeader title="Deficiency Workflow" subtitle="Manage vessel deficiency assignments and approvals" />
-
-      {showDashboardFilterPendingBanner && (
-        <div className="mb-4 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            Dashboard repeat-deficiency filters are not supported by the current API yet.
-            Showing the base deficiency list.
-          </p>
-        </div>
-      )}
 
       {/* Filter bar */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
