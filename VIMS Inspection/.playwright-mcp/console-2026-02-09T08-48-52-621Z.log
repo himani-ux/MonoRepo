@@ -1,0 +1,4 @@
+[     328ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  188506ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8000/api/psc/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f/deficiencies/:0
+[  189712ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8000/api/psc/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f/deficiencies/:0
+[  189715ms] [ERROR] Failed to create deficiency: AxiosError @ http://localhost:5173/src/components/inspection/deficiency-modal.tsx?t=1770625346158:83

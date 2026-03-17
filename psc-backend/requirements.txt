@@ -1,0 +1,27 @@
+# VIMS Inspection - PSC Backend
+# Versions locked per TECH_STACK.md Section 6.2
+# DO NOT upgrade without approval
+
+# Framework
+Django==5.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.4.0
+
+# Authentication
+djangorestframework-simplejwt==5.3.1
+PyJWT==2.8.0
+
+# Database (SQL Server)
+pyodbc==5.1.0
+mssql-django==1.6
+
+# File Generation
+reportlab==4.2.0
+PyPDF2==3.0.1
+openpyxl==3.1.5
+Pillow==10.4.0
+
+# Utilities
+python-dotenv==1.0.1
+gunicorn==22.0.0
+requests==2.32.5

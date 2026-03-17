@@ -1,0 +1,20 @@
+[     484ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5174/inspections:0
+[     617ms] The requested module '/src/lib/validations/follow-up.ts' does not provide an export named 'followUpFormDefaults'
+[     617ms] The requested module '/src/lib/validations/follow-up.ts' does not provide an export named 'followUpFormDefaults'
+[     569ms] [ERROR] The above error occurred in one of your React components:
+
+    at Lazy
+    at MasterOnlyGuard (http://localhost:5174/src/App.tsx:133:28)
+    at AuthGuard (http://localhost:5174/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5174/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:3989:5)
+    at Routes (http://localhost:5174/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5174/src/App.tsx:168:3)
+    at Router (http://localhost:5174/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:4366:15)
+    at BrowserRouter (http://localhost:5174/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5174/node_modules/.vite/deps/@tanstack_react-query.js?v=5d173d08:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5174/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:14031
+[     619ms] The requested module '/src/lib/validations/follow-up.ts' does not provide an export named 'followUpFormDefaults'

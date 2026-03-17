@@ -1,0 +1,37 @@
+[     323ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f:0
+[  209961ms] The requested module '/src/hooks/use-auth.ts' does not provide an export named 'useAuthStore'
+[  209964ms] The requested module '/src/hooks/use-auth.ts' does not provide an export named 'useAuthStore'
+[  209964ms] [ERROR] The above error occurred in the <AuthGuard> component:
+
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:129:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=9b5cc7c9:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=9b5cc7c9:14031
+[  209967ms] The requested module '/src/hooks/use-auth.ts' does not provide an export named 'useAuthStore'
+[  213566ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  214827ms] The requested module '/src/hooks/use-auth.ts' does not provide an export named 'useAuthStore'
+[  214831ms] The requested module '/src/hooks/use-auth.ts' does not provide an export named 'useAuthStore'
+[  214828ms] [ERROR] The above error occurred in the <AuthGuard> component:
+
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:129:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=9b5cc7c9:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=9b5cc7c9:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=9b5cc7c9:14031
+[  214835ms] The requested module '/src/hooks/use-auth.ts' does not provide an export named 'useAuthStore'
+[  217709ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0

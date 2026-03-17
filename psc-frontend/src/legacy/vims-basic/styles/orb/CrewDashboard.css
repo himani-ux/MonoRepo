@@ -1,0 +1,147 @@
+/* Orb-themed CrewDashboard - paste into CrewDashboard.css or into <style> */
+/* Uses same CSS variables as your orb_new_roopam HTML */
+:root{
+  --bg: #eef2f6;
+  --glass-bg: rgba(255,255,255,.75);
+  --glass-border: rgba(255,255,255,.06);
+  --muted: #6b7280;
+  --border: #e6e9f0;
+  --ring: rgba(99,102,241,.18);
+  --grad-1:#6b9dfc;
+  --grad-2:#a97cf8;
+  --btn-1:#5a6ef5;
+  --btn-2:#8a6cf3;
+  --btn-accent: linear-gradient(90deg,var(--btn-2),var(--btn-1));
+  --orb-primary: #0f172a;
+  --orb-accent: #3a8fc4;
+  --orb-bg: #f6f9fb;
+  --orb-text: #0f172a;
+  --orb-shadow: 0 6px 20px rgba(15,23,42,0.06);
+}
+
+/* Page/Container */
+.orb-theme { 
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--orb-text);
+  background: radial-gradient(1200px 600px at 10% 10%, 0%, var(--bg) 60%, #ffffff 100%);
+  min-height: 100%;
+  padding: 1.5rem;
+}
+
+/* Panel + Titlebar */
+.panel {
+  position: relative;
+  margin: 2rem auto;
+  width: min(85%, 1200px);        /* <- wider and centered */
+  border-radius: 20px;
+  box-shadow: var(--orb-shadow);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+.titlebar {
+  display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+  padding:.6rem .9rem; background:linear-gradient(90deg,var(--grad-2),var(--grad-1));
+  color:#fff; font-weight:700;
+}
+.titlebar .left { display:flex; align-items:center; gap:.6rem; }
+.panel-body { padding:1.5rem; }
+
+/* Card */
+.card {
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:14px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+  padding:1.25rem;
+  width:100%;
+  margin-bottom:1rem;
+}
+.card h2 { margin:.25rem 0 1rem; font-size:1.05rem; font-weight:700; letter-spacing: .01em; color:var(--orb-primary) }
+
+/* Fields */
+.field { display:flex; flex-direction:column; gap:0.25rem; margin-bottom:0.75rem; }
+.field.inline { flex-direction:row; align-items:end; gap:0.75rem; }
+.field label { display:block; font-size:.92rem; font-weight:700; color:var(--orb-primary); margin:0; }
+.field .small-label { font-size:.78rem; color:var(--muted); margin-bottom:0.25rem; font-weight:600; }
+
+/* Inputs (Orb glass style) */
+input, select, textarea {
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(6px);
+  font-size: 0.95rem;
+  padding: .6rem .8rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s;
+  width:100%;
+  box-sizing:border-box;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--grad-2);
+  box-shadow: 0 0 0 6px rgba(167,139,250,0.14);
+  background: rgba(255,255,255,0.98);
+}
+
+/* Grid helpers (use instead of inline style grids) */
+.grid { display:grid; gap:.5rem; width:100%; }
+.grid-auto-fit { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-6 { grid-template-columns: repeat(6, minmax(60px,1fr)); } /* for lat/lon 6-column blocks */
+.align-end { align-items:end; }
+
+/* Small field sizing */
+.input-sm { padding: .45rem .6rem; font-size:.9rem; }
+
+/* Buttons */
+button { border:none; cursor:pointer; border-radius:10px; padding:.6rem .9rem; font-weight:700; font-size:.95rem; display:inline-flex; align-items:center; gap:.5rem; }
+.btn-primary { color:#fff; background: var(--btn-accent); box-shadow: 0 10px 24px rgba(90,110,245,0.24); }
+.btn-secondary { background:#f3f4f6; color:var(--orb-primary); border:1px solid var(--border); }
+.btn-ghost { background:transparent; border:1px dashed var(--border); color:var(--muted); }
+
+/* Add/remove circular */
+.btn-circle { border-radius:50%; width:36px; height:36px; padding:0; display:inline-flex; align-items:center; justify-content:center }
+
+/* Error helper */
+.error { color: var(--danger); font-size:.85rem; margin-top:.25rem; display:block; }
+.error-input { border-color: var(--danger) !important; box-shadow: 0 0 0 4px rgba(239,68,68,0.06); }
+
+/* Tank row */
+.tank-row { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; background:#f7fbfd; border-radius:8px; padding:.6rem; border:1px solid var(--border); }
+
+/* Entries table - consistent with Orb */
+.orb-table { width:100%; border-collapse:collapse; font-size:0.95rem; border-radius:8px; overflow:hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.orb-table th, .orb-table td { padding:.8rem; text-align:left; border-bottom:1px solid var(--border); }
+.orb-table th { background:linear-gradient(90deg,var(--grad-2),var(--grad-1)); color:#fff; font-weight:700; font-size:.85rem; text-transform:uppercase; }
+.orb-table tr:nth-child(even) { background:#fbfdff; }
+.orb-table tr:hover { background:#eef6fa; }
+
+/* PDF preview block: match jsPDF layout (Courier, small size & tight leading) */
+.pdf-preview {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 11px;            
+  line-height: 1.18;        
+  white-space: pre-wrap;
+  background:#fff;
+  padding:0.85rem;
+  border-radius:6px;
+  border:1px solid var(--border);
+  overflow-x:auto;
+  margin:0;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .panel { width:95%; margin:1rem; border-radius:12px; }
+  .grid-6 { grid-template-columns: repeat(3, 1fr); } 
+  .card { padding:1rem; }
+  .btn-circle { width:40px; height:40px; }
+}
+
+
+

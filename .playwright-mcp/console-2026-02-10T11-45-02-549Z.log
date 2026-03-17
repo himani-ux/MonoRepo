@@ -1,0 +1,3 @@
+[     434ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5174/inspections:0
+[   35314ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ http://localhost:5174/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=5d173d08:333
+[   35316ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ http://localhost:5174/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=5d173d08:333

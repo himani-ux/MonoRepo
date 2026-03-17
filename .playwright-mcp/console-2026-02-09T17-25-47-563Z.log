@@ -1,0 +1,6 @@
+[     486ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/edit:0
+[   44949ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/actions/ed8ebb9d-cec9-4aa4-969b-695e33568b1e/:0
+[   45971ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/actions/ed8ebb9d-cec9-4aa4-969b-695e33568b1e/:0
+[   45981ms] AxiosError
+[   68267ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/actions/ed8ebb9d-cec9-4aa4-969b-695e33568b1e/delete/:0
+[   69290ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/actions/ed8ebb9d-cec9-4aa4-969b-695e33568b1e/delete/:0

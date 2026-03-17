@@ -1,0 +1,5 @@
+[     353ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5174/inspections/new:0
+[  152619ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/inspections/34026907-36b5-469c-898f-56f74180fc14/deficiencies/:0
+[  153664ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/inspections/34026907-36b5-469c-898f-56f74180fc14/deficiencies/:0
+[  153666ms] [ERROR] Failed to create deficiency: AxiosError @ http://localhost:5174/src/components/inspection/deficiency-modal.tsx:79
+[  289810ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5174/inspections/34026907-36b5-469c-898f-56f74180fc14:0

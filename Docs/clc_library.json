@@ -1,0 +1,355 @@
+{
+  "version": "1.0",
+  "description": "Comprehensive List of Causes (CLC) - A Tool for Root Cause Analysis",
+  "categories": {
+    "immediate_causes": {
+      "actions": {
+        "1": {
+          "name": "Following Procedures",
+          "items": {
+            "1-1": "Violation by individual",
+            "1-2": "Violation by group",
+            "1-3": "Violation by supervisor",
+            "1-4": "Operation equipment without authority",
+            "1-5": "Improper position or posture for the task",
+            "1-6": "Overexertion of physical capability",
+            "1-7": "Work or motion at improper speed",
+            "1-8": "Improper lifting",
+            "1-9": "Improper loading",
+            "1-10": "Shortcuts",
+            "1-11": "Other"
+          }
+        },
+        "2": {
+          "name": "Use of Tools or Equipment",
+          "items": {
+            "2-1": "Improper use of equipment",
+            "2-2": "Improper use of tools",
+            "2-3": "Use of defective equipment (aware)",
+            "2-4": "Use of defective tools (aware)",
+            "2-5": "Improper placement of tools, equipment or material",
+            "2-6": "Operation equipment at improper speed",
+            "2-7": "Servicing equipment in operation",
+            "2-8": "Other"
+          }
+        },
+        "3": {
+          "name": "Use of Protective Methods",
+          "items": {
+            "3-1": "Lack of knowledge of hazards present",
+            "3-2": "Personal protective equipment not used",
+            "3-3": "Improper use of proper personal protective equipment",
+            "3-4": "Servicing of energized equipment",
+            "3-5": "Equipment or material not secured",
+            "3-6": "Disabled guards, warning systems or safety devices",
+            "3-7": "Removal of guards, warning systems or safety devices",
+            "3-8": "Personal protective equipment not available",
+            "3-9": "Other"
+          }
+        },
+        "4": {
+          "name": "Inattention / Lack of Awareness",
+          "items": {
+            "4-1": "Improper decision making or lack of judgment",
+            "4-2": "Distracted by other concerns",
+            "4-3": "Inattention to footing and surroundings",
+            "4-4": "Horseplay",
+            "4-5": "Acts of violence",
+            "4-6": "Failure to warn",
+            "4-7": "Use of drugs or alcohol",
+            "4-8": "Routine activity without thought",
+            "4-9": "Other"
+          }
+        }
+      },
+      "conditions": {
+        "5": {
+          "name": "Protective Systems",
+          "items": {
+            "5-1": "Inadequate guards or protective devices",
+            "5-2": "Defective guards or protective devices",
+            "5-3": "Inadequate personal protective equipment",
+            "5-4": "Defective personal protective equipment",
+            "5-5": "Inadequate warning systems",
+            "5-6": "Defective warning systems",
+            "5-7": "Inadequate isolation of process or equipment",
+            "5-8": "Inadequate safety devices",
+            "5-9": "Defective safety devices",
+            "5-10": "Other"
+          }
+        },
+        "6": {
+          "name": "Tools, Equipment & Vehicles",
+          "items": {
+            "6-1": "Defective equipment",
+            "6-2": "Inadequate equipment",
+            "6-3": "Improperly prepared equipment",
+            "6-4": "Defective tools",
+            "6-5": "Inadequate tools",
+            "6-6": "Improperly prepared tools",
+            "6-7": "Defective vehicle",
+            "6-8": "Inadequate vehicle for the purpose",
+            "6-9": "Improperly prepared vehicle",
+            "6-10": "Other"
+          }
+        },
+        "7": {
+          "name": "Work Exposures",
+          "items": {
+            "7-1": "Fire or explosion",
+            "7-2": "Noise",
+            "7-3": "Energized electrical system",
+            "7-4": "Energized system, other than electrical",
+            "7-5": "Radiation",
+            "7-6": "Temperature extremes",
+            "7-7": "Hazardous chemicals",
+            "7-8": "Mechanical hazards",
+            "7-9": "Clutter or debris",
+            "7-10": "Storms or acts of nature",
+            "7-11": "Slippery floors or walkways",
+            "7-12": "Other"
+          }
+        },
+        "8": {
+          "name": "Work Place Environment / Layout",
+          "items": {
+            "8-1": "Congestion or restricted motion",
+            "8-2": "Inadequate or excessive illumination",
+            "8-3": "Inadequate ventilation",
+            "8-4": "Unprotected height",
+            "8-5": "Inadequate work place layout (controls less than adequate, displays less than adequate, labels less than adequate, locations out of reach or sight, conflicting information is presented)",
+            "8-6": "Other"
+          }
+        }
+      }
+    },
+    "root_causes": {
+      "personal_factors": {
+        "1": {
+          "name": "Physical Capability",
+          "items": {
+            "1-1": "Vision deficiency",
+            "1-2": "Hearing deficiency",
+            "1-3": "Other sensory deficiency",
+            "1-4": "Reduced respiratory capacity",
+            "1-5": "Other permanent physical disability",
+            "1-6": "Temporary disabilities",
+            "1-7": "Inability to sustain body positions",
+            "1-8": "Restricted range of body movement",
+            "1-9": "Substance sensitivities or allergies",
+            "1-10": "Inadequate size or strength",
+            "1-11": "Diminished capacity due to medication",
+            "1-12": "Other"
+          }
+        },
+        "2": {
+          "name": "Physical Condition",
+          "items": {
+            "2-1": "Previous injury or illness",
+            "2-2": "Fatigue (due to workload, due to lack of rest, due to sensory overload)",
+            "2-3": "Diminished performance (due to temperature extremes, due to oxygen deficiency, due to atmospheric pressure variation)",
+            "2-4": "Blood sugar insufficiency",
+            "2-5": "Impairment due to drug or alcohol use",
+            "2-6": "Other"
+          }
+        },
+        "3": {
+          "name": "Mental State",
+          "items": {
+            "3-1": "Poor judgment",
+            "3-2": "Memory failure",
+            "3-3": "Poor coordination or reaction time",
+            "3-4": "Emotional disturbance",
+            "3-5": "Fears or phobias",
+            "3-6": "Low mechanical aptitude",
+            "3-7": "Low learning aptitude",
+            "3-8": "Influenced by medication",
+            "3-9": "Other"
+          }
+        },
+        "4": {
+          "name": "Mental Stress",
+          "items": {
+            "4-1": "Preoccupation with problems",
+            "4-2": "Frustration",
+            "4-3": "Confusing directions/demands",
+            "4-4": "Conflicting directions/demands",
+            "4-5": "Meaningless or degrading activities",
+            "4-6": "Emotional overload",
+            "4-7": "Extreme judgment / decision demands",
+            "4-8": "Extreme concentration / perception demands",
+            "4-9": "Extreme boredom",
+            "4-10": "Other"
+          }
+        },
+        "5": {
+          "name": "Behavior",
+          "items": {
+            "5-1": "Improper performance is rewarded (saves time or effort, avoids discomfort, gains attention)",
+            "5-2": "Improper supervisory example",
+            "5-3": "Inadequate identification of critical safe behavior",
+            "5-4": "Inadequate reinforcement of critical safe behavior (proper performance is criticized, inappropriate peer pressure, inadequate performance feedback, inadequate disciplinary process)",
+            "5-5": "Inappropriate aggression",
+            "5-6": "Improper use of production incentives",
+            "5-7": "Supervisor implied haste",
+            "5-8": "Employee perceived haste",
+            "5-9": "Other"
+          }
+        },
+        "6": {
+          "name": "Skill Level",
+          "items": {
+            "6-1": "Inadequate assessment of required skills",
+            "6-2": "Inadequate practice of skill",
+            "6-3": "Infrequent performance of skill",
+            "6-4": "Lack of coaching on skill",
+            "6-5": "Insufficient review of instruction to establish skill",
+            "6-6": "Other"
+          }
+        }
+      },
+      "job_factors": {
+        "7": {
+          "name": "Training / Knowledge Transfer",
+          "items": {
+            "7-1": "Inadequate knowledge transfer (inability to comprehend, inadequate instructor qualifications, inadequate training equipment, misunderstood instruction)",
+            "7-2": "Inadequate recall of training material (training not reinforced on the job, inadequate refresher training frequency)",
+            "7-3": "Inadequate training effort (inadequate training program design, inadequate training goals/objectives, inadequate new employee orientation, inadequate initial training, inadequate means to determine if qualified for job)",
+            "7-4": "No training provided (need for training not identified, training records incorrect or out of date, new work methods introduced without training, decision made not to train)",
+            "7-5": "Other"
+          }
+        },
+        "8": {
+          "name": "Management / Supervision / Employee Leadership",
+          "items": {
+            "8-1": "Conflicting roles/responsibilities (unclear reporting relationship, conflicting reporting relationship, unclear assignment of responsibility, conflicting assignment of responsibility, improper or insufficient delegation of authority)",
+            "8-2": "Inadequate leadership (standards of performance missing or not enforced, inadequate accountability, inadequate or incorrect performance feedback, inadequate worksite walkthrough, inadequate safety promotion)",
+            "8-3": "Inadequate correction of prior hazard/incident",
+            "8-4": "Inadequate identification of worksite/job hazards",
+            "8-5": "Inadequate management of change system",
+            "8-6": "Inadequate incident reporting/investigation system",
+            "8-7": "Inadequate or lack of safety meetings",
+            "8-8": "Inadequate performance measurement & assessment",
+            "8-9": "Other"
+          }
+        },
+        "9": {
+          "name": "Contractor Selection & Oversight",
+          "items": {
+            "9-1": "Lack of contractor pre-qualifications",
+            "9-2": "Inadequate contractor pre-qualifications",
+            "9-3": "Inadequate contractor selection",
+            "9-4": "Use of non-approved contractor",
+            "9-5": "Lack of job oversight",
+            "9-6": "Inadequate oversight",
+            "9-7": "Other"
+          }
+        },
+        "10": {
+          "name": "Engineering / Design",
+          "items": {
+            "10-1": "Inadequate technical design (design input obsolete, design input not correct, design input not available, design output inadequate, design output infeasible, design output not correct, design output inconsistent, no independent design review)",
+            "10-2": "Inadequate standards, specifications, and/or design criteria",
+            "10-3": "Inadequate assessment of potential failure",
+            "10-4": "Inadequate ergonomic design",
+            "10-5": "Inadequate monitoring of construction",
+            "10-6": "Inadequate assessment of operational readiness",
+            "10-7": "Inadequate monitoring of initial operation",
+            "10-8": "Inadequate evaluation and/or documentation of change",
+            "10-9": "Other"
+          }
+        },
+        "11": {
+          "name": "Work Planning",
+          "items": {
+            "11-1": "Inadequate work planning",
+            "11-2": "Inadequate preventive maintenance (assessment of needs, lubrication/servicing, adjustment/assembly, clearing/resurfacing)",
+            "11-3": "Inadequate repair (communication of needed repair, scheduling of work, examination of parts, parts substitution)",
+            "11-4": "Excessive wear and tear (inadequate planning for use, extension of service life, improper loading, use by untrained people, use for wrong purpose)",
+            "11-5": "Inadequate reference materials or publications",
+            "11-6": "Inadequate audit/inspection/monitoring (no documentation, no correction responsibility assigned, no accountability for corrective action)",
+            "11-7": "Inadequate job placement (appropriate personnel not identified, appropriate personnel not available, appropriate personnel not provided)",
+            "11-8": "Other"
+          }
+        },
+        "12": {
+          "name": "Purchasing, Material Handling & Material Control",
+          "items": {
+            "12-1": "Incorrect item received",
+            "12-2": "Inadequate preventive maintenance assessment of needs",
+            "12-3": "Inadequate vendor factors",
+            "12-4": "Inadequate specifications or ordering",
+            "12-5": "Inadequate coordination with person",
+            "12-6": "Inadequate design output",
+            "12-7": "Inadequate repair communication of needed repair",
+            "12-8": "Inadequate product acceptance verification",
+            "12-9": "Inadequate acceptance salvage and/or reclamation",
+            "12-10": "Other"
+          }
+        },
+        "13": {
+          "name": "Tools & Equipment",
+          "items": {
+            "13-1": "Inadequate assessment of needs and risks",
+            "13-2": "Inadequate human factors/ergonomics considerations",
+            "13-3": "Inadequate specifications or ordering",
+            "13-4": "Inadequate involvement in the development",
+            "13-5": "Inadequate definition of use",
+            "13-6": "Other"
+          }
+        },
+        "14": {
+          "name": "Work Rules / Policies / Standards / Procedures (PSP)",
+          "items": {
+            "14-1": "Lack of PSP for the task (lack of defined responsibility and/or PSP, lack of job safety analysis)",
+            "14-2": "Inadequate job safety analysis development of PSP",
+            "14-3": "Inadequate coordination with and person",
+            "14-4": "Inadequate communication",
+            "14-5": "Inadequate involvement in corrective action",
+            "14-6": "Inadequate definition of use",
+            "14-7": "Other"
+          }
+        },
+        "15": {
+          "name": "Communication",
+          "items": {
+            "15-1": "Inadequate horizontal communication between workers",
+            "15-2": "Inadequate vertical communication between supervisor and person",
+            "15-3": "Inadequate communication between different shifts",
+            "15-4": "Inadequate communication method",
+            "15-5": "No communication",
+            "15-6": "Incorrect instructions",
+            "15-7": "No communication method available",
+            "15-8": "Incorrect instructions",
+            "15-9": "Messages too long",
+            "15-10": "Inadequate communication of safety and health data, regulations or guidelines",
+            "15-11": "Standard terminology not used",
+            "15-12": "Verification/repeat back techniques not used",
+            "15-13": "Special interfaces",
+            "15-14": "Inadequate translation to appropriate languages",
+            "15-15": "Other"
+          }
+        }
+      }
+    }
+  },
+  "area_for_improvement": [
+    "HSE Risk Management",
+    "HSE Legal and Other Requirements",
+    "Setting Up Objectives, Targets & Programs",
+    "Management of Change",
+    "Leadership, Organization & Resources",
+    "Competence, Training & Awareness",
+    "Communication & Consultation",
+    "Documentation",
+    "Control of Documents",
+    "Operational Control",
+    "Emergency Preparedness & Response",
+    "Performance Monitoring and Measurements",
+    "Evaluation of Compliance",
+    "Accident/Incident, Non-Conformity, Corrective and Preventive Action",
+    "Control of Record",
+    "Audit",
+    "Management Review"
+  ]
+}

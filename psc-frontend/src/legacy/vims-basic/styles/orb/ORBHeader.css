@@ -1,0 +1,33 @@
+/* src/components/ORBHeader.css */
+
+.or-header {
+  margin-bottom: 1rem;
+  font-family: "Courier New", monospace;
+}
+
+.OR-header th,
+.OR-header td {
+  padding: 6px 8px;
+  text-align: left;
+  border: 1px solid #000;
+}
+
+.OR-header .help {
+  color: #555;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.or-table-header {
+  margin-top: 1rem;
+  font-size: 14px;
+  font-weight: bold;
+  border-collapse: collapse;
+}
+
+.OR-table-header th {
+  background-color: #f8f9fa;
+  padding: 8px;
+  text-align: center;
+  border: 1px solid #000;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "vims_inspection",
+  "version": "1.0.0",
+  "description": "Maritime vessel inspection management system for Port State Control (PSC), RightShip (RS), and Audit inspections. Manages the complete lifecycle from inspection recording through deficiency tracking, Corrective Action Reports (CAR), and DPA closure.",
+  "main": "mssql-mcp.js",
+  "scripts": {
+    "build": "npm --prefix psc-frontend install && npm --prefix psc-frontend run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "mssql": "^12.2.0"
+  }
+}

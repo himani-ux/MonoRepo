@@ -1,0 +1,31 @@
+[     510ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/26c545e5-85b4-4b44-99ba-2f51028814c7:0
+[ 3424979ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:8000/api/psc/notifications/?is_read=false&page=1&page_size=1:0
+[ 4471322ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/26c545e5-85b4-4b44-99ba-2f51028814c7:0
+[ 4476799ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/26c545e5-85b4-4b44-99ba-2f51028814c7:0
+[ 4483972ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/26c545e5-85b4-4b44-99ba-2f51028814c7:0
+[ 4489691ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/26c545e5-85b4-4b44-99ba-2f51028814c7:0
+[ 4498546ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/26c545e5-85b4-4b44-99ba-2f51028814c7:0
+[ 4638256ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/psc/notifications/?is_read=false&page=1&page_size=1:0
+[ 4641637ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/psc/notifications/?is_read=false&page=1&page_size=1:0
+[ 4713271ms] [ERROR] ReferenceError: registerFollowUp is not defined
+    at http://localhost:5173/src/lib/api/inspections.ts?t=1770722861315:136:3 @ http://localhost:5173/@vite/client:173
+[ 4713272ms] [ERROR] [hmr] Failed to reload /src/components/inspection/deficiency-modal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4713272ms] [ERROR] ReferenceError: registerFollowUp is not defined
+    at http://localhost:5173/src/lib/api/inspections.ts?t=1770722861315:136:3 @ http://localhost:5173/@vite/client:173
+[ 4713272ms] [ERROR] [hmr] Failed to reload /src/components/inspection/inspection-list.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4713273ms] [ERROR] ReferenceError: registerFollowUp is not defined
+    at http://localhost:5173/src/lib/api/inspections.ts?t=1770722861315:136:3 @ http://localhost:5173/@vite/client:173
+[ 4713274ms] [ERROR] [hmr] Failed to reload /src/components/inspection/deficiency-list.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4713274ms] [ERROR] ReferenceError: registerFollowUp is not defined
+    at http://localhost:5173/src/lib/api/inspections.ts?t=1770722861315:136:3 @ http://localhost:5173/@vite/client:173
+[ 4713275ms] [ERROR] [hmr] Failed to reload /src/components/inspection/inspection-dpa-close-modal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4713275ms] [ERROR] ReferenceError: registerFollowUp is not defined
+    at http://localhost:5173/src/lib/api/inspections.ts?t=1770722861315:136:3 @ http://localhost:5173/@vite/client:173
+[ 4713275ms] [ERROR] [hmr] Failed to reload /src/components/inspection/inspection-pic-review-modal.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4713277ms] [ERROR] ReferenceError: registerFollowUp is not defined
+    at http://localhost:5173/src/lib/api/inspections.ts?t=1770722861315:136:3 @ http://localhost:5173/@vite/client:173
+[ 4713277ms] [ERROR] [hmr] Failed to reload /src/routes/inspections/[id].tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4757256ms] [ERROR] SyntaxError: The requested module '/src/lib/validations/follow-up.ts?t=1770722905337' does not provide an export named 'followUpFormDefaults' @ http://localhost:5173/@vite/client:173
+[ 4757256ms] [ERROR] [hmr] Failed to reload /src/components/inspection/follow-up-form.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175
+[ 4886803ms] [ERROR] SyntaxError: The requested module '/src/lib/validations/follow-up.ts?t=1770722905337' does not provide an export named 'followUpFormDefaults' @ http://localhost:5173/@vite/client:173
+[ 4886803ms] [ERROR] [hmr] Failed to reload /src/routes/inspections/[id].tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:175

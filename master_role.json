@@ -1,0 +1,242 @@
+[
+  {
+    "id": "f415d39c-4037-ee11-b023-782b4610c006",
+    "role_name": "Operation Team",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-08-10T11:11:55.357",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:33.89"
+  },
+  {
+    "id": "9ec9fb38-95cd-ef11-aa02-9aca9a39e86d",
+    "role_name": "Observer",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2025-01-08T13:20:27.16",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "841c6054-a5d1-ef11-aa02-9aca9a39e86d",
+    "role_name": "Purchase Executive",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2025-01-13T17:26:45.343",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "a103b023-a6d1-ef11-aa02-9aca9a39e86d",
+    "role_name": "Purchase Manager",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2025-01-13T17:31:37.527",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "4bb2b3f3-d1b8-ed11-99ad-9da677dd1a69",
+    "role_name": "Test_New",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-03-02T08:12:20.463",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:28.233"
+  },
+  {
+    "id": "7195f6af-87c4-ed11-99ad-9da677dd1a69",
+    "role_name": "Operational Section",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-07-29T12:44:09.84",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:38.443"
+  },
+  {
+    "id": "c9840f10-88c4-ed11-99ad-9da677dd1a69",
+    "role_name": "Change Request",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-03-17T05:53:39.24",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:43.583"
+  },
+  {
+    "id": "b4dd2c54-88c4-ed11-99ad-9da677dd1a69",
+    "role_name": "View_Only",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-03-17T05:55:33.517",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:48.323"
+  },
+  {
+    "id": "53718017-e8a2-ed11-b6bb-a864f15c6e2f",
+    "role_name": "admin",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:29:16.77",
+    "updated_by": null,
+    "updated_date": "2025-02-10T15:39:48.887"
+  },
+  {
+    "id": "aea9911e-e8a2-ed11-b6bb-a864f15c6e2f",
+    "role_name": "Fleet Manager",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T16:04:17.67",
+    "updated_by": null,
+    "updated_date": "2024-05-27T15:25:58.82"
+  },
+  {
+    "id": "09f8d8f5-1fa6-ed11-b6bc-a864f15c6e2f",
+    "role_name": "New Request",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-02-06T18:42:52.717",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:52.68"
+  },
+  {
+    "id": "26d5ad8f-83e3-ef11-aa04-cd8db15ac468",
+    "role_name": "Accounts",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2025-02-05T11:09:27.25",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "c9ca60a5-9c20-ee11-99ae-da75f524456d",
+    "role_name": "SupportTeam",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-07-12T15:42:46.66",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:12:57.42"
+  },
+  {
+    "id": "37cd227d-4a0b-ee11-b6ad-dc1ba160dafa",
+    "role_name": "Developer",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-06-15T12:31:45.997",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:13:15.117"
+  },
+  {
+    "id": "2abce8a3-4a0b-ee11-b6ad-dc1ba160dafa",
+    "role_name": "Tester",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2023-06-15T12:32:51.047",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:13:20.23"
+  },
+  {
+    "id": "1baaa9b0-0c1c-ef11-a9f1-f348983bae6b",
+    "role_name": "Super Admin",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:07:11.093",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "30723f07-0f1c-ef11-a9f1-f348983bae6b",
+    "role_name": "Fleet_Manager",
+    "is_active": "1",
+    "is_deleted": "1",
+    "created_by": null,
+    "created_date": "2024-05-27T16:01:17.57",
+    "updated_by": null,
+    "updated_date": "2024-05-27T16:13:26.733"
+  },
+  {
+    "id": "d604980f-0f1c-ef11-a9f1-f348983bae6b",
+    "role_name": "Technical Superintendent",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:26:38.467",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "407ef017-0f1c-ef11-a9f1-f348983bae6b",
+    "role_name": "Marine Superintendent",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:26:49.567",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "809c3c1e-0f1c-ef11-a9f1-f348983bae6b",
+    "role_name": "SEQ Manager",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:24:33.92",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "a446e624-0f1c-ef11-a9f1-f348983bae6b",
+    "role_name": "Crewing Manager",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:24:45.087",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "0c3ad72b-0f1c-ef11-a9f1-f348983bae6b",
+    "role_name": "Crewing Executive",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T15:24:56.73",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "ad92a33d-191c-ef11-a9f1-f348983bae6b",
+    "role_name": "Energy Efficiency and Operations Officer",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T16:37:01.557",
+    "updated_by": null,
+    "updated_date": null
+  },
+  {
+    "id": "28d37c55-191c-ef11-a9f1-f348983bae6b",
+    "role_name": "Senior Technical Superintendent",
+    "is_active": "1",
+    "is_deleted": "0",
+    "created_by": null,
+    "created_date": "2024-05-27T16:37:41.587",
+    "updated_by": null,
+    "updated_date": null
+  }
+]

@@ -1,0 +1,110 @@
+
+/* Container for the entire page */
+.guidelines-page {
+  padding: 20px;
+  min-height: 100vh; /* Ensure it fills the viewport height */
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); /* Subtle gradient background */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Modern font */
+}
+
+/* Card specific styles */
+.guidelines-page .card {
+  background-color: rgba(255, 255, 255, 0.95); /* Slightly transparent white */
+  border-radius: 12px; /* Rounded corners */
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37); /* Soft shadow */
+  backdrop-filter: blur(4px); /* Frosted glass effect */
+  border: 1px solid rgba(255, 255, 255, 0.18); /* Subtle border */
+  padding: 20px;
+  max-width: 800px; /* Limit width for better readability */
+  margin: 0 auto; /* Center the card */
+}
+
+/* Card title styling */
+.guidelines-page .card h2 {
+  color: #2c3e50; /* Darker text color */
+  font-size: 1.8em; /* Larger font size */
+  margin-bottom: 15px; /* Space below title */
+  text-align: center; /* Center the title */
+  position: relative; /* For pseudo-element */
+}
+
+/* Add an underline effect to the title */
+.guidelines-page .card h2::after {
+  content: '';
+  display: block;
+  width: 50px; /* Width of the underline */
+  height: 3px; /* Height of the underline */
+  /* background: linear-gradient(90deg, #3498db, #2ecc71); Gradient underline */
+  margin: 8px auto 0; /* Center it below the title */
+  border-radius: 2px; /* Slightly rounded underline */
+}
+
+/* Card content area */
+.guidelines-page .card .p-card-content {
+  padding: 15px 0; /* Add some vertical padding */
+}
+
+/* Styling for the instruction paragraph */
+.guidelines-page .card .p-card-content p {
+  text-align: center; /* Center the paragraph */
+  color: #34495e; /* Slightly lighter text */
+  font-size: 1.1em; /* Slightly larger font */
+  margin-bottom: 20px; /* Space below paragraph */
+  font-weight: 500; /* Medium weight */
+}
+
+/* List container for the PDF links */
+.guidelines-page .card .p-card-content ul {
+  list-style-type: none; /* Remove default bullet points */
+  padding: 0; /* Remove default padding */
+  margin: 0; /* Remove default margin */
+}
+
+/* Individual list item */
+.guidelines-page .card .p-card-content ul li {
+  margin-bottom: 15px; /* Space between items */
+  display: flex; /* Use flexbox for centering */
+  justify-content: center; /* Center the link horizontally */
+}
+
+/* Style for the PDF links (a tags) */
+.guidelines-page .card .p-card-content ul li a {
+  text-decoration: none; /* Remove underline from links */
+  color: #fff; /* White text */
+  padding: 12px 20px; /* Padding for the link area */
+  border-radius: 8px; /* Rounded corners for the link button */
+  display: inline-block; /* Make it a block for padding/borders */
+  width: 100%; /* Full width within the li */
+  max-width: 300px; /* Max width to prevent it getting too wide */
+  text-align: center; /* Center the text inside the link */
+  font-weight: 600; /* Bold text */
+  font-size: 1em; /* Font size */
+  transition: all 0.3s ease; /* Smooth transition for hover effects */
+  position: relative; /* For pseudo-element effects */
+  overflow: hidden; /* Hide overflow for pseudo-element */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); /* Gradient background */
+  border: 2px solid #2980b9; /* Border matching gradient */
+}
+
+/* Hover effect for the links */
+.guidelines-page .card .p-card-content ul li a:hover {
+  transform: translateY(-2px); /* Slight lift on hover */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); /* Deeper shadow on hover */
+  background: linear-gradient(135deg, #2980b9 0%, #3498db 100%); /* Reverse gradient on hover */
+  border-color: #3498db; /* Change border color on hover */
+}
+
+/* Focus effect for accessibility */
+.guidelines-page .card .p-card-content ul li a:focus {
+  outline: 2px solid #3498db; /* Blue outline for focus */
+  outline-offset: 2px; /* Space between outline and element */
+}
+
+/* Optional: Add an icon-like effect using pseudo-elements (e.g., PDF icon) */
+.guidelines-page .card .p-card-content ul li a::before {
+  content: "📄"; /* Unicode PDF icon */
+  margin-right: 8px; /* Space between icon and text */
+  font-size: 1.2em; /* Slightly larger icon */
+  vertical-align: middle; /* Align icon with text */
+}

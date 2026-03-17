@@ -1,0 +1,866 @@
+[    1092ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/login:0
+[   43643ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:8000/api/psc/auth/login/:0
+[   93189ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   93214ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   93228ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   93239ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   93247ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[   93247ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[   93259ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  130247ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  130551ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  130553ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  130554ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  130556ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  130503ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  130503ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  130560ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  133737ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  134023ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  134024ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  134026ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  134028ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  133873ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  133873ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  134033ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  151666ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  152005ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  152005ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  152006ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  152007ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  151947ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  151948ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at InspectionFilters (http://localhost:5173/src/components/inspection/inspection-filters.tsx:45:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionListPage (http://localhost:5173/src/routes/inspections/index.tsx:80:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  152009ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  210562ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  210590ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  210599ms] [ERROR] The above error occurred in the <InspectionDetail> component:
+
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:64:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionDetailPage (http://localhost:5173/src/routes/inspections/[id].tsx:51:18)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  210603ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  218545ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  218552ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  218552ms] [ERROR] The above error occurred in the <SelectItem> component:
+
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:815:7
+    at _c1 (http://localhost:5173/src/components/ui/select.tsx:199:12)
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:730:13
+    at div
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:38:15
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:285:58
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:52:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-DKHUMOWT.js?v=7d260e8d:33:11
+    at http://localhost:5173/node_modules/.vite/deps/chunk-H5AYEWDG.js?v=7d260e8d:41:13
+    at http://localhost:5173/node_modules/.vite/deps/chunk-YLVJ4UAU.js?v=7d260e8d:258:22
+    at SelectPortal
+    at _c7 (http://localhost:5173/src/components/ui/select.tsx:120:12)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at CollectionProvider (http://localhost:5173/node_modules/.vite/deps/chunk-65AD7TTI.js?v=7d260e8d:29:13)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Provider (http://localhost:5173/node_modules/.vite/deps/chunk-HBRAB2OS.js?v=7d260e8d:47:15)
+    at Popper (http://localhost:5173/node_modules/.vite/deps/chunk-F32UVMOH.js?v=7d260e8d:1966:11)
+    at Select (http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:82:5)
+    at div
+    at div
+    at CARFilters (http://localhost:5173/src/components/car/car-filters.tsx:40:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at CARListPage (http://localhost:5173/src/routes/cars/index.tsx:47:43)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  218557ms] Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at http://localhost:5173/node_modules/.vite/deps/@radix-ui_react-select.js?v=3cfb7d7d:841:13
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at updateForwardRef (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14325:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15946:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  223446ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  237576ms] TypeError: mouCodes?.map is not a function
+    at Object.render (http://localhost:5173/src/components/inspection/inspection-form.tsx:480:83)
+    at Controller (http://localhost:5173/node_modules/.vite/deps/chunk-353GMZHS.js?v=7d260e8d:312:35)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+[  237593ms] TypeError: mouCodes?.map is not a function
+    at Object.render (http://localhost:5173/src/components/inspection/inspection-form.tsx:480:83)
+    at Controller (http://localhost:5173/node_modules/.vite/deps/chunk-353GMZHS.js?v=7d260e8d:312:35)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+[  237596ms] [ERROR] The above error occurred in the <Controller> component:
+
+    at Controller (http://localhost:5173/node_modules/.vite/deps/chunk-353GMZHS.js?v=7d260e8d:312:35)
+    at div
+    at section
+    at form
+    at InspectionForm (http://localhost:5173/src/components/inspection/inspection-form.tsx:56:3)
+    at div
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at CreateInspectionPage (http://localhost:5173/src/routes/inspections/new.tsx:34:20)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx?t=1770407376677:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  237601ms] TypeError: mouCodes?.map is not a function
+    at Object.render (http://localhost:5173/src/components/inspection/inspection-form.tsx:480:83)
+    at Controller (http://localhost:5173/node_modules/.vite/deps/chunk-353GMZHS.js?v=7d260e8d:312:35)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+[  243233ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  250968ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  250992ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  250996ms] [ERROR] The above error occurred in the <InspectionDetail> component:
+
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:64:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionDetailPage (http://localhost:5173/src/routes/inspections/[id].tsx?t=1770407376677:51:18)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx?t=1770407403220:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  251003ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  259081ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0

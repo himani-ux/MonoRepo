@@ -1,0 +1,53 @@
+/* Ensure table looks good in PDF */
+#approved-entries {
+  font-family: "Courier New", monospace;
+  font-size: 14px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#approved-entries table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#approved-entries th,
+#approved-entries td {
+  border: 1px solid #000;
+  padding: 6px;
+  text-align: left;
+}
+
+#approved-entries th {
+  background-color: #f8F9FA;
+  font-weight: bold;
+}
+
+#approved-entries th:nth-child(1) {
+  width: 80px;
+}
+
+#approved-entries th:nth-child(2) {
+  width: 60px;
+}
+
+#approved-entries th:nth-child(3) {
+  width: 100px;
+}
+
+#approved-entries th:nth-child(4) {
+  width: auto;
+}
+
+
+
+#approved-entries tr {
+  page-break-inside: avoid; /* PREVENTS BREAK INSIDE AN ENTRY */
+}
+
+#approved-entries p {
+  margin: 0;
+  line-height: 1.5;
+}
+

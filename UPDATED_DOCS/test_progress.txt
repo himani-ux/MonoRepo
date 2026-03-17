@@ -1,0 +1,1093 @@
+================================================================
+TEST BACKFILL PROGRESS - VIMS Inspection Module
+Last Updated: 2026-02-08
+================================================================
+
+OVERALL STATUS:
+- Total features in PRD.md: 41
+- Features with complete tests: 41
+- Features with partial tests: 0
+- Features with NO tests: 0
+- Overall complete coverage: 100.0% (41/41)
+- Overall touched coverage (partial + complete): 100.0% (41/41)
+
+================================================================
+COMPLETED (with Feature Test Reports)
+================================================================
+
+[x] FEAT-DEF-001 Update Action Code - 13 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_DEF_001_002_report.md
+
+[x] FEAT-DEF-002 Register PSC Follow-up - 12 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_DEF_001_002_report.md
+
+[x] FEAT-CAR-003 Upload CAR Evidence - 11 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_001_002_003_report.md
+    Note: Backend gap fixed (crew assigned-action RBAC). Frontend offline upload queue behavior remains FE scope.
+
+[x] FEAT-CAR-002 Edit CAR (Draft) - 9 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_001_002_003_report.md
+    Note: Backend gaps fixed (target_date past-date reject, CLC master validation hook, action owner/due_date requirement).
+
+[x] FEAT-CAR-001 Auto-Create CAR from Deficiency - 7 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_001_002_003_report.md
+    Note: Backend gaps fixed (target_date default from deficiency/+7 and CAR_CREATED activity event).
+
+[x] FEAT-CAR-004 Submit CAR - 18 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_004_005_006_report.md
+    Note: Backend gaps fixed (CLC/custom-cause requirement and action owner/due-date quality checks) with expanded RBAC and edge-case coverage.
+
+[x] FEAT-CAR-005 PIC Accept CAR - 14 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_004_005_006_report.md
+    Note: Backend validation gap fixed (PIC comment minimum length 10) with boundary and whitespace edge-case coverage.
+
+[x] FEAT-CAR-007 DPA Close CAR - 13 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_007_009_010_report.md
+    Note: Backend validation gap fixed (DPA close comment minimum length 10).
+
+[x] FEAT-CAR-009 View CAR List - 11 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_007_009_010_report.md
+    Note: Backend list gaps fixed (source/date-range/overdue filters + is_overdue indicator).
+
+[x] FEAT-CAR-010 View CAR Detail - 12 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_007_009_010_report.md
+    Note: Backend detail gaps fixed (cross-vessel visibility guard + evidence preview metadata).
+
+[x] FEAT-CAR-011 Add Corrective Action - 5 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_011_012_report.md
+    Note: Backend gaps fixed (status precondition and whitespace owner normalization).
+
+[x] FEAT-CAR-012 Complete Corrective Action - 5 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_CAR_011_012_report.md
+    Note: Backend gaps fixed (completion_remarks optionality and already-completed guard).
+
+[x] FEAT-HIST-001 Activity History - 3 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_HIST_001_002_report.md
+    Note: Backend gap fixed (CAR detail timeline now aggregates CAR + ACTION + EVIDENCE activity events, including EVIDENCE_UPLOADED and ACTION_COMPLETED).
+
+[x] FEAT-SYNC-001 Offline Data Caching - 3 tests - 2026-02-07
+    Report: psc-frontend/tests/reports/FEAT_SYNC_001_006_frontend_report.md
+    Note: Frontend pull now persists `data.masters` to IndexedDB masters store.
+
+[x] FEAT-SYNC-002 Sync Pull (Server -> Vessel) - 8 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_SYNC_002_003_004_report.md
+    Note: Pull payload includes expected data buckets + sync token/version handling under isolated test DB.
+
+[x] FEAT-SYNC-003 Sync Push (Vessel -> Server) - 16 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_SYNC_002_003_004_report.md
+    Note: Push validation and upload-token flow verified end-to-end (`apps.sync.tests` passing).
+
+[x] FEAT-SYNC-004 Conflict Detection - 8 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_SYNC_002_003_004_report.md
+    Note: Conflict detection/list visibility and sync detail logging verified in full suite run.
+
+[x] FEAT-SYNC-005 Conflict Resolution - 10 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_SYNC_005_CAR_008_RPT_001_report.md
+    Note: Resolution validation and KEEP_SERVER/KEEP_VESSEL/REOPEN flows fully green.
+
+[x] FEAT-SYNC-006 Attachment Upload Retry - 10 tests - 2026-02-07
+    Report: psc-frontend/tests/reports/FEAT_SYNC_001_006_frontend_report.md
+    Note: Failed uploads persist to queue as `FAILED`; retry and UI feed now have data source.
+
+[x] FEAT-INS-007 Edit Inspection (Draft) - 8 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_INS_007_008_009_report.md
+    Note: Backend gap fixed (office edit-assist update now writes inspection audit log with `is_office_edit_assist=True`).
+
+[x] FEAT-INS-008 Edit Inspection (Post-Submit) - 9 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_INS_007_008_009_report.md
+    Note: Backend gaps fixed (post-submit edit now increments `revision_no` and writes inspection update audit log).
+
+[x] FEAT-INS-009 Delete Draft Inspection - 8 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_INS_007_008_009_report.md
+    Note: Backend gap fixed (draft delete now cascades soft-delete to related deficiency and linked CAR).
+
+[x] FEAT-INS-002 Upload Inspection Report - 7 tests - 2026-02-07
+    Report: psc-backend/tests/reports/FEAT_INS_001_002_003_report.md
+    Note: Backend gap closed (description mandatory enforced).
+
+[x] FEAT-INS-005 PIC Review Inspection - 13 tests - 2026-02-08
+    Report: psc-backend/tests/reports/FEAT_INS_004_005_report.md
+    Note: Backend gap closed (INSPECTION_PIC_REVIEWED activity event created on review).
+
+[x] FEAT-INS-006 DPA Close Inspection - 12 tests - 2026-02-08
+    Report: psc-backend/tests/reports/FEAT_INS_006_010_011_report.md
+    Note: Backend gaps closed (INSPECTION_DPA_CLOSED activity event + vessel notification trigger).
+
+[x] FEAT-CAR-006 Request CAR Rework - 12 tests - 2026-02-08
+    Coverage: psc-backend/apps/car/tests.py::TestFEAT_CAR_006_RequestCARRework
+    Note: All 12 tests green; no backend gaps detected. Promoted from partial.
+
+[x] FEAT-PV-001 Create Physical Verification - 6 tests - 2026-02-08
+    Report: psc-backend/tests/reports/FEAT_PV_001_002_NOTIF_001_report.md
+    Note: All 6 tests green; duplicate OPEN-PV guard gap already closed. Promoted from partial.
+
+[x] FEAT-PV-002 Close Physical Verification - 8 tests - 2026-02-08
+    Report: psc-backend/tests/reports/FEAT_PV_001_002_NOTIF_001_report.md
+    Note: All 8 tests green; future visit_date reject gap already closed. Promoted from partial.
+
+[x] FEAT-CAR-008 Reopen Closed CAR - 10 tests - 2026-02-08
+    Report: psc-backend/tests/reports/FEAT_SYNC_005_CAR_008_RPT_001_report.md
+    Note: Backend gaps fixed (status transition DPA_CLOSED->REWORK_REQUESTED, audit log creation, test helper falsy dict bug).
+
+[x] FEAT-RPT-001 CAR PDF Export - 10 tests - 2026-02-08
+    Report: psc-backend/tests/reports/FEAT_SYNC_005_CAR_008_RPT_001_report.md
+    Note: Backend gap fixed (cross-vessel export guard for VESSEL users in CARExportPDFView).
+
+[x] FEAT-RPT-002 Deficiency Excel Export - 8 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_RPT_002_DeficiencyExcelExport
+    Note: Test infra fixed (connection.cursor mock caused infinite ORM loop; extracted _lookup_vessel_names helper). View bug fixed (vessel name lookup key format mismatch).
+
+[x] FEAT-INS-001 Create Inspection - 11 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_INS_001_CreateInspection
+    Note: Validation gaps closed (future date, port_place min length, PSC mou_id). Promoted from partial in Session 50.
+
+[x] FEAT-INS-003 Add Deficiency to Inspection - 14 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_INS_003_AddDeficiency
+    Note: Validation/precondition/activity gaps closed. Promoted from partial in Session 50.
+
+[x] FEAT-INS-004 Submit Inspection - 10 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_INS_004_SubmitInspection
+    Note: RBAC/validation/audit gaps closed. Promoted from partial in Session 50.
+
+[x] FEAT-INS-010 View Inspection List - 10 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_INS_010_ViewInspectionList
+    Note: Backend gap fixed (deficiency_count and open_deficiency_count RawSQL annotations added to InspectionListView).
+
+[x] FEAT-INS-011 View Inspection Detail - 9 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_INS_011_ViewInspectionDetail
+    Note: Backend gap fixed (audit_log SerializerMethodField with role-based visibility added to InspectionDetailSerializer).
+
+[x] FEAT-DEF-003 Mark Deficiency Cleared - 7 tests - 2026-02-08
+    Coverage: psc-backend/apps/inspection/tests.py::TestFEAT_DEF_003_MarkDeficiencyCleared
+    Note: Gap tests added (clearing creates DeficiencyActionHistory, multi-deficiency isolation). Export test mock fixed (_lookup_vessel_names).
+
+[x] FEAT-NOTIF-001 In-App Notifications - 21 tests - 2026-02-08
+    Coverage: psc-backend/apps/notifications/tests.py (all test classes)
+    Note: Gap tests added (entity_type/entity_id deep linking, cross-vessel mark-read isolation).
+
+[x] FEAT-AUTH-001 User Authentication - 9 tests - 2026-02-08
+    Coverage: psc-backend/apps/accounts/tests.py::TestFEAT_AUTH_001_UserAuthentication
+    Note: Gap tests added (login response payload for vessel and office users).
+
+[x] FEAT-AUTH-002 Role-Based Access Control - 7 tests - 2026-02-08
+    Coverage: psc-backend/apps/accounts/tests.py::TestFEAT_AUTH_002_RoleBasedAccessControl
+    Note: Gap tests added (vessel crew blocked from create, SSQE can view detail).
+
+[x] FEAT-HIST-002 Full Audit Log - 4 tests - 2026-02-08
+    Coverage: psc-backend/apps/car/tests.py::TestFEAT_HIST_002_FullAuditLog
+    Note: Gap tests added (schema field validation, chronological ordering). Timestamp fix for deterministic ordering.
+
+================================================================
+IN PROGRESS (PARTIAL TESTS ADDED, GAPS DETECTED)
+================================================================
+
+(none - all 41 features are COMPLETE)
+
+================================================================
+NOT STARTED - PRIORITY ORDER
+================================================================
+
+(none - all 41 features have test coverage)
+
+================================================================
+NEXT SESSION TARGET
+================================================================
+
+ALL 41 FEATURES ARE COMPLETE (100% coverage).
+
+Potential future work:
+- Close modal accessibility warnings by adding `DialogDescription` / `aria-describedby` in CAR action modals (PIC Accept, Rework, DPA Close)
+- Continue frontend depth tests for FEAT-INS-007/008/009 edit/delete UI surfaces
+- Add integration/E2E tests with Playwright for end-to-end inspection + CAR flows
+- Evaluate mutation testing for higher-confidence coverage
+
+================================================================
+SESSION LOG
+================================================================
+
+Session 1: 2026-02-07
+- Features: FEAT-INS-001, FEAT-INS-002, FEAT-INS-003
+- Tests added: 27
+- Test result: 20 passed, 7 failed (expected gap-detection failures)
+- Coverage after session: 3 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_INS_001_002_003_report.md
+
+Session 2: 2026-02-07
+- Features: FEAT-INS-004, FEAT-INS-005
+- Tests added: 21
+- Test result: 17 passed, 4 failed (expected gap-detection failures)
+- Coverage after session: 5 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_INS_004_005_report.md
+
+Session 3: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Next target locked: FEAT-INS-006 (strict backfill)
+
+Session 4: 2026-02-07
+- Features: FEAT-INS-006, FEAT-INS-010, FEAT-INS-011
+- Tests added: 29
+- Test result: 25 passed, 4 failed (expected gap-detection failures)
+- Coverage after session: 8 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_INS_006_010_011_report.md
+- Test command used: python manage.py test apps.inspection.tests.TestFEAT_INS_006_DPACloseInspection apps.inspection.tests.TestFEAT_INS_010_ViewInspectionList apps.inspection.tests.TestFEAT_INS_011_ViewInspectionDetail --settings=core.settings_test -v 2
+
+Session 5: 2026-02-07
+- Features: FEAT-DEF-001, FEAT-DEF-002
+- Tests added: 25
+- Test result: 23 passed, 2 failed (expected gap-detection failures)
+- Coverage after session: 10 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_DEF_001_002_report.md
+- Test command used: python manage.py test apps.inspection.tests.TestFEAT_DEF_001_UpdateActionCode apps.inspection.tests.TestFEAT_DEF_002_RegisterPSCFollowUp --settings=core.settings_test -v 2
+
+Session 6: 2026-02-07
+- Action: Gap fixes for FEAT-DEF-001 and FEAT-DEF-002
+- Code changes: action-code follow-up subtype validation + follow-up activity event creation
+- Test result: 25 passed, 0 failed
+- Coverage after session: 2 complete + 8 partial / 41 total
+- Report updated: psc-backend/tests/reports/FEAT_DEF_001_002_report.md
+- Test command used: python manage.py test apps.inspection.tests.TestFEAT_DEF_001_UpdateActionCode apps.inspection.tests.TestFEAT_DEF_002_RegisterPSCFollowUp --settings=core.settings_test -v 1
+
+Session 7: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 2 complete + 8 partial / 41 total
+- Next target retained: FEAT-CAR-001, FEAT-CAR-002, FEAT-CAR-003
+
+Session 8: 2026-02-07
+- Features: FEAT-CAR-001, FEAT-CAR-002, FEAT-CAR-003
+- Tests added: 27
+- Test result: 20 passed, 7 failed (expected gap-detection failures)
+- Coverage after session: 2 complete + 11 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_CAR_001_002_003_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_001_AutoCreateCAR apps.car.tests.TestFEAT_CAR_002_EditCARDraft apps.car.tests.TestFEAT_CAR_003_UploadCAREvidence --settings=core.settings_test -v 2
+
+Session 9: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 2 complete + 11 partial / 41 total
+- Next target retained: FEAT-CAR-004, FEAT-CAR-005, FEAT-CAR-006
+
+Session 10: 2026-02-07
+- Action: Gap fix for FEAT-CAR-003 (unassigned crew upload evidence RBAC)
+- Code changes: object-level crew assignment check in CanUploadEvidence + EvidenceUploadView object permission enforcement
+- Test result (targeted): 11 passed, 0 failed
+- Regression snapshot: CAR suites 21 passed, 6 failed (existing FEAT-CAR-001/002 expected gaps)
+- Coverage after session: 3 complete + 10 partial / 41 total
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_003_UploadCAREvidence --settings=core.settings_test -v 2
+
+Session 11: 2026-02-07
+- Action: Gap fix for FEAT-CAR-002 (edit CAR validation)
+- Code changes: CAR update target_date validation + CLC master validation hook + corrective action owner/due_date requirement
+- Test result (targeted): 9 passed, 0 failed
+- Regression snapshot: CAR suites 24 passed, 3 failed (existing FEAT-CAR-001 expected gaps)
+- Coverage after session: 4 complete + 9 partial / 41 total
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_002_EditCARDraft --settings=core.settings_test -v 2
+
+Session 12: 2026-02-07
+- Action: Re-audit FEAT-CAR-001, FEAT-CAR-002, FEAT-CAR-003 and close session
+- Code/tests added: none
+- Test result (targeted): 27 passed, 0 failed
+- Coverage after session: 5 complete + 8 partial / 41 total
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_001_AutoCreateCAR apps.car.tests.TestFEAT_CAR_002_EditCARDraft apps.car.tests.TestFEAT_CAR_003_UploadCAREvidence --settings=core.settings_test -v 2
+
+Session 13: 2026-02-07
+- Features: FEAT-CAR-004, FEAT-CAR-005, FEAT-CAR-006
+- Tests added: 38
+- Test result: 35 passed, 3 failed (expected gap-detection failures)
+- Coverage after session: 5 complete + 11 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_CAR_004_005_006_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_004_SubmitCAR apps.car.tests.TestFEAT_CAR_005_PICAcceptCAR apps.car.tests.TestFEAT_CAR_006_RequestCARRework --settings=core.settings_test -v 2
+
+Session 14: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 5 complete + 11 partial / 41 total
+- Next target retained: FEAT-CAR-007, FEAT-CAR-009, FEAT-CAR-010
+
+================================================================
+
+Session 15: 2026-02-07
+- Action: FEAT-CAR-004/005 backfill hardening + progress/report sync
+- Test additions: 8 (FEAT-CAR-004 +5, FEAT-CAR-005 +3)
+- Test result (targeted trio): 44 passed, 0 failed
+- Coverage after session: 7 complete + 9 partial / 41 total
+- Report updated: psc-backend/tests/reports/FEAT_CAR_004_005_006_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_004_SubmitCAR apps.car.tests.TestFEAT_CAR_005_PICAcceptCAR apps.car.tests.TestFEAT_CAR_006_RequestCARRework --settings=core.settings_test -v 2
+
+Session 16: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 7 complete + 9 partial / 41 total
+- Next target retained: FEAT-CAR-007, FEAT-CAR-009, FEAT-CAR-010
+
+Session 17: 2026-02-07
+- Features: FEAT-CAR-007, FEAT-CAR-009, FEAT-CAR-010
+- Tests added: 36
+- Test result: 29 passed, 7 failed (expected gap-detection failures)
+- Coverage after session: 7 complete + 12 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_CAR_007_009_010_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_007_DPACloseCAR apps.car.tests.TestFEAT_CAR_009_ViewCARList apps.car.tests.TestFEAT_CAR_010_ViewCARDetail --settings=core.settings_test -v 2
+
+Session 18: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 7 complete + 12 partial / 41 total
+- Next target retained: FEAT-CAR-007, FEAT-CAR-009, FEAT-CAR-010 gap fixes
+
+Session 19: 2026-02-07
+- Action: Gap fixes for FEAT-CAR-007, FEAT-CAR-009, FEAT-CAR-010
+- Code changes:
+  - `psc-backend/apps/car/serializers.py`: DPA close comment min-length 10; list `is_overdue`; evidence `preview_url`
+  - `psc-backend/apps/car/views.py`: list filters (`source`, `date_from`, `date_to`, `overdue`) + detail vessel visibility guard
+- Test result (targeted): 36 passed, 0 failed
+- Coverage after session: 10 complete + 9 partial / 41 total
+- Report updated: psc-backend/tests/reports/FEAT_CAR_007_009_010_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_007_DPACloseCAR apps.car.tests.TestFEAT_CAR_009_ViewCARList apps.car.tests.TestFEAT_CAR_010_ViewCARDetail --settings=core.settings_test -v 2
+Session 20: 2026-02-07
+- Action: FEAT-CAR-011/012 audit and Phase 2 feature mapping completed
+- Code/tests added: none (audit-only session)
+- Coverage after session: 10 complete + 9 partial / 41 total (unchanged)
+- Key gaps captured for next backfill:
+  - FEAT-CAR-011: owner/user validation and status precondition coverage pending
+  - FEAT-CAR-012: completion_remarks optionality mismatch and already-completed guard pending
+- Next target locked: FEAT-CAR-011 strict backfill, then FEAT-CAR-012
+
+Session 21: 2026-02-07
+- Action: FEAT-CAR-011/012 strict backfill + backend gap fixes
+- Test additions:
+  - FEAT-CAR-011: +5 tests
+  - FEAT-CAR-012: +5 tests
+- Code changes:
+  - `psc-backend/apps/car/serializers.py`: normalized blank `owner_user_id`; made `completion_remarks` optional with max-length guard
+  - `psc-backend/apps/car/views.py`: added DRAFT/REWORK status precondition for action-create; added already-completed guard on action-complete
+- Test result (targeted): 10 passed, 0 failed
+- Regression snapshot: `apps.car.tests` 117 passed, 0 failed
+- Coverage after session: 12 complete + 9 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_CAR_011_012_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_CAR_011_AddCorrectiveAction apps.car.tests.TestFEAT_CAR_012_CompleteCorrectiveAction --settings=core.settings_test -v 2
+
+Session 22: 2026-02-07
+- Features: FEAT-SYNC-002, FEAT-SYNC-003, FEAT-SYNC-004
+- Tests added: 30
+- Test result: 24 passed, 6 failed (expected gap-detection failures)
+- Coverage after session: 12 complete + 12 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_SYNC_002_003_004_report.md
+- Gap snapshot:
+  - FEAT-SYNC-002: pull response missing `data.masters`
+  - FEAT-SYNC-003: checksum/client_version/event-count/event-id/timestamp validation not enforced
+- Test command used: python manage.py test apps.sync.tests --settings=core.settings_test -v 2
+================================================================
+
+Session 23: 2026-02-07
+- Action: FEAT-SYNC-002/003 targeted backend gap fixes implemented
+- Code changes:
+  - `psc-backend/apps/sync/sync_service.py`: added `data.masters` payload bucket in pull response; adjusted total record counting for nested masters payload
+  - `psc-backend/apps/sync/serializers.py`: added push validations for client_version >= 1, future timestamp rejection, max 100 events, duplicate event_id rejection, and checksum integrity guard (including all-zero checksum reject)
+- Verification:
+  - Syntax check passed: `python -m py_compile apps/sync/serializers.py apps/sync/sync_service.py`
+  - Targeted Django tests blocked by local SQL test DB state (`test_ksm_cms_dev` existing + keepdb migrate failure on token_id constraint dependency)
+- Coverage after session: 12 complete + 12 partial / 41 total (unchanged until blocked sync suite is re-run)
+- Next target:
+  1) Clear test DB/migration blocker and re-run `apps.sync.tests` targeted suite
+  2) If green, mark FEAT-SYNC-002/003 complete and continue FEAT-SYNC-005
+
+Session 24: 2026-02-07
+- Features: FEAT-AUTH-001, FEAT-AUTH-002, FEAT-HIST-001, FEAT-HIST-002
+- Tests added: 19
+- Test result: 18 passed, 1 failed (expected gap-detection failure)
+- Coverage after session: 12 complete + 16 partial / 41 total
+- Reports:
+  - psc-backend/tests/reports/FEAT_AUTH_001_002_report.md
+  - psc-backend/tests/reports/FEAT_HIST_001_002_report.md
+- Gap snapshot:
+  - FEAT-HIST-001: CAR detail activity timeline does not currently include evidence/action events (`EVIDENCE_UPLOADED`, `ACTION_COMPLETED`)
+- Test command used: python manage.py test apps.accounts.tests.TestFEAT_AUTH_001_UserAuthentication apps.accounts.tests.TestFEAT_AUTH_002_RoleBasedAccessControl apps.car.tests.TestFEAT_HIST_001_ActivityHistory apps.car.tests.TestFEAT_HIST_002_FullAuditLog apps.sync.tests.TestFEAT_HIST_001_002_SyncHistoryAuditBoundary --settings=core.settings_test -v 2
+
+Session 25: 2026-02-07
+- Action: FEAT-HIST-001 backend gap fix verification and documentation sync
+- Code changes verified:
+  - `psc-backend/apps/car/serializers.py`: CAR detail timeline now aggregates CAR + ACTION + EVIDENCE activity rows
+  - `psc-backend/apps/car/tests.py`: FEAT-HIST-001 status-change assertion hardened for expanded timeline ordering
+- Test result (targeted): 3 passed, 0 failed
+- Regression snapshot: `apps.car.tests` 122 passed, 0 failed
+- Coverage after session: 13 complete + 15 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_HIST_001_002_report.md
+- Test command used: python manage.py test apps.car.tests.TestFEAT_HIST_001_ActivityHistory --settings=core.settings_test -v 2
+
+Session 26: 2026-02-07
+- Features: FEAT-SYNC-001, FEAT-SYNC-006 (frontend backfill)
+- Action: Added frontend test tooling and initial sync/offline + attachment retry suites
+- Frontend setup added:
+  - `psc-frontend/vitest.config.ts`
+  - `psc-frontend/src/test/setup.ts`
+  - `psc-frontend/package.json` scripts/devDependencies (`vitest`, `jsdom`, RTL)
+- Tests added:
+  - `psc-frontend/src/lib/sync/attachment-uploader.test.ts` (5)
+  - `psc-frontend/src/lib/sync/sync-service.test.ts` (4)
+  - `psc-frontend/src/components/sync/pending-changes.test.tsx` (2)
+- Test result: 9 passed, 2 failed (expected gap-detection failures)
+- Gap snapshot:
+  - FEAT-SYNC-001: pull flow does not persist `data.masters` to IndexedDB masters store
+  - FEAT-SYNC-006: failed attachment uploads are not marked `FAILED` in sync queue (currently transitions to `COMPLETED`)
+- Report: `psc-frontend/tests/reports/FEAT_SYNC_001_006_frontend_report.md`
+- Test command used: `npm run test` (in `psc-frontend`)
+
+Session 27: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 13 complete + 17 partial / 41 total
+- Not-started feature count updated: 11
+
+Session 28: 2026-02-07
+- Features: FEAT-INS-007, FEAT-INS-008, FEAT-INS-009
+- Tests added: 25
+- Test result: 21 passed, 4 failed (expected gap-detection failures)
+- Coverage after session: 13 complete + 20 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_INS_007_008_009_report.md
+- Gap snapshot:
+  - FEAT-INS-007: office edit-assist audit logging not implemented
+  - FEAT-INS-008: revision_no increment + inspection audit logging not implemented
+  - FEAT-INS-009: related deficiency/CAR soft-delete cascade not implemented
+- Test command used: python manage.py test apps.inspection.tests.TestFEAT_INS_007_EditInspectionDraft apps.inspection.tests.TestFEAT_INS_008_EditInspectionPostSubmit apps.inspection.tests.TestFEAT_INS_009_DeleteDraftInspection --settings=core.settings_test -v 2
+
+Session 29: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 13 complete + 20 partial / 41 total
+- Not-started feature count updated: 8
+
+Session 30: 2026-02-07
+- Action: Backend sync test DB stabilization + full sync suite verification
+- Code changes:
+  - `psc-backend/manage.py`: default `manage.py test` to `core.settings_test` unless explicit `--settings`
+  - `psc-backend/conftest.py`: pytest Django bootstrap + test DB lifecycle setup/teardown
+  - `psc-backend/apps/sync/serializers.py`: FEAT-SYNC-005 notes max length (1000)
+- Test result (targeted backend sync): `apps.sync.tests` 44 passed, 0 failed
+- Coverage after session: 17 complete + 17 partial / 41 total
+- Test commands used:
+  - `python manage.py test apps.sync.tests -v 2 --noinput`
+  - `pytest -q apps/sync/tests.py`
+
+Session 31: 2026-02-07
+- Action: Frontend sync gap closure for FEAT-SYNC-001 masters persistence
+- Code changes:
+  - `psc-frontend/src/lib/sync/sync-service.ts`: persist `data.masters` via `bulkPutMasterData` during pull
+  - `psc-frontend/src/lib/api/sync.ts`: added optional `data.masters` type contract
+- Test result (targeted frontend sync): 11 passed, 0 failed
+- Coverage after session: 19 complete + 15 partial / 41 total
+- Test command used:
+  - `npm run test -- src/lib/sync/sync-service.test.ts src/lib/sync/attachment-uploader.test.ts src/components/sync/pending-changes.test.tsx`
+
+Session 32: 2026-02-07
+- Action: Gap fixes for FEAT-INS-007, FEAT-INS-008, FEAT-INS-009
+- Code changes:
+  - `psc-backend/apps/inspection/views.py`: added inspection update audit logging helper
+  - `psc-backend/apps/inspection/views.py`: increment `revision_no` for non-DRAFT edits
+  - `psc-backend/apps/inspection/views.py`: transactional soft-delete cascade for related deficiencies and linked CARs
+- Test result (targeted):
+  - FEAT-INS-007/008/009 gap tests: 4 passed, 0 failed
+  - FEAT-INS-007/008/009 feature suites: 25 passed, 0 failed
+  - FEAT-SYNC frontend regression check: 4 passed, 0 failed
+- Coverage after session: 22 complete + 12 partial / 41 total
+- Test commands used:
+  - `pytest -q apps/inspection/tests.py -k "feat_ins_007_gap_office_edit_assist_should_create_audit_log or feat_ins_008_gap_revision_no_should_increment_on_post_submit_edit or feat_ins_008_gap_post_submit_edit_should_create_audit_log or feat_ins_009_gap_delete_should_soft_delete_related_deficiencies_and_car"`
+  - `pytest -q apps/inspection/tests.py -k "TestFEAT_INS_007 or TestFEAT_INS_008 or TestFEAT_INS_009"`
+  - `npm run test -- src/lib/sync/sync-service.test.ts`
+
+Session 33: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 22 complete + 12 partial / 41 total
+
+Session 34: 2026-02-07
+- Features: FEAT-PV-001, FEAT-PV-002, FEAT-NOTIF-001
+- Tests added: 30
+- Test result: 28 passed, 2 failed (expected gap-detection failures)
+- Coverage after session: 22 complete + 16 partial / 41 total
+- Report: psc-backend/tests/reports/FEAT_PV_001_002_NOTIF_001_report.md
+- Gap snapshot:
+  - FEAT-PV-001: duplicate OPEN physical verification currently allowed for same CAR
+  - FEAT-PV-002: future visit_date currently accepted on close
+- Test command used:
+  - python manage.py test apps.car.tests.TestFEAT_PV_001_CreatePhysicalVerification apps.car.tests.TestFEAT_PV_002_ClosePhysicalVerification apps.notifications.tests --settings=core.settings_test -v 2
+
+Session 35: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current coverage state retained: 22 complete + 16 partial / 41 total
+- Next target retained: FEAT-PV-001/002 gap closure, then FEAT-RPT-001/002 strict backfill
+
+Session 36: 2026-02-07
+- Features: FEAT-PV-001, FEAT-PV-002
+- Action: Backend validation gap closure for physical verification create/close flows
+- Code changes:
+  - `psc-backend/apps/car/views.py`: reject create when same CAR already has `OPEN` physical verification
+  - `psc-backend/apps/car/serializers.py`: reject close when `visit_date` is in the future
+- Test result (targeted):
+  - `apps.car.tests.TestFEAT_PV_001_CreatePhysicalVerification`: 6 passed, 0 failed
+  - `apps.car.tests.TestFEAT_PV_002_ClosePhysicalVerification`: 8 passed, 0 failed
+  - Combined: 14 passed, 0 failed
+- Gap status:
+  - FEAT-PV-001 duplicate OPEN guard: CLOSED
+  - FEAT-PV-002 future visit_date guard: CLOSED
+- Test command used:
+  - `python manage.py test apps.car.tests.TestFEAT_PV_001_CreatePhysicalVerification apps.car.tests.TestFEAT_PV_002_ClosePhysicalVerification -v 2`
+
+Session 37: 2026-02-07
+- Action: Session closed on user request
+- Code/tests added: none
+- Current state:
+  - FEAT-PV-001/002 backend validation gaps are closed and verified (14/14 targeted tests passing)
+  - Coverage state updated: 24 complete + 14 partial / 41 total
+
+Session 38: 2026-02-08
+- Features: FEAT-INS-001, FEAT-INS-004
+- Action: Backend gap closure for inspection create/submit rules + contract path alignment
+- Code changes:
+  - `psc-backend/apps/inspection/serializers.py`: added create/update validation for future `inspection_date`, PSC `mou_id` requirement, and `port_place` min length; added submit precondition to reject deficiencies without linked CAR
+  - `psc-backend/apps/inspection/permissions.py`: restricted submit to documented roles (blocks `VESSEL_CREW`)
+  - `psc-backend/apps/inspection/views.py`: added `POST /api/psc/inspections/` support; kept `/create/` compatibility; added `INSPECTION_SUBMITTED` activity event; added early vessel-scope guard before serializer validation
+  - `psc-backend/apps/inspection/models.py`: aligned `can_submit()` with CAR-link precondition
+  - `psc-backend/apps/inspection/tests.py`: added root create endpoint regression test; hardened orphan-deficiency submit gap test setup
+- Test result (targeted):
+  - `apps.inspection.tests.TestFEAT_INS_001_CreateInspection`: 11 passed, 0 failed
+  - `apps.inspection.tests.TestFEAT_INS_004_SubmitInspection`: 10 passed, 0 failed
+  - Combined: 21 passed, 0 failed
+- Test commands used:
+  - `python -m py_compile psc-backend/apps/inspection/serializers.py psc-backend/apps/inspection/permissions.py psc-backend/apps/inspection/views.py psc-backend/apps/inspection/models.py psc-backend/apps/inspection/tests.py`
+  - `cd psc-backend; python manage.py test apps.inspection.tests.TestFEAT_INS_001_CreateInspection apps.inspection.tests.TestFEAT_INS_004_SubmitInspection -v 2`
+- Current state:
+  - FEAT-INS-001 create validation gaps: CLOSED
+  - FEAT-INS-004 submit precondition/RBAC/activity gaps: CLOSED
+  - API contract gap (`POST /api/psc/inspections/`): CLOSED
+
+Session 39: 2026-02-08
+- Features: FEAT-INS-002, FEAT-INS-003, FEAT-INS-005, FEAT-INS-006
+- Action: Strict backfill extension (additional validation/RBAC boundary tests + re-audit run)
+- Test additions:
+  - `FEAT-INS-002`: +3 tests
+  - `FEAT-INS-003`: +4 tests
+  - `FEAT-INS-005`: +1 test
+  - `FEAT-INS-006`: +3 tests
+  - Total added: +11 tests
+- Test result (targeted):
+  - Command: `python manage.py test apps.inspection.tests.TestFEAT_INS_002_UploadInspectionReport apps.inspection.tests.TestFEAT_INS_003_AddDeficiency apps.inspection.tests.TestFEAT_INS_005_PICReviewInspection apps.inspection.tests.TestFEAT_INS_006_DPACloseInspection -v 2`
+  - Result: 40 passed, 9 failed
+- Gap snapshot (failed tests):
+  - FEAT-INS-002: description-mandatory requirement mismatch remains (`test_gap_validation_description_should_be_mandatory`)
+  - FEAT-INS-003: description min/max and target_date validations missing; submitted-status office-only precondition missing; deficiency create activity event missing
+  - FEAT-INS-005: PIC review activity event missing
+  - FEAT-INS-006: DPA close activity event and vessel-master notification missing
+- Reports updated:
+  - `psc-backend/tests/reports/FEAT_INS_001_002_003_report.md`
+  - `psc-backend/tests/reports/FEAT_INS_004_005_report.md`
+  - `psc-backend/tests/reports/FEAT_INS_006_010_011_report.md`
+
+Session 40: 2026-02-08
+- Action: Session closed on user request
+- Code/tests added: none beyond Session 39 updates
+- Current state retained: 22 complete + 16 partial / 41 total
+- Latest targeted run retained:
+  - `apps.inspection.tests.TestFEAT_INS_002_UploadInspectionReport`
+  - `apps.inspection.tests.TestFEAT_INS_003_AddDeficiency`
+  - `apps.inspection.tests.TestFEAT_INS_005_PICReviewInspection`
+  - `apps.inspection.tests.TestFEAT_INS_006_DPACloseInspection`
+  - Result: 40 passed, 9 failed
+- Next session target retained:
+  - Close remaining backend gaps in FEAT-INS-002/003/005/006 (validation, activity events, DPA-close notification)
+
+Session 43: 2026-02-08
+- Features: FEAT-INS-002
+- Action: Close description-mandatory validation gap for report upload
+- Root cause:
+  - `InspectionReportUploadSerializer` allowed missing/blank `description` (`required=False`, `allow_blank=True`), so upload requests without description were accepted.
+- Code changes:
+  - `psc-backend/apps/inspection/serializers.py`
+    - Updated `InspectionReportUploadSerializer.description` to mandatory `CharField(max_length=500)`.
+  - `Docs/VALIDATION_RULES.md`
+    - Section 8.1 updated to mark upload `description` as required.
+- Test result (targeted):
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k test_gap_validation_description_should_be_mandatory` -> `1 passed`
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k TestFEAT_INS_002_UploadInspectionReport` -> `10 passed`
+- Current state:
+  - FEAT-INS-002 description-mandatory gap: CLOSED
+  - Coverage state: 23 complete + 15 partial / 41 total
+
+Session 44: 2026-02-08
+- Action: Session closed on user request
+- Code/tests added: none beyond Session 43 updates
+- Current state retained: 23 complete + 15 partial / 41 total
+- Next session target:
+  - Close remaining backend gaps in FEAT-INS-003/005/006 (validation and activity/notification side effects)
+
+Session 45: 2026-02-08
+- Features: FEAT-INS-003
+- Action: Close deficiency-create validation/precondition/activity-event gaps
+- Root cause:
+  - `DeficiencyCreateSerializer` lacked description length and past-date validation.
+  - `DeficiencyCreateView` did not enforce office-only add on `SUBMITTED` inspections.
+  - `DeficiencyCreateView` did not create `DEFICIENCY_ADDED` activity event.
+- Code changes:
+  - `psc-backend/apps/inspection/deficiency_serializers.py`
+    - Added `description` min/max (`10..4000`) and `validate_target_date()` (today/future only).
+  - `psc-backend/apps/inspection/deficiency_views.py`
+    - Added submitted-status office-only guard (`403` for non-office users).
+    - Added deficiency create `ActivityHistory` event (`DEFICIENCY_ADDED`).
+- Test result (targeted):
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k TestFEAT_INS_003_AddDeficiency` -> `14 passed`
+- Additional state check:
+  - Full `apps/inspection/tests.py` run timed out in this environment.
+  - Focused follow-up selector still shows unrelated FEAT-INS-005/006 activity-event gaps open.
+- Current state:
+  - FEAT-INS-003 backend gap set: CLOSED
+  - Coverage state: 24 complete + 14 partial / 41 total
+
+Session 46: 2026-02-08
+- Action: Session closed on user request
+- Code/tests added: none beyond Session 45 updates
+- Current state retained: 24 complete + 14 partial / 41 total
+- Next session target:
+  - Close remaining backend gaps in FEAT-INS-005/006 (activity events and DPA-close notification side effects)
+
+Session 47: 2026-02-08
+- Features: FEAT-INS-005, FEAT-INS-006
+- Action: Close inspection transition activity/notification side-effect gaps
+- Root cause:
+  - `InspectionPICReviewView` and `InspectionDPACloseView` updated state but did not create required activity timeline events.
+  - `InspectionDPACloseView` did not trigger inspection vessel notification flow.
+- Code changes:
+  - `psc-backend/apps/inspection/views.py`
+    - Added shared `create_inspection_activity(...)` helper.
+    - Added `INSPECTION_PIC_REVIEWED` activity event on PIC review.
+    - Added `INSPECTION_DPA_CLOSED` activity event on DPA close.
+    - Added DPA-close notification trigger to vessel path.
+  - `psc-backend/apps/notifications/models.py`
+    - Added `INSPECTION_DPA_CLOSED` notification type.
+  - `psc-backend/apps/notifications/signals.py`
+    - Added `notify_inspection_dpa_closed(...)` helper with fallback recipient path for test environments missing `HRM501` rows.
+- Test result (targeted):
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k "gap_audit_activity_event_should_be_created_on_pic_review or gap_audit_activity_event_should_be_created_on_dpa_close or gap_notification_to_vessel_master_should_be_sent_on_dpa_close"` -> `3 passed`
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k "TestFEAT_INS_005_PICReviewInspection or TestFEAT_INS_006_DPACloseInspection"` -> `25 passed`
+  - `cd psc-backend; pytest -q apps/notifications/tests.py` -> `16 passed`
+- Current state:
+  - FEAT-INS-005 gap set: CLOSED
+  - FEAT-INS-006 gap set: CLOSED
+  - Coverage state: 26 complete + 12 partial / 41 total
+
+Session 48: 2026-02-08
+- Action: Session closed on user request
+- Code/tests added: none beyond Session 47 updates
+- Current state retained: 26 complete + 12 partial / 41 total
+- Next session target:
+  - Continue remaining integration backfill from current partial feature set
+
+Session 49: 2026-02-08
+- Features: FEAT-CAR-008, FEAT-RPT-001, FEAT-RPT-002, FEAT-CAR-006, FEAT-PV-001, FEAT-PV-002
+- Action: Audit test classes for "NOT STARTED" features, fix backend gaps, fix test infra, promote partials
+- Bugs fixed:
+  1) CAR-008 test helper `_reopen()` used `payload or {...}` — empty dict treated as falsy (Python).
+     Fix: `payload if payload is not None else {...}` in psc-backend/apps/car/tests.py
+  2) CAR-008 `CARReopenView` set status to DRAFT instead of REWORK_REQUESTED per PRD.
+     Fix: `car.status = CARStatus.REWORK_REQUESTED` in psc-backend/apps/car/views.py
+  3) CAR-008 `CARReopenView` did not create audit log entry.
+     Fix: Added `create_audit_log()` call in psc-backend/apps/car/views.py
+  4) RPT-001 `CARExportPDFView` had no vessel-scope guard for VESSEL users.
+     Fix: Added vessel_id comparison guard in psc-backend/apps/car/report_views.py
+  5) RPT-002 tests hung due to `connection.cursor` mock breaking ORM queries (infinite fetchmany loop).
+     Fix: Extracted `_lookup_vessel_names()` helper in psc-backend/apps/inspection/report_views.py;
+     updated tests to mock `_lookup_vessel_names` instead of `connection.cursor`.
+  6) RPT-002 view had vessel name lookup key format mismatch (UUID obj vs char32 string).
+     Fix: Normalized lookup key with `str(vid).replace('-','').lower()` in view.
+- Test results:
+  - CAR-008: 10/10 passed
+  - RPT-001: 8/8 passed
+  - RPT-002: 8/8 passed (was hanging before fix)
+  - CAR-006: 12/12 passed (promoted from partial)
+  - PV-001: 6/6 passed (promoted from partial)
+  - PV-002: 8/8 passed (promoted from partial)
+- Files changed:
+  - psc-backend/apps/car/tests.py (test helper fix)
+  - psc-backend/apps/car/views.py (CARReopenView status + audit log)
+  - psc-backend/apps/car/report_views.py (vessel-scope guard)
+  - psc-backend/apps/inspection/report_views.py (extracted _lookup_vessel_names, fixed key format)
+  - psc-backend/apps/inspection/tests.py (updated RPT-002 mocks)
+- Promotions: 9 features promoted (INS-002, INS-005, INS-006, CAR-006, PV-001, PV-002, CAR-008, RPT-001, RPT-002)
+- Header reconciled: stale 22/16/3 updated to 31/10/0
+- Current state:
+  - Coverage state: 31 complete + 10 partial / 41 total
+
+Session 50: 2026-02-08
+- Features: FEAT-INS-001, INS-003, INS-004, INS-010, INS-011, DEF-003, NOTIF-001, AUTH-001, AUTH-002, HIST-002
+- Action: Final gap closure session — all 10 remaining partial features promoted to COMPLETE (100%)
+- Backend code fixes:
+  - `psc-backend/apps/inspection/views.py`: added deficiency_count + open_deficiency_count RawSQL annotations to InspectionListView
+  - `psc-backend/apps/inspection/serializers.py`: added audit_log SerializerMethodField with role-based visibility to InspectionDetailSerializer
+  - `psc-backend/apps/inspection/tests.py`: fixed hanging DEF-003 export test (mock _lookup_vessel_names instead of connection.cursor)
+- Gap-closing tests added: 10 new tests
+  - accounts/tests.py: +4 (2 AUTH-001 login payload, 2 AUTH-002 RBAC matrix)
+  - car/tests.py: +2 (HIST-002 schema fields, chronological ordering)
+  - inspection/tests.py: +2 (DEF-003 action history, multi-deficiency isolation)
+  - notifications/tests.py: +2 (NOTIF-001 entity linking, cross-vessel mark-read)
+- Test fixes:
+  - HIST-002 chronological order: pushed setUp entry into past via update() for deterministic ordering
+  - NOTIF-001 mark-read scoping: used different vessel_id for cross-user test (vessel mark-all-read scopes by vessel)
+  - DEF-003 export test: replaced connection.cursor mock with _lookup_vessel_names mock (Django proxy issue)
+- Promotions: 3 features verified and promoted (INS-001, INS-003, INS-004 — gaps already closed in prior sessions)
+  + 7 features gap-closed and promoted (INS-010, INS-011, DEF-003, NOTIF-001, AUTH-001, AUTH-002, HIST-002)
+- Test result (targeted): 45 passed, 0 failed
+- Test total: 374 (363 backend + 11 frontend)
+- Current state:
+  - Coverage state: 41 complete + 0 partial / 41 total (100%)
+
+Session 51: 2026-02-08
+- Features: FEAT-INS-001, FEAT-INS-010, FEAT-INS-011, FEAT-CAR-009, FEAT-CAR-010, FEAT-NOTIF-001
+- Action: Frontend component audit/backfill extension after 100% feature completion (depth increase, no backend changes)
+- Frontend test files added:
+  - `psc-frontend/src/components/inspection/inspection-list.test.tsx` (6)
+  - `psc-frontend/src/components/inspection/inspection-detail.test.tsx` (5)
+  - `psc-frontend/src/components/inspection/inspection-form.test.tsx` (6)
+  - `psc-frontend/src/components/car/car-list.test.tsx` (6)
+  - `psc-frontend/src/components/car/car-detail.test.tsx` (5)
+  - `psc-frontend/src/components/notification/notification-list.test.tsx` (6)
+  - `psc-frontend/src/components/notification/notification-item.test.tsx` (6)
+- Test additions: +40 frontend tests (component behavior coverage)
+- Test infra note:
+  - Added local `ResizeObserver` stub in `inspection-form.test.tsx` for Radix checkbox compatibility under jsdom.
+- Test result (targeted):
+  - `cd psc-frontend; npm run test -- src/components/inspection/inspection-list.test.tsx src/components/inspection/inspection-detail.test.tsx src/components/car/car-detail.test.tsx src/components/notification/notification-list.test.tsx src/components/inspection/inspection-form.test.tsx src/components/car/car-list.test.tsx src/components/notification/notification-item.test.tsx`
+  - Result: 7 files passed, 40 tests passed, 0 failed
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Frontend depth improved for INS/CAR/NOTIF component surfaces
+  - Session closed on user request
+
+Session 52: 2026-02-08
+- Features: FEAT-INS-003, FEAT-CAR-002, FEAT-CAR-003, FEAT-SYNC-001, FEAT-SYNC-006
+- Action: Frontend depth-audit continuation (component-level behavior backfill; no backend changes)
+- Frontend test files added:
+  - `psc-frontend/src/components/inspection/deficiency-modal.test.tsx` (5)
+  - `psc-frontend/src/components/car/evidence-section.test.tsx` (4)
+  - `psc-frontend/src/components/car/car-form.test.tsx` (5)
+  - `psc-frontend/src/components/sync/sync-status.test.tsx` (8)
+- Test additions: +22 frontend tests
+- Test result (targeted):
+  - `cd psc-frontend; npm run test -- src/components/inspection/deficiency-modal.test.tsx src/components/car/evidence-section.test.tsx src/components/car/car-form.test.tsx src/components/sync/sync-status.test.tsx`
+  - Result: 4 files passed, 22 tests passed, 0 failed
+- Notes:
+  - Dialog accessibility warning observed in `DeficiencyModal` tests (missing dialog description in Radix `DialogContent`), tests pass.
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Frontend depth improved for INS/CAR/SYNC component surfaces
+  - Session closed on user request
+
+Session 53: 2026-02-08
+- Features: FEAT-INS-003, FEAT-INS-004, FEAT-CAR-010, FEAT-SYNC-001
+- Action: Frontend a11y remediation + depth-audit continuation (component-level test expansion; no backend changes)
+- Root cause:
+  - `DeficiencyModal` rendered Radix `DialogContent` without description linkage, causing repeated a11y warnings in test stderr.
+- Code/test changes:
+  - `psc-frontend/src/components/inspection/deficiency-modal.tsx`
+    - Added `DialogDescription` text for dialog accessibility contract.
+  - `psc-frontend/src/components/inspection/deficiency-modal.test.tsx`
+    - Added regression assertions for description text and `aria-describedby` linkage.
+  - Added frontend test files:
+    - `psc-frontend/src/components/inspection/deficiency-list.test.tsx` (3)
+    - `psc-frontend/src/components/inspection/deficiency-card.test.tsx` (4)
+    - `psc-frontend/src/components/car/car-filters.test.tsx` (5)
+    - `psc-frontend/src/components/sync/storage-indicator.test.tsx` (2)
+    - `psc-frontend/src/components/sync/offline-banner.test.tsx` (3)
+  - Refined existing:
+    - `psc-frontend/src/components/sync/sync-status.test.tsx` now covers SyncStatus only (3 tests).
+- Test additions:
+  - Net +12 new frontend tests (depth increase).
+- Test result (targeted):
+  - `cd psc-frontend; npm run test -- src/components/inspection/deficiency-modal.test.tsx src/components/inspection/deficiency-list.test.tsx src/components/inspection/deficiency-card.test.tsx src/components/car/car-filters.test.tsx src/components/sync/sync-status.test.tsx src/components/sync/storage-indicator.test.tsx src/components/sync/offline-banner.test.tsx`
+  - Result: 7 files passed, 25 tests passed, 0 failed
+- Additional verification:
+  - `cd psc-frontend; npm run type-check` -> pass
+  - `cd psc-frontend; npm run lint` -> fails on pre-existing unrelated files (outside this change scope)
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Frontend depth improved for deficiency/card/filter/sync surfaces
+
+Session 54: 2026-02-08
+- Features: FEAT-SYNC-005
+- Action: Debug fix for requirement mismatch in conflict resolution reopen flow.
+- Root cause:
+  - Sync resolver and tests expected `CARStatus.DRAFT` for `REOPEN_FOR_MERGE`, while PRD requires `REWORK_REQUESTED`.
+- Code/test changes:
+  - `psc-backend/apps/sync/conflict_resolver.py`
+    - Set CAR status to `REWORK_REQUESTED` for `REOPEN_FOR_MERGE`.
+    - Updated audit log `new_value` and logger text accordingly.
+  - `psc-backend/apps/sync/tests.py`
+    - Renamed reopen test to `...sets_car_to_rework_requested`.
+    - Updated assertion to `CARStatus.REWORK_REQUESTED`.
+- Verification:
+  - `cd psc-backend; pytest -q apps/sync/tests.py` -> `44 passed`
+- Current state:
+  - FEAT-SYNC-005 behavior aligned with PRD.
+
+Session 55: 2026-02-08
+- Features: Validation infrastructure (pytest, ruff, mypy) + regression safety
+- Action: Backend verification hardening and static-check cleanup.
+- Tooling/config:
+  - Added `psc-backend/mypy.ini` (Django + DRF plugins, scoped files/excludes).
+  - Installed venv typing packages (`mypy`, `django-stubs`, `djangorestframework-stubs`, `types-openpyxl`, `types-reportlab`).
+- Code quality fixes:
+  - Resolved all backend `ruff` findings (auto-fix + manual residual fixes).
+  - Fixed actionable type issues across `apps/sync`, `apps/accounts`, `apps/notifications`, and report modules.
+- Verification:
+  - `cd psc-backend; pytest -q apps/accounts/tests.py apps/car/tests.py apps/inspection/tests.py apps/notifications/tests.py apps/sync/tests.py` -> `388 passed`
+  - `cd psc-backend; uvx ruff check .` -> `All checks passed`
+  - `cd psc-backend; venv\\Scripts\\python.exe -m mypy` -> `Success: no issues found in 80 source files`
+- Current state:
+  - Backend verification gate fully green.
+
+Session 56: 2026-02-08
+- Action: Session closed on user request after documentation sync.
+- Docs updated:
+  - `Docs/progress.txt`
+  - `Docs/LESSONS.md`
+  - `Docs/test_progress.txt`
+- Final state retained:
+  - Coverage: 41 complete + 0 partial / 41 total (100%)
+  - Backend checks green (`pytest`, `ruff`, `mypy`)
+
+Session 57: 2026-02-08
+- Features: FEAT-RPT-001, FEAT-SYNC-005, FEAT-CAR-008
+- Action: Close debug-flagged report criteria/assertion/traceability gaps and run full backend regression.
+- Code/doc changes:
+  - `psc-backend/apps/car/reports.py`
+    - Replaced `"[Company Logo]"` placeholder with `_build_company_logo()` vector drawing in PDF header.
+  - `psc-backend/apps/car/tests.py`
+    - Added FEAT-RPT-001 test for full section-builder invocation order/completeness.
+    - Added FEAT-RPT-001 test asserting header logo is a drawing (no placeholder text path).
+    - FEAT-RPT-001 class count updated to 10 tests.
+  - `psc-backend/tests/reports/FEAT_SYNC_005_CAR_008_RPT_001_report.md`
+    - Added report artifact for FEAT-SYNC-005, FEAT-CAR-008, FEAT-RPT-001.
+  - `Docs/test_progress.txt`
+    - Updated FEAT-SYNC-005, FEAT-CAR-008, FEAT-RPT-001 entries to `Report:` links.
+- Verification:
+  - `cd psc-backend; pytest -q apps/car/tests.py -k feat_rpt_001` -> `10 passed`
+  - `cd psc-backend; pytest -q apps/accounts/tests.py apps/car/tests.py apps/inspection/tests.py apps/notifications/tests.py apps/sync/tests.py` -> `390 passed`
+- Current state:
+  - Coverage remains 41 complete + 0 partial / 41 total (100%).
+  - Session closed on user request.
+
+Session 58: 2026-02-08
+- Features: FEAT-SYNC-004, FEAT-SYNC-005, FEAT-INS-010, FEAT-INS-011, FEAT-CAR-005, FEAT-CAR-006, FEAT-CAR-007
+- Action: Frontend depth-audit continuation (component-level backfill for sync conflict UI, inspection list surfaces, and CAR decision modals)
+- Frontend test files added:
+  - `psc-frontend/src/components/sync/conflict-list.test.tsx` (3)
+  - `psc-frontend/src/components/sync/conflict-resolution-modal.test.tsx` (4)
+  - `psc-frontend/src/components/inspection/inspection-card.test.tsx` (3)
+  - `psc-frontend/src/components/inspection/inspection-filters.test.tsx` (5)
+  - `psc-frontend/src/components/car/pic-accept-modal.test.tsx` (4)
+  - `psc-frontend/src/components/car/rework-modal.test.tsx` (4)
+  - `psc-frontend/src/components/car/dpa-close-modal.test.tsx` (4)
+- Test additions: +27 frontend tests
+- Test result (targeted):
+  - `cd psc-frontend; npm run test -- src/components/sync/conflict-list.test.tsx src/components/sync/conflict-resolution-modal.test.tsx src/components/inspection/inspection-card.test.tsx src/components/inspection/inspection-filters.test.tsx src/components/car/pic-accept-modal.test.tsx src/components/car/rework-modal.test.tsx src/components/car/dpa-close-modal.test.tsx`
+  - Result: 7 files passed, 27 tests passed, 0 failed
+- Notes:
+  - Radix dialog accessibility warnings observed for CAR action modals (missing `DialogDescription` / `aria-describedby`); tests pass.
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Session closed on user request
+
+Session 59: 2026-02-08
+- Features: FEAT-CAR-005, FEAT-CAR-006, FEAT-CAR-007
+- Action: Close Radix dialog a11y warning gap at source-component level for CAR action modals.
+- Code changes:
+  - `psc-frontend/src/components/car/pic-accept-modal.tsx`
+    - Added `DialogDescription` under `DialogTitle`.
+  - `psc-frontend/src/components/car/rework-modal.tsx`
+    - Added `DialogDescription` under `DialogTitle`.
+  - `psc-frontend/src/components/car/dpa-close-modal.tsx`
+    - Added `DialogDescription` under `DialogTitle`.
+  - `psc-frontend/src/components/car/evidence-upload-modal.tsx`
+    - Added `DialogDescription` under `DialogTitle` for sibling-modal consistency.
+- Verification:
+  - `cd psc-frontend; npm run test -- src/components/car/dpa-close-modal.test.tsx src/components/car/pic-accept-modal.test.tsx src/components/car/rework-modal.test.tsx` -> `12 passed`
+  - `cd psc-frontend; npm run test -- src/components/car` -> `37 passed`
+- Result:
+  - Prior Radix a11y warnings for CAR action modals are resolved.
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Session closed on user request
+
+Session 60: 2026-02-08
+- Features: FEAT-PV-001, FEAT-PV-002, FEAT-HIST-001, FEAT-HIST-002, FEAT-INS-007, FEAT-INS-008, FEAT-INS-009
+- Action: Frontend depth-audit continuation with route-level and subcomponent-level backfill (no backend changes).
+- Frontend test files added:
+  - `psc-frontend/src/components/car/activity-history.test.tsx` (2)
+  - `psc-frontend/src/components/car/audit-log.test.tsx` (3)
+  - `psc-frontend/src/components/car/physical-verification-section.test.tsx` (4)
+  - `psc-frontend/src/components/car/pv-create-modal.test.tsx` (3)
+  - `psc-frontend/src/components/car/pv-close-modal.test.tsx` (4)
+  - `psc-frontend/src/routes/inspections/[id].edit.test.tsx` (3)
+  - `psc-frontend/src/routes/inspections/[id].test.tsx` (2)
+- Report:
+  - `psc-frontend/tests/reports/FEAT_PV_HIST_INS_ROUTE_frontend_report.md`
+- Test additions: +21 frontend tests.
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/components/car/activity-history.test.tsx src/components/car/audit-log.test.tsx src/components/car/physical-verification-section.test.tsx src/components/car/pv-create-modal.test.tsx src/components/car/pv-close-modal.test.tsx src/routes/inspections/[id].edit.test.tsx src/routes/inspections/[id].test.tsx`
+  - Result: 7 files passed, 21 tests passed, 0 failed
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Frontend depth improved for PV timeline/modals and inspection edit/delete route surfaces
+
+Session 61: 2026-02-08
+- Features: FEAT-INS-005, FEAT-INS-006, FEAT-PV-002
+- Action: Close two frontend behavior gaps found in Session 60 audit.
+- Code fixes:
+  - `psc-frontend/src/routes/inspections/[id].tsx`
+    - Replaced confirm-only PIC/DPA transitions with validated comment modals.
+    - Integrated `InspectionPICReviewModal` and `InspectionDPACloseModal` so empty comments are no longer submitted.
+  - `psc-frontend/src/routes/cars/[id].tsx`
+    - Tightened PV close permission: office users must be the assigned verifier (`verifier_user_id`), DPA remains allowed.
+- Components added:
+  - `psc-frontend/src/components/inspection/inspection-pic-review-modal.tsx`
+  - `psc-frontend/src/components/inspection/inspection-dpa-close-modal.tsx`
+- Tests added:
+  - `psc-frontend/src/components/inspection/inspection-pic-review-modal.test.tsx` (2)
+  - `psc-frontend/src/components/inspection/inspection-dpa-close-modal.test.tsx` (2)
+  - `psc-frontend/src/routes/cars/[id].test.tsx` (3)
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/components/inspection/inspection-pic-review-modal.test.tsx src/components/inspection/inspection-dpa-close-modal.test.tsx src/routes/inspections/[id].test.tsx src/routes/inspections/[id].edit.test.tsx src/routes/cars/[id].test.tsx`
+  - Result: 5 files passed, 12 tests passed, 0 failed
+- Current state:
+  - Session 60 frontend audit gaps for mandatory inspection review comments and PV assigned-verifier close gating are CLOSED.
+
+Session 62: 2026-02-08
+- Action: Documentation sync and session close on user request.
+- Docs updated:
+  - `Docs/progress.txt`
+  - `Docs/LESSONS.md`
+  - `Docs/test_progress.txt`
+- Final state retained:
+  - Coverage: 41 complete + 0 partial / 41 total (100%)
+  - Session 60/61 frontend gap closures retained and verified
+
+Session 63: 2026-02-08
+- Features: FEAT-AUTH-001, FEAT-CAR-009, FEAT-INS-010, FEAT-RPT-002, FEAT-NOTIF-001
+- Action: Frontend route-depth backfill (untested routes) - batch 1.
+- Frontend test files added:
+  - `psc-frontend/src/routes/login.test.tsx` (4)
+  - `psc-frontend/src/routes/cars/index.test.tsx` (4)
+  - `psc-frontend/src/routes/inspections/index.test.tsx` (6)
+  - `psc-frontend/src/routes/notifications/page.test.tsx` (4)
+- Test additions: +18 frontend tests.
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/routes/login.test.tsx src/routes/cars/index.test.tsx src/routes/inspections/index.test.tsx src/routes/notifications/page.test.tsx`
+  - Result: 4 files passed, 18 tests passed, 0 failed
+- Notes:
+  - JSDOM console warning observed during export-link flow test: `Not implemented: navigation to another Document` (non-failing, expected for anchor navigation in test env).
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Route test gap reduced from 8 to 4 remaining (`cars/[id].edit`, `inspections/new`, `inspections/[id].follow-up`, `sync/page`)
+
+Session 64: 2026-02-08
+- Features: FEAT-INS-001, FEAT-INS-002, FEAT-DEF-002, FEAT-CAR-002, FEAT-SYNC-001, FEAT-SYNC-005
+- Action: Frontend route-depth backfill (untested routes) - batch 2.
+- Frontend test files added:
+  - `psc-frontend/src/routes/inspections/new.test.tsx` (4)
+  - `psc-frontend/src/routes/inspections/[id].follow-up.test.tsx` (4)
+  - `psc-frontend/src/routes/cars/[id].edit.test.tsx` (4)
+  - `psc-frontend/src/routes/sync/page.test.tsx` (4)
+- Test additions: +16 frontend tests.
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/routes/inspections/new.test.tsx src/routes/inspections/[id].follow-up.test.tsx src/routes/cars/[id].edit.test.tsx src/routes/sync/page.test.tsx`
+  - Result: 4 files passed, 16 tests passed, 0 failed
+  - `cd psc-frontend; npm run test -- src/routes/login.test.tsx src/routes/cars/index.test.tsx src/routes/inspections/index.test.tsx src/routes/notifications/page.test.tsx src/routes/inspections/new.test.tsx src/routes/inspections/[id].follow-up.test.tsx src/routes/cars/[id].edit.test.tsx src/routes/sync/page.test.tsx`
+  - Result: 8 files passed, 34 tests passed, 0 failed
+- Notes:
+  - JSDOM console warning persists in FEAT-RPT-002 export-link flow test: `Not implemented: navigation to another Document` (non-failing, expected for anchor navigation in test env).
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Route-level gap closed: 0 untested routes in `psc-frontend/src/routes`
+
+Session 65: 2026-02-08
+- Features: FEAT-AUTH-001, FEAT-DEF-002, FEAT-INS-002, FEAT-CAR-003, FEAT-INS-010, FEAT-CAR-009, FEAT-INS-004, FEAT-CAR-004
+- Action: Frontend component-depth backfill (shared/layout/auth/inspection surfaces) - batch 1.
+- Frontend test files added:
+  - `psc-frontend/src/components/layout/page-header.test.tsx` (3)
+  - `psc-frontend/src/components/shared/search-input.test.tsx` (4)
+  - `psc-frontend/src/components/shared/file-upload.test.tsx` (4)
+  - `psc-frontend/src/components/auth/login-form.test.tsx` (4)
+  - `psc-frontend/src/components/inspection/follow-up-form.test.tsx` (4)
+  - `psc-frontend/src/components/shared/confirm-dialog.test.tsx` (4)
+- Test additions: +23 frontend tests.
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/components/layout/page-header.test.tsx src/components/shared/search-input.test.tsx src/components/shared/file-upload.test.tsx src/components/auth/login-form.test.tsx src/components/inspection/follow-up-form.test.tsx src/components/shared/confirm-dialog.test.tsx`
+  - Result: 6 files passed, 23 tests passed, 0 failed
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Route-level gap remains closed: 0 untested routes in `psc-frontend/src/routes`
+  - Component-level gap reduced from 35 to 29 untested components
+
+Session 66: 2026-02-08
+- Features: FEAT-CAR-002, FEAT-CAR-003, FEAT-CAR-009, FEAT-CAR-011, FEAT-CAR-012, FEAT-AUTH-001, FEAT-AUTH-002, FEAT-NOTIF-001, FEAT-INS-001, FEAT-DEF-002, FEAT-SYNC-001
+- Action: Frontend component-depth backfill (car/layout/notification/shared surfaces) - batch 2.
+- Frontend test files added:
+  - `psc-frontend/src/components/car/car-card.test.tsx` (3)
+  - `psc-frontend/src/components/car/corrective-action-item.test.tsx` (3)
+  - `psc-frontend/src/components/car/corrective-action-list.test.tsx` (3)
+  - `psc-frontend/src/components/car/evidence-upload-modal.test.tsx` (4)
+  - `psc-frontend/src/components/car/root-cause-section.test.tsx` (3)
+  - `psc-frontend/src/components/layout/root-layout.test.tsx` (3)
+  - `psc-frontend/src/components/layout/header.test.tsx` (4)
+  - `psc-frontend/src/components/layout/sidebar.test.tsx` (3)
+  - `psc-frontend/src/components/layout/bottom-nav.test.tsx` (3)
+  - `psc-frontend/src/components/notification/notification-badge.test.tsx` (3)
+  - `psc-frontend/src/components/shared/date-picker.test.tsx` (4)
+- Test additions: +36 frontend tests.
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/components/car/car-card.test.tsx src/components/car/corrective-action-item.test.tsx src/components/car/corrective-action-list.test.tsx src/components/car/evidence-upload-modal.test.tsx src/components/car/root-cause-section.test.tsx src/components/shared/date-picker.test.tsx src/components/notification/notification-badge.test.tsx src/components/layout/root-layout.test.tsx src/components/layout/header.test.tsx src/components/layout/sidebar.test.tsx src/components/layout/bottom-nav.test.tsx`
+  - Result: 11 files passed, 36 tests passed, 0 failed
+  - `cd psc-frontend; npm run test -- src/components/car/evidence-upload-modal.test.tsx`
+  - Result: 1 file passed, 4 tests passed, 0 failed
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Route-level gap remains closed: 0 untested routes in `psc-frontend/src/routes`
+  - Component-level gap reduced from 29 to 18 untested components (remaining concentrated in `ui/*` and `shared/*`)
+
+Session 67: 2026-02-08
+- Features: FEAT-INS-003, FEAT-INS-010, FEAT-INS-011, FEAT-NOTIF-001, FEAT-AUTH-002
+- Action: Frontend component-depth backfill (remaining shared/ui primitives) - batch 3.
+- Frontend test files added:
+  - `psc-frontend/src/components/shared/def-code-select.test.tsx` (4)
+  - `psc-frontend/src/components/shared/empty-state.test.tsx` (3)
+  - `psc-frontend/src/components/shared/error-state.test.tsx` (3)
+  - `psc-frontend/src/components/shared/loading-skeleton.test.tsx` (4)
+  - `psc-frontend/src/components/shared/status-badge.test.tsx` (3)
+  - `psc-frontend/src/components/ui/badge.test.tsx` (1)
+  - `psc-frontend/src/components/ui/button.test.tsx` (2)
+  - `psc-frontend/src/components/ui/card.test.tsx` (2)
+  - `psc-frontend/src/components/ui/checkbox.test.tsx` (1)
+  - `psc-frontend/src/components/ui/dialog.test.tsx` (1)
+  - `psc-frontend/src/components/ui/dropdown-menu.test.tsx` (1)
+  - `psc-frontend/src/components/ui/input.test.tsx` (2)
+  - `psc-frontend/src/components/ui/label.test.tsx` (1)
+  - `psc-frontend/src/components/ui/select.test.tsx` (1)
+  - `psc-frontend/src/components/ui/skeleton.test.tsx` (1)
+  - `psc-frontend/src/components/ui/textarea.test.tsx` (2)
+  - `psc-frontend/src/components/ui/toast.test.tsx` (1)
+  - `psc-frontend/src/components/ui/toaster.test.tsx` (1)
+- Test additions: +34 frontend tests.
+- Verification (targeted):
+  - `cd psc-frontend; npm run test -- src/components/shared/def-code-select.test.tsx src/components/shared/empty-state.test.tsx src/components/shared/error-state.test.tsx src/components/shared/loading-skeleton.test.tsx src/components/shared/status-badge.test.tsx src/components/ui/badge.test.tsx src/components/ui/button.test.tsx src/components/ui/card.test.tsx src/components/ui/checkbox.test.tsx src/components/ui/dialog.test.tsx src/components/ui/dropdown-menu.test.tsx src/components/ui/input.test.tsx src/components/ui/label.test.tsx src/components/ui/select.test.tsx src/components/ui/skeleton.test.tsx src/components/ui/textarea.test.tsx src/components/ui/toast.test.tsx src/components/ui/toaster.test.tsx`
+  - Result: 18 files passed, 34 tests passed, 0 failed
+- Current state:
+  - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%)
+  - Route-level gap: 0 untested routes
+  - Component-level gap: 0 untested components
+
+Session 68: 2026-02-08
+- Action: Session closeout on user request; audit status snapshot recorded.
+- Current state at close:
+  - Coverage: 41 complete + 0 partial / 41 total (100%)
+  - Remaining feature test backfill: 0
+  - Remaining route-level backfill: 0 untested routes
+  - Remaining component-level backfill: 0 untested components

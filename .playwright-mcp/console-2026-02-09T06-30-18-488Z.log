@@ -1,0 +1,3 @@
+[     427ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5174/login:0
+[    7884ms] [ERROR] Access to XMLHttpRequest at 'http://localhost:8000/api/psc/auth/login/' from origin 'http://localhost:5174' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5174/login:0
+[    7887ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:8000/api/psc/auth/login/:0

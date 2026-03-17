@@ -1,0 +1,12 @@
+[     650ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/new:0
+[  943786ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/inspections/NaN/deficiencies/:0
+[  944819ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/inspections/NaN/deficiencies/:0
+[  944821ms] [ERROR] Failed to create deficiency: AxiosError @ http://localhost:5173/src/components/inspection/deficiency-modal.tsx:79
+[ 1064362ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3c92f87b-bec9-419a-abf2-66036df0d6d8:0
+[ 1309592ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[ 1320492ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[ 2503636ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3c92f87b-bec9-419a-abf2-66036df0d6d8:0
+[ 2527166ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3c92f87b-bec9-419a-abf2-66036df0d6d8:0
+[ 2596244ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3c92f87b-bec9-419a-abf2-66036df0d6d8:0
+[ 2678058ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3c92f87b-bec9-419a-abf2-66036df0d6d8:0
+[ 2690581ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3c92f87b-bec9-419a-abf2-66036df0d6d8:0

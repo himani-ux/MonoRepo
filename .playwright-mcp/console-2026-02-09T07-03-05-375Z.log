@@ -1,0 +1,2 @@
+[     264ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5174/inspections/34026907-36b5-469c-898f-56f74180fc14:0
+[  888684ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:8000/api/psc/auth/login/:0

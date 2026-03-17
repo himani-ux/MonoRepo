@@ -1,0 +1,3 @@
+[     280ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/new:0
+[   30749ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/inspections//upload-report/:0
+[   31806ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/inspections/8575bfe9-6523-441c-8a4f-b7bf06aa84d6/upload-report/:0

@@ -1,0 +1,18 @@
+[     511ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/edit:0
+[  304733ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/update/:0
+[  305805ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/update/:0
+[  305873ms] AxiosError
+[  461168ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/update/:0
+[  462203ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/update/:0
+[  462255ms] AxiosError
+[  470492ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/update/:0
+[  627667ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  628702ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  647573ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  648607ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  652551ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  653596ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  763730ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  768945ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  776708ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0
+[  801784ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:8000/api/psc/cars/eccfe1f9-6d04-4951-bfe9-cde51f39c920/submit/:0

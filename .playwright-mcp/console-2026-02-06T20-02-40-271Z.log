@@ -1,0 +1,163 @@
+[     798ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[   15213ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   15261ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   15271ms] [ERROR] The above error occurred in the <InspectionDetail> component:
+
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:64:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionDetailPage (http://localhost:5173/src/routes/inspections/[id].tsx?t=1770407910204:51:18)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx?t=1770407910204:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[   15276ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[   29042ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/4ae2ad85-d2ec-4d0c-bb3c-9e8534a402c9:0
+[   29409ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   29411ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[   29366ms] [ERROR] The above error occurred in the <InspectionDetail> component:
+
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:64:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionDetailPage (http://localhost:5173/src/routes/inspections/[id].tsx?t=1770407910204:51:18)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx?t=1770407910204:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[   29413ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[   34085ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[  122198ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  122213ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19765:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+[  122219ms] [ERROR] The above error occurred in the <InspectionDetail> component:
+
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:64:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionDetailPage (http://localhost:5173/src/routes/inspections/[id].tsx?t=1770407910204:51:18)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx?t=1770407910204:125:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=a36e8287:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=c27f624f:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14031
+[  122223ms] TypeError: Cannot read properties of undefined (reading 'length')
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx?t=1770407594699:92:33)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:19116:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18736:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=7d260e8d:18879:28)
+[  127547ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0

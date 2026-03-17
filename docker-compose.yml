@@ -1,0 +1,109 @@
+# Docker Compose for local development
+# Usage: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Frontend service
+  frontend:
+    build:
+      context: ./psc-frontend
+      dockerfile: Dockerfile
+    container_name: psc-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - psc-network
+    restart: unless-stopped
+
+  # Backend service
+  backend:
+    build:
+      context: ./psc-backend
+      dockerfile: Dockerfile
+    container_name: psc-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_NAME=${DB_NAME:-ksm_cms_dev}
+      - DB_USER=${DB_USER:-}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_PORT=${DB_PORT:-1433}
+      - DB_TRUSTED_CONNECTION=${DB_TRUSTED_CONNECTION:-yes}
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      - backend-media:/app/media
+      - backend-static:/app/staticfiles
+    networks:
+      - psc-network
+    restart: unless-stopped
+    # For SQL Server Windows Auth from Docker, additional configuration may be needed
+    # See: https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/using-integrated-authentication
+
+  # Frontend development (hot reload)
+  frontend-dev:
+    image: node:22-alpine
+    container_name: psc-frontend-dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./psc-frontend:/app
+      - frontend-node-modules:/app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/psc
+    networks:
+      - psc-network
+    profiles:
+      - dev
+
+  # Backend development (hot reload)
+  backend-dev:
+    image: python:3.11-slim
+    container_name: psc-backend-dev
+    working_dir: /app
+    command: >
+      sh -c "apt-get update && apt-get install -y curl gnupg2 unixodbc-dev &&
+             curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - &&
+             curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list &&
+             apt-get update &&
+             ACCEPT_EULA=Y apt-get install -y msodbcsql18 &&
+             pip install -r requirements.txt &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./psc-backend:/app
+      - backend-dev-media:/app/media
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend-dev
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_NAME=${DB_NAME:-ksm_cms_dev}
+      - DB_USER=${DB_USER:-}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_PORT=${DB_PORT:-1433}
+      - DB_TRUSTED_CONNECTION=${DB_TRUSTED_CONNECTION:-yes}
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    networks:
+      - psc-network
+    profiles:
+      - dev
+
+networks:
+  psc-network:
+    driver: bridge
+
+volumes:
+  backend-media:
+  backend-static:
+  frontend-node-modules:
+  backend-dev-media:

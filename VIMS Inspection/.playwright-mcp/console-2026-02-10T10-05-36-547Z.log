@@ -1,0 +1,61 @@
+[     294ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections:0
+[    6576ms] ReferenceError: APPROVED_STATUS is not defined
+    at http://localhost:5173/src/components/inspection/deficiency-list.tsx:232:52
+    at Array.map (<anonymous>)
+    at DeficiencyList (http://localhost:5173/src/components/inspection/deficiency-list.tsx:231:88)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:19765:15)
+[    6651ms] ReferenceError: APPROVED_STATUS is not defined
+    at http://localhost:5173/src/components/inspection/deficiency-list.tsx:232:52
+    at Array.map (<anonymous>)
+    at DeficiencyList (http://localhost:5173/src/components/inspection/deficiency-list.tsx:231:88)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:15914:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:3674:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:3699:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:3733:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:19765:15)
+[    6671ms] [ERROR] The above error occurred in the <DeficiencyList> component:
+
+    at DeficiencyList (http://localhost:5173/src/components/inspection/deficiency-list.tsx:28:3)
+    at div
+    at _c9 (http://localhost:5173/src/components/ui/card.tsx:105:12)
+    at div
+    at _c (http://localhost:5173/src/components/ui/card.tsx:20:11)
+    at div
+    at InspectionDetail (http://localhost:5173/src/components/inspection/inspection-detail.tsx:64:3)
+    at main
+    at div
+    at div
+    at RootLayout (http://localhost:5173/src/components/layout/root-layout.tsx:27:3)
+    at InspectionDetailPage (http://localhost:5173/src/routes/inspections/[id].tsx:54:18)
+    at MasterOnlyGuard (http://localhost:5173/src/App.tsx:133:28)
+    at AuthGuard (http://localhost:5173/src/components/auth/auth-guard.tsx:33:29)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:3989:5)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:4423:5)
+    at Suspense
+    at AppShell (http://localhost:5173/src/App.tsx:168:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:4366:15)
+    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=5d173d08:5109:5)
+    at App
+    at QueryClientProvider (http://localhost:5173/node_modules/.vite/deps/@tanstack_react-query.js?v=5d173d08:2707:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:14031
+[    6677ms] ReferenceError: APPROVED_STATUS is not defined
+    at http://localhost:5173/src/components/inspection/deficiency-list.tsx:232:52
+    at Array.map (<anonymous>)
+    at DeficiencyList (http://localhost:5173/src/components/inspection/deficiency-list.tsx:231:88)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:11548:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:14926:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:15914:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:19753:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:19198:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:19137:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-T2SWDQEL.js?v=5d173d08:19116:15)

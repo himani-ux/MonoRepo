@@ -1,0 +1,4 @@
+[     756ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f:0
+[ 2143482ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f:0
+[ 2144357ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8000/api/psc/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f/:0
+[ 2145546ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8000/api/psc/inspections/58ae2384-ca4d-4321-bc7e-979156ec495f/:0

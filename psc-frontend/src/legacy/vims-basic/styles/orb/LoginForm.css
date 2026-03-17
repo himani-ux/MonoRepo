@@ -1,0 +1,102 @@
+/* LoginForm.css */
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(120deg, #e0f7fa, #f1f8ff);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+}
+
+.login-container h2 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #2c3e50;
+  text-align: center;
+  font-weight: 600;
+}
+
+.login-container p {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #555;
+}
+
+.login-form {
+  background: #fff;
+  padding: 35px 30px;
+  border-radius: 18px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 340px;
+  transition: all 0.3s ease;
+}
+
+.login-form input {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+  background: #f9f9f9;
+  transition: border 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: #42a5f5;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(66, 165, 245, 0.4);
+}
+
+.login-form button {
+  padding: 14px 20px;
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(135deg, #42a5f5, #5c6bc0);
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+.login-form button:hover {
+  background: linear-gradient(135deg, #5c6bc0, #42a5f5);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.error-box {
+  background: #ffecec;
+  color: #d9534f;
+  padding: 12px;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  text-align: center;
+  border: 1px solid #f5c6cb;
+  width: 340px;
+  font-size: 0.95rem;
+}
+
+.role-guide {
+  margin-top: 1.5rem;
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 14px;
+  width: 340px;
+  text-align: center;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.role-guide h4 {
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-weight: 600;
+}

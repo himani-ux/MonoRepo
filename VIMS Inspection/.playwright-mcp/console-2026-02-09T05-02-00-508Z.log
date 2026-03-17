@@ -1,0 +1,4 @@
+[     454ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://localhost:5173/inspections/3bd0e117-aff7-4542-8068-2f0853de14e6:0
+[   57713ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/inspections/NaN/deficiencies/:0
+[   58739ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:8000/api/psc/inspections/NaN/deficiencies/:0
+[   58740ms] [ERROR] Failed to create deficiency: AxiosError @ http://localhost:5173/src/components/inspection/deficiency-modal.tsx:79

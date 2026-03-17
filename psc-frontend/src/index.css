@@ -1,0 +1,110 @@
+/* Inter font - Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Font families from DESIGN_SYSTEM.md Section 2.1 */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, 'Courier New',
+      monospace;
+
+    /* shadcn/ui CSS variables mapped to DESIGN_SYSTEM.md tokens */
+    /* Using HSL format for shadcn compatibility */
+    --background: 249 250 251; /* neutral-50 #F9FAFB */
+    --foreground: 55 65 81; /* neutral-700 #374151 */
+
+    --card: 255 255 255; /* white */
+    --card-foreground: 31 41 55; /* neutral-800 #1F2937 */
+
+    --popover: 255 255 255; /* white */
+    --popover-foreground: 31 41 55; /* neutral-800 */
+
+    --primary: 59 130 246; /* primary-500 #3B82F6 */
+    --primary-foreground: 255 255 255; /* white */
+
+    --secondary: 243 244 246; /* neutral-100 #F3F4F6 */
+    --secondary-foreground: 55 65 81; /* neutral-700 */
+
+    --muted: 243 244 246; /* neutral-100 */
+    --muted-foreground: 107 114 128; /* neutral-500 #6B7280 */
+
+    --accent: 243 244 246; /* neutral-100 */
+    --accent-foreground: 31 41 55; /* neutral-800 */
+
+    --destructive: 220 38 38; /* error-600 #DC2626 */
+    --destructive-foreground: 255 255 255; /* white */
+
+    --border: 229 231 235; /* neutral-200 #E5E7EB */
+    --input: 209 213 219; /* neutral-300 #D1D5DB */
+    --ring: 59 130 246; /* primary-500 */
+
+    --radius: 6px; /* radius-md from DESIGN_SYSTEM.md */
+
+    /* Success - for custom use */
+    --success: 16 185 129; /* success-500 #10B981 */
+    --success-foreground: 255 255 255;
+
+    /* Warning - for custom use */
+    --warning: 245 158 11; /* warning-500 #F59E0B */
+    --warning-foreground: 255 255 255;
+  }
+
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    @apply bg-surface-page text-neutral-700 antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  /* Typography defaults */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-neutral-800;
+  }
+
+  /* Focus visible for accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+}
+
+/* Animation keyframes for shadcn components */
+@layer utilities {
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+
+  .animate-accordion-down {
+    animation: accordion-down 0.2s ease-out;
+  }
+
+  .animate-accordion-up {
+    animation: accordion-up 0.2s ease-out;
+  }
+}

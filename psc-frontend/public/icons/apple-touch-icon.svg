@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="22" fill="#3B82F6"/>
+  <g transform="translate(90,86)">
+    <!-- Ship hull -->
+    <path d="M-44 10 L-36-18 L36-18 L44 10 Q0 28 -44 10Z" fill="white" opacity="0.95"/>
+    <!-- Bridge -->
+    <rect x="-14" y="-38" width="28" height="20" rx="3" fill="white" opacity="0.95"/>
+    <!-- Mast -->
+    <line x1="0" y1="-38" x2="0" y2="-52" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <!-- Flag -->
+    <path d="M0-52 L14-46 L0-40Z" fill="white" opacity="0.8"/>
+    <!-- Checkmark -->
+    <circle cx="26" cy="-26" r="14" fill="#22C55E"/>
+    <path d="M18-26 L24-20 L34-32" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="90" y="138" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="white" letter-spacing="3">PSC</text>
+</svg>

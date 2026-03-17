@@ -1,0 +1,16 @@
+
+
+/* src/components/ORBFooter.css */
+
+.or-footer {
+  margin-top: 3rem;
+  font-family: "Courier New", monospace;
+  text-align: center;
+}
+
+.or-footer .signature-line {
+  width: 300px;
+  height: 1px;
+  border-top: 1px solid #000;
+  margin: 1rem auto;
+}
