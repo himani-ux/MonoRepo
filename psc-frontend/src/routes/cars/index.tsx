@@ -84,7 +84,7 @@ function filtersToParams(filters: FilterType): URLSearchParams {
 }
 
 export function CARListPage() {
-  const { isOffice, isDPA, user } = useAuth();
+  const { isOffice, isDPA, isPIC, user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -154,11 +154,13 @@ export function CARListPage() {
         verifierUserId && currentUserIds.includes(verifierUserId)
       );
 
-      if (!(isDPA || (isOffice && isAssignedVerifier))) {
+      const canQuickClose = isPIC || (isOffice && isAssignedVerifier);
+      if (!canQuickClose) {
         toast({
           variant: 'destructive',
           title: 'Permission denied',
-          description: 'Only the assigned verifier or DPA can close this verification.',
+          description:
+            'Only the assigned verifier, PIC reviewer, or DPA can close this verification.',
         });
         return;
       }

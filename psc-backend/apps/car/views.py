@@ -35,7 +35,7 @@ from django.http import FileResponse
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from apps.accounts.models import RoleCodes, MasterAppliedRank
@@ -83,6 +83,7 @@ from .permissions import (
     CanCreatePV,
     CanClosePV,
 )
+from .evidence_links import is_valid_report_evidence_token
 from apps.notifications.signals import (
     notify_car_submitted,
     notify_car_submitted_to_dpa,
@@ -976,10 +977,6 @@ class CARWorkflowView(APIView):
             car.pic_comment = comment if comment else None
             car.pic_accepted_by = str(request.user.id)
             car.pic_accepted_at = timezone.now()
-        elif action == WorkflowAction.SUBMIT_TO_DPA:
-            # Persist PIC's forwarding comment in the dedicated PIC column.
-            # Without this, only last_action_comment is updated and pic_comment stays NULL.
-            car.pic_comment = comment if comment else car.pic_comment
 
         car.save()
 
@@ -1261,7 +1258,7 @@ class EvidenceViewFileView(APIView):
 
     Authenticated inline file view for evidence attachments.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, id, *args, **kwargs):
         try:
@@ -1273,6 +1270,19 @@ class EvidenceViewFileView(APIView):
                 'error': 'NOT_FOUND',
                 'message': 'Evidence not found.'
             }, status=status.HTTP_404_NOT_FOUND)
+
+        is_authenticated = bool(getattr(request.user, 'is_authenticated', False))
+        report_token = request.query_params.get('report_token')
+        has_valid_report_token = is_valid_report_evidence_token(
+            report_token,
+            evidence_id=evidence.id,
+            car_id=evidence.car_id,
+        )
+        if not is_authenticated and not has_valid_report_token:
+            return Response({
+                'error': 'AUTHENTICATION_REQUIRED',
+                'message': 'Authentication or a valid report link is required.'
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
         file_path = evidence.file_path or ''
         if not file_path:

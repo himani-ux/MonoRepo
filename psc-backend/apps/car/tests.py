@@ -4433,9 +4433,14 @@ class TestFEAT_PV_002_ClosePhysicalVerification(BaseCARAPITestCase):
         self.pv.refresh_from_db()
         self.assertEqual(self.pv.status, PVStatus.CLOSED)
 
-    def test_feat_pv_002_rbac_unassigned_office_user_cannot_close(self):
-        """RBAC FEAT-PV-002: only assigned verifier or DPA can close."""
+    def test_feat_pv_002_rbac_pic_reviewer_can_close_without_assignment(self):
+        """RBAC FEAT-PV-002: PIC reviewers need not be assigned to close."""
         response = self._close(self.office_ssqe)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_feat_pv_002_rbac_vessel_user_cannot_close(self):
+        """RBAC FEAT-PV-002: vessel users cannot close physical verification."""
+        response = self._close(self.vessel_master)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_feat_pv_002_validation_comments_min_length_required(self):

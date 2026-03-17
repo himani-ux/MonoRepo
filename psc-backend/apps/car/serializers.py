@@ -82,6 +82,11 @@ INTERNAL_CORRECTIVE_ACTION_PATTERN = re.compile(
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+APPENDED_COMMENT_SPLIT_RE = re.compile(r"\s+(?:\u2014|-)\s+")
+PIC_REVIEW_HISTORY_EVENT_TYPES = (
+    'CAR_WORKFLOW_START_PIC_REVIEW',
+    'CAR_PIC_ACCEPTED',
+)
 
 
 def _contains_internal_system_text(value: str | None) -> bool:
@@ -90,6 +95,18 @@ def _contains_internal_system_text(value: str | None) -> bool:
     if not text:
         return False
     return bool(INTERNAL_CORRECTIVE_ACTION_PATTERN.search(text))
+
+
+def _extract_appended_comment(event_description: str | None) -> str:
+    """Extract a user comment appended to an activity description."""
+    text = (event_description or '').strip()
+    if not text:
+        return ''
+
+    parts = APPENDED_COMMENT_SPLIT_RE.split(text, maxsplit=1)
+    if len(parts) != 2:
+        return ''
+    return parts[1].strip()
 
 
 def _lookup_def_code_title(def_code_id: str | None) -> str | None:
@@ -636,6 +653,7 @@ class CARDetailSerializer(serializers.ModelSerializer):
     # Nested related data
     deficiency = serializers.SerializerMethodField()
     inspection = serializers.SerializerMethodField()
+    pic_comment = serializers.SerializerMethodField()
     clc_items = CarClcMappingSerializer(source='clc_mappings', many=True, read_only=True)
     corrective_actions = serializers.SerializerMethodField()
     evidence = serializers.SerializerMethodField()
@@ -742,6 +760,21 @@ class CARDetailSerializer(serializers.ModelSerializer):
         if pv:
             return PhysicalVerificationSerializer(pv).data
         return None
+
+    def get_pic_comment(self, obj):
+        """Return the PIC review comment, not the later submit-to-DPA note."""
+        review_events = ActivityHistory.objects.filter(
+            entity_type='CAR',
+            entity_id=obj.id,
+            event_type__in=PIC_REVIEW_HISTORY_EVENT_TYPES,
+        ).order_by('-performed_at')
+
+        for event in review_events:
+            review_comment = _extract_appended_comment(event.event_description)
+            if review_comment:
+                return review_comment
+
+        return obj.pic_comment
 
     def get_activity_history(self, obj):
         """Get activity history for this CAR."""

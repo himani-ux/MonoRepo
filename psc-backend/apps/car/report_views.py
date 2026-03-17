@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.accounts.models import RoleCodes
 from apps.inspection.deficiency_models import CAR
 from core.db_utils import car_vessel_name_annotation
+from .evidence_links import build_report_evidence_url
 from .serializers import CARDetailSerializer
 from .reports import generate_car_pdf
 
@@ -121,6 +122,14 @@ class CARExportPDFView(APIView):
         # Serialize CAR detail data (same as CARDetailView)
         serializer = CARDetailSerializer(car, context={'request': request})
         car_data = serializer.data
+        for evidence_item in car_data.get('evidence') or []:
+            evidence_id = evidence_item.get('id')
+            if evidence_id:
+                evidence_item['report_preview_url'] = build_report_evidence_url(
+                    request,
+                    evidence_id=evidence_id,
+                    car_id=car.id,
+                )
         vessel_name = (getattr(car, 'vessel_name', '') or '').strip()
         if not vessel_name:
             vessel_name = _lookup_vessel_name(

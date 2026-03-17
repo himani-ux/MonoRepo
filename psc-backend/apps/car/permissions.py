@@ -36,14 +36,19 @@ import uuid
 from rest_framework.permissions import BasePermission
 
 class CanEditCAR(permissions.BasePermission):
+    message = "You don't have permission to edit this CAR."
 
     def has_object_permission(self, request, view, obj):
-
-        # OFFICE can edit anything
         if request.user.user_type == 'OFFICE':
+            if obj.status == CARStatus.CLOSED:
+                self.message = "Closed CARs are read-only."
+                return False
             return True
 
         if request.user.user_type == 'VESSEL':
+            if request.user.role != RoleCodes.VESSEL_MASTER:
+                self.message = "Only Vessel Masters can edit CARs."
+                return False
 
             car_vessel_id = obj.deficiency.inspection.vessel_id
             user_vessel_id = request.user.vessel_id
@@ -353,7 +358,7 @@ class CanCreatePV(permissions.BasePermission):
 class CanClosePV(permissions.BasePermission):
     """
     Permission to close a physical verification.
-    Per BACKEND_STRUCTURE.md: Assigned verifier or DPA
+    Per BACKEND_STRUCTURE.md: Assigned verifier, PIC reviewer, or DPA
     """
     message = "You don't have permission to close this physical verification."
 
@@ -365,10 +370,14 @@ class CanClosePV(permissions.BasePermission):
         if request.user.role == RoleCodes.DPA:
             return True
 
+        # PIC/SSQE/SUPT reviewers can also close verifications (they own the process)
+        if request.user.role in PIC_REVIEWER_ROLES:
+            return True
+
         # Assigned verifier can close
         user_id = getattr(request.user, 'employee_id', None) or getattr(request.user, 'username', None)
         if obj.verifier_user_id and obj.verifier_user_id == user_id:
             return True
 
-        self.message = "Only the assigned verifier or DPA can close this verification."
+        self.message = "Only the assigned verifier, PIC reviewer, or DPA can close this verification."
         return False
