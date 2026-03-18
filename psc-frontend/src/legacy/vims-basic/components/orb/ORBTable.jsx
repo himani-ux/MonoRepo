@@ -29,14 +29,11 @@ export default function ORBTable({
   const displayEntries = entries;
 
   return (
-    <Card>
-      <div className="orb-theme">
-        {showCardTitle && <h1>{cardTitle}</h1>}
-        <div style={{ overflowX: "auto", width: "100%", margin: "1rem 0" }}>
-          <table
-            className="orb-table"
-            style={{ minWidth: "800px", width: "100%" }}
-          >
+    <Card className="border-0 shadow-none">
+      <div className="orb-page">
+        {showCardTitle && <h1 className="orb-card-title">{cardTitle}</h1>}
+        <div className="orb-table-shell">
+          <table className="orb-table">
             <thead>
               <tr>
                 <th>Date</th>
@@ -80,17 +77,17 @@ export default function ORBTable({
                       {showActions && (
                         <td>
                           {lineIdx === 0 && showActions && (
-                            <>
+                            <div className="flex flex-wrap gap-2">
                               {canEdit && (
-                                <button onClick={() => onEdit(entry.id)}>
+                                <Button variant="outline" onClick={() => onEdit(entry.id)}>
                                   Edit
-                                </button>
+                                </Button>
                               )}
 
                               {canDelete && (
-                                <button onClick={() => onDelete(entry.id)}>
+                                <Button variant="outline" onClick={() => onDelete(entry.id)}>
                                   Delete
-                                </button>
+                                </Button>
                               )}
 
                               {canApprove && entry.status === "Pending" && (
@@ -104,7 +101,7 @@ export default function ORBTable({
                                   Reject
                                 </Button>
                               )}
-                            </>
+                            </div>
                           )}
                         </td>
                       )}

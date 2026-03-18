@@ -1,6 +1,6 @@
 // src/components/DeletedEntriesView.jsx
 import React, { useState, useEffect } from 'react';
-import { Panel, Button, Card, Stack } from "../../components/orb/OrbUI";
+import { Button, Card } from "../../components/orb/OrbUI";
 import { formatDate } from '../../utils/orb/orbUtils'; // Import your date formatting helper
 import { useAuth } from '../../hooks/auth/useAuth'; // Import the useAuth hook to get user info
 import PageLayout from '../../components/layout/PageLayout'; // Import the PageLayout component
@@ -105,56 +105,34 @@ const DeletedEntriesView = () => {
 
   // Render loading state
   if (loading) {
-    return <div className="deleted-entries-view">Loading deleted entries...</div>;
+    return <div className="deleted-entries-view orb-theme orb-page-status">Loading deleted entries...</div>;
   }
 
   // Render error state
   if (error) {
-    return <div className="deleted-entries-view">Error: {error}</div>;
+    return <div className="deleted-entries-view orb-theme orb-page-status">Error: {error}</div>;
   }
 
   // Render the table with entries using the specific format
   return (
   
     
-    <div className="deleted-entries-view orb-theme"> {/* Apply your theme class if needed */}
-      <Card>
-        <div className="p-card-title">
-          <h2>Deleted ORB Entries</h2>
-        </div>
-        <div className="p-card-content">
+    <div className="deleted-entries-view orb-theme orb-page">
+      <Card title="Deleted ORB Entries">
           {/* Refresh Button */}
-          <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-            <button
-              className="p-button p-component" // Use PrimeReact button styles or your custom styles
-              onClick={handleRefresh}
-              disabled={loading} // Disable button while loading
-            >
+          <div className="orb-toolbar">
+            <div className="orb-meta">
+              <strong>Vessel:</strong>
+              <span>{vessel ? vessel.vesselName || 'N/A' : 'Loading...'}</span>
+            </div>
+            <Button onClick={handleRefresh} disabled={loading}>
               Refresh
-            </button>
-          </div>
-
-          {/* Display current vessel name (using the fetched vessel object) - STYLING APPLIED HERE */}
-          <div style={{
-            marginBottom: '1rem',
-            fontSize: '0.9em',
-            color: '#495057', // Slightly darker for better readability
-            display: 'flex', // Use flex for icon alignment
-            alignItems: 'center', // Vertically align icon and text
-            gap: '6px', // Space between icon and text
-            padding: '4px 0', // Small vertical padding if needed
-            borderBottom: '1px dashed #ced4da', // Optional subtle underline
-            paddingBottom: '6px'
-          }}>
-
-            <span>
-              {vessel ? `Vessel: ${vessel.vesselName || 'N/A'}` : 'Loading...'}
-            </span>
+            </Button>
           </div>
 
           {/* Entries Table */}
-          <div style={{ overflowX: 'auto', width: '100%', margin: '1rem 0' }}>
-            <table className="orb-table" style={{ minWidth: '800px', width: '100%' }}>
+          <div className="orb-table-shell">
+            <table className="orb-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -170,7 +148,7 @@ const DeletedEntriesView = () => {
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center' }}>No deleted entries found.</td>
+                    <td colSpan="8" className="orb-empty">No deleted entries found.</td>
                   </tr>
                 ) : (
                   entries.map((entry, entryIndex) => {
@@ -356,7 +334,6 @@ const DeletedEntriesView = () => {
               </tbody>
             </table>
           </div>
-        </div>
       </Card>
     </div>
   
