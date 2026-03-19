@@ -1,9 +1,8 @@
 // src/components/ApprovedEntriesView.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { Panel, Button, Card, Stack } from "../../components/orb/OrbUI"; // Assuming these are your custom components
+import { Button, Card } from "../../components/orb/OrbUI";
 import { formatDate } from '../../utils/orb/orbUtils'; // Import your date formatting helper
 import { useAuth } from '../../hooks/auth/useAuth'; // Import your authentication hook
-import PageLayout from '../../components/layout/PageLayout'; // Import the PageLayout component
 
 const ApprovedEntriesView = () => {
   const {user} = useAuth(); 
@@ -107,7 +106,7 @@ const ApprovedEntriesView = () => {
   // Render loading state
   if (loading) {
     return (
-      <div className="approved-entries-view orb-theme" style={{ padding: '20px' }}>
+      <div className="approved-entries-view orb-theme orb-page-status">
         <p>Loading approved entries...</p>
       </div>
     );
@@ -116,7 +115,7 @@ const ApprovedEntriesView = () => {
   // Render error state
   if (error) {
     return (
-      <div className="approved-entries-view orb-theme" style={{ padding: '20px' }}>
+      <div className="approved-entries-view orb-theme orb-page-status">
         <p>Error: {error}</p>
       </div>
     );
@@ -126,77 +125,37 @@ const ApprovedEntriesView = () => {
   return (
       
     
-    <div className="approved-entries-view orb-theme" style={{ padding: '20px' }}>
-      <Card>
-        <div className="p-card-title" style={{ backgroundColor: '#f0f0f0', padding: '10px', borderRadius: '4px 4px 0 0' }}>
-          <h2 style={{ margin: 0, fontSize: '1.5em', fontWeight: 'bold', color: '#333' }}>Approved ORB Entries</h2>
-        </div>
-        <div className="p-card-content" style={{ padding: '20px' }}>
+    <div className="approved-entries-view orb-theme orb-page">
+      <Card title="Approved ORB Entries">
           {/* Refresh Button */}
-          <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-            <button
-              className="p-button p-component" // Use PrimeReact button styles or your custom styles
-              onClick={handleRefresh}
-              disabled={loading} // Disable button while loading
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-              }}
-            >
+          <div className="orb-toolbar">
+            <div className="orb-meta">
+              <strong>Vessel:</strong>
+              <span>{vessel ? vessel.vesselName || 'N/A' : 'Loading...'}</span>
+            </div>
+            <Button onClick={handleRefresh} disabled={loading}>
               Refresh
-            </button>
-          </div>
-
-          {/* Vessel Name styling */}
-          <div style={{
-            marginBottom: '1rem',
-            fontSize: '0.9em',
-            color: '#495057',
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px',
-            padding: '4px 0', 
-            borderBottom: '1px dashed #ced4da', 
-            paddingBottom: '6px'
-          }}>
-            <span style={{ fontSize: '1.1em' }}>* </span> 
-            <span>
-              {vessel ? `Vessel: ${vessel.vesselName || 'N/A'}` : 'Loading...'}
-            </span>
+            </Button>
           </div>
 
           {/* Entries Table - with the proper formatting */}
-          <div style={{ overflowX: 'auto', width: '100%', margin: '1rem 0' }}>
-            <table
-              className="orb-table"
-              style={{
-                minWidth: '800px',
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontFamily: 'Courier New, monospace', // the same font is used in chief's dashboard
-                fontSize: '12px',
-              }}
-            >
+          <div className="orb-table-shell">
+            <table className="orb-table orb-table-compact">
               <thead>
-                <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Date</th>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Code</th>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Item No.</th>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Record of operations/signature of officer in charge</th>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Status</th>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Approved By</th>
-                  <th style={{ padding: '8px', border: '1px solid #dee2e6', textAlign: 'left', fontWeight: 'bold' }}>Approved At</th>
+                <tr>
+                  <th>Date</th>
+                  <th>Code</th>
+                  <th>Item No.</th>
+                  <th>Record of operations/signature of officer in charge</th>
+                  <th>Status</th>
+                  <th>Approved By</th>
+                  <th>Approved At</th>
                 </tr>
               </thead>
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#6c757d' }}>No approved entries found.</td>
+                    <td colSpan="7" className="orb-empty">No approved entries found.</td>
                   </tr>
                 ) : (
                   entries.map((entry) => { // Iterate through the flat list of entries
@@ -353,29 +312,23 @@ const ApprovedEntriesView = () => {
                       }
 
                       return (
-                        <tr
-                          key={`${entry.id}-${lineIndex}`}
-                          style={{
-                            backgroundColor: lineIndex % 2 === 0 ? '#ffffff' : '#f9f9f9', // Alternate row colors
-                            // Hover effect could be added here if desired
-                          }}
-                        >
-                          <td style={{ padding: '6px', border: '1px solid #dee2e6' }}>{showDate ? formattedDate : ''}</td>
-                          <td style={{ padding: '6px', border: '1px solid #dee2e6' }}>{showCode ? entry.code : ''}</td>
-                          <td style={{ padding: '6px', border: '1px solid #dee2e6' }}>{itemNo}</td>
-                          <td style={{ padding: '6px', border: '1px solid #dee2e6', whiteSpace: 'pre-line' }}>{line}</td>
+                        <tr key={`${entry.id}-${lineIndex}`}>
+                          <td>{showDate ? formattedDate : ''}</td>
+                          <td>{showCode ? entry.code : ''}</td>
+                          <td>{itemNo}</td>
+                          <td className="orb-table-cell-preline">{line}</td>
                           {/* Only show Status, Approved By, and Approved At on the first line of the entry */}
                           {lineIndex === 0 ? (
                             <>
-                              <td style={{ padding: '6px', border: '1px solid #dee2e6' }}>{entry.status}</td> {/* Display status */}
-                              <td style={{ padding: '6px', border: '1px solid #dee2e6' }}>{entry.approved_by || 'N/A'}</td> {/* Display approved by */}
-                              <td style={{ padding: '6px', border: '1px solid #dee2e6' }}>{entry.approved_at ? formatDate(entry.approved_at) : 'N/A'}</td> {/* Display approved at */}
+                              <td>{entry.status}</td>
+                              <td>{entry.approved_by || 'N/A'}</td>
+                              <td>{entry.approved_at ? formatDate(entry.approved_at) : 'N/A'}</td>
                             </>
                           ) : (
                             <>
-                              <td style={{ padding: '6px', border: '1px solid #dee2e6' }}></td> {/* Empty cell for Status on subsequent lines */}
-                              <td style={{ padding: '6px', border: '1px solid #dee2e6' }}></td> {/* Empty cell for Approved By on subsequent lines */}
-                              <td style={{ padding: '6px', border: '1px solid #dee2e6' }}></td> {/* Empty cell for Approved At on subsequent lines */}
+                              <td></td>
+                              <td></td>
+                              <td></td>
                             </>
                           )}
                         </tr>
@@ -386,7 +339,6 @@ const ApprovedEntriesView = () => {
               </tbody>
             </table>
           </div>
-        </div>
       </Card>
     </div>
     

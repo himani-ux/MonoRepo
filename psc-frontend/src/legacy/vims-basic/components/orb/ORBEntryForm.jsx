@@ -1,5 +1,5 @@
 
-import { Card } from './OrbUI';
+import { Button, Card } from './OrbUI';
 import DateTimeInput from './DateTimeInput';
 import CodeAForm from './CodeAForm';
 import CodeBForm from './CodeBForm';
@@ -63,7 +63,7 @@ export default function ORBEntryForm({
   ));
 
   return (
-    <Card>
+    <Card className='border-0 shadow-none'>
       <form onSubmit={handleSubmit} className="orb-form">
         {canAccessSelectCode && (
         <div className="form-row">
@@ -80,11 +80,11 @@ export default function ORBEntryForm({
         </div>
         )}
 
-        {code && <div style={{ marginTop: '1.5rem' }}>{renderCodeForm()}</div>}
+        {code && <div className="form-row">{renderCodeForm()}</div>}
 
         {code && code !== 'H' && (
-          <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-            <button type="submit" className="btn-submit">Save Draft</button>
+          <div className="flex justify-end">
+            <Button type="submit">Save Draft</Button>
           </div>
         )}
       </form>

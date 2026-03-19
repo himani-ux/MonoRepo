@@ -43,27 +43,21 @@ const ReportFilter = ({
   return (
     <div
       ref={wrapperRef}
-      style={{
-        marginBottom: "1rem",
-        position: "relative",
-        display: "inline-block",
-      }}
+      className="orb-report-filter"
     >
-      {/* ✅ Filter Button */}
       {canAccessFilterReports && (
         <Button onClick={() => setIsFilterOpen((prev) => !prev)}>
           Filter Report
         </Button>
       )}
 
-      {/* ✅ Dropdown */}
       {isFilterOpen && (
         <div className="filter-dropdown">
           {filterOptions.map((option) => (
             <div
               key={option.key}
               onClick={() => handleFilterClick(option.key)}
-              style={{ cursor: "pointer" }}
+              className="filter-dropdown-item"
             >
               {option.label}
             </div>
@@ -71,10 +65,9 @@ const ReportFilter = ({
         </div>
       )}
 
-      {/* ✅ Close Report Button */}
       {isVisible && (
         <Button variant="secondary" onClick={onClose}>
-          🗙 Close Report
+          Close Report
         </Button>
       )}
     </div>
@@ -82,5 +75,3 @@ const ReportFilter = ({
 };
 
 export default ReportFilter;
-
-

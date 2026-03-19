@@ -1,6 +1,6 @@
 // src/components/AllEntriesView.jsx
 import React, { useState, useEffect } from 'react';
-import { Panel, Button, Card, Stack } from "../../components/orb/OrbUI";
+import { Button, Card } from "../../components/orb/OrbUI";
 import { formatDate } from '../../utils/orb/orbUtils'; 
 import { useAuth } from '../../hooks/auth/useAuth';
 
@@ -70,42 +70,33 @@ const AllEntriesView = () => {
 
   // Render loading state
   if (loading) {
-    return <div className="all-entries-view">Loading all entries...</div>;
+    return <div className="all-entries-view orb-theme orb-page-status">Loading all entries...</div>;
   }
 
   // Render error state
   if (error) {
-    return <div className="all-entries-view">Error: {error}</div>;
+    return <div className="all-entries-view orb-theme orb-page-status">Error: {error}</div>;
   }
 
   // Render the table with entries using the specific format
   return (
    
-    <div className="all-entries-view orb-theme"> {/* Apply your theme class if needed */}
-      <Card>
-        <div className="p-card-title">
-          <h2>All Non-Deleted ORB Entries</h2>
-        </div>
-        <div className="p-card-content">
-          {/* Refresh Button */}
-          <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-            <button
-              className="p-button p-component" // Use PrimeReact button styles or your custom styles
-              onClick={handleRefresh}
-              disabled={loading} // Disable button while loading
-            >
+    <div className="all-entries-view orb-theme orb-page">
+      <Card title="All Non-Deleted ORB Entries">
+        <div className="orb-toolbar">
+          <div className="orb-meta">
+            <strong>Vessel ID:</strong> <span>{vesselId}</span>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={handleRefresh} disabled={loading}>
               Refresh
-            </button>
+            </Button>
           </div>
-
-          {/* Display current vessel (optional) */}
-          <div style={{ marginBottom: '1rem', fontSize: '0.9em', color: '#666' }}>
-            Viewing entries for Vessel ID: {vesselId}
-          </div>
+        </div>
 
           {/* Entries Table - Using the specific format from ORBTable */}
-          <div style={{ overflowX: 'auto', width: '100%', margin: '1rem 0' }}>
-            <table className="orb-table" style={{ minWidth: '800px', width: '100%' }}>
+          <div className="orb-table-shell">
+            <table className="orb-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -118,7 +109,7 @@ const AllEntriesView = () => {
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
-                    <td colSpan="4" style={{ textAlign: 'center' }}>No entries found.</td>
+                    <td colSpan="4" className="orb-empty">No entries found.</td>
                   </tr>
                 ) : (
                   entries.map((entry) => { // Iterate through the flat list of entries
@@ -289,7 +280,6 @@ const AllEntriesView = () => {
               </tbody>
             </table>
           </div>
-        </div>
       </Card>
     </div>
     

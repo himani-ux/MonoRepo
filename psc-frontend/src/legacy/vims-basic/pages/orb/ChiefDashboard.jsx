@@ -1243,6 +1243,7 @@ useEffect(() => {
       </WithPermission>
 
       <WithPermission id="PSC_F_017">
+        <div className="orb-section-gap">
         <Card title="Approved Logbook Entries(Preview)">
           <div
             id="approved-entries"
@@ -1482,6 +1483,7 @@ useEffect(() => {
             </div>
           </div>
         </Card>
+        </div>
       </WithPermission>
 
 

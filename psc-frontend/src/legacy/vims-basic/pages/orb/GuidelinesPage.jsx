@@ -12,48 +12,27 @@ const GuidelinesPage = () => {
   const { user } = useAuth(); // Get user info from auth context
 
   return (
-   
-    <div className="guidelines-page orb-theme" style={{ padding: '20px' }}>
+    <div className="guidelines-page orb-theme">
       <Card title="Guidelines">
         <div className="p-card-content">
           <p>Please select the guideline document you wish to view or download:</p>
-          <ul style={{ listStyleType: 'none', padding: 0 }}>
-            <li style={{ marginBottom: '10px' }}>
+          <ul className="orb-link-list">
+            <li>
               <a
                 href={correctEntriesPdfPath}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{
-                  textDecoration: 'none',
-                  color: '#030303ff',
-                  padding: '10px 15px',
-                  border: '1px solid #007bff',
-                  borderRadius: '4px',
-                  display: 'inline-block',
-                  backgroundColor: '#f8f9fa',
-                  fontWeight: '500',
-                  fontSize: '14px'
-                }}
+                className="orb-link-card"
               >
                 ORB Correct Entries Guidelines
               </a>
             </li>
-            <li style={{ marginBottom: '10px' }}>
+            <li>
               <a
                 href={softwareGuidelinesPdfPath}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{
-                  textDecoration: 'none',
-                  color: '#020202ff',
-                  padding: '10px 15px',
-                  border: '1px solid #007bff',
-                  borderRadius: '4px',
-                  display: 'inline-block',
-                  backgroundColor: '#f8f9fa',
-                  fontWeight: '500',
-                  fontSize: '14px'
-                }}
+                className="orb-link-card"
               >
                 Software Guidelines        
                 

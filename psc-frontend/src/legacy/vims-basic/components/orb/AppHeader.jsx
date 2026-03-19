@@ -117,20 +117,17 @@ export default function ORBHeader() {
 
   return (
     <>
-      {/* Sidebar Component */}
       <Sidebar
         isVisible={sidebarVisible}
         onClose={() => setSidebarVisible(false)}
-        // This are the props for sidebar
         hasNewApproved={hasNewApproved}
         hasNewRejected={hasNewRejected}
         hasNewDeleted={hasNewDeleted}
       />
 
-      {/* Header */}
-      <div className="app-header">
+      <div className="app-header orb-theme">
         <div className="header-content">
-          <button className="sidebar-toggle" onClick={toggleSidebar}>
+          <button className="sidebar-toggle" onClick={toggleSidebar} aria-label="Open ORB navigation">
             ☰
           </button>
 
@@ -139,22 +136,19 @@ export default function ORBHeader() {
             <span className="title-sub">Logbook</span>
           </h1>
 
-          {/* Vessel Info in Navbar */}
           <div className="vessel-info">
-            {isLoadingVessel ? ( // Show loading state
+            {isLoadingVessel ? (
               "Loading vessel..."
             ) : vessel ? (
               <>
                 <strong>{vessel.vesselName?.toUpperCase() || "UNKNOWN VESSEL"}</strong>
-                {/* Optionally display IMONumber too */}
-                {/* <span>IMO: {vessel.imoNumber}</span> */}
+                {vessel.imoNumber ? <span>IMO {vessel.imoNumber}</span> : null}
               </>
             ) : (
-              "Vessel Not Found" // Show error state if vessel data couldn't be loaded/found
+              "Vessel Not Found"
             )}
           </div>
 
-          {/* User Section */}
           <div className="user-section">
             <span className="greeting">
               Welcome, <strong>{user?.first_name || user?.surname ? `${user.first_name} ${user.surname}` : "USER"}</strong>
@@ -185,24 +179,25 @@ function Sidebar({ isVisible, onClose, hasNewApproved, hasNewRejected, hasNewDel
   return (
     <div id="sidebar" className="sidebar-overlay">
       <div className="sidebar-content">
-        <button className="close-btn" onClick={onClose}>×</button>
+        <button className="close-btn" onClick={onClose} aria-label="Close ORB navigation">×</button>
         <ul className="sidebar-menu">
-          {/* <li onClick={() => handleNavigation('/all-entries')}>All Entries</li> */}
           <li onClick={() => handleNavigation('/approved-entries')}>
-            Approved Entries {hasNewApproved && <span style={{ color: 'red', marginLeft: '5px' }}>New Entry</span>}
+            <span>Approved Entries</span>
+            {hasNewApproved && <span className="sidebar-badge">New Entry</span>}
           </li>
           <li onClick={() => handleNavigation('/rejected-entries')}>
-            Rejected Entries {hasNewRejected && <span style={{ color: 'red', marginLeft: '5px' }}>New Entry</span>}
+            <span>Rejected Entries</span>
+            {hasNewRejected && <span className="sidebar-badge">New Entry</span>}
           </li>
           <li onClick={() => handleNavigation('/deleted-entries')}>
-            Deleted Entries {hasNewDeleted && <span style={{ color: 'red', marginLeft: '5px' }}>New Entry</span>}
+            <span>Deleted Entries</span>
+            {hasNewDeleted && <span className="sidebar-badge">New Entry</span>}
           </li>
-          <li onClick={() => handleNavigation('/pdf-archive')}>Master Signed PDFs</li>
-          <li
-            onClick={() => handleNavigation('/orb-guidelines')}
-            style={{ marginTop: '400px' }}
-          >
-            GUIDELINEs
+          <li onClick={() => handleNavigation('/pdf-archive')}>
+            <span>Master Signed PDFs</span>
+          </li>
+          <li className="sidebar-menu-footer" onClick={() => handleNavigation('/orb-guidelines')}>
+            <span>Guidelines</span>
           </li>
         </ul>
       </div>

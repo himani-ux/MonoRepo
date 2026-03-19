@@ -457,7 +457,7 @@ export default function VIMSDashboard() {
           {navItems.map(item => <NavItem key={item.id} {...item} active={activeNav === item.id} onClick={() => setActiveNav(item.id)} />)}
         </nav>
         <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.sidebarBorder}` }}>
-          <span style={{ fontSize: 11, color: C.textMuted }}>VIMS Inspection v0.1.0</span>
+          <span style={{ fontSize: 11, color: C.textMuted }}>VIMS v0.1.0</span>
         </div>
       </aside>
 

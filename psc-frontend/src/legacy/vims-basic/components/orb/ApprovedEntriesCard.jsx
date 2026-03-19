@@ -7,7 +7,7 @@ import ORBTable from './ORBTable';
 
 const ApprovedEntriesCard = ({ approved, vessel, onSavePDF, canAccessSavePDF }) => {
   return (
-    <Card title="Approved Logbook Entries(Preview)">
+    <Card title="Approved Logbook Entries(Preview)" className='mt-6'>
       <div id="approved-entries">
         <ORBTable entries={approved} />
       </div>
