@@ -338,7 +338,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
         {/* Footer */}
         <div className="border-t border-neutral-200 p-4">
           <p className="text-xs text-neutral-400">
-            VIMS Inspection v0.1.0
+            VIMS v0.1.0
           </p>
         </div>
       </aside>

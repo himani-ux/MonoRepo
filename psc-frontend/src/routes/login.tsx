@@ -62,7 +62,7 @@ export function LoginPage() {
           <Ship className="h-8 w-8" />
         </div>
         <h1 className="mt-4 text-2xl font-semibold text-neutral-800">
-          VIMS Inspection
+          VIMS 
         </h1>
         <p className="mt-1 text-sm text-neutral-500">
           PSC / RS / Audit Close-out System
