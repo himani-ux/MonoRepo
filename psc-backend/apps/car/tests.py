@@ -472,6 +472,19 @@ class TestFEAT_CAR_002_EditCARDraft(BaseCARAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Notification.objects.count(), 0)
 
+    def test_rbac_office_cannot_edit_closed_car(self):
+        """RBAC FEAT-CAR-002: closed CARs are read-only even for office users."""
+        self.car.status = CARStatus.CLOSED
+        self.car.save(update_fields=["status"])
+
+        view = CARUpdateView.as_view()
+        payload = {"root_cause_summary": "Closed CAR edit attempt " + ("Z" * 50)}
+        request = self.factory.put(f"/api/psc/cars/{self.car.id}/update/", payload, format="json")
+        force_authenticate(request, user=self.office_pic)
+        response = view(request, id=self.car.id)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_happy_path_adds_immediate_and_long_term_actions(self):
         """PRD FEAT-CAR-002: CAR supports immediate and long-term corrective actions."""
         view = CorrectiveActionCreateView.as_view()
@@ -2679,21 +2692,31 @@ class TestCARReportPrintFormatting(TestCase):
 
     @staticmethod
     def _flatten_flowable_text(elements: list) -> str:
-        """Extract plain text from Paragraph and Table cell Paragraphs."""
+        """Extract plain text from Paragraphs and nested Table cell content."""
         lines: list[str] = []
-        for flowable in elements:
+
+        def _collect(flowable):
             if hasattr(flowable, "getPlainText"):
                 lines.append(flowable.getPlainText())
-                continue
+                return
+
             cell_values = getattr(flowable, "_cellvalues", None)
-            if not cell_values:
-                continue
-            for row in cell_values:
-                for cell in row:
-                    if hasattr(cell, "getPlainText"):
-                        lines.append(cell.getPlainText())
-                    else:
-                        lines.append(str(cell))
+            if cell_values:
+                for row in cell_values:
+                    for cell in row:
+                        _collect(cell)
+                return
+
+            if isinstance(flowable, (list, tuple)):
+                for item in flowable:
+                    _collect(item)
+                return
+
+            lines.append(str(flowable))
+
+        for flowable in elements:
+            _collect(flowable)
+
         return "\n".join(lines)
 
     def test_car_info_prints_vessel_from_inspection_vessel_name(self):
@@ -3139,13 +3162,16 @@ class TestCARReportPrintFormatting(TestCase):
         merged = self._flatten_flowable_text(elements)
         self.assertIn("Office Actions", merged)
         self.assertIn("PIC", merged)
-        self.assertIn("Name: PIC Office", merged)
-        self.assertIn("Datetime: 10 Feb 2026 10:00", merged)
-        self.assertIn("Comment: PIC: Root cause accepted.", merged)
+        self.assertIn("Name:", merged)
+        self.assertIn("PIC Office", merged)
+        self.assertIn("Datetime:", merged)
+        self.assertIn("10 Feb 2026 10:00", merged)
+        self.assertIn("Comment:", merged)
+        self.assertIn("PIC: Root cause accepted.", merged)
         self.assertIn("DPA", merged)
-        self.assertIn("Name: DPA Office", merged)
-        self.assertIn("Datetime: 10 Feb 2026 11:00", merged)
-        self.assertIn("Comment: DPA: Closure approved.", merged)
+        self.assertIn("DPA Office", merged)
+        self.assertIn("10 Feb 2026 11:00", merged)
+        self.assertIn("DPA: Closure approved.", merged)
         self.assertNotIn("history PIC suffix should not replace body field", merged)
         self.assertNotIn("history DPA suffix should not replace body field", merged)
 
@@ -3685,7 +3711,7 @@ class TestWorkflowMarkCompletedRouting(BaseCARAPITestCase):
 
 
 class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
-    """PIC comment on SUBMIT_TO_DPA should persist into psc_car.pic_comment."""
+    """SUBMIT_TO_DPA comment should not overwrite the PIC review comment."""
 
     def setUp(self):
         super().setUp()
@@ -3693,6 +3719,8 @@ class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
         self.inspection, self.deficiency, self.car = self.create_car_with_deficiency(
             status=CARStatus.PIC_REVIEW
         )
+        self.car.pic_comment = "PIC review comment that must stay visible."
+        self.car.save(update_fields=["pic_comment"])
 
     def _submit_to_dpa(self, user, comment: str):
         request = self.factory.post(
@@ -3703,16 +3731,124 @@ class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
         force_authenticate(request, user=user)
         return self.view(request, id=self.car.id)
 
-    def test_submit_to_dpa_saves_comment_to_pic_comment(self):
-        comment = "PIC reviewed and forwarding this CAR to DPA for closure."
+    def test_submit_to_dpa_keeps_pic_review_comment_and_stores_forwarding_comment_as_last_action(self):
+        comment = "Forwarding this CAR to DPA with final office notes."
 
         response = self._submit_to_dpa(self.office_pic, comment)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CARStatus.SUBMITTED_TO_DPA)
-        self.assertEqual(self.car.pic_comment, comment)
+        self.assertEqual(self.car.pic_comment, "PIC review comment that must stay visible.")
         self.assertEqual(self.car.last_action_comment, comment)
+
+
+class TestCARPICCommentResolution(BaseCARAPITestCase):
+    """CAR detail/report should show the PIC review comment, not the submit-to-DPA comment."""
+
+    def setUp(self):
+        super().setUp()
+        self.inspection, self.deficiency, self.car = self.create_car_with_deficiency(
+            status=CARStatus.SUBMITTED_TO_DPA
+        )
+
+    def test_serializer_and_report_prefer_full_car_pic_comment_when_review_history_is_truncated(self):
+        full_comment = (
+            "PIC review confirms the corrective action remains acceptable.\n\n"
+            "Tail marker for full comment visibility in detail and PDF output."
+        )
+        truncated_history_comment = full_comment[:72]
+
+        self.car.status = CARStatus.PIC_REVIEW
+        self.car.pic_comment = full_comment
+        self.car.last_action = "START_PIC_REVIEW"
+        self.car.last_action_comment = full_comment
+        self.car.pic_accepted_by = str(self.office_pic.id)
+        self.car.pic_accepted_at = timezone.now()
+        self.car.save(
+            update_fields=[
+                "status",
+                "pic_comment",
+                "last_action",
+                "last_action_comment",
+                "pic_accepted_by",
+                "pic_accepted_at",
+            ]
+        )
+
+        ActivityHistory.objects.create(
+            entity_type="CAR",
+            entity_id=self.car.id,
+            vessel_id=self.inspection.vessel_id,
+            event_type="CAR_WORKFLOW_START_PIC_REVIEW",
+            event_description=(
+                f"CAR {self.car.car_number}: Start Review (SUBMITTED_TO_PIC -> PIC_REVIEW)"
+                f" - {truncated_history_comment}"
+            ),
+            performed_by=str(self.office_pic.id),
+            performed_by_name="PIC Office",
+        )
+
+        payload = CARDetailSerializer(self.car).data
+        self.assertEqual(payload["pic_comment"], full_comment)
+
+        styles = car_reports._build_styles()
+        elements: list = []
+        content_width = car_reports.PAGE_WIDTH - car_reports.MARGIN_LEFT - car_reports.MARGIN_RIGHT
+        car_reports._build_review_comments(elements, payload, styles, content_width)
+
+        merged = TestCARReportPrintFormatting._flatten_flowable_text(elements)
+        self.assertIn("Tail marker for full comment visibility", merged)
+
+    def test_serializer_and_report_prefer_pic_review_comment_over_submit_to_dpa_comment(self):
+        review_comment = (
+            "PIC review approved the corrective actions and confirmed the full narrative "
+            "must remain visible in the report output."
+        )
+        submit_to_dpa_comment = "Forwarding to DPA after final office review."
+
+        self.car.pic_comment = submit_to_dpa_comment
+        self.car.last_action = "SUBMIT_TO_DPA"
+        self.car.last_action_comment = submit_to_dpa_comment
+        self.car.pic_accepted_by = str(self.office_pic.id)
+        self.car.pic_accepted_at = timezone.now()
+        self.car.save(
+            update_fields=[
+                "pic_comment",
+                "last_action",
+                "last_action_comment",
+                "pic_accepted_by",
+                "pic_accepted_at",
+            ]
+        )
+
+        ActivityHistory.objects.create(
+            entity_type="CAR",
+            entity_id=self.car.id,
+            vessel_id=self.inspection.vessel_id,
+            event_type="CAR_WORKFLOW_START_PIC_REVIEW",
+            event_description=(
+                f"CAR {self.car.car_number}: Start Review (SUBMITTED_TO_PIC -> PIC_REVIEW)"
+                f" - {review_comment}"
+            ),
+            performed_by=str(self.office_pic.id),
+            performed_by_name="PIC Office",
+        )
+
+        payload = CARDetailSerializer(self.car).data
+
+        self.assertEqual(payload["pic_comment"], review_comment)
+        self.assertEqual(payload["last_action_comment"], submit_to_dpa_comment)
+
+        styles = car_reports._build_styles()
+        elements: list = []
+        content_width = car_reports.PAGE_WIDTH - car_reports.MARGIN_LEFT - car_reports.MARGIN_RIGHT
+        car_reports._build_review_comments(elements, payload, styles, content_width)
+
+        merged = TestCARReportPrintFormatting._flatten_flowable_text(elements)
+        self.assertIn("Comment:", merged)
+        self.assertIn(review_comment, merged)
+        self.assertNotIn(submit_to_dpa_comment, merged)
 
 
 class TestWorkflowCloseAutoCreatesPV(BaseCARAPITestCase):

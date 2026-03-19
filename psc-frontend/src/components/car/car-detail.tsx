@@ -79,17 +79,21 @@ export const CARDetail: FC<CARDetailProps> = ({
 
           {/* PIC comment */}
           {car.pic_comment && (
-            <div className="mt-2 rounded-md bg-primary-50 p-3 text-sm">
+            <div className="mt-2 min-w-0 rounded-md bg-primary-50 p-3 text-sm">
               <p className="font-medium text-primary-800">PIC Comment:</p>
-              <p className="mt-1 text-primary-700">{car.pic_comment}</p>
+              <p className="mt-1 whitespace-pre-wrap break-words text-primary-700">
+                {car.pic_comment}
+              </p>
             </div>
           )}
 
           {/* DPA comment */}
           {car.dpa_comment && (
-            <div className="mt-2 rounded-md bg-success-50 p-3 text-sm">
+            <div className="mt-2 min-w-0 rounded-md bg-success-50 p-3 text-sm">
               <p className="font-medium text-success-800">DPA Comment:</p>
-              <p className="mt-1 text-success-700">{car.dpa_comment}</p>
+              <p className="mt-1 whitespace-pre-wrap break-words text-success-700">
+                {car.dpa_comment}
+              </p>
             </div>
           )}
         </CardContent>
