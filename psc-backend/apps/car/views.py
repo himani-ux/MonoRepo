@@ -1390,7 +1390,9 @@ class CorrectiveActionUpdateView(APIView):
 
     def put(self, request, id, *args, **kwargs):
         try:
-            action = CorrectiveAction.objects.get(id=id, is_deleted=False)
+            action = CorrectiveAction.objects.select_related('car__deficiency__inspection').get(
+                id=id, is_deleted=False
+            )
         except CorrectiveAction.DoesNotExist:
             return Response({
                 'error': 'NOT_FOUND',
@@ -1400,19 +1402,41 @@ class CorrectiveActionUpdateView(APIView):
         serializer = CorrectiveActionUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        changed_fields = []
 
         if 'description' in data:
+            if action.description != data['description']:
+                changed_fields.append('description')
             action.description = data['description']
         if 'owner_crew_id' in data:
+            if action.owner_crew_id != data['owner_crew_id']:
+                changed_fields.append('owner_crew_id')
             action.owner_crew_id = data['owner_crew_id']
         if 'owner_user_id' in data:
+            if action.owner_user_id != data['owner_user_id']:
+                changed_fields.append('owner_user_id')
             action.owner_user_id = data['owner_user_id']
         if 'due_date' in data:
+            if action.due_date != data['due_date']:
+                changed_fields.append('due_date')
             action.due_date = data['due_date']
 
         action.updated_by = str(request.user.id)
         action.sync_version += 1
         action.save()
+
+        if changed_fields:
+            vessel_id = _get_vessel_id_from_car(action.car)
+            if vessel_id:
+                create_activity(
+                    'ACTION',
+                    action.id,
+                    vessel_id,
+                    'ACTION_UPDATED',
+                    f'Corrective action updated for CAR {action.car.car_number}',
+                    request.user,
+                    metadata={'changed_fields': changed_fields},
+                )
 
         return Response({
             'data': CorrectiveActionSerializer(action).data,
@@ -1501,7 +1525,7 @@ class CorrectiveActionDeleteView(APIView):
         # Only allow delete when CAR is in editable vessel-side statuses
         allowed = [CARStatus.ALLOTTED, CARStatus.IN_PROGRESS,
                    CARStatus.PENDING_CE_REVIEW, CARStatus.PENDING_MASTER_REVIEW,
-                   CARStatus.RETURNED_FOR_REWORK]
+                   CARStatus.RETURNED_FOR_REWORK, CARStatus.SUBMITTED_TO_PIC, CARStatus.PIC_REVIEW, CARStatus.RETURNED_FOR_REWORK, CARStatus.SUBMITTED_TO_DPA]
         if action.car.status not in allowed:
             return Response({
                 'error': 'INVALID_STATE',

@@ -4,15 +4,25 @@ import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
   AlertTriangle,
   FileText,
-  ChevronRight,
   Bell,
+  BellRing,
   CheckCircle2,
   User,
   Mail,
   FileDown,
   Eye,
+  PanelRightOpen,
+  X,
   Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -40,6 +50,7 @@ const KsmLibrary = ({
   canViewCrewStatus,
   canRemindCrew,
   canDownloadPdf,
+  canAccessPdf,
   onViewPdf,
 
   // Filter props from Dashboard.jsx
@@ -61,6 +72,7 @@ const KsmLibrary = ({
   const [showCrewList, setShowCrewList] = useState(false);
   const [crewList, setCrewList] = useState([]);
   const [crewLoading, setCrewLoading] = useState(false);
+  const [sendingCrewReminder, setSendingCrewReminder] = useState(null);
 
   // 📥 Fetch notifications
   useEffect(() => {
@@ -167,7 +179,10 @@ const KsmLibrary = ({
   // 🛎️ Remind crew
   const handleRemindIndividualCrew = async (employeeId) => {
     if (!canRemindCrew) return;
+    if (sendingCrewReminder) return;
     
+    setSendingCrewReminder(employeeId);
+
     try {
       const res = await fetch('http://localhost:8000/api/circular/api/msc/remind-crew/', {
         method: 'POST',
@@ -181,8 +196,27 @@ const KsmLibrary = ({
       
       if (res.ok) {
         alert(`Reminder sent to ${employeeId}`);
-        setShowCrewList(false);
-        setTimeout(() => setShowCrewList(true), 100);
+        const reminderTimestamp = new Date().toISOString();
+
+        setCrewList((prev) =>
+          prev.map((crew) =>
+            crew.crew_id === employeeId
+              ? { ...crew, reminder_sent_at: reminderTimestamp }
+              : crew
+          )
+        );
+
+        setNotifications((prev) =>
+          prev.map((notification) =>
+            notification.id === selectedId
+              ? {
+                  ...notification,
+                  isReminded: 1,
+                  reminder_sent_at: reminderTimestamp,
+                }
+              : notification
+          )
+        );
       } else {
         const errorData = await res.json();
         alert('Failed: ' + (errorData.error || 'Unknown error'));
@@ -190,6 +224,8 @@ const KsmLibrary = ({
     } catch (err) {
       console.error('Remind error:', err);
       alert('Network error');
+    } finally {
+      setSendingCrewReminder(null);
     }
   };
 
@@ -215,6 +251,36 @@ const KsmLibrary = ({
     } catch (err) {
       console.error('Acknowledge failed:', err);
       alert('Failed to acknowledge notification.');
+    }
+  };
+
+  const handleDownloadNotification = async (notification) => {
+    if (!canDownloadPdf) return;
+
+    try {
+      const crewId = user?.crew_id || user?.username;
+      const res = await fetch(
+        `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${encodeURIComponent(crewId)}`
+      );
+
+      if (!res.ok) {
+        throw new Error('Download not available');
+      }
+
+      const data = await res.json();
+      const fileUrl = data.pdf_url || data.attachment_url;
+
+      if (!fileUrl) {
+        throw new Error('No file URL found');
+      }
+
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = `MSC-${notification.id}.pdf`;
+      link.click();
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to download file.');
     }
   };
 
@@ -270,170 +336,248 @@ const KsmLibrary = ({
     );
   }
 
+  const showDetailPanel = canViewDetail && Boolean(selectedNotification);
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-12 gap-6 bg-sky-50">
+    <div className="grid grid-cols-12 gap-6">
       {/* Left List Panel */}
-      <div className="col-span-12 lg:col-span-7">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">KSM Library  Test</h2>
-          <div className="text-xs text-slate-500">
+      <div className={`col-span-12 ${showDetailPanel ? 'lg:col-span-7' : 'lg:col-span-12'}`}>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-neutral-800">KSM Library</h2>
+          <div className="text-xs text-neutral-500">
             {loading ? 'Loading...' : `${filteredNotifications.length} results`}
           </div>
         </div>
 
         {loading ? (
-          <p className="text-center py-4">Loading notifications...</p>
+          <div className="rounded-lg border border-dashed border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">Loading notifications...</div>
         ) : error ? (
-          <p className="text-center py-4 text-red-600">{error}</p>
+          <div className="rounded-lg border border-error-100 bg-error-50 p-6 text-center text-sm text-error-700">{error}</div>
         ) : filteredNotifications.length === 0 ? (
-          <p className="text-center py-4 text-slate-500">No notifications match your filters</p>
+          <div className="rounded-lg border border-dashed border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">No notifications match your filters</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredNotifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-4 cursor-pointer ${
-                  selectedId === notification.id ? "ring-2 ring-sky-200" : ""
-                } ${
-                  notification.isAck === 0 ? "border-red-400" : "border-blue-500"
-                }`}
-                onClick={() => {
-                  setSelectedId(selectedId === notification.id ? null : notification.id);
-                }}
-              >
-                {/* Top Row: Date + Criticality */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs text-gray-500">
-                    {notification.publishedDate
-                      ? new Date(notification.publishedDate).toLocaleDateString()
-                      : "—"}
-                  </div>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      notification.criticality === "Critical"
-                        ? "bg-red-100 text-red-700"
-                        : notification.criticality === "High"
-                        ? "bg-orange-100 text-orange-700"
-                        : notification.criticality === "Medium"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {notification.criticality}
-                  </span>
-                </div>
-
-                {/* Title */}
-                <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">
-                  {notification.title}
-                  {notification.isReminded === 1 && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                      <Bell className="h-3 w-3" />
-                      Reminded
-                    </span>
-                  )}
-                </h3>
-
-                {/* Type Badge + Hashtags */}
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {/* Type badge */}
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      notification.type === "Alert"
-                        ? "bg-red-100 text-red-700"
-                        : notification.type === "Circular"
-                        ? "bg-blue-100 text-blue-700"
-                        : notification.type === "Work Instruction"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {notification.type}
-                  </span>
-
-                  {/* Hashtags */}
-                  {notification.hashtags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {notification.hashtags
-                        .slice(0, 3)
-                        .map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-0.5 text-xs font-medium rounded-full bg-gradient-to-r from-sky-100 via-sky-200 to-sky-100 text-sky-800 border border-sky-200"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer: ID, Dept, Read Status */}
-                <div className="mt-2 text-xs text-gray-600 flex flex-wrap gap-x-2 gap-y-1">
-                  <span>ID: {notification.id}</span>
-                  <span>•</span>
-                  <span>Dept: {notification.scope}</span>
-                  {canViewCrewStatus && (
-                    <>
-                      <span>•</span>
-                      <span>
-                        Read:{" "}
-                        <span className="font-medium">
-                          {notification.totalCrew - notification.unreadCount}/{notification.totalCrew}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Department</TableHead>
+                    {canViewCrewStatus && <TableHead>Read</TableHead>}
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredNotifications.map((notification) => (
+                    <TableRow
+                      key={notification.id}
+                      className={`cursor-pointer ${
+                        selectedId === notification.id
+                          ? "bg-primary-50"
+                          : notification.isReminded === 1
+                          ? "bg-warning-50/40"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedId(selectedId === notification.id ? null : notification.id);
+                      }}
+                    >
+                      <TableCell className="max-w-[320px]">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-neutral-800" title={notification.title}>
+                            {notification.title}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {notification.isReminded === 1 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">
+                                <BellRing className="h-3 w-3" />
+                                Reminder Sent
+                              </span>
+                            )}
+                            {notification.hashtags.slice(0, 3).map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-600"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            notification.type === "Alert"
+                              ? "bg-error-50 text-error-700"
+                              : notification.type === "Circular"
+                              ? "bg-primary-50 text-primary-700"
+                              : notification.type === "Work Instruction"
+                              ? "bg-warning-50 text-warning-700"
+                              : "bg-neutral-100 text-neutral-700"
+                          }`}
+                        >
+                          {notification.type}
                         </span>
-                      </span>
-                    </>
-                  )}
-                </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {notification.publishedDate
+                          ? new Date(notification.publishedDate).toLocaleDateString()
+                          : "—"}
+                      </TableCell>
+                      <TableCell>{notification.scope}</TableCell>
+                      {canViewCrewStatus && (
+                        <TableCell className="whitespace-nowrap">
+                          <span className="font-semibold text-neutral-800">
+                            {notification.totalCrew - notification.unreadCount}/{notification.totalCrew}
+                          </span>
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${notification.isAck === 0 ? "bg-error-50 text-error-700" : "bg-success-50 text-success-700"}`}>
+                            {notification.isAck === 0 ? "Unread" : "Read"}
+                          </span>
+                          {notification.isReminded === 1 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">
+                              <Bell className="h-3 w-3" />
+                              Reminded
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          {canViewDetail && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedId(selectedId === notification.id ? null : notification.id);
+                              }}
+                              aria-label={`Show details for ${notification.title}`}
+                              title="Details"
+                            >
+                              <PanelRightOpen className="h-4 w-4" />
+                            </Button>
+                          )}
 
-                {/* NO ACTION ICONS — EVER */}
-              </div>
-            ))}
-          </div>
+                          {canAccessPdf && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onViewPdf(notification);
+                              }}
+                              aria-label={`View ${notification.title}`}
+                              title="View"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+
+                          {canDownloadPdf && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDownloadNotification(notification);
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50"
+                              aria-label={`Download ${notification.title}`}
+                              title="Download"
+                            >
+                              <FileDown className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
       </div>
 
       {/* Detail Panel */}
-      {canViewDetail && (
+      {showDetailPanel && (
         <div ref={detailsPanelRef} className="col-span-12 lg:col-span-5">
-          <Card className="shadow-none border border-sky-100 rounded-xl">
+          <Card className="shadow-md">
             <CardContent className="p-4 space-y-3">
               {selectedNotification ? (
                 <>
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-base truncate">
-                      {selectedNotification.title}
-                    </h3>
-                    <div className="flex gap-2">
-                      <Badge
-                        variant={getTypeVariant(selectedNotification.type)}
-                        className="flex items-center gap-1 justify-start border-[#87CEEB] text-[#1E89B3] bg-[#E9F6FB] rounded-full text-xs"
-                      >
-                        {getTypeIcon(selectedNotification.type)}
-                        {selectedNotification.type}
-                      </Badge>
-                      <Badge
-                        className={`flex items-center justify-center gap-1 font-medium border px-2 py-0.5 rounded-full text-xs ${
-                          selectedNotification.criticality === "Critical"
-                            ? "border-[#D45959] text-[#D45959] bg-[#FFE6EA]"
-                            : selectedNotification.criticality === "High"
-                            ? "border-orange-300 text-orange-500 bg-[#FFFFE6]"
-                            : "border-[#1E89B3] text-[#1E89B3] bg-[#E9F6FB]"
-                        }`}
-                      >
-                        {selectedNotification.criticality}
-                      </Badge>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="truncate text-base font-semibold text-neutral-800">
+                          {selectedNotification.title}
+                        </h3>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => {
+                            setSelectedId(null);
+                            setShowCrewList(false);
+                          }}
+                          aria-label="Close details"
+                          title="Close"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <Badge
+                          variant={getTypeVariant(selectedNotification.type)}
+                          className="flex items-center justify-start gap-1 border-primary-200 bg-primary-50 text-primary-700 text-xs"
+                        >
+                          {getTypeIcon(selectedNotification.type)}
+                          {selectedNotification.type}
+                        </Badge>
+                        <Badge
+                          className={`flex items-center justify-center gap-1 border px-2 py-0.5 text-xs font-medium ${
+                            selectedNotification.criticality === "Critical"
+                              ? "border-error-100 bg-error-50 text-error-700"
+                              : selectedNotification.criticality === "High"
+                              ? "border-warning-100 bg-warning-50 text-warning-700"
+                              : "border-primary-200 bg-primary-50 text-primary-700"
+                          }`}
+                        >
+                          {selectedNotification.criticality}
+                        </Badge>
+                        {selectedNotification.isReminded === 1 && (
+                          <Badge className="border-warning-100 bg-warning-50 text-warning-700 text-xs">
+                            <BellRing className="h-3 w-3" />
+                            Reminder Sent
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-600 space-y-1">
+                  <div className="space-y-1 text-xs text-neutral-600">
                     <div><span className="font-semibold">ID:</span> {selectedNotification.id}</div>
                     <div><span className="font-semibold">Published:</span> {selectedNotification.publishedDate}</div>
                     <div><span className="font-semibold">Scope:</span> {selectedNotification.scope}</div>
+                    {selectedNotification.reminder_sent_at && (
+                      <div>
+                        <span className="font-semibold">Reminder sent:</span>{" "}
+                        {new Date(selectedNotification.reminder_sent_at).toLocaleString()}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 flex-wrap mt-1">
                       <Badge
                         variant="outline"
-                        className="border-[#87CEEB] text-[#1E89B3] bg-[#E9F6FB] rounded-full text-xs"
+                        className="border-primary-200 bg-primary-50 text-primary-700 text-xs"
                       >
                         {selectedNotification.hashtags.join(' ')}
                       </Badge>
@@ -442,7 +586,7 @@ const KsmLibrary = ({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-2 border-sky-200 text-xs p-2"
+                          className="gap-2 border-neutral-300 p-2 text-xs"
                           onClick={(e) => {
                             e.stopPropagation();
                             onViewPdf(selectedNotification);
@@ -456,23 +600,23 @@ const KsmLibrary = ({
 
                   {/* Crew Status Panel */}
                   {canViewCrewStatus && (
-                    <div className="border-t border-sky-100 pt-3">
+                    <div className="border-t border-neutral-200 pt-3">
                       <div className="grid grid-cols-1 gap-3 text-xs">
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <div className="text-[11px] text-slate-500">Read</div>
+                            <div className="text-[11px] text-neutral-500">Read</div>
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="p-0 h-auto font-medium text-xs text-sky-700 hover:bg-sky-50"
+                              className="h-auto p-0 text-xs font-medium text-primary-700 hover:bg-transparent"
                               onClick={() => setShowCrewList(!showCrewList)}
                             >
                               {showCrewList ? 'Hide Crew' : 'View Crew Status'}
                             </Button>
                           </div>
-                          <div className="h-2 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                          <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-200">
                             <div
-                              className="h-full bg-blue-500 rounded-full"
+                              className="h-full rounded-full bg-primary-500"
                               style={{ width: `${Math.round(((selectedNotification.totalCrew - selectedNotification.unreadCount) / selectedNotification.totalCrew) * 100)}%` }}
                             />
                           </div>
@@ -483,12 +627,12 @@ const KsmLibrary = ({
                       </div>
 
                       {showCrewList && (
-                        <div className="pt-4 border-t border-sky-200">
+                        <div className="border-t border-neutral-200 pt-4">
                           <h4 className="font-medium text-sm mb-2">Crew Members</h4>
                           {crewLoading ? (
-                            <p className="text-xs text-slate-500">Loading crew list...</p>
+                            <p className="text-xs text-neutral-500">Loading crew list...</p>
                           ) : crewList.length === 0 ? (
-                            <p className="text-xs text-slate-500">No crew members found.</p>
+                            <p className="text-xs text-neutral-500">No crew members found.</p>
                           ) : (
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {crewList.map((crew) => (
@@ -511,18 +655,34 @@ const KsmLibrary = ({
                                     </span>
                                   </div>
 
-                                  {canRemindCrew && (
-                                    <Badge
-                                      variant="outline"
-                                      className="cursor-pointer flex items-center gap-1 px-2 py-0.5 text-xs border-red-400 text-red-700 hover:bg-red-100"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemindIndividualCrew(crew.crew_id);
-                                      }}
-                                    >
-                                      <Bell className="h-4 w-4 mr-1" />
-                                      Remind
-                                    </Badge>
+                                  {canRemindCrew && crew.status !== 'Acknowledged' && (
+                                    crew.reminder_sent_at ? (
+                                      <div className="ml-2 flex flex-col items-end gap-1">
+                                        <div
+                                          className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-1 text-xs font-medium text-warning-700"
+                                          title={`Reminder already sent to ${crew.crew_id}`}
+                                        >
+                                          <BellRing className="h-3.5 w-3.5" />
+                                          Reminded
+                                        </div>
+                                        <div className="text-[11px] text-warning-700">
+                                          {new Date(crew.reminder_sent_at).toLocaleString()}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        disabled={sendingCrewReminder === crew.crew_id}
+                                        className="inline-flex items-center gap-1 rounded-full border border-red-400 px-2 py-0.5 text-xs text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemindIndividualCrew(crew.crew_id);
+                                        }}
+                                      >
+                                        <Bell className={`h-4 w-4 mr-1 ${sendingCrewReminder === crew.crew_id ? 'animate-pulse' : ''}`} />
+                                        {sendingCrewReminder === crew.crew_id ? 'Sending...' : 'Remind'}
+                                      </button>
+                                    )
                                   )}
                                 </div>
                               ))}
@@ -534,7 +694,7 @@ const KsmLibrary = ({
                   )}
                 </>
               ) : (
-                <p className="text-muted-foreground text-center py-8">
+                <p className="py-8 text-center text-neutral-500">
                   {loading ? 'Loading...' : 'Select a notification to see details'}
                 </p>
               )}

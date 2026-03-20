@@ -53,6 +53,7 @@ from apps.car.views import (
     CARUpdateView,
     CorrectiveActionCompleteView,
     CorrectiveActionCreateView,
+    CorrectiveActionUpdateView,
     EvidenceUploadView,
     PhysicalVerificationCloseView,
     PhysicalVerificationCreateView,
@@ -4226,6 +4227,59 @@ class TestFEAT_CAR_012_CompleteCorrectiveAction(BaseCARAPITestCase):
         response = self._complete(self.vessel_crew_unassigned, payload={})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+
+class TestCorrectiveActionUpdateHistory(BaseCARAPITestCase):
+    """Corrective action edits should create user-visible CAR history entries."""
+
+    def setUp(self):
+        super().setUp()
+        self.inspection, self.deficiency, self.car = self.create_car_with_deficiency()
+        self.action = self.add_corrective_action(
+            self.car,
+            action_type=ActionType.IMMEDIATE,
+            description="Original corrective action text for history coverage.",
+        )
+        self.update_view = CorrectiveActionUpdateView.as_view()
+        self.detail_view = CARDetailView.as_view()
+
+    def _update(self, user, payload):
+        request = self.factory.put(
+            f"/api/psc/actions/{self.action.id}/",
+            payload,
+            format="json",
+        )
+        force_authenticate(request, user=user)
+        return self.update_view(request, id=self.action.id)
+
+    def _detail(self, user):
+        request = self.factory.get(f"/api/psc/cars/{self.car.id}/")
+        force_authenticate(request, user=user)
+        with patch("apps.car.views.car_vessel_name_annotation", return_value=Value("MV Example")):
+            return self.detail_view(request, id=self.car.id)
+
+    def test_corrective_action_update_creates_activity_history_entry(self):
+        response = self._update(
+            self.vessel_master,
+            {"description": "Updated corrective action text that should appear in CAR history."},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        detail_response = self._detail(self.vessel_master)
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+
+        updated_event = next(
+            (
+                event
+                for event in detail_response.data["data"]["activity_history"]
+                if event["event_type"] == "ACTION_UPDATED"
+            ),
+            None,
+        )
+
+        self.assertIsNotNone(updated_event)
+        self.assertEqual(updated_event["performed_by"], self.vessel_master.id)
+        self.assertIn("Corrective action updated", updated_event["event_description"])
 
 class TestFEAT_HIST_001_ActivityHistory(BaseCARAPITestCase):
     """
