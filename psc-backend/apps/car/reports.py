@@ -259,15 +259,26 @@ def _wrap(text: str, style) -> Paragraph:
     return Paragraph(escaped, style)
 
 
+def _wrap_labeled_text(label: str, value: Any, style, *, multiline: bool = False) -> Paragraph:
+    """Wrap label/value text with a bold label while preserving line breaks."""
+    escaped_label = escape(str(label or '').strip())
+    escaped_value = escape(_safe(value, '—')).replace('\n', '<br/>')
+    separator = '<br/>' if multiline else ' '
+    return Paragraph(f'<b>{escaped_label}</b>{separator}{escaped_value}', style)
+
+
 def _wrap_link(text: str, url: str | None, style) -> Paragraph:
-    """Wrap text in a clickable PDF hyperlink when a URL is available."""
+    """Wrap attachment text in a clickable PDF hyperlink when a URL is available."""
     if not url:
         return _wrap(text, style)
 
     normalized = str(text or '—')
     escaped_text = escape(normalized).replace('\n', '<br/>')
     escaped_url = escape(str(url), quote=True)
-    return Paragraph(f'<link href="{escaped_url}">{escaped_text}</link>', style)
+    return Paragraph(
+        f'<link href="{escaped_url}"><font color="#1D4ED8"><u>{escaped_text}</u></font></link>',
+        style,
+    )
 
 
 def _normalize_audience(audience: str | None) -> str:
@@ -853,25 +864,20 @@ def _build_review_comments(
     """Main-body office actions with actor/time/comment (PIC and DPA)."""
     elements.append(Paragraph('Office Actions', styles['SectionHeading']))
 
-    def _build_review_details(actor: str, performed_at: Any, comment: str) -> Table:
-        """Render actor, datetime, and comment in dedicated rows for readable wrapping."""
-        details_width = max(content_width - (40 * mm) - 8, 60 * mm)
-        label_width = min(24 * mm, details_width * 0.3)
-        value_width = max(details_width - label_width, 30 * mm)
-        detail_data = [
-            [_wrap('Name:', styles['CellBold']), _wrap(actor, styles['CellText'])],
-            [_wrap('Datetime:', styles['CellBold']), _wrap(_fmt_date(performed_at), styles['CellText'])],
-            [_wrap('Comment:', styles['CellBold']), _wrap(comment, styles['CellText'])],
-        ]
-        detail_table = Table(detail_data, colWidths=[label_width, value_width])
-        detail_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        return detail_table
+    del content_width
+
+    def _append_review_block(title: str, actor: str, performed_at: Any, comment: str):
+        """
+        Render a page-break-friendly office action block.
+
+        Large comments stay in Paragraph flowables so ReportLab can split them
+        across pages instead of forcing a single oversized table row.
+        """
+        elements.append(Paragraph(title, styles['BodyBold10']))
+        elements.append(_wrap_labeled_text('Name:', actor, styles['CellText']))
+        elements.append(_wrap_labeled_text('Datetime:', _fmt_date(performed_at), styles['CellText']))
+        elements.append(_wrap_labeled_text('Comment:', comment, styles['CellText'], multiline=True))
+        elements.append(Spacer(1, 2 * mm))
 
     pic_actor, pic_performed_at = _resolve_pic_actor_time(car_data)
     dpa_actor, dpa_performed_at = _resolve_dpa_actor_time(car_data)
@@ -885,20 +891,8 @@ def _build_review_comments(
     pic_comment = pic_comment or '—'
     dpa_comment = dpa_comment or '—'
 
-    comments_data = [
-        [
-            _wrap('PIC', styles['CellBold']),
-            _build_review_details(pic_actor, pic_performed_at, pic_comment),
-        ],
-        [
-            _wrap('DPA', styles['CellBold']),
-            _build_review_details(dpa_actor, dpa_performed_at, dpa_comment),
-        ],
-    ]
-
-    comments_table = Table(comments_data, colWidths=[40 * mm, content_width - 40 * mm])
-    comments_table.setStyle(TableStyle(_info_table_style()))
-    elements.append(comments_table)
+    _append_review_block('PIC', pic_actor, pic_performed_at, pic_comment)
+    _append_review_block('DPA', dpa_actor, dpa_performed_at, dpa_comment)
 
 
 def _build_corrective_actions(

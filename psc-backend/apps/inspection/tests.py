@@ -21,7 +21,7 @@ from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.accounts.models import RoleCodes
-from apps.car.models import ActivityHistory, AuditLog
+from apps.car.models import ActivityHistory, AuditLog, Evidence
 from apps.inspection.deficiency_models import CAR, Deficiency, DeficiencyActionHistory
 from apps.inspection.models import Inspection, InspectionReport, InspectionStatus
 from apps.inspection.views import (
@@ -37,8 +37,8 @@ from apps.inspection.views import (
 )
 from apps.inspection.deficiency_views import DeficiencyCreateView
 from apps.inspection.deficiency_views import DeficiencyActionCodeUpdateView
-from apps.inspection.followup_views import PSCFollowUpRegisterView
-from apps.inspection.report_views import DeficiencyExcelExportView
+from apps.inspection.followup_views import FollowUpView
+from apps.inspection.report_views import BulkCARExportView, DeficiencyExcelExportView
 from apps.inspection.reports import generate_deficiency_excel
 from apps.masters.models import PSCActionCode, PSCDefCode
 from apps.notifications.models import Notification
@@ -162,6 +162,7 @@ class TestFEAT_INS_001_CreateInspection(BaseInspectionAPITestCase):
         inspection = Inspection.objects.get(id=response.data["data"]["id"])
         self.assertEqual(inspection.psc_subtype, None)
         self.assertEqual(inspection.status, InspectionStatus.DRAFT)
+
 
     def test_contract_create_supported_on_root_inspections_endpoint(self):
         view = InspectionListView.as_view()
@@ -2637,7 +2638,7 @@ class TestFEAT_DEF_002_RegisterPSCFollowUp(BaseInspectionAPITestCase):
 
     def setUp(self):
         super().setUp()
-        self.view = PSCFollowUpRegisterView.as_view()
+        self.view = FollowUpView.as_view()
         self.parent_psc = self.create_inspection(
             inspection_type="PSC",
             psc_subtype="INITIAL",
@@ -3113,6 +3114,88 @@ class TestFEAT_DEF_003_MarkDeficiencyCleared(BaseInspectionAPITestCase):
         second_def.refresh_from_db()
         self.assertTrue(self.deficiency.is_cleared)
         self.assertFalse(second_def.is_cleared, "Second deficiency should NOT be cleared.")
+
+
+class TestFEAT_RPT_002_BulkCARPDFExport(BaseInspectionAPITestCase):
+    """Inspection-level CAR PDF export should attach evidence preview URLs for every CAR."""
+
+    def setUp(self):
+        super().setUp()
+        self.view = BulkCARExportView.as_view()
+        self.inspection = self.create_inspection(status=InspectionStatus.SUBMITTED)
+
+        self.car_one = CAR.objects.create(
+            car_number=f"PSC-{date.today().year}-BULK01",
+            status="SUBMITTED_TO_PIC",
+            created_by=str(self.vessel_master.id),
+        )
+        self.car_two = CAR.objects.create(
+            car_number=f"PSC-{date.today().year}-BULK02",
+            status="SUBMITTED_TO_PIC",
+            created_by=str(self.vessel_master.id),
+        )
+
+        Deficiency.objects.create(
+            inspection=self.inspection,
+            def_code_id="10101",
+            def_code="10101",
+            description="Bulk export deficiency one.",
+            action_code_id=30,
+            action_code="30",
+            car=self.car_one,
+            created_by=str(self.vessel_master.id),
+        )
+        Deficiency.objects.create(
+            inspection=self.inspection,
+            def_code_id="20202",
+            def_code="20202",
+            description="Bulk export deficiency two.",
+            action_code_id=17,
+            action_code="17",
+            car=self.car_two,
+            created_by=str(self.vessel_master.id),
+        )
+
+        Evidence.objects.create(
+            car=self.car_one,
+            evidence_type="BEFORE",
+            file_name="bulk-one-before.jpg",
+            file_path="/tmp/bulk-one-before.jpg",
+            file_size=1024,
+            mime_type="image/jpeg",
+            description="First bulk-export evidence attachment.",
+            uploaded_by=str(self.vessel_master.id),
+        )
+        Evidence.objects.create(
+            car=self.car_two,
+            evidence_type="AFTER",
+            file_name="bulk-two-after.jpg",
+            file_path="/tmp/bulk-two-after.jpg",
+            file_size=2048,
+            mime_type="image/jpeg",
+            description="Second bulk-export evidence attachment.",
+            uploaded_by=str(self.vessel_master.id),
+        )
+
+    def _export(self, user=None):
+        request = self.factory.get(f"/api/psc/inspections/{self.inspection.id}/cars/export-pdf/")
+        force_authenticate(request, user=user or self.vessel_master)
+        return self.view(request, inspection_id=self.inspection.id)
+
+    @patch("apps.inspection.report_views.generate_car_pdf", return_value=b"%PDF-1.4 bulk")
+    def test_bulk_export_attaches_report_preview_urls_to_each_car_payload(self, mock_generate):
+        response = self._export()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        self.assertEqual(mock_generate.call_count, 2)
+
+        for call in mock_generate.call_args_list:
+            payload = call.args[0]
+            self.assertTrue(payload["evidence"])
+            preview_url = payload["evidence"][0].get("report_preview_url", "")
+            self.assertIn("/api/psc/evidence/", preview_url)
+            self.assertIn("report_token=", preview_url)
 
 
 class TestFEAT_RPT_002_DeficiencyExcelExport(BaseInspectionAPITestCase):

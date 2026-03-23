@@ -2456,6 +2456,23 @@ class TestFEAT_RPT_001_CARPDFExport(BaseCARAPITestCase):
         self.assertTrue(response.content.startswith(b"%PDF"))
         self.assertGreater(len(response.content), 100)
 
+    def test_feat_rpt_001_export_handles_large_pic_and_dpa_comments(self):
+        """Regression: long office-action comments should not trigger ReportLab layout errors."""
+        long_comment = "\n".join(
+            f"Office action block {index}: " + ("Detailed closure narrative " * 18)
+            for index in range(1, 70)
+        )
+        self.car.status = CARStatus.DPA_CLOSED
+        self.car.pic_comment = long_comment
+        self.car.dpa_comment = long_comment
+        self.car.save(update_fields=["status", "pic_comment", "dpa_comment"])
+
+        response = self._export(user=self.vessel_master)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertGreater(len(response.content), 1000)
+
     def test_feat_rpt_001_happy_path_generator_invokes_all_required_section_builders(self):
         """PRD FEAT-RPT-001: generator should build all required CAR report sections."""
         sample_data = {
@@ -2895,6 +2912,36 @@ class TestCARReportPrintFormatting(TestCase):
             "Corrective action text withheld (internal/system content detected).",
             merged,
         )
+
+    def test_evidence_section_renders_attachment_name_as_blue_underlined_link(self):
+        styles = car_reports._build_styles()
+        elements: list = []
+        content_width = car_reports.PAGE_WIDTH - car_reports.MARGIN_LEFT - car_reports.MARGIN_RIGHT
+        car_reports._build_evidence_list(
+            elements=elements,
+            car_data={
+                "evidence": [
+                    {
+                        "evidence_type_display": "Before",
+                        "file_name": "before-evidence.jpg",
+                        "report_preview_url": "https://example.test/api/psc/evidence/123/view/?report_token=abc",
+                        "description": "Before evidence link visibility check.",
+                        "uploaded_at": "2026-02-10T10:00:00",
+                    }
+                ]
+            },
+            styles=styles,
+            content_width=content_width,
+        )
+
+        merged = self._flatten_flowable_text(elements)
+        evidence_table = elements[1]
+        file_name_cell = evidence_table._cellvalues[1][2]
+        self.assertIn("Evidence", merged)
+        self.assertIn("before-evidence.jpg", merged)
+        self.assertNotIn("Open attachment", merged)
+        self.assertIn("#1D4ED8", getattr(file_name_cell, "text", ""))
+        self.assertIn("<u>", getattr(file_name_cell, "text", ""))
 
     def test_review_history_is_hidden_in_external_mode(self):
         styles = car_reports._build_styles()

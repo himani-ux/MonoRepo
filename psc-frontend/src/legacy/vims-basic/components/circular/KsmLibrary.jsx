@@ -429,133 +429,102 @@ const KsmLibrary = ({
         ) : filteredNotifications.length === 0 ? (
           <div className="rounded-lg border border-dashed border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">No notifications match your filters</div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredNotifications.map((notification) => (
-                <TableRow
-                  key={notification.id}
-                  className={`cursor-pointer ${
-                    selectedId === notification.id
-                      ? "[&>td]:border-primary-200 [&>td]:bg-primary-50"
-                      : notification.isReminded === 1
-                      ? "[&>td]:border-warning-100 [&>td]:bg-warning-50/50"
-                      : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedId(selectedId === notification.id ? null : notification.id);
-                  }}
-                >
-                  <TableCell className="max-w-[380px]">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-[15px] font-semibold leading-6 text-neutral-900" title={notification.title}>
-                          {notification.title}
-                        </div>
-                        <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
-                          SR No: {notification.id || "—"}
-                        </div>
-                        {notification.isReminded === 1 && (
-                          <div className="mt-2">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-[11px] font-semibold text-warning-700 shadow-sm">
-                              <BellRing className="h-3 w-3" />
-                              Reminded
-                            </span>
-                          </div>
-                        )}
-                      </div>
+          <div className="space-y-3">
+            {filteredNotifications.map((notification) => (
+              <Card
+                key={notification.id}
+                className={`cursor-pointer border-l-4 border-l-error-500 transition-shadow hover:shadow-md ${
+                  selectedId === notification.id
+                    ? 'border-primary-200 bg-primary-50/40'
+                    : notification.isReminded === 1
+                    ? 'border-warning-100 bg-warning-50/30'
+                    : ''
+                }`}
+                onClick={() => {
+                  setSelectedId(selectedId === notification.id ? null : notification.id);
+                }}
+              >
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-neutral-900">{notification.id || "—"}</div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${
-                          notification.type === "Alert"
-                            ? "bg-error-50 text-error-700"
-                            : notification.type === "Circular"
-                            ? "bg-primary-50 text-primary-700"
-                            : notification.type === "Work Instruction"
-                            ? "bg-warning-50 text-warning-700"
-                            : "bg-neutral-100 text-neutral-700"
-                        }`}
-                      >
-                        {notification.type}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${notification.isAck === 0 ? "bg-error-50 text-error-700" : "bg-success-50 text-success-700"}`}>
-                        {notification.isAck === 0 ? "Unread" : "Read"}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end">
-                      <div className="flex items-center gap-1.5">
-                        {canViewDetail && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 w-9 rounded-full border-neutral-200 bg-white p-0 hover:border-neutral-300 hover:bg-neutral-50"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedId(selectedId === notification.id ? null : notification.id);
-                            }}
-                            aria-label={`Show details for ${notification.title}`}
-                            title="Details"
-                          >
-                            <PanelRightOpen className="h-4 w-4" />
-                          </Button>
-                        )}
+                    <div className="flex items-center gap-1.5">
+                      {canViewDetail && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 w-9 rounded-full border-neutral-200 bg-white p-0 hover:border-neutral-300 hover:bg-neutral-50"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedId(selectedId === notification.id ? null : notification.id);
+                          }}
+                          aria-label={`Show details for ${notification.title}`}
+                          title="Details"
+                        >
+                          <PanelRightOpen className="h-4 w-4" />
+                        </Button>
+                      )}
 
-                        {canAccessPdf && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-9 w-9 rounded-full border-neutral-200 bg-white p-0 hover:border-neutral-300 hover:bg-neutral-50"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onViewPdf(notification);
-                            }}
-                            aria-label={`View ${notification.title}`}
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
+                      {canAccessPdf && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 w-9 rounded-full border-neutral-200 bg-white p-0 hover:border-neutral-300 hover:bg-neutral-50"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onViewPdf(notification);
+                          }}
+                          aria-label={`View ${notification.title}`}
+                          title="View"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
 
-                        {canDownloadPdf && (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDownloadNotification(notification);
-                            }}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-                            aria-label={`Download ${notification.title}`}
-                            title="Download"
-                          >
-                            <FileDown className="h-4 w-4" />
-                          </button>
-                        )}
+                      {canDownloadPdf && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDownloadNotification(notification);
+                          }}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                          aria-label={`Download ${notification.title}`}
+                          title="Download"
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
+                      {getTypeIcon(notification.type) || <FileText className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[17px] font-semibold leading-7 text-neutral-900" title={notification.title}>
+                        {notification.title}
                       </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${notification.isAck === 0 ? "bg-error-50 text-error-700" : "bg-success-50 text-success-700"}`}>
+                      {notification.isAck === 0 ? "Unread" : "Read"}
+                    </span>
+                    {notification.isReminded === 1 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-[11px] font-semibold text-warning-700 shadow-sm">
+                        <BellRing className="h-3 w-3" />
+                        Reminded
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
 

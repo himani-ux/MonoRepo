@@ -15,6 +15,7 @@ import { WithPermission } from '../../utils/circular/permissionUtils';
 import { useAuth } from '../../hooks/auth/useAuth';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '../../components/circular/ui/card';
 import {
     Table,
     TableBody,
@@ -703,121 +704,98 @@ const ApprovedNotificationsLibrary = () => {
                         No notifications match your filters.
                     </div>
                 ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Title</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Priority</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredNotifications.map((n) => (
-                                    <TableRow
-                                        key={n.id}
-                                        className={n.is_superseeded ? '[&>td]:border-warning-100 [&>td]:bg-warning-50/60' : ''}
-                                    >
-                                        <TableCell className="max-w-[380px]">
-                                            <div className="flex items-start gap-3">
-                                                <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
-                                                    <FileText className="h-4 w-4" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="truncate text-[15px] font-semibold leading-6 text-neutral-900" title={n.title || n.sr_no}>
-                                                        {n.title || n.sr_no}
-                                                    </div>
-                                                    <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
-                                                        SR No: {n.sr_no || '—'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center">
-                                                {getTypeBadge(n.msc_type)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center">
-                                                {getPriorityBadge(n.priority)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center justify-end">
-                                                <div className="flex items-center gap-1.5">
-                                                <WithPermission id="PSC_P_020">
-                                                    {n.attachment_url ? (
-                                                        <a
-                                                            href={`http://localhost:8000${n.attachment_url}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            process-id="PSC_P_020"
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-                                                            title={`Download ${n.sr_no}`}
-                                                        >
-                                                            <FileDown size={14} />
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-xs text-neutral-400">No file</span>
-                                                    )}
-                                                </WithPermission>
-
-                                                <WithPermission id="PSC_P_021">
-                                                    <button
-                                                        onClick={() => handleSupersede(n.sr_no)}
-                                                        process-id="PSC_P_021"
-                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-warning-100 bg-warning-50 text-warning-700 shadow-sm transition-colors hover:bg-warning-100"
-                                                        aria-label={`Supersede ${n.sr_no}`}
-                                                        title={`Supersede ${n.sr_no}`}
+                    <div className="space-y-3">
+                        {filteredNotifications.map((n) => (
+                            <Card
+                                key={n.id}
+                                className={`border-l-4 border-l-error-500 transition-shadow hover:shadow-md ${n.is_superseeded ? 'border-warning-100 bg-warning-50/40' : ''}`}
+                            >
+                                <CardContent className="p-4">
+                                    <div className="mb-3 flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-neutral-900">{n.sr_no || '—'}</div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <WithPermission id="PSC_P_020">
+                                                {n.attachment_url ? (
+                                                    <a
+                                                        href={`http://localhost:8000${n.attachment_url}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        process-id="PSC_P_020"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                                                        title={`Download ${n.sr_no}`}
                                                     >
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            strokeWidth={2}
-                                                            stroke="currentColor"
-                                                            className="h-4 w-4"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                d="M4 4v5h.582m0 0A7.5 7.5 0 1112 19.5 7.5 7.5 0 014.582 9H9"
-                                                            />
-                                                        </svg>
-                                                    </button>
-                                                </WithPermission>
+                                                        <FileDown size={14} />
+                                                    </a>
+                                                ) : null}
+                                            </WithPermission>
 
-                                                <WithPermission id="PSC_P_022">
-                                                    <button
-                                                        onClick={() => handleViewSeenCrews(n.sr_no)}
-                                                        process-id="PSC_P_022"
-                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-success-100 bg-success-50 text-success-700 shadow-sm transition-colors hover:bg-success-100"
-                                                        aria-label={`View seen crews for ${n.sr_no}`}
-                                                        title={`View seen crews for ${n.sr_no}`}
+                                            <WithPermission id="PSC_P_021">
+                                                <button
+                                                    onClick={() => handleSupersede(n.sr_no)}
+                                                    process-id="PSC_P_021"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-warning-100 bg-warning-50 text-warning-700 shadow-sm transition-colors hover:bg-warning-100"
+                                                    aria-label={`Supersede ${n.sr_no}`}
+                                                    title={`Supersede ${n.sr_no}`}
+                                                >
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        strokeWidth={2}
+                                                        stroke="currentColor"
+                                                        className="h-4 w-4"
                                                     >
-                                                        <Eye size={14} />
-                                                    </button>
-                                                </WithPermission>
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            d="M4 4v5h.582m0 0A7.5 7.5 0 1112 19.5 7.5 7.5 0 014.582 9H9"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                            </WithPermission>
 
-                                                <WithPermission id="PSC_P_023">
-                                                    <button
-                                                        onClick={() => handleDelete(n.sr_no)}
-                                                        process-id="PSC_P_023"
-                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-error-100 bg-error-50 text-error-700 shadow-sm transition-colors hover:bg-error-100"
-                                                        aria-label={`Delete ${n.sr_no}`}
-                                                        title={`Delete ${n.sr_no}`}
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </WithPermission>
-                                                </div>
+                                            <WithPermission id="PSC_P_022">
+                                                <button
+                                                    onClick={() => handleViewSeenCrews(n.sr_no)}
+                                                    process-id="PSC_P_022"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-success-100 bg-success-50 text-success-700 shadow-sm transition-colors hover:bg-success-100"
+                                                    aria-label={`View seen crews for ${n.sr_no}`}
+                                                    title={`View seen crews for ${n.sr_no}`}
+                                                >
+                                                    <Eye size={14} />
+                                                </button>
+                                            </WithPermission>
+
+                                            <WithPermission id="PSC_P_023">
+                                                <button
+                                                    onClick={() => handleDelete(n.sr_no)}
+                                                    process-id="PSC_P_023"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-error-100 bg-error-50 text-error-700 shadow-sm transition-colors hover:bg-error-100"
+                                                    aria-label={`Delete ${n.sr_no}`}
+                                                    title={`Delete ${n.sr_no}`}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </WithPermission>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-3 flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
+                                            <FileText className="h-4 w-4" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-[17px] font-semibold leading-7 text-neutral-900" title={n.title || n.sr_no}>
+                                                {n.title || n.sr_no}
                                             </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
                 )}
 
                 {/* --- NEW: View Seen Crews Modal --- */}
@@ -839,8 +817,7 @@ const ApprovedNotificationsLibrary = () => {
                                         &times;
                                     </button>
                                 </div>
-                                <div className="p-6">
-                                <div className="mb-4">
+                                <div className="sticky top-[65px] z-10 border-b border-neutral-200 bg-white px-6 pb-4 pt-4">
                                     <div className="relative">
                                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
                                         <input
@@ -852,6 +829,7 @@ const ApprovedNotificationsLibrary = () => {
                                         />
                                     </div>
                                 </div>
+                                <div className="p-6">
 
                                 {loadingSeenCrews ? (
                                     <div className="text-center py-4">
