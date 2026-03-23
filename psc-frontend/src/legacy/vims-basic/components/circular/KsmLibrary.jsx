@@ -32,6 +32,8 @@ function fixDate(dateString) {
   return new Date(dateString.replace(" ", "T").split(".")[0]);
 }
 
+const REMINDER_STORAGE_KEY = "circular-master-reminded-crews";
+
 const getTypeIcon = (type) => {
   if (type === "Alert") return <AlertTriangle className="h-3 w-3" />;
   if (type === "Circular") return <FileText className="h-3 w-3" />;
@@ -73,6 +75,25 @@ const KsmLibrary = ({
   const [crewList, setCrewList] = useState([]);
   const [crewLoading, setCrewLoading] = useState(false);
   const [sendingCrewReminder, setSendingCrewReminder] = useState(null);
+  const [remindedCrewByNotification, setRemindedCrewByNotification] = useState(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const storedValue = window.localStorage.getItem(REMINDER_STORAGE_KEY);
+      return storedValue ? JSON.parse(storedValue) : {};
+    } catch (error) {
+      console.error("Failed to read reminder state from storage:", error);
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(remindedCrewByNotification));
+    } catch (error) {
+      console.error("Failed to persist reminder state:", error);
+    }
+  }, [remindedCrewByNotification]);
 
   // 📥 Fetch notifications
   useEffect(() => {
@@ -113,6 +134,9 @@ const KsmLibrary = ({
         } else if (Array.isArray(item.hashtags)) {
           hashtags = item.hashtags;
         }
+        const reminderSentAt = item.reminder_sent_at || null;
+        const seenAt = item.seen_at || null;
+        const isReminded = !seenAt && (Boolean(reminderSentAt) || Number(item.isReminded) === 1) ? 1 : 0;
 
         return {
           id: item.sr_no || 'N/A',
@@ -123,13 +147,13 @@ const KsmLibrary = ({
           publishedDate: item.publishedDate ? item.publishedDate.replace("T", " ").split(".")[0] : "—",
           scope: scopeLabel,
           attachment_url: item.attachment_url || null,
-          isReminded: item.isReminded || 0,
+          isReminded,
           isAck: item.isAck || 0,
           unreadCount: item.unreadCount || 0,
           totalCrew: item.totalCrew || 0,
           delivered_at: item.delivered_at || null,
-          seen_at: item.seen_at || null,
-          reminder_sent_at: item.reminder_sent_at || null,
+          seen_at: seenAt,
+          reminder_sent_at: reminderSentAt,
         };
       });
 
@@ -164,7 +188,43 @@ const KsmLibrary = ({
         const res = await fetch(`http://localhost:8000/api/circular/api/crew/list/?notification_id=${selectedId}&crew_id=${user.crew_id || user.username}`);
         if (!res.ok) throw new Error('Failed to load crew status');
         const data = await res.json();
-        setCrewList(data);
+        const localReminderState = remindedCrewByNotification[selectedId] || {};
+        const normalizedCrewList = data.map((crew) => ({
+            ...crew,
+            reminder_sent_at: crew.reminder_sent_at || localReminderState[crew.crew_id] || null,
+          }));
+
+        const acknowledgedCrewIds = normalizedCrewList
+          .filter((crew) => crew.status === "Acknowledged")
+          .map((crew) => crew.crew_id);
+
+        if (acknowledgedCrewIds.length > 0) {
+          setRemindedCrewByNotification((prev) => {
+            const existingState = prev[selectedId];
+            if (!existingState) return prev;
+
+            const nextNotificationState = { ...existingState };
+            acknowledgedCrewIds.forEach((crewId) => {
+              delete nextNotificationState[crewId];
+            });
+
+            if (Object.keys(nextNotificationState).length === Object.keys(existingState).length) {
+              return prev;
+            }
+
+            if (Object.keys(nextNotificationState).length === 0) {
+              const { [selectedId]: _removed, ...rest } = prev;
+              return rest;
+            }
+
+            return {
+              ...prev,
+              [selectedId]: nextNotificationState,
+            };
+          });
+        }
+
+        setCrewList(normalizedCrewList);
       } catch (err) {
         console.error('Fetch crew error:', err);
         alert('Failed to load crew list');
@@ -174,7 +234,13 @@ const KsmLibrary = ({
     };
 
     fetchCrewList();
-  }, [showCrewList, selectedId, canViewCrewStatus, user]);
+  }, [showCrewList, selectedId, canViewCrewStatus, user, remindedCrewByNotification]);
+
+  useEffect(() => {
+    setCrewList([]);
+    setShowCrewList(false);
+    setSendingCrewReminder(null);
+  }, [selectedId]);
 
   // 🛎️ Remind crew
   const handleRemindIndividualCrew = async (employeeId) => {
@@ -198,23 +264,19 @@ const KsmLibrary = ({
         alert(`Reminder sent to ${employeeId}`);
         const reminderTimestamp = new Date().toISOString();
 
+        setRemindedCrewByNotification((prev) => ({
+          ...prev,
+          [selectedId]: {
+            ...(prev[selectedId] || {}),
+            [employeeId]: reminderTimestamp,
+          },
+        }));
+
         setCrewList((prev) =>
           prev.map((crew) =>
             crew.crew_id === employeeId
               ? { ...crew, reminder_sent_at: reminderTimestamp }
               : crew
-          )
-        );
-
-        setNotifications((prev) =>
-          prev.map((notification) =>
-            notification.id === selectedId
-              ? {
-                  ...notification,
-                  isReminded: 1,
-                  reminder_sent_at: reminderTimestamp,
-                }
-              : notification
           )
         );
       } else {
@@ -297,6 +359,17 @@ const KsmLibrary = ({
   });
 
   const selectedNotification = notifications.find((n) => n.id === selectedId);
+  const crewSummary = selectedNotification
+    ? crewList.length > 0
+      ? {
+          total: crewList.length,
+          read: crewList.filter((crew) => crew.status === 'Acknowledged').length,
+        }
+      : {
+          total: selectedNotification.totalCrew || 0,
+          read: Math.max(0, (selectedNotification.totalCrew || 0) - (selectedNotification.unreadCount || 0)),
+        }
+    : { total: 0, read: 0 };
 
   // 🖼️ Render helpers
   const getStatusColor = (isAck) => isAck ? 'border-blue-400' : 'border-red-400';
@@ -356,155 +429,133 @@ const KsmLibrary = ({
         ) : filteredNotifications.length === 0 ? (
           <div className="rounded-lg border border-dashed border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">No notifications match your filters</div>
         ) : (
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Department</TableHead>
-                    {canViewCrewStatus && <TableHead>Read</TableHead>}
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredNotifications.map((notification) => (
-                    <TableRow
-                      key={notification.id}
-                      className={`cursor-pointer ${
-                        selectedId === notification.id
-                          ? "bg-primary-50"
-                          : notification.isReminded === 1
-                          ? "bg-warning-50/40"
-                          : ""
-                      }`}
-                      onClick={() => {
-                        setSelectedId(selectedId === notification.id ? null : notification.id);
-                      }}
-                    >
-                      <TableCell className="max-w-[320px]">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-neutral-800" title={notification.title}>
-                            {notification.title}
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
-                            {notification.isReminded === 1 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">
-                                <BellRing className="h-3 w-3" />
-                                Reminder Sent
-                              </span>
-                            )}
-                            {notification.hashtags.slice(0, 3).map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-600"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredNotifications.map((notification) => (
+                <TableRow
+                  key={notification.id}
+                  className={`cursor-pointer ${
+                    selectedId === notification.id
+                      ? "[&>td]:border-primary-200 [&>td]:bg-primary-50"
+                      : notification.isReminded === 1
+                      ? "[&>td]:border-warning-100 [&>td]:bg-warning-50/50"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedId(selectedId === notification.id ? null : notification.id);
+                  }}
+                >
+                  <TableCell className="max-w-[380px]">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[15px] font-semibold leading-6 text-neutral-900" title={notification.title}>
+                          {notification.title}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            notification.type === "Alert"
-                              ? "bg-error-50 text-error-700"
-                              : notification.type === "Circular"
-                              ? "bg-primary-50 text-primary-700"
-                              : notification.type === "Work Instruction"
-                              ? "bg-warning-50 text-warning-700"
-                              : "bg-neutral-100 text-neutral-700"
-                          }`}
-                        >
-                          {notification.type}
-                        </span>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {notification.publishedDate
-                          ? new Date(notification.publishedDate).toLocaleDateString()
-                          : "—"}
-                      </TableCell>
-                      <TableCell>{notification.scope}</TableCell>
-                      {canViewCrewStatus && (
-                        <TableCell className="whitespace-nowrap">
-                          <span className="font-semibold text-neutral-800">
-                            {notification.totalCrew - notification.unreadCount}/{notification.totalCrew}
-                          </span>
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${notification.isAck === 0 ? "bg-error-50 text-error-700" : "bg-success-50 text-success-700"}`}>
-                            {notification.isAck === 0 ? "Unread" : "Read"}
-                          </span>
-                          {notification.isReminded === 1 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">
-                              <Bell className="h-3 w-3" />
+                        <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+                          SR No: {notification.id || "—"}
+                        </div>
+                        {notification.isReminded === 1 && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-[11px] font-semibold text-warning-700 shadow-sm">
+                              <BellRing className="h-3 w-3" />
                               Reminded
                             </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
-                          {canViewDetail && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedId(selectedId === notification.id ? null : notification.id);
-                              }}
-                              aria-label={`Show details for ${notification.title}`}
-                              title="Details"
-                            >
-                              <PanelRightOpen className="h-4 w-4" />
-                            </Button>
-                          )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${
+                          notification.type === "Alert"
+                            ? "bg-error-50 text-error-700"
+                            : notification.type === "Circular"
+                            ? "bg-primary-50 text-primary-700"
+                            : notification.type === "Work Instruction"
+                            ? "bg-warning-50 text-warning-700"
+                            : "bg-neutral-100 text-neutral-700"
+                        }`}
+                      >
+                        {notification.type}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ${notification.isAck === 0 ? "bg-error-50 text-error-700" : "bg-success-50 text-success-700"}`}>
+                        {notification.isAck === 0 ? "Unread" : "Read"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end">
+                      <div className="flex items-center gap-1.5">
+                        {canViewDetail && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 w-9 rounded-full border-neutral-200 bg-white p-0 hover:border-neutral-300 hover:bg-neutral-50"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedId(selectedId === notification.id ? null : notification.id);
+                            }}
+                            aria-label={`Show details for ${notification.title}`}
+                            title="Details"
+                          >
+                            <PanelRightOpen className="h-4 w-4" />
+                          </Button>
+                        )}
 
-                          {canAccessPdf && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onViewPdf(notification);
-                              }}
-                              aria-label={`View ${notification.title}`}
-                              title="View"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          )}
+                        {canAccessPdf && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 w-9 rounded-full border-neutral-200 bg-white p-0 hover:border-neutral-300 hover:bg-neutral-50"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onViewPdf(notification);
+                            }}
+                            aria-label={`View ${notification.title}`}
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
 
-                          {canDownloadPdf && (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDownloadNotification(notification);
-                              }}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50"
-                              aria-label={`Download ${notification.title}`}
-                              title="Download"
-                            >
-                              <FileDown className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                        {canDownloadPdf && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDownloadNotification(notification);
+                            }}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                            aria-label={`Download ${notification.title}`}
+                            title="Download"
+                          >
+                            <FileDown className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -557,7 +608,7 @@ const KsmLibrary = ({
                         {selectedNotification.isReminded === 1 && (
                           <Badge className="border-warning-100 bg-warning-50 text-warning-700 text-xs">
                             <BellRing className="h-3 w-3" />
-                            Reminder Sent
+                            Reminded
                           </Badge>
                         )}
                       </div>
@@ -570,7 +621,7 @@ const KsmLibrary = ({
                     <div><span className="font-semibold">Scope:</span> {selectedNotification.scope}</div>
                     {selectedNotification.reminder_sent_at && (
                       <div>
-                        <span className="font-semibold">Reminder sent:</span>{" "}
+                        <span className="font-semibold">Reminded at:</span>{" "}
                         {new Date(selectedNotification.reminder_sent_at).toLocaleString()}
                       </div>
                     )}
@@ -617,11 +668,11 @@ const KsmLibrary = ({
                           <div className="mt-1 h-2 overflow-hidden rounded-full bg-neutral-200">
                             <div
                               className="h-full rounded-full bg-primary-500"
-                              style={{ width: `${Math.round(((selectedNotification.totalCrew - selectedNotification.unreadCount) / selectedNotification.totalCrew) * 100)}%` }}
+                              style={{ width: `${crewSummary.total > 0 ? Math.round((crewSummary.read / crewSummary.total) * 100) : 0}%` }}
                             />
                           </div>
                           <div className="mt-1 flex justify-between">
-                            <span>{selectedNotification.totalCrew - selectedNotification.unreadCount}/{selectedNotification.totalCrew}</span>
+                            <span>{crewSummary.read}/{crewSummary.total}</span>
                           </div>
                         </div>
                       </div>

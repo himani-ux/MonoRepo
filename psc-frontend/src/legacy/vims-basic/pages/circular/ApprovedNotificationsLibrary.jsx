@@ -7,7 +7,8 @@ import {
     BellRing,
     Search,
     Trash2,
-    Eye
+    Eye,
+    FileText
 } from "lucide-react";
 import { Download as DownloadIcon } from 'lucide-react';
 import { WithPermission } from '../../utils/circular/permissionUtils';
@@ -42,13 +43,21 @@ const ApprovedNotificationsLibrary = () => {
     const [sortCriteria, setSortCriteria] = useState("created_at");
     const [sortDirection, setSortDirection] = useState("desc");
     const [searchQuery, setSearchQuery] = useState("");
+    const [crewSearchQuery, setCrewSearchQuery] = useState("");
     const [sendingIndividualReminder, setSendingIndividualReminder] = useState(null); // Store the crew_id being processed for individual reminder
     const [typeUuidToNameMap, setTypeUuidToNameMap] = useState({});
     const [priorityUuidToNameMap, setPriorityUuidToNameMap] = useState({});
     const [loadingLookupMaps, setLoadingLookupMaps] = useState(true); // To track loading of lookup data
 
 
-  
+
+
+
+    const filteredSeenCrewsData = seenCrewsData.filter((record) => {
+        const query = crewSearchQuery.trim().toLowerCase();
+        if (!query) return true;
+        return String(record.crew_id || '').toLowerCase().includes(query);
+    });
 
 
     // --- NEW: Fetch Lookup Maps on Component Mount ---
@@ -148,6 +157,7 @@ const ApprovedNotificationsLibrary = () => {
 
                 const notificationsWithNames = data.map(notification => ({
                     ...notification,
+                    title: notification.office_instructions || notification.title || '',
                     msc_type: typeUuidToNameMap[notification.msc_type] || notification.msc_type,
                     priority: priorityUuidToNameMap[notification.priority] || notification.priority,
                 }));
@@ -693,14 +703,10 @@ const ApprovedNotificationsLibrary = () => {
                         No notifications match your filters.
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-md">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Title</TableHead>
-                                    <TableHead>Hashtags</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Department</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Priority</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
@@ -710,46 +716,36 @@ const ApprovedNotificationsLibrary = () => {
                                 {filteredNotifications.map((n) => (
                                     <TableRow
                                         key={n.id}
-                                        className={n.is_superseeded ? 'bg-warning-50/60' : ''}
+                                        className={n.is_superseeded ? '[&>td]:border-warning-100 [&>td]:bg-warning-50/60' : ''}
                                     >
-                                        <TableCell className="max-w-[320px]">
-                                            <div className="min-w-0">
-                                                <div className="truncate font-medium text-neutral-800" title={n.title || n.sr_no}>
-                                                    {n.title || n.sr_no}
+                                        <TableCell className="max-w-[380px]">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
+                                                    <FileText className="h-4 w-4" />
                                                 </div>
-                                                <div className="mt-1 text-xs text-neutral-500">
-                                                    SR No: {n.sr_no || '—'}
+                                                <div className="min-w-0">
+                                                    <div className="truncate text-[15px] font-semibold leading-6 text-neutral-900" title={n.title || n.sr_no}>
+                                                        {n.title || n.sr_no}
+                                                    </div>
+                                                    <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+                                                        SR No: {n.sr_no || '—'}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="max-w-[240px]">
-                                            <div className="flex flex-wrap gap-1">
-                                                {n.hashtags && n.hashtags.trim() !== '' ? (
-                                                    n.hashtags
-                                                        .split(/[\s,]+/)
-                                                        .filter(tag => tag.trim() !== '')
-                                                        .slice(0, 4)
-                                                        .map((tag, index) => (
-                                                            <span
-                                                                key={index}
-                                                                className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-600"
-                                                            >
-                                                                #{tag.replace(/^#/, '')}
-                                                            </span>
-                                                        ))
-                                                ) : (
-                                                    <span className="text-xs text-neutral-400">No hashtags</span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="whitespace-nowrap">
-                                            {new Date(n.created_at).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell>{n.department_name || n.department || '—'}</TableCell>
-                                        <TableCell>{getTypeBadge(n.msc_type)}</TableCell>
-                                        <TableCell>{getPriorityBadge(n.priority)}</TableCell>
                                         <TableCell>
-                                            <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center">
+                                                {getTypeBadge(n.msc_type)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center">
+                                                {getPriorityBadge(n.priority)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center justify-end">
+                                                <div className="flex items-center gap-1.5">
                                                 <WithPermission id="PSC_P_020">
                                                     {n.attachment_url ? (
                                                         <a
@@ -757,7 +753,7 @@ const ApprovedNotificationsLibrary = () => {
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             process-id="PSC_P_020"
-                                                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-neutral-300 bg-white text-neutral-700 transition-colors hover:bg-neutral-50"
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
                                                             title={`Download ${n.sr_no}`}
                                                         >
                                                             <FileDown size={14} />
@@ -771,7 +767,7 @@ const ApprovedNotificationsLibrary = () => {
                                                     <button
                                                         onClick={() => handleSupersede(n.sr_no)}
                                                         process-id="PSC_P_021"
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-warning-100 bg-warning-50 text-warning-700 transition-colors hover:bg-warning-100"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-warning-100 bg-warning-50 text-warning-700 shadow-sm transition-colors hover:bg-warning-100"
                                                         aria-label={`Supersede ${n.sr_no}`}
                                                         title={`Supersede ${n.sr_no}`}
                                                     >
@@ -796,7 +792,7 @@ const ApprovedNotificationsLibrary = () => {
                                                     <button
                                                         onClick={() => handleViewSeenCrews(n.sr_no)}
                                                         process-id="PSC_P_022"
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-success-100 bg-success-50 text-success-700 transition-colors hover:bg-success-100"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-success-100 bg-success-50 text-success-700 shadow-sm transition-colors hover:bg-success-100"
                                                         aria-label={`View seen crews for ${n.sr_no}`}
                                                         title={`View seen crews for ${n.sr_no}`}
                                                     >
@@ -808,36 +804,53 @@ const ApprovedNotificationsLibrary = () => {
                                                     <button
                                                         onClick={() => handleDelete(n.sr_no)}
                                                         process-id="PSC_P_023"
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-error-100 bg-error-50 text-error-700 transition-colors hover:bg-error-100"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-error-100 bg-error-50 text-error-700 shadow-sm transition-colors hover:bg-error-100"
                                                         aria-label={`Delete ${n.sr_no}`}
                                                         title={`Delete ${n.sr_no}`}
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
                                                 </WithPermission>
+                                                </div>
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
-                    </div>
                 )}
 
                 {/* --- NEW: View Seen Crews Modal --- */}
 
                 {viewingSeenCrews && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
-                            <div className="p-6">
-                                <div className="flex justify-between items-center mb-4">
+                        <div className="w-full max-w-md max-h-[80vh] overflow-hidden rounded-xl bg-white shadow-xl">
+                            <div className="max-h-[80vh] overflow-y-auto">
+                                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
                                     <h2 className="text-lg font-semibold text-gray-800">Seen Crews for {viewingSeenCrews}</h2>
                                     <button
-                                        onClick={() => setViewingSeenCrews(null)}
-                                        className="text-gray-500 hover:text-gray-700"
+                                        onClick={() => {
+                                            setViewingSeenCrews(null);
+                                            setCrewSearchQuery("");
+                                        }}
+                                        className="rounded-md p-1 text-gray-500 transition hover:bg-neutral-100 hover:text-gray-700"
+                                        aria-label="Close seen crews modal"
                                     >
                                         &times;
                                     </button>
+                                </div>
+                                <div className="p-6">
+                                <div className="mb-4">
+                                    <div className="relative">
+                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                                        <input
+                                            type="text"
+                                            value={crewSearchQuery}
+                                            onChange={(e) => setCrewSearchQuery(e.target.value)}
+                                            placeholder="Search crew ID..."
+                                            className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                                        />
+                                    </div>
                                 </div>
 
                                 {loadingSeenCrews ? (
@@ -847,9 +860,9 @@ const ApprovedNotificationsLibrary = () => {
                                     </div>
                                 ) : (
                                     <>
-                                        {seenCrewsData.length > 0 ? (
+                                        {filteredSeenCrewsData.length > 0 ? (
                                             <div className="space-y-2">
-                                                {seenCrewsData.map((record, index) => (
+                                                {filteredSeenCrewsData.map((record, index) => (
                                                     <div key={index} className={`p-3 rounded-lg ${record.seen_at ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'} flex items-center justify-between`}>
                                                         <div className="flex-1">
                                                             <span className="font-medium">{record.crew_id}</span>
@@ -897,7 +910,9 @@ const ApprovedNotificationsLibrary = () => {
                                             </div>
                                         ) : (
                                             <div className="text-center py-4">
-                                                <p className="text-gray-500">No crew members have seen this notification yet.</p>
+                                                <p className="text-gray-500">
+                                                    {seenCrewsData.length > 0 ? 'No crew members match your search.' : 'No crew members have seen this notification yet.'}
+                                                </p>
                                             </div>
                                         )}
                                     </>
@@ -907,6 +922,7 @@ const ApprovedNotificationsLibrary = () => {
                                     {/* * Green background indicates the crew has seen the notification.
                     <br /> */}
                                     * Click on Bell icon to send reminder.
+                                </div>
                                 </div>
                             </div>
                         </div>
