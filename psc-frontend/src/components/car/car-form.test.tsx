@@ -99,6 +99,12 @@ vi.mock('@/components/shared', async () => ({
 
 import { CARForm } from './car-form';
 
+function isoDateDaysOffset(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function buildCar(overrides: Record<string, unknown> = {}) {
   return {
     id: 101,
@@ -107,7 +113,7 @@ function buildCar(overrides: Record<string, unknown> = {}) {
     status_display: 'Draft',
     root_cause_summary:
       'Root cause summary for this CAR is detailed enough to satisfy minimum length checks.',
-    target_date: '2026-02-20',
+    target_date: isoDateDaysOffset(30),
     clc_items: [{ id: 1, clc_item_id: 'CLC001', custom_cause_text: '' }],
     corrective_actions: [
       {
@@ -115,7 +121,7 @@ function buildCar(overrides: Record<string, unknown> = {}) {
         action_type: 'IMMEDIATE',
         description:
           'Immediate corrective action executed onboard with detailed procedural steps and verification.',
-        due_date: '2026-02-12',
+        due_date: isoDateDaysOffset(7),
         is_completed: false,
         completed_at: null,
         completion_remarks: null,
@@ -125,7 +131,7 @@ function buildCar(overrides: Record<string, unknown> = {}) {
         action_type: 'LONG_TERM',
         description:
           'Long-term preventive action planned with assigned ownership, milestones, and follow-up controls.',
-        due_date: '2026-02-28',
+        due_date: isoDateDaysOffset(21),
         is_completed: false,
         completed_at: null,
         completion_remarks: null,
@@ -297,6 +303,81 @@ describe('CARForm', () => {
 
     expect(onUploadEvidence).toHaveBeenNthCalledWith(1, 'BEFORE');
     expect(onUploadEvidence).toHaveBeenNthCalledWith(2, 'AFTER');
+  });
+
+  it('test_feat_car_002_corrective_actions_edit_in_place_without_completion_flow', async () => {
+    render(
+      <CARForm
+        car={buildCar()}
+        onSaveDraft={vi.fn().mockResolvedValue(undefined)}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    fireEvent.change(
+      screen.getByDisplayValue(
+        'Immediate corrective action executed onboard with detailed procedural steps and verification.'
+      ),
+      {
+        target: {
+          value:
+            'Immediate corrective action updated with revised onboard procedure and follow-up notes.',
+        },
+      }
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(carFormMocks.updateActionMutateAsync).toHaveBeenCalledWith({
+        actionId: 11,
+        data: {
+          description:
+            'Immediate corrective action updated with revised onboard procedure and follow-up notes.',
+        },
+      });
+    });
+    expect(carFormMocks.completeActionMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('test_feat_car_002_completed_actions_hide_completion_date_and_remain_editable', () => {
+    render(
+      <CARForm
+        car={buildCar({
+          corrective_actions: [
+            {
+              id: 11,
+              action_type: 'IMMEDIATE',
+              description:
+                'Immediate corrective action executed onboard with detailed procedural steps and verification.',
+              due_date: '2026-02-12',
+              is_completed: true,
+              completed_at: '2026-02-13T09:30:00Z',
+              completion_remarks: 'Completed by vessel crew',
+            },
+            {
+              id: 12,
+              action_type: 'LONG_TERM',
+              description:
+                'Long-term preventive action planned with assigned ownership, milestones, and follow-up controls.',
+              due_date: '2026-02-28',
+              is_completed: false,
+              completed_at: null,
+              completion_remarks: null,
+            },
+          ],
+        })}
+        onSaveDraft={vi.fn().mockResolvedValue(undefined)}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/Completed:/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2);
   });
 
   it('test_feat_car_002_dirty_cancel_opens_discard_confirmation_and_calls_cancel_on_confirm', () => {

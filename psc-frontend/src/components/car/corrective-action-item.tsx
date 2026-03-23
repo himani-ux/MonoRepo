@@ -68,9 +68,7 @@ export const CorrectiveActionItem: FC<CorrectiveActionItemProps> = memo(function
           </span>
         )}
         {action.is_completed && (
-          <span className="text-success-600">
-            Completed {action.completed_at ? formatDate(action.completed_at) : ''}
-          </span>
+          <span className="text-success-600">Completed</span>
         )}
       </div>
 

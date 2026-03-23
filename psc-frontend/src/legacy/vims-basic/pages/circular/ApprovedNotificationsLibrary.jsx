@@ -1,21 +1,28 @@
 // src/components/ApprovedNotificationsLibrary.jsx
 import React, { useState, useEffect } from "react";
 import {
-    ArrowDownUp,
-    Filter,
     RefreshCcw,
     FileDown,
-    Printer,
     Bell,
-    Circle,
+    BellRing,
     Search,
     Trash2,
-    RotateCcw,
-    Eye
+    Eye,
+    FileText
 } from "lucide-react";
 import { Download as DownloadIcon } from 'lucide-react';
 import { WithPermission } from '../../utils/circular/permissionUtils';
 import { useAuth } from '../../hooks/auth/useAuth';
+import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '../../components/circular/ui/table';
 
 
 
@@ -36,13 +43,21 @@ const ApprovedNotificationsLibrary = () => {
     const [sortCriteria, setSortCriteria] = useState("created_at");
     const [sortDirection, setSortDirection] = useState("desc");
     const [searchQuery, setSearchQuery] = useState("");
+    const [crewSearchQuery, setCrewSearchQuery] = useState("");
     const [sendingIndividualReminder, setSendingIndividualReminder] = useState(null); // Store the crew_id being processed for individual reminder
     const [typeUuidToNameMap, setTypeUuidToNameMap] = useState({});
     const [priorityUuidToNameMap, setPriorityUuidToNameMap] = useState({});
     const [loadingLookupMaps, setLoadingLookupMaps] = useState(true); // To track loading of lookup data
 
 
-  
+
+
+
+    const filteredSeenCrewsData = seenCrewsData.filter((record) => {
+        const query = crewSearchQuery.trim().toLowerCase();
+        if (!query) return true;
+        return String(record.crew_id || '').toLowerCase().includes(query);
+    });
 
 
     // --- NEW: Fetch Lookup Maps on Component Mount ---
@@ -142,6 +157,7 @@ const ApprovedNotificationsLibrary = () => {
 
                 const notificationsWithNames = data.map(notification => ({
                     ...notification,
+                    title: notification.office_instructions || notification.title || '',
                     msc_type: typeUuidToNameMap[notification.msc_type] || notification.msc_type,
                     priority: priorityUuidToNameMap[notification.priority] || notification.priority,
                 }));
@@ -357,12 +373,13 @@ const ApprovedNotificationsLibrary = () => {
             if (response.ok) {
                 console.log("✅ handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
                 alert(`Reminder sent successfully to crew ${crewId}.`);
-                // window.location.reload();
-
-                // Optional: Refresh the list of seen crews to reflect the updated reminder status
-                // This is optional because the UI will update when the modal re-renders after the state change
-                // But you could trigger it manually if needed.
-                // handleViewSeenCrews(notificationSrNo); // Re-fetch the data
+                setSeenCrewsData((prev) =>
+                    prev.map((record) =>
+                        record.crew_id === crewId
+                            ? { ...record, reminder_sent_at: new Date().toISOString() }
+                            : record
+                    )
+                );
 
             } else {
                 console.error("handleSendIndividualReminder: Error sending individual reminder:", result.error);
@@ -577,17 +594,13 @@ const ApprovedNotificationsLibrary = () => {
 
     return (
          
-        <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 py-10">
-            {/* Header */}
-            <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold text-sky-800 tracking-tight">KSM Library</h1>
-                <p className="text-gray-600 mt-1 text-sm">
-                    View, search and download approved circulars, alerts & work instructions.
-                </p>
-            </div>
+        <div className="space-y-6">
+            <PageHeader
+                title="KSM Library"
+                subtitle="View, search and download approved circulars, alerts and work instructions."
+            />
 
-            {/* Compact Filter Toolbar */}
-            <div className="max-w-7xl mx-auto mb-6 bg-white/95 shadow-md rounded-xl border border-sky-100 px-4 py-4">
+            <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-md">
                 <div className="flex flex-wrap items-center justify-between gap-4">
 
                     {/* Left Section – Search + Filters */}
@@ -595,13 +608,13 @@ const ApprovedNotificationsLibrary = () => {
 
                         {/* Search */}
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                             <input
                                 type="text"
                                 placeholder="Search title, SR No, hashtags..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-3 py-2 w-64 border border-sky-200 rounded-lg text-sm focus:ring-sky-400 focus:border-sky-400 bg-sky-50/50"
+                                className="h-10 w-64 rounded-md border border-neutral-300 bg-white pl-9 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                             />
                         </div>
 
@@ -609,7 +622,7 @@ const ApprovedNotificationsLibrary = () => {
                         <select
                             value={selectedType}
                             onChange={(e) => setSelectedType(e.target.value)}
-                            className="py-2 px-2 border border-sky-200 rounded-lg text-sm bg-white focus:ring-sky-400 focus:border-sky-400"
+                            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                         >
                             <option value="all">All Types</option>
                             <option value="alert">Alert</option>
@@ -621,7 +634,7 @@ const ApprovedNotificationsLibrary = () => {
                         <select
                             value={selectedPriority}
                             onChange={(e) => setSelectedPriority(e.target.value)}
-                            className="py-2 px-2 border border-sky-200 rounded-lg text-sm bg-white focus:ring-sky-400 focus:border-sky-400"
+                            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                         >
                             <option value="all">All Priorities</option>
                             <option value="Low">Low</option>
@@ -638,7 +651,7 @@ const ApprovedNotificationsLibrary = () => {
                         <select
                             value={sortCriteria}
                             onChange={(e) => setSortCriteria(e.target.value)}
-                            className="py-2 px-2 border border-gray-300 rounded-lg text-sm focus:ring-sky-400"
+                            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                         >
                             <option value="created_at">Date Created</option>
                             <option value="sr_no">SR No</option>
@@ -647,197 +660,197 @@ const ApprovedNotificationsLibrary = () => {
                         <select
                             value={sortDirection}
                             onChange={(e) => setSortDirection(e.target.value)}
-                            className="py-2 px-2 border border-gray-300 rounded-lg text-sm focus:ring-sky-400"
+                            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                         >
                             <option value="desc">Descending</option>
                             <option value="asc">Ascending</option>
                         </select>
 
                         {/* CSV Button */}
-                        <button
+                        <Button
                             onClick={handleDownloadCSV}
-                            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
-                            
+                            className="bg-success-600 text-white hover:bg-success-700"
                         >
                             <DownloadIcon size={14} />
                             CSV
-                        </button>
+                        </Button>
 
                         {/* Reset */}
-                        <button
+                        <Button
                             onClick={resetFilters}
-                            className="flex items-center gap-1 px-3 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700"
+                            className="gap-1"
                         >
                             <RefreshCcw size={14} />
                             Reset
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
 
 
             {/* Results */}
-            <div className="max-w-7xl mx-auto">
-                <p className="text-sm text-gray-600 mb-4">
+            <div>
+                <p className="mb-4 text-sm text-neutral-600">
                     Showing{" "}
-                    <span className="font-semibold text-sky-700">
+                    <span className="font-semibold text-neutral-800">
                         {filteredNotifications.length}
                     </span>{" "}
                     of {notifications.length} approved notifications
                 </p>
 
                 {filteredNotifications.length === 0 ? (
-                    <div className="text-center py-20 text-gray-500">
+                    <div className="rounded-lg border border-dashed border-neutral-200 bg-white py-20 text-center text-neutral-500">
                         No notifications match your filters.
                     </div>
                 ) : (
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                        {filteredNotifications.map((n) => (
-                            // --- DEBUG: Log the notification object to see its properties ---
-                            console.log("ApprovedNotificationsLibrary: Rendering notification card for SR No:", n.sr_no, "Object:", n),
-                            // --- END DEBUG ---
-                            // --- NEW: Highlight superseded notifications ---
-                            <div
-                                key={n.id}
-                                // --- CHANGED: Log the is_superseeded value for this specific card ---
-                                className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all p-5 flex flex-col justify-between ${n.is_superseeded
-                                    ? (console.log("  - Card for", n.sr_no, "is highlighted as superseded."), 'bg-yellow-50 border-yellow-200')
-                                    : (console.log("  - Card for", n.sr_no, "is NOT highlighted as superseded."), '')
-                                    }`}
-                            // --- END CHANGED ---
-                            >
-                                {/* --- END NEW --- */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-xs text-gray-500">
-                                            {new Date(n.created_at).toLocaleDateString()}
-                                        </div>
-                                        <div>{getPriorityBadge(n.priority)}</div>
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">
-                                        {n.title || n.sr_no}
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {getTypeBadge(n.msc_type)}
-                                        {/* --- NEW: Display Hashtags --- */}
-                                        {/* Check if hashtags exist and are not empty */}
-                                        {n.hashtags && n.hashtags.trim() !== '' && (
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                {n.hashtags
-                                                    .split(/[\s,]+/) // split by space or comma
-                                                    .filter(tag => tag.trim() !== '')
-                                                    .map((tag, index) => (
-                                                        <span
-                                                            key={index}
-                                                            className="px-2 py-0.5 text-xs font-medium rounded-full bg-gradient-to-r from-sky-100 via-sky-200 to-sky-100 text-sky-800 border border-sky-200 shadow-sm hover:shadow-md hover:scale-105 transition-transform duration-200 cursor-default"
-                                                        >
-                                                            #{tag.replace(/^#/, '')}
-                                                        </span>
-                                                    ))}
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Title</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Priority</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredNotifications.map((n) => (
+                                    <TableRow
+                                        key={n.id}
+                                        className={n.is_superseeded ? '[&>td]:border-warning-100 [&>td]:bg-warning-50/60' : ''}
+                                    >
+                                        <TableCell className="max-w-[380px]">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary-100 bg-primary-50 text-primary-700 shadow-sm">
+                                                    <FileText className="h-4 w-4" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="truncate text-[15px] font-semibold leading-6 text-neutral-900" title={n.title || n.sr_no}>
+                                                        {n.title || n.sr_no}
+                                                    </div>
+                                                    <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+                                                        SR No: {n.sr_no || '—'}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center">
+                                                {getTypeBadge(n.msc_type)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center">
+                                                {getPriorityBadge(n.priority)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center justify-end">
+                                                <div className="flex items-center gap-1.5">
+                                                <WithPermission id="PSC_P_020">
+                                                    {n.attachment_url ? (
+                                                        <a
+                                                            href={`http://localhost:8000${n.attachment_url}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            process-id="PSC_P_020"
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                                                            title={`Download ${n.sr_no}`}
+                                                        >
+                                                            <FileDown size={14} />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-xs text-neutral-400">No file</span>
+                                                    )}
+                                                </WithPermission>
 
-                                        {/* --- END NEW: Display Hashtags --- */}
-                                    </div>
-                                </div>
+                                                <WithPermission id="PSC_P_021">
+                                                    <button
+                                                        onClick={() => handleSupersede(n.sr_no)}
+                                                        process-id="PSC_P_021"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-warning-100 bg-warning-50 text-warning-700 shadow-sm transition-colors hover:bg-warning-100"
+                                                        aria-label={`Supersede ${n.sr_no}`}
+                                                        title={`Supersede ${n.sr_no}`}
+                                                    >
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            fill="none"
+                                                            viewBox="0 0 24 24"
+                                                            strokeWidth={2}
+                                                            stroke="currentColor"
+                                                            className="h-4 w-4"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                d="M4 4v5h.582m0 0A7.5 7.5 0 1112 19.5 7.5 7.5 0 014.582 9H9"
+                                                            />
+                                                        </svg>
+                                                    </button>
+                                                </WithPermission>
 
-                                {/* Buttons */}
-                                <div className="mt-4 flex justify-between items-center">
-                                    <div className="flex gap-2">
-                                         <WithPermission id="PSC_P_020">
-                                        {n.attachment_url ? (
-                                            <a
-                                                href={`http://localhost:8000/api/circular${n.attachment_url}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                process-id="PSC_P_020"
-                                                className="flex items-center gap-1 px-3 py-1 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 transition"
-                                            >
-                                                <FileDown size={14} />
-                                            </a>
-                                        ) : (
-                                            <span className="text-gray-400 text-sm italic">
-                                                No file
-                                            </span>
-                                        )}
-                                        </WithPermission>
+                                                <WithPermission id="PSC_P_022">
+                                                    <button
+                                                        onClick={() => handleViewSeenCrews(n.sr_no)}
+                                                        process-id="PSC_P_022"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-success-100 bg-success-50 text-success-700 shadow-sm transition-colors hover:bg-success-100"
+                                                        aria-label={`View seen crews for ${n.sr_no}`}
+                                                        title={`View seen crews for ${n.sr_no}`}
+                                                    >
+                                                        <Eye size={14} />
+                                                    </button>
+                                                </WithPermission>
 
-                                        {/* --- NEW: Supersede Button --- */}
-                                         <WithPermission id="PSC_P_021">
-                                        <button
-                                            onClick={() => handleSupersede(n.sr_no)}
-                                            process-id="PSC_P_021"
-                                            className="flex items-center justify-center w-9 h-9 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-700 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
-                                            aria-label={`Supersede ${n.sr_no}`}
-                                            title={`Supersede ${n.sr_no}`}
-                                        >
-                                            {/* Supersede SVG Icon */}
-                                            <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                strokeWidth={2}
-                                                stroke="currentColor"
-                                                className="w-5 h-5"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    d="M4 4v5h.582m0 0A7.5 7.5 0 1112 19.5 7.5 7.5 0 014.582 9H9"
-                                                />
-                                            </svg>
-                                        </button>
-                                        </WithPermission>
-
-                                        {/* --- END NEW: Supersede Button --- */}
-                                            <WithPermission id="PSC_P_022">
-                                        <button
-                                            onClick={() => handleViewSeenCrews(n.sr_no)} // Pass the notification's SR No
-                                            process-id="PSC_P_022"
-                                            className="flex items-center justify-center w-9 h-9 rounded-full bg-green-100 hover:bg-green-200 text-green-700 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-400"
-                                            aria-label={`View seen crews for ${n.sr_no}`}
-                                            title={`View seen crews for ${n.sr_no}`}
-                                        >
-                                            <Eye size={14} /> {/* Use Eye icon for viewing seen crews */}
-                                        </button>
-                                        </WithPermission>
-
-                                        {/* --- NEW: Delete Button --- */}
-                                            <WithPermission id="PSC_P_023">
-                                        <button
-                                            onClick={() => handleDelete(n.sr_no)}
-                                            process-id="PSC_P_023"
-                                            className="flex items-center gap-1 px-3 py-1 text-sm font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition"
-                                            aria-label={`Delete ${n.sr_no}`}
-                                            title={`Delete ${n.sr_no}`}
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                        </WithPermission>
-                                        {/* --- END NEW: Delete Button --- */}
-
-
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                                <WithPermission id="PSC_P_023">
+                                                    <button
+                                                        onClick={() => handleDelete(n.sr_no)}
+                                                        process-id="PSC_P_023"
+                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-error-100 bg-error-50 text-error-700 shadow-sm transition-colors hover:bg-error-100"
+                                                        aria-label={`Delete ${n.sr_no}`}
+                                                        title={`Delete ${n.sr_no}`}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </WithPermission>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
                 )}
 
                 {/* --- NEW: View Seen Crews Modal --- */}
 
                 {viewingSeenCrews && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
-                            <div className="p-6">
-                                <div className="flex justify-between items-center mb-4">
+                        <div className="w-full max-w-md max-h-[80vh] overflow-hidden rounded-xl bg-white shadow-xl">
+                            <div className="max-h-[80vh] overflow-y-auto">
+                                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
                                     <h2 className="text-lg font-semibold text-gray-800">Seen Crews for {viewingSeenCrews}</h2>
                                     <button
-                                        onClick={() => setViewingSeenCrews(null)}
-                                        className="text-gray-500 hover:text-gray-700"
+                                        onClick={() => {
+                                            setViewingSeenCrews(null);
+                                            setCrewSearchQuery("");
+                                        }}
+                                        className="rounded-md p-1 text-gray-500 transition hover:bg-neutral-100 hover:text-gray-700"
+                                        aria-label="Close seen crews modal"
                                     >
                                         &times;
                                     </button>
+                                </div>
+                                <div className="p-6">
+                                <div className="mb-4">
+                                    <div className="relative">
+                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                                        <input
+                                            type="text"
+                                            value={crewSearchQuery}
+                                            onChange={(e) => setCrewSearchQuery(e.target.value)}
+                                            placeholder="Search crew ID..."
+                                            className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                                        />
+                                    </div>
                                 </div>
 
                                 {loadingSeenCrews ? (
@@ -847,9 +860,9 @@ const ApprovedNotificationsLibrary = () => {
                                     </div>
                                 ) : (
                                     <>
-                                        {seenCrewsData.length > 0 ? (
+                                        {filteredSeenCrewsData.length > 0 ? (
                                             <div className="space-y-2">
-                                                {seenCrewsData.map((record, index) => (
+                                                {filteredSeenCrewsData.map((record, index) => (
                                                     <div key={index} className={`p-3 rounded-lg ${record.seen_at ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'} flex items-center justify-between`}>
                                                         <div className="flex-1">
                                                             <span className="font-medium">{record.crew_id}</span>
@@ -861,13 +874,28 @@ const ApprovedNotificationsLibrary = () => {
                                                         </div>
                                                         {/* --- NEW: Send Reminder Button (Bell Icon) for Individual Crew --- */}
                                                         {!record.seen_at && ( // Only show the button if the crew has NOT seen the notification
-                                                            <button
-                                                                onClick={() => handleSendIndividualReminder(viewingSeenCrews, record.crew_id)} // Pass the SR No and crew ID
-                                                                className="ml-2 p-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-full transition"
-                                                                title={`Send reminder to ${record.crew_id}`}
-                                                            >
-                                                                <Bell size={16} />
-                                                            </button>
+                                                            record.reminder_sent_at ? (
+                                                                <div
+                                                                    className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-1 text-xs font-medium text-warning-700"
+                                                                    title={`Reminder already sent to ${record.crew_id}`}
+                                                                >
+                                                                    <BellRing size={14} />
+                                                                    Reminded
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleSendIndividualReminder(viewingSeenCrews, record.crew_id)} // Pass the SR No and crew ID
+                                                                    disabled={sendingIndividualReminder === record.crew_id}
+                                                                    className="ml-2 rounded-full bg-amber-100 p-1 text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                    title={
+                                                                        sendingIndividualReminder === record.crew_id
+                                                                            ? `Sending reminder to ${record.crew_id}`
+                                                                            : `Send reminder to ${record.crew_id}`
+                                                                    }
+                                                                >
+                                                                    <Bell size={16} className={sendingIndividualReminder === record.crew_id ? 'animate-pulse' : ''} />
+                                                                </button>
+                                                            )
                                                         )}
                                                         {/* --- END NEW: Send Reminder Button --- */}
 
@@ -882,7 +910,9 @@ const ApprovedNotificationsLibrary = () => {
                                             </div>
                                         ) : (
                                             <div className="text-center py-4">
-                                                <p className="text-gray-500">No crew members have seen this notification yet.</p>
+                                                <p className="text-gray-500">
+                                                    {seenCrewsData.length > 0 ? 'No crew members match your search.' : 'No crew members have seen this notification yet.'}
+                                                </p>
                                             </div>
                                         )}
                                     </>
@@ -892,6 +922,7 @@ const ApprovedNotificationsLibrary = () => {
                                     {/* * Green background indicates the crew has seen the notification.
                     <br /> */}
                                     * Click on Bell icon to send reminder.
+                                </div>
                                 </div>
                             </div>
                         </div>

@@ -46,32 +46,24 @@ const FilterBar = ({
   };
 
   return (
-    <div className="min-h-[10vh] bg-gradient-to-b from-sky-50 to-white text-slate-800">
-      {/* 🔝 Top Bar — now inside FilterBar */}
-      <div className="sticky top-0 z-30 border-b border-sky-100 bg-white/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        
-        
-        </div>
-      </div>
-
-      {/* 📋 Actual Filter Controls */}
-      <div className="border-b border-sky-100 bg-white/70">
-        <div className="max-w-7xl mx-auto px-4 py-3 grid gap-3 lg:grid-cols-12">
+    <div className="mb-6 rounded-lg border border-neutral-200 bg-white shadow-md">
+      <div className="grid gap-4 p-4 lg:grid-cols-12 lg:items-start">
           {canUseSearch && (
-            <div className="lg:col-span-5 relative">
-              <LuSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search titles, tags..."
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-9 w-full px-3 py-1.5 border border-slate-300 rounded-md bg-white"
-              />
+            <div className="lg:col-span-4">
+              <div className="relative flex h-10 items-center">
+                <LuSearch className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  placeholder="Search titles, tags..."
+                  value={searchTerm}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="h-10 w-full rounded-md border border-neutral-300 bg-white pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
             </div>
           )}
 
-          <div className="lg:col-span-7 flex flex-wrap items-center gap-2">
+          <div className={`${canUseDownload ? 'lg:col-span-6' : canUseSearch ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-wrap items-center gap-2`}>
             {canUseDeptFilter && (
               <>
                 <div className="flex items-center gap-2">
@@ -79,17 +71,17 @@ const FilterBar = ({
                     <button
                       key={dept}
                       onClick={() => onToggleScope(dept)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         scope.includes(dept)
-                          ? 'bg-sky-600 text-white border-sky-600'
-                          : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-50'
+                          ? 'border-primary-200 bg-primary-50 text-primary-700'
+                          : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
                       }`}
                     >
                       {dept}
                     </button>
                   ))}
                 </div>
-                <div className="h-6 w-px bg-sky-200 hidden md:block" />
+                <div className="hidden h-6 w-px bg-neutral-200 md:block" />
               </>
             )}
 
@@ -100,17 +92,17 @@ const FilterBar = ({
                     <button
                       key={type}
                       onClick={() => onToggleType(type)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         selectedTypes.includes(type)
-                          ? 'bg-sky-600 text-white border-sky-600'
-                          : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-50'
+                          ? 'border-primary-200 bg-primary-50 text-primary-700'
+                          : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
                       }`}
                     >
                       {type}
                     </button>
                   ))}
                 </div>
-                <div className="h-6 w-px bg-sky-200 hidden md:block" />
+                <div className="hidden h-6 w-px bg-neutral-200 md:block" />
               </>
             )}
 
@@ -120,10 +112,10 @@ const FilterBar = ({
                   <button
                     key={crit}
                     onClick={() => onToggleCriticality(crit)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                       selectedCriticalities.includes(crit)
-                        ? 'bg-sky-600 text-white border-sky-600'
-                        : 'bg-white text-slate-700 border-sky-200 hover:bg-sky-50'
+                        ? 'border-primary-200 bg-primary-50 text-primary-700'
+                        : 'border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
                     }`}
                   >
                     {crit}
@@ -134,7 +126,7 @@ const FilterBar = ({
 
             {canUseUnreadToggle && (
               <div className="ml-auto flex items-center gap-2">
-                <label className="flex items-center gap-2 text-xs text-slate-600">
+                <label className="flex items-center gap-2 text-xs text-neutral-600">
                   <input
                     type="checkbox"
                     checked={onlyUnread}
@@ -142,26 +134,25 @@ const FilterBar = ({
                     className="sr-only"
                   />
                   <span>Only unread</span>
-                  <div className={`w-12 h-6 rounded-full relative ${onlyUnread ? 'bg-sky-500' : 'bg-gray-300'}`}>
+                  <div className={`relative h-6 w-12 rounded-full transition-colors ${onlyUnread ? 'bg-primary-500' : 'bg-neutral-300'}`}>
                     <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform ${onlyUnread ? 'translate-x-6' : 'translate-x-0.5'}`}></div>
                   </div>
                 </label>
               </div>
             )}
-            {/* 👇 PDF Download Button */}
-              {canUseDownload && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-2 bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
-                  onClick={handleDownload}
-                >
-                  <Download className="h-3 w-3" />
-                  <span className="text-xs">Download</span>
-                </Button>
-              )}
           </div>
-        </div>
+          {canUseDownload && (
+            <div className={`${canUseSearch ? 'lg:col-span-2' : 'lg:col-span-12'} flex justify-start lg:justify-end`}>
+              <Button
+                size="sm"
+                className="h-10 gap-2 bg-success-600 px-4 text-white hover:bg-success-700"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4" />
+                <span className="text-sm">Download</span>
+              </Button>
+            </div>
+          )}
       </div>
     </div>
   );
