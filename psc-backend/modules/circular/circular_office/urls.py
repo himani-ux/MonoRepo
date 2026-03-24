@@ -39,9 +39,10 @@ urlpatterns = [
     # Draft Endpoints
     path('api/notifications/draft/', views.get_notifications_draft, name='get_notifications_draft'),
     path('api/user-drafts/', views.get_user_drafts, name='get_user_drafts'),
-    path('api/draft/<path:sr_no>/', views.get_draft_by_sr_no, name='get_draft_by_sr_no'),
     path('api/draft/<path:sr_no>/update/', views.update_draft_by_sr_no, name='update_draft_by_sr_no'),
+    path('api/drafts/<str:draft_id>/update/', views.update_draft_by_id, name='update_draft_by_id'),
     path('api/draft/<path:sr_no>/delete/', views.delete_draft_by_sr_no, name='delete_draft_by_sr_no'),
+    path('api/draft/<path:sr_no>/', views.get_draft_by_sr_no, name='get_draft_by_sr_no'),
     
     # Approved and User Notifications
     path('api/approved-notifications/', views.get_approved_notifications, name='get_approved_notifications'),

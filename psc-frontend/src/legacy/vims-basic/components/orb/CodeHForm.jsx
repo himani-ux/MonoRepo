@@ -118,8 +118,8 @@ export default function CodeHForm({ details, handleChange, availableTanks, forma
         </div>
         {details.start_time && details.end_time && new Date(details.end_time) < new Date(details.start_time) &&
           <p style={{ color:'red', fontSize:'0.85rem' }}>End time cannot be before start time.</p>}
-        {details.start_time && new Date(details.start_time) < yesterdayDate() &&
-          <p style={{ color:'red', fontSize:'0.85rem' }}>Start time cannot be earlier than yesterday 00:00.</p>}
+        {/* {details.start_time && new Date(details.start_time) < yesterdayDate() &&
+          <p style={{ color:'red', fontSize:'0.85rem' }}>Start time cannot be earlier than yesterday 00:00.</p>} */}
       </div>
 
       {/* Bunkering Type */}

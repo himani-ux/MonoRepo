@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
 import { useAuth } from '../../hooks/auth/useAuth';
 import { useAuthStore } from '@/stores/auth-store';
+import { buildCircularAttachmentUrl } from '../../utils/circular/attachmentUrl';
 
 const DraftNotifications = ({ currentUser }) => {
 
@@ -27,7 +28,6 @@ const DraftNotifications = ({ currentUser }) => {
     const [idToSubCatMap, setIdToSubCatMap] = useState({});
     const [secondSubCategories, setSecondSubCategories] = useState([]);
     const [idToSecondSubCatMap, setIdToSecondSubCatMap] = useState({});
-
         // Get user data for header
     
     const { user } = useAuth();
@@ -53,6 +53,7 @@ const DraftNotifications = ({ currentUser }) => {
         }
 
         setIsLoading(true);
+
         try {
             const queryParams = new URLSearchParams({
                 created_by: currentUser.employee_id,
@@ -215,16 +216,11 @@ const DraftNotifications = ({ currentUser }) => {
         console.log("🚀 handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
 
         try {
-            // Fetch the draft data first using the SR No (as defined in your URLs)
-            console.log("handleEditClick: Fetching draft data for ID:", notificationId);
-            const response = await fetch(`http://localhost:8000/api/circular/api/draft/${notificationId}/`); // Uses SR No
-
-            if (!response.ok) {
-                throw new Error(`Failed to fetch draft: ${response.status} ${response.statusText}`);
-            }
-
-            let draftData = await response.json();
-            console.log("handleEditClick: Retrieved raw draft ", draftData);
+            const primaryDashboardPath = isAdmin ? '/circular/admin' : '/circular/office';
+            const draftEditUrl = `${primaryDashboardPath}?draft_sr_no=${encodeURIComponent(notificationId)}`;
+            console.log(`handleEditClick: Navigating to draft edit URL: ${draftEditUrl}`);
+            navigate(draftEditUrl);
+            return;
 
             // --- Process draftData to handle UUIDs and map them back to frontend state values ---
             // Now that handleEditClick is inside the component, it can access idTo...Map states directly.
@@ -248,15 +244,15 @@ const DraftNotifications = ({ currentUser }) => {
             if (draftData.priority) {
                 const mappedPriorityName = idToPriorityMap[draftData.priority]; // ✅ Access the state variable
                 if (mappedPriorityName) {
-                    draftData.selectedSeverityForPreFill = mappedPriorityName.toLowerCase(); // e.g., 'Critical' -> 'critical'
+                    draftData.selectedSeverityForPreFill = mappedPriorityName;
                     console.log("handleEditClick: Mapped priority UUID '", draftData.priority, "' to frontend state value '", draftData.selectedSeverityForPreFill, "'");
                 } else {
                      console.warn("handleEditClick: Unknown priority UUID received:", draftData.priority);
-                     draftData.selectedSeverityForPreFill = 'critical'; // Fallback
+                     draftData.selectedSeverityForPreFill = null;
                 }
             } else {
                 console.log("handleEditClick: priority field is missing or null in draftData.");
-                draftData.selectedSeverityForPreFill = 'critical'; // Or a default value
+                draftData.selectedSeverityForPreFill = null;
             }
 
             // Map dept UUID to frontend state value (e.g., 'seq', 'technical')
@@ -289,30 +285,30 @@ const DraftNotifications = ({ currentUser }) => {
             if (draftData.sub_category) {
                 const subCatName = idToSubCatMap[draftData.sub_category]; // ✅ Access the state variable
                 if (subCatName) {
-                    draftData.selectedSub1ForPreFill = new Set([subCatName]); // Convert to Set containing the name
-                    console.log("handleEditClick: Set selectedSub1ForPreFill to Set containing:", subCatName);
+                    draftData.selectedSub1ForPreFill = [subCatName];
+                    console.log("handleEditClick: Set selectedSub1ForPreFill to array containing:", subCatName);
                 } else {
                      console.warn("handleEditClick: Unknown sub_category UUID received:", draftData.sub_category);
-                     draftData.selectedSub1ForPreFill = new Set(); // Fallback
+                     draftData.selectedSub1ForPreFill = [];
                 }
             } else {
                 console.log("handleEditClick: sub_category field is missing or null in draftData.");
-                draftData.selectedSub1ForPreFill = new Set(); // Or a default value
+                draftData.selectedSub1ForPreFill = [];
             }
 
             // Map second_sub_category UUID to frontend state values (Set of names)
             if (draftData.second_sub_category) {
                 const secondSubCatName = idToSecondSubCatMap[draftData.second_sub_category]; // ✅ Access the state variable
                 if (secondSubCatName) {
-                    draftData.selectedSub2ForPreFill = new Set([secondSubCatName]); // Convert to Set containing the name
-                    console.log("handleEditClick: Set selectedSub2ForPreFill to Set containing:", secondSubCatName);
+                    draftData.selectedSub2ForPreFill = [secondSubCatName];
+                    console.log("handleEditClick: Set selectedSub2ForPreFill to array containing:", secondSubCatName);
                 } else {
                      console.warn("handleEditClick: Unknown second_sub_category UUID received:", draftData.second_sub_category);
-                     draftData.selectedSub2ForPreFill = new Set(); // Fallback
+                     draftData.selectedSub2ForPreFill = [];
                 }
             } else {
                 console.log("handleEditClick: second_sub_category field is missing or null in draftData.");
-                draftData.selectedSub2ForPreFill = new Set(); // Or a default value
+                draftData.selectedSub2ForPreFill = [];
             }
 
             // --- END Process draftData ---
@@ -325,8 +321,10 @@ const DraftNotifications = ({ currentUser }) => {
 
             // CRITICAL: Store the DATABASE ID for the update operation
             if (draftData.id) {
-                localStorage.setItem('editingDraftId', draftData.id); // Use the 'id' field from the response
-                console.log("✅ handleEditClick: Stored editingDraftId (database ID) in localStorage:", draftData.id);
+                const normalizedDraftId = String(draftData.id).trim().toLowerCase();
+                localStorage.setItem('editingDraftId', normalizedDraftId);
+                localStorage.setItem('editingDraftSrNo', draftData.sr_no);
+                console.log("✅ handleEditClick: Stored editingDraftId (database ID) in localStorage:", normalizedDraftId);
             } else {
                 console.error("handleEditClick: Draft data does not contain an 'id' field!");
                 alert("Error: Draft data is incomplete. Cannot edit.");
@@ -335,12 +333,8 @@ const DraftNotifications = ({ currentUser }) => {
 
             // --- NEW: Navigate based on user role ---
             // Determine the primary dashboard route based on the user's role
-            const primaryDashboardPath = isAdmin ? '/admin' : '/office';
-            console.log(`handleEditClick: Navigating to primary dashboard for role (${isAdmin ? 'Admin' : 'Non-Admin'}): ${primaryDashboardPath}`);
-            navigate(primaryDashboardPath);
-            // --- END NEW ---
-
             console.log("handleEditClick: Navigated to primary dashboard page");
+            // --- END NEW ---
         } catch (error) {
             console.error("handleEditClick: Error fetching or processing draft ", error);
             alert(`Failed to load draft: ${error.message}`);
@@ -543,7 +537,7 @@ const DraftNotifications = ({ currentUser }) => {
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                         {notification.attachment_url ? (
                                             <a
-                                                href={`http://localhost:8000/api/circular${notification.attachment_url}`}
+                                                href={buildCircularAttachmentUrl(notification.attachment_url)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-indigo-800 bg-indigo-200 hover:bg-indigo-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400"

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'; // For back button if needed
 import PageLayout from '../../components/layout/PageLayout';
 import { useAuth } from '../../hooks/auth/useAuth';
 import { useAuthStore } from '@/stores/auth-store';
+import { buildCircularAttachmentUrl } from '../../utils/circular/attachmentUrl';
 
 const AdminAllNotifications = () => {
     const [allNotifications, setAllNotifications] = useState([]);
@@ -244,7 +245,7 @@ const AdminAllNotifications = () => {
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                         {n.attachment_url ? (
                                             <a
-                                                href={`http://localhost:8000/api/circular/${n.attachment_url}`}
+                                                href={buildCircularAttachmentUrl(n.attachment_url)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-indigo-800 bg-indigo-200 hover:bg-indigo-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400"

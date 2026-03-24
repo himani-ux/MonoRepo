@@ -1,7 +1,7 @@
 //-----------------------------------------------------------VERSION 1.0 -----------------------------------------------------------//
 
 // Admin.jsx
-import React, { useState, useEffect, navigate } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, navigate } from "react";
 import "../../styles/circular/Officeuser.css";
 import {
   Card,
@@ -22,13 +22,45 @@ import {
 } from "../../components/circular/ui/table";
 import { WithPermission } from "../../utils/circular/permissionUtils";
 import PageLayout from "../../components/layout/PageLayout";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/auth/useAuth";
 import Modal from "../../components/layout/Modal";
 import { useAuthStore } from "@/stores/auth-store";
+import {
+  resolveCircularDepartmentUiKey,
+  resolveCircularMappedId,
+  resolveCircularMappedName,
+  resolveCircularMappedNames,
+} from "../../utils/circular/supersede";
+import {
+  clearCircularDraftEditSession,
+} from "../../utils/circular/draftSession";
+
+const clearCircularPrefillStorage = () => {
+  localStorage.removeItem("supersedingNotificationId");
+  localStorage.removeItem("oldNotificationType");
+  localStorage.removeItem("oldNotificationDept");
+  localStorage.removeItem("oldNotificationCategory");
+  localStorage.removeItem("oldNotificationPriority");
+  localStorage.removeItem("oldNotificationSubCatNames");
+  localStorage.removeItem("oldNotificationSecondSubCatNames");
+  clearCircularDraftEditSession();
+};
+
+const isCircularFormReload = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const navigationEntries =
+    window.performance?.getEntriesByType?.("navigation") || [];
+  return navigationEntries[0]?.type === "reload";
+};
 
 const Admin = ({ onNotificationSubmit }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const draftRequestSrNoRef = useRef(null);
   // Form State
   // ================= CORE DATA =================
   const [documentTypes, setDocumentTypes] = useState([]);
@@ -51,7 +83,55 @@ const Admin = ({ onNotificationSubmit }) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedSub1, setSelectedSub1] = useState(new Set());
   const [selectedSub2, setSelectedSub2] = useState(new Set());
-  const [selectedSeverity, setSelectedSeverity] = useState("critical");
+  const [selectedSeverity, setSelectedSeverity] = useState("Critical");
+
+  useLayoutEffect(() => {
+    if (isCircularFormReload()) {
+      clearCircularPrefillStorage();
+    }
+  }, []);
+
+  useEffect(() => {
+    const draftSrNoFromUrl = new URLSearchParams(location.search).get("draft_sr_no");
+    if (!draftSrNoFromUrl) {
+      return;
+    }
+
+    const normalizedDraftSrNo = String(draftSrNoFromUrl).trim();
+    if (!normalizedDraftSrNo || draftRequestSrNoRef.current === normalizedDraftSrNo) {
+      return;
+    }
+
+    draftRequestSrNoRef.current = normalizedDraftSrNo;
+    setEditingDraftId(null);
+    setEditingDraftSrNo(normalizedDraftSrNo);
+
+    const fetchDraftForEditing = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/circular/api/draft/${normalizedDraftSrNo}/`,
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch draft: ${response.status} ${response.statusText}`);
+        }
+
+        const draftData = await response.json();
+        setDraftPrefillData(draftData);
+        navigate(location.pathname, { replace: true });
+      } catch (error) {
+        console.error("Failed to load draft for editing:", error);
+        draftRequestSrNoRef.current = null;
+        setEditingDraftId(null);
+        setEditingDraftSrNo(null);
+        setDraftPrefillData(null);
+        navigate(location.pathname, { replace: true });
+        alert(`Failed to load draft: ${error.message}`);
+      }
+    };
+
+    fetchDraftForEditing();
+  }, [location.pathname, location.search, navigate]);
 
   // ================= FORM DATA =================
   const [title, setTitle] = useState("");
@@ -89,9 +169,37 @@ const Admin = ({ onNotificationSubmit }) => {
   // ================= SUPERSEDING =================
   const [supersedingNotificationSrNo, setSupersedingNotificationSrNo] =
     useState(null);
+  const [editingDraftId, setEditingDraftId] = useState(null);
+  const [editingDraftSrNo, setEditingDraftSrNo] = useState(null);
+  const [draftPrefillData, setDraftPrefillData] = useState(null);
   const [currentVesselIdsForComment, setCurrentVesselIdsForComment] = useState(
     [],
   );
+
+  const resolveEditingDraftContext = () => {
+    const resolvedDraftId = String(
+      editingDraftId ||
+        draftPrefillData?.id ||
+        "",
+    )
+      .trim()
+      .toLowerCase();
+    const resolvedDraftSrNo = String(
+      editingDraftSrNo ||
+        draftPrefillData?.sr_no ||
+        "",
+    ).trim();
+
+    return {
+      draftId: resolvedDraftId || null,
+      draftSrNo: resolvedDraftSrNo || null,
+      isEditingDraftSession: Boolean(
+        resolvedDraftId ||
+          resolvedDraftSrNo ||
+          draftPrefillData,
+      ),
+    };
+  };
 
   // ================= OLD NOTIFICATION =================
   const [oldNotificationType, setOldNotificationType] = useState(null);
@@ -306,23 +414,22 @@ const Admin = ({ onNotificationSubmit }) => {
     const dept = localStorage.getItem("oldNotificationDept");
 
     if (type) {
-      // find ID by name
-      const t = documentTypes.find((d) => d.name === type);
-      if (t) setSelectedType(t.id);
+      const resolvedType = resolveCircularMappedName(type, typeToIdMap);
+      if (resolvedType) {
+        setSelectedType(resolvedType.toLowerCase());
+      }
     }
 
     if (dept) {
-      if (dept === "Deck" || dept === "seq") {
-        setSelectedMainOption("seq");
-      }
-      if (dept === "Engine" || dept === "technical") {
-        setSelectedMainOption("technical");
+      const mappedDept = resolveCircularDepartmentUiKey(dept, deptToIdMap);
+      if (mappedDept) {
+        setSelectedMainOption(mappedDept);
       }
     }
-  }, [documentTypes]);
+  }, [typeToIdMap, deptToIdMap]);
 
   useEffect(() => {
-    if (selectedMainOption === "") return; // wait until dept is selected
+    if (!selectedMainOption) return; // wait until dept is selected
 
     // const category = localStorage.getItem('oldNotificationCategory');
     const priority = localStorage.getItem("oldNotificationPriority");
@@ -331,48 +438,39 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // PRIORITY
     if (priority) {
-      const p = priorities.find((p) => p.name === priority);
-      if (p) setSelectedSeverity(p.id);
+      const resolvedPriority = resolveCircularMappedName(
+        priority,
+        priorityToIdMap,
+      );
+      if (resolvedPriority) {
+        setSelectedSeverity(resolvedPriority);
+      }
     }
 
     // SUB1
     if (sub1) {
-      const parsed = JSON.parse(sub1);
-      const ids = parsed
-        .map((name) => {
-          const obj = subCategories.find((x) => x.name === name);
-          return obj?.id;
-        })
-        .filter(Boolean);
-
-      setSelectedSub1(new Set(ids));
+      const resolvedSubCategories = resolveCircularMappedNames(
+        sub1,
+        subCatToIdMap,
+      );
+      setSelectedSub1(new Set(resolvedSubCategories));
     }
 
     // SUB2
     if (sub2) {
-      const parsed = JSON.parse(sub2);
-      const ids = parsed
-        .map((name) => {
-          const obj = secondSubCategories.find((x) => x.name === name);
-          return obj?.id;
-        })
-        .filter(Boolean);
-
-      setSelectedSub2(new Set(ids));
+      const resolvedSecondSubCategories = resolveCircularMappedNames(
+        sub2,
+        secondSubCatToIdMap,
+      );
+      setSelectedSub2(new Set(resolvedSecondSubCategories));
     }
-  }, [priorities, subCategories, secondSubCategories, selectedMainOption]);
+  }, [priorityToIdMap, subCatToIdMap, secondSubCatToIdMap, selectedMainOption]);
 
   useEffect(() => {
     const handleRefresh = () => {
       console.log("🔄 Page refreshed — clearing supersede data");
 
-      localStorage.removeItem("supersedingNotificationId");
-      localStorage.removeItem("oldNotificationType");
-      localStorage.removeItem("oldNotificationDept");
-      localStorage.removeItem("oldNotificationCategory");
-      localStorage.removeItem("oldNotificationPriority");
-      localStorage.removeItem("oldNotificationSubCatNames");
-      localStorage.removeItem("oldNotificationSecondSubCatNames");
+      clearCircularPrefillStorage();
     };
 
     window.addEventListener("beforeunload", handleRefresh);
@@ -915,7 +1013,7 @@ const Admin = ({ onNotificationSubmit }) => {
   };
 
   /* ============================================================
-       3️⃣ FINAL APPROVAL / REJECTION API CALL  
+       3️⃣ FINAL APPROVAL / REJECTION API CALL
            CALL THIS AFTER COMMENT or AFTER VESSEL POPUP CONFIRM
        ============================================================ */
 
@@ -1561,24 +1659,16 @@ const Admin = ({ onNotificationSubmit }) => {
     // --- Create FormData ---
     const formData = new FormData();
 
-    // --- CHANGED: Use ID maps to get UUIDs ---
-    // Get the ID for 'type' using the map
-    // Assuming selectedType is 'alert', 'circular', 'workinstruction'
-    const typeKeyMap = {
-      alert: "Alert",
-      circular: "Circular",
-      workinstruction: "WorkInstruction",
-    };
-    const mappedTypeName = typeKeyMap[selectedType];
-    let selectedTypeId = mappedTypeName ? typeToIdMap[mappedTypeName] : null;
+    // --- CHANGED: Use shared type lookup so spacing/casing variants still resolve ---
+    const selectedTypeId = resolveCircularMappedId(selectedType, typeToIdMap);
 
     if (!selectedTypeId) {
       alert(
         `Document type ID not found for selection '${selectedType}'. Please try again.`,
       );
       console.error(
-        "Missing ID for selected type key:",
-        mappedTypeName,
+        "Missing ID for selected type:",
+        selectedType,
         "Map:",
         typeToIdMap,
       );
@@ -1609,15 +1699,10 @@ const Admin = ({ onNotificationSubmit }) => {
     formData.append("category", selectedCategory); // Send the name string
 
     // Get the ID for 'priority' using the map
-    // Assuming selectedSeverity is 'low', 'medium', 'high', 'critical'
-    const priorityKeyMap = {
-      low: "Low",
-      medium: "Medium",
-      high: "High",
-      critical: "Critical",
-    };
-    const mappedPriorityName = priorityKeyMap[selectedSeverity];
-    const selectedPriorityId = priorityToIdMap[selectedSeverity];
+    const selectedPriorityId = resolveCircularMappedId(
+      selectedSeverity,
+      priorityToIdMap,
+    );
 
     if (!selectedPriorityId) {
       alert(
@@ -1625,7 +1710,7 @@ const Admin = ({ onNotificationSubmit }) => {
       );
       console.error(
         "Missing ID for selected priority key:",
-        mappedPriorityName,
+        selectedSeverity,
         "Map:",
         priorityToIdMap,
       );
@@ -1676,6 +1761,20 @@ const Admin = ({ onNotificationSubmit }) => {
     files.forEach((file) => formData.append("attachment", file));
     // --- End FormData ---
 
+    const {
+      draftId: activeDraftId,
+      draftSrNo: activeDraftSrNo,
+      isEditingDraftSession,
+    } = resolveEditingDraftContext();
+    const draftUpdateUrl = activeDraftSrNo
+      ? `http://localhost:8000/api/circular/api/draft/${activeDraftSrNo}/update/`
+      : null;
+
+    if (isEditingDraftSession && !draftUpdateUrl) {
+      alert("Draft edit session was lost. Reopen the draft from the Drafts page.");
+      return;
+    }
+
     console.log(
       "📤 Saving draft with FormData:",
       Object.fromEntries(formData.entries()),
@@ -1683,7 +1782,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
     try {
       const response = await fetch(
-        "http://localhost:8000/api/circular/api/notifications/",
+        draftUpdateUrl || "http://localhost:8000/api/circular/api/notifications/",
         {
           method: "POST",
           //  DO NOT set Content-Type — browser sets it automatically with boundary for FormData
@@ -1693,7 +1792,15 @@ const Admin = ({ onNotificationSubmit }) => {
 
       const result = await response.json();
       if (response.ok) {
-        alert("Draft saved successfully!");
+        alert(
+          draftUpdateUrl
+            ? "Draft updated successfully!"
+            : "Draft saved successfully!",
+        );
+        setEditingDraftId(null);
+        setEditingDraftSrNo(null);
+        setDraftPrefillData(null);
+        clearCircularDraftEditSession();
         console.log("✅ Draft saved with ID:", result.id);
         window.location.reload();
         // Optional: Reset form or redirect
@@ -1708,11 +1815,9 @@ const Admin = ({ onNotificationSubmit }) => {
   };
 
   useEffect(() => {
-    // Check if there's draft data to load
-    const draftData = localStorage.getItem("editingDraftData");
-    if (draftData) {
+    if (draftPrefillData) {
       try {
-        const draft = JSON.parse(draftData);
+        const draft = draftPrefillData;
         console.log("=== LOADING DRAFT DATA ===");
         console.log("Full draft ", draft);
 
@@ -1745,72 +1850,76 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         // Set priority (selectedSeverity)
-        if (draft.priority) {
-          setSelectedSeverity(draft.priority);
-          console.log("Set priority:", draft.priority);
+        if (draft.selectedSeverityForPreFill || draft.priority) {
+          const resolvedPriority = resolveCircularMappedName(
+            draft.selectedSeverityForPreFill || draft.priority,
+            priorityToIdMap,
+          );
+          if (resolvedPriority) {
+            setSelectedSeverity(resolvedPriority);
+            console.log("Set priority:", resolvedPriority);
+          }
         }
 
         // Set document type (msc_type -> selectedType)
-        if (draft.msc_type) {
-          const typeMap = {
-            Alert: "alert",
-            Circular: "circular",
-            WorkInstruction: "workinstruction",
-            alert: "alert",
-            circular: "circular",
-            workinstruction: "workinstruction",
-          };
-
-          const mappedType =
-            typeMap[draft.msc_type] || draft.msc_type.toLowerCase();
-          setSelectedType(mappedType);
-          console.log(
-            "Set selectedType:",
-            mappedType,
-            "from msc_type:",
-            draft.msc_type,
+        if (draft.selectedTypeForPreFill || draft.msc_type) {
+          const resolvedType = resolveCircularMappedName(
+            draft.selectedTypeForPreFill || draft.msc_type,
+            typeToIdMap,
           );
+          if (resolvedType) {
+            const mappedType = String(resolvedType).toLowerCase();
+            setSelectedType(mappedType);
+            console.log(
+              "Set selectedType:",
+              mappedType,
+              "from msc_type:",
+              draft.msc_type,
+            );
+          }
         }
 
         // Set department (dept -> selectedMainOption)
-        if (draft.dept !== undefined && draft.dept !== null) {
-          const deptMap = {
-            0: "seq",
-            1: "tech",
-            0: "seq",
-            1: "tech",
-            seq: "seq",
-            tech: "tech",
-            deck: "seq",
-            engine: "tech",
-          };
-
-          const mappedDept = deptMap[draft.dept] || draft.dept;
-          setSelectedMainOption(mappedDept);
-          console.log(
-            "Set selectedMainOption:",
-            mappedDept,
-            "from dept:",
-            draft.dept,
+        if (
+          draft.selectedMainOptionForPreFill ||
+          (draft.dept !== undefined && draft.dept !== null)
+        ) {
+          const mappedDept = resolveCircularDepartmentUiKey(
+            draft.selectedMainOptionForPreFill || draft.dept,
+            deptToIdMap,
           );
+          if (mappedDept) {
+            setSelectedMainOption(mappedDept);
+            console.log(
+              "Set selectedMainOption:",
+              mappedDept,
+              "from dept:",
+              draft.dept,
+            );
+          }
         }
 
         // Set category (category -> selectedCategory)
-        if (draft.category) {
-          setSelectedCategory(draft.category.toLowerCase());
+        if (draft.selectedCategoryForPreFill || draft.category) {
+          const mappedCategory =
+            draft.selectedCategoryForPreFill ||
+            String(draft.category || "").toLowerCase();
+          setSelectedCategory(mappedCategory);
           console.log(
             "Set selectedCategory:",
-            draft.category.toLowerCase(),
+            mappedCategory,
             "from category:",
             draft.category,
           );
         }
 
         // Set sub-categories (sub_category -> selectedSub1)
-        if (draft.sub_category) {
-          const subCatSet = Array.isArray(draft.sub_category)
-            ? new Set(draft.sub_category)
-            : new Set([draft.sub_category]);
+        if (draft.selectedSub1ForPreFill || draft.sub_category) {
+          const resolvedSubCategories = resolveCircularMappedNames(
+            draft.selectedSub1ForPreFill || draft.sub_category,
+            subCatToIdMap,
+          );
+          const subCatSet = new Set(resolvedSubCategories);
           setSelectedSub1(subCatSet);
           console.log(
             "Set selectedSub1:",
@@ -1821,10 +1930,12 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         // Set second sub-categories (second_sub_category -> selectedSub2)
-        if (draft.second_sub_category) {
-          const secondSubCatSet = Array.isArray(draft.second_sub_category)
-            ? new Set(draft.second_sub_category)
-            : new Set([draft.second_sub_category]);
+        if (draft.selectedSub2ForPreFill || draft.second_sub_category) {
+          const resolvedSecondSubCategories = resolveCircularMappedNames(
+            draft.selectedSub2ForPreFill || draft.second_sub_category,
+            secondSubCatToIdMap,
+          );
+          const secondSubCatSet = new Set(resolvedSecondSubCategories);
           setSelectedSub2(secondSubCatSet);
           console.log(
             "Set selectedSub2:",
@@ -1833,45 +1944,33 @@ const Admin = ({ onNotificationSubmit }) => {
             draft.second_sub_category,
           );
         }
-
-        // Clear the stored draft data after loading
-        localStorage.removeItem("editingDraftData");
-        localStorage.removeItem("editingDraftId"); // Clear the ID as well
-
         console.log("=== DRAFT DATA LOADED SUCCESSFULLY ===");
       } catch (error) {
         console.error("Error parsing or loading draft ", error);
-        console.error("Draft data that caused error:", draftData);
+        console.error("Draft data that caused error:", draftPrefillData);
       }
     }
-  }, []);
+  }, [
+    draftPrefillData,
+    deptToIdMap,
+    priorityToIdMap,
+    secondSubCatToIdMap,
+    subCatToIdMap,
+    typeToIdMap,
+  ]);
 
   const handleConfirmPublish = async () => {
-    // Inside handleConfirmPublish, after getting selectedType
-    const normalizedSelectedType =
-      selectedType.charAt(0).toUpperCase() + selectedType.slice(1); // Capitalize first letter
-    // This converts "work instruction" to "Work instruction"
-
-    let selectedTypeId = typeToIdMap[normalizedSelectedType];
+    const selectedTypeId = resolveCircularMappedId(selectedType, typeToIdMap);
 
     if (!selectedTypeId) {
-      // If the capitalized version doesn't work, try the original key or handle it differently
-      // For example, you could create a case-insensitive lookup
-      const selectedTypeKey = Object.keys(typeToIdMap).find(
-        (key) => key.toLowerCase() === selectedType.toLowerCase(),
+      alert("Document type ID not found. Please try again.");
+      console.error(
+        "Missing ID for type:",
+        selectedType,
+        "Map:",
+        typeToIdMap,
       );
-      selectedTypeId = typeToIdMap[selectedTypeKey];
-
-      if (!selectedTypeId) {
-        alert("Document type ID not found. Please try again.");
-        console.error(
-          "Missing ID for type:",
-          selectedType,
-          "Map:",
-          typeToIdMap,
-        );
-        return;
-      }
+      return;
     }
     console.log(
       "handleConfirmPublish: Confirm clicked. Checking for approval context...",
@@ -2136,12 +2235,15 @@ const Admin = ({ onNotificationSubmit }) => {
       // Create FormData
       const formData = new FormData();
       // --- CHANGED: Use ID maps for type, category, priority ---
-      const selectedTypeId =
-        typeToIdMap[
-          selectedType.charAt(0).toUpperCase() + selectedType.slice(1)
-        ];
+      const selectedTypeId = resolveCircularMappedId(
+        selectedType,
+        typeToIdMap,
+      );
       // const selectedCategoryId = catToIdMap[selectedCategory]; // Use catToIdMap
-      const selectedPriorityId = priorityToIdMap[selectedSeverity];
+      const selectedPriorityId = resolveCircularMappedId(
+        selectedSeverity,
+        priorityToIdMap,
+      );
 
       if (!selectedTypeId) {
         alert("Document type ID not found. Please try again.");
@@ -2346,8 +2448,6 @@ const Admin = ({ onNotificationSubmit }) => {
     );
     // --- END NEW ---
 
-    // Get the original draft ID from localStorage (set when draft was loaded for editing)
-    const editingDraftId = localStorage.getItem("editingDraftId");
     console.log(
       "handleSubmit: editingDraftId (database ID) found:",
       editingDraftId,
@@ -2464,13 +2564,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // --- NEW: Use ID Maps (Plain Objects) to get UUIDs ---
     // Get the ID for 'type' using the map
-    const typeKeyMap = {
-      alert: "Alert",
-      circular: "Circular",
-      workinstruction: "Work Instruction",
-    };
-    const mappedTypeName = typeKeyMap[selectedType];
-    const selectedTypeId = mappedTypeName ? typeToIdMap[mappedTypeName] : null; // ✅ Use [] for plain objects
+    const selectedTypeId = resolveCircularMappedId(selectedType, typeToIdMap);
 
     if (!selectedTypeId) {
       alert(
@@ -2478,7 +2572,7 @@ const Admin = ({ onNotificationSubmit }) => {
       );
       console.error(
         "handleSubmit: Missing ID for selected type key:",
-        mappedTypeName,
+        selectedType,
         "Map:",
         typeToIdMap,
       );
@@ -2503,7 +2597,10 @@ const Admin = ({ onNotificationSubmit }) => {
     }
 
     // Get the ID for 'priority' using the map
-    const selectedPriorityId = priorityToIdMap[selectedSeverity]; // ✅ Use [] for plain objects
+    const selectedPriorityId = resolveCircularMappedId(
+      selectedSeverity,
+      priorityToIdMap,
+    );
 
     if (!selectedPriorityId) {
       alert(
@@ -2589,20 +2686,35 @@ const Admin = ({ onNotificationSubmit }) => {
     }
     console.log("=========================");
 
+    const {
+      draftId: activeDraftId,
+      draftSrNo: activeDraftSrNo,
+      isEditingDraftSession,
+    } = resolveEditingDraftContext();
+    const draftUpdateUrl = activeDraftSrNo
+      ? `http://localhost:8000/api/circular/api/draft/${activeDraftSrNo}/update/`
+      : null;
+
+    if (isEditingDraftSession && !draftUpdateUrl) {
+      alert("Draft edit session was lost. Reopen the draft from the Drafts page.");
+      return;
+    }
+
     try {
       let response;
       let result;
 
-      if (editingDraftId) {
+      if (draftUpdateUrl) {
         // --- UPDATE PATH (Editing a draft) ---
-        console.log("Editing draft with DATABASE ID:", editingDraftId);
+        console.log("Editing draft with DATABASE ID:", activeDraftId);
+        console.log("Editing draft with SR No:", activeDraftSrNo);
         console.log(
-          `Sending request to update endpoint: http://localhost:8000/api/circular/api/drafts/${editingDraftId}/update/`,
+          `Sending request to update endpoint: ${draftUpdateUrl}`,
         );
 
         // Send the request to the UPDATE endpoint using the specific DATABASE ID
         response = await fetch(
-          `http://localhost:8000/api/circular/api/drafts/${editingDraftId}/update/`,
+          draftUpdateUrl,
           {
             method: "POST",
             body: formData, // Send the updated data (still pending approval)
@@ -2629,15 +2741,17 @@ const Admin = ({ onNotificationSubmit }) => {
           }
           // --- END NEW ---
 
+          setEditingDraftId(null);
+          setEditingDraftSrNo(null);
+          setDraftPrefillData(null);
+          clearCircularDraftEditSession();
+          console.log("Cleared editingDraftId from localStorage");
+
           // --- NEW: Refresh the page after successful submission/update ---
           // This will clear all form state and localStorage flags like 'editingDraftId' and 'supersedingNotificationId'
           window.location.reload();
 
           // --- END NEW ---
-
-          // Clear the editing flag from localStorage after successful update
-          localStorage.removeItem("editingDraftId");
-          console.log("Cleared editingDraftId from localStorage");
 
           // Clear form data if needed
           setTitle("");
@@ -2933,7 +3047,7 @@ const Admin = ({ onNotificationSubmit }) => {
   );
 
   return (
-   
+
      <div className="max-w-7xl mx-auto p-4 space-y-6 bg-sky-50 text-sky-700 ">
             {supersedingNotificationSrNo && (
                 <div className="mb-4 p-3 bg-amber-100 border border-amber-200 rounded-lg">
@@ -3134,7 +3248,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             />
                         </div>
 
-                   
+
 
                         {/* Hashtags */}
                         <div className="space-y-2">
@@ -3175,7 +3289,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                         {/* --- NEW: Vessel Selection Popup Modal --- */}
                         {showVesselPopup && (
-                            
+
 
                             <div className="fixed inset-0 backdrop-blur-sm bg-black/20 flex items-center justify-center z-50">
 
@@ -3267,7 +3381,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                     </div>
                                 </div>
                             </div>
-                          
+
                         )}
 
 
@@ -3514,7 +3628,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             </WithPermission>
                             <WithPermission formId="PSC_F_009" processId="PSC_P_018">
                                 <button
-                                    // type="submit"
+                                    type="button"
                                     onClick={handleSubmit}
                                     process-id="PSC_P_018"
                                     className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-sky-700 hover:bg-sky-800 text-white h-9 px-3"
@@ -3877,7 +3991,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 </div>
             )}
         </div>
-  
+
   );
 };
 

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
 import { useAuth } from "../../hooks/auth/useAuth";
 import { useAuthStore } from '@/stores/auth-store';
+import { buildCircularAttachmentUrl } from '../../utils/circular/attachmentUrl';
 
 const UserNotifications = ({ currentUser }) => {
     const [userNotifications, setUserNotifications] = useState([]);
@@ -219,7 +220,7 @@ const UserNotifications = ({ currentUser }) => {
                                             ) : (
                                                 notification.attachment_url ? (
                                                     <a
-                                                        href={`http://localhost:8000/api/circular${notification.attachment_url}`}
+                                                        href={buildCircularAttachmentUrl(notification.attachment_url)}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-400"

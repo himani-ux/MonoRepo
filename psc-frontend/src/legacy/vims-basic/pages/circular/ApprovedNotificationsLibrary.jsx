@@ -16,6 +16,8 @@ import {
 import { Download as DownloadIcon } from 'lucide-react';
 import { WithPermission } from '../../utils/circular/permissionUtils';
 import { useAuth } from '../../hooks/auth/useAuth';
+import { buildCircularAttachmentUrl } from '../../utils/circular/attachmentUrl';
+import { parseCircularStoredArray } from '../../utils/circular/supersede';
 
 
 
@@ -465,52 +467,50 @@ const ApprovedNotificationsLibrary = () => {
     // --- END NEW ---
 
 
-    const handleSupersede = async (srNoToSupersede) => {
+    const handleSupersede = (notificationToSupersede) => {
+        const srNoToSupersede = notificationToSupersede?.sr_no;
+        if (!srNoToSupersede) {
+            console.error("handleSupersede: Missing SR No for notification", notificationToSupersede);
+            alert("Unable to supersede this notification because its serial number is missing.");
+            return;
+        }
+
+        const currentUser = user;
+        const redirectPath = currentUser
+            ? (currentUser.role_name?.toLowerCase() === 'admin'
+                ? '/circular/admin'
+                : '/circular/office')
+            : '/login';
         console.log(`🚀 handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
 
         try {
-            // 1. Fetch the DETAILS of the notification being superseded
-            console.log(`handleSupersede: Fetching details for notification ${srNoToSupersede} to pre-fill form.`);
-            const detailsResponse = await fetch(`http://localhost:8000/api/circular/api/submitted/${srNoToSupersede}/`);
-            if (!detailsResponse.ok) {
-                throw new Error(`Failed to fetch notification details for supersede: ${detailsResponse.status} ${detailsResponse.statusText}`);
-            }
-            const oldNotificationDetails = await detailsResponse.json();
-            console.log(`handleSupersede: Retrieved details for old notification ${srNoToSupersede}:`, oldNotificationDetails);
-
-            // 2. Store the OLD SR No (for linking the new to the old in the backend)
             localStorage.setItem('supersedingNotificationId', srNoToSupersede); // Store the OLD SR No
             console.log(`✅ handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
 
-            // 3. Store the OLD notification's details (for pre-filling the form)
-            // Use the exact key names that the pre-fill useEffect expects
-            localStorage.setItem('oldNotificationType', oldNotificationDetails.msc_type || ''); // Key name: 'oldNotificationType'
-            localStorage.setItem('oldNotificationDept', oldNotificationDetails.dept === 0 ? 'seq' : oldNotificationDetails.dept === 1 ? 'technical' : ''); //  Key name: 'oldNotificationDept'
-            localStorage.setItem('oldNotificationCategory', oldNotificationDetails.category || ''); //  Key name: 'oldNotificationCategory'
-            localStorage.setItem('oldNotificationPriority', oldNotificationDetails.priority || ''); //  Key name: 'oldNotificationPriority'
+            localStorage.setItem('oldNotificationType', notificationToSupersede.msc_type || '');
+            localStorage.setItem(
+                'oldNotificationDept',
+                notificationToSupersede.dept_name || notificationToSupersede.dept || '',
+            );
+            localStorage.setItem('oldNotificationCategory', notificationToSupersede.category || '');
+            localStorage.setItem('oldNotificationPriority', notificationToSupersede.priority || '');
 
-            // Store sub-categories as JSON strings
-            const oldSubCatNames = oldNotificationDetails.sub_category ? oldNotificationDetails.sub_category.split(',').map(s => s.trim()).filter(s => s) : [];
-            const oldSecondSubCatNames = oldNotificationDetails.second_sub_category ? oldNotificationDetails.second_sub_category.split(',').map(s => s.trim()).filter(s => s) : [];
-            localStorage.setItem('oldNotificationSubCatNames', JSON.stringify(oldSubCatNames)); //  Key name: 'oldNotificationSubCatNames'
-            localStorage.setItem('oldNotificationSecondSubCatNames', JSON.stringify(oldSecondSubCatNames)); //  Key name: 'oldNotificationSecondSubCatNames'
+            const oldSubCatNames = parseCircularStoredArray(notificationToSupersede.sub_category);
+            const oldSecondSubCatNames = parseCircularStoredArray(notificationToSupersede.second_sub_category);
+            localStorage.setItem('oldNotificationSubCatNames', JSON.stringify(oldSubCatNames));
+            localStorage.setItem('oldNotificationSecondSubCatNames', JSON.stringify(oldSecondSubCatNames));
 
             console.log(`✅ handleSupersede: Stored old notification details in localStorage for pre-filling.`);
 
             // 4. Determine user type to redirect correctly
-            const currentUser = user
-            let redirectPath = '/';
             if (currentUser) {
-                if (currentUser.employee_id === 'Prince.S') {
-                    redirectPath = '/admin'; // Redirect to Admin panel
-                    console.log("handleSupersede: Identified user as Admin, will redirect to /admin");
+                if (currentUser.role_name?.toLowerCase() === 'admin') {
+                    console.log("handleSupersede: Identified user as Admin, will redirect to /circular/admin");
                 } else {
-                    redirectPath = '/office'; // Redirect to Office User panel
-                    console.log("handleSupersede: Identified user as Office User, will redirect to /office");
+                    console.log("handleSupersede: Identified user as Office User, will redirect to /circular/office");
                 }
             } else {
                 console.warn("handleSupersede: No user found in localStorage, redirecting to login.");
-                redirectPath = '/login';
             }
 
             // 5. Redirect the user to the appropriate form
@@ -521,10 +521,8 @@ const ApprovedNotificationsLibrary = () => {
             // # will happen in the `create_notification` view when the new notification is submitted.
             // # This frontend handler just initiates the process by storing the OLD details and ID, then redirecting.
 
-        } catch (fetchError) {
-            console.error(`❌ handleSupersede: Error fetching old notification details for ${srNoToSupersede}:`, fetchError);
-            alert(`Failed to fetch details for notification ${srNoToSupersede}. Cannot pre-fill form. Proceeding without pre-fill.`);
-            // Optionally, still proceed with just the SR No if fetching details fails
+        } catch (storageError) {
+            console.error(`❌ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
             localStorage.setItem('supersedingNotificationId', srNoToSupersede);
             window.location.href = redirectPath;
         }
@@ -747,7 +745,7 @@ const ApprovedNotificationsLibrary = () => {
                                          <WithPermission id="PSC_P_020">
                                         {n.attachment_url ? (
                                             <a
-                                                href={`http://localhost:8000/api/circular${n.attachment_url}`}
+                                                href={buildCircularAttachmentUrl(n.attachment_url)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 process-id="PSC_P_020"
@@ -765,7 +763,7 @@ const ApprovedNotificationsLibrary = () => {
                                         {/* --- NEW: Supersede Button --- */}
                                          <WithPermission id="PSC_P_021">
                                         <button
-                                            onClick={() => handleSupersede(n.sr_no)}
+                                            onClick={() => handleSupersede(n)}
                                             process-id="PSC_P_021"
                                             className="flex items-center justify-center w-9 h-9 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-700 shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
                                             aria-label={`Supersede ${n.sr_no}`}
