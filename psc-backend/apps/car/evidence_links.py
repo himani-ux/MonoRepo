@@ -29,6 +29,19 @@ def build_report_evidence_url(request, evidence_id, car_id) -> str:
     return request.build_absolute_uri(f"/api/psc/evidence/{evidence_id}/view/?{query}")
 
 
+def attach_report_evidence_urls(request, *, car_id, car_data: dict) -> dict:
+    """Attach signed evidence preview URLs to a serialized CAR payload for PDF export."""
+    for evidence_item in car_data.get("evidence") or []:
+        evidence_id = evidence_item.get("id")
+        if evidence_id:
+            evidence_item["report_preview_url"] = build_report_evidence_url(
+                request,
+                evidence_id=evidence_id,
+                car_id=car_id,
+            )
+    return car_data
+
+
 def is_valid_report_evidence_token(
     token: str | None,
     *,

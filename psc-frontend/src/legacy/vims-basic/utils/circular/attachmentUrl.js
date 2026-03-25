@@ -1,21 +1,21 @@
 const CIRCULAR_FILE_BASE_URL = "http://localhost:8000";
 
 export const buildCircularAttachmentUrl = (attachmentUrl) => {
-    if (!attachmentUrl) {
-        return "";
-    }
+  if (!attachmentUrl) {
+    return "";
+  }
 
-    if (/^https?:\/\//i.test(attachmentUrl)) {
-        return attachmentUrl;
-    }
+  if (/^https?:\/\//i.test(attachmentUrl)) {
+    return attachmentUrl;
+  }
 
-    const normalizedPath = attachmentUrl
-        .replace(/^\/api\/circular(?=\/media\/)/i, "")
-        .replace(/^\/+/, "/");
+  const normalizedPath = attachmentUrl
+    .replace(/^\/api\/circular(?=\/media\/)/i, "")
+    .replace(/^\/+/, "/");
 
-    if (normalizedPath.startsWith("/")) {
-        return `${CIRCULAR_FILE_BASE_URL}${normalizedPath}`;
-    }
+  if (normalizedPath.startsWith("/")) {
+    return `${CIRCULAR_FILE_BASE_URL}${normalizedPath}`;
+  }
 
-    return `${CIRCULAR_FILE_BASE_URL}/${normalizedPath}`;
+  return `${CIRCULAR_FILE_BASE_URL}/${normalizedPath}`;
 };

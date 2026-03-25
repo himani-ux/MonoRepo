@@ -172,6 +172,7 @@ const Dashboard = () => {
           canViewCrewStatus={canViewCrewStatus}
           canRemindCrew={canRemindCrew}
           canDownloadPdf={canDownloadPdf}
+          canAccessPdf={canAccessPdf}
           onViewPdf={handleViewPdf}
 
           searchTerm={searchTerm}

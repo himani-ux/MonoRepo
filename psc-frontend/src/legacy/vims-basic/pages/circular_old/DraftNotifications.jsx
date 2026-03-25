@@ -28,7 +28,6 @@ const DraftNotifications = ({ currentUser }) => {
     const [idToSubCatMap, setIdToSubCatMap] = useState({});
     const [secondSubCategories, setSecondSubCategories] = useState([]);
     const [idToSecondSubCatMap, setIdToSecondSubCatMap] = useState({});
-
         // Get user data for header
     
     const { user } = useAuth();
@@ -54,6 +53,7 @@ const DraftNotifications = ({ currentUser }) => {
         }
 
         setIsLoading(true);
+
         try {
             const queryParams = new URLSearchParams({
                 created_by: currentUser.employee_id,
@@ -220,6 +220,121 @@ const DraftNotifications = ({ currentUser }) => {
             const draftEditUrl = `${primaryDashboardPath}?draft_sr_no=${encodeURIComponent(notificationId)}`;
             console.log(`handleEditClick: Navigating to draft edit URL: ${draftEditUrl}`);
             navigate(draftEditUrl);
+            return;
+
+            // --- Process draftData to handle UUIDs and map them back to frontend state values ---
+            // Now that handleEditClick is inside the component, it can access idTo...Map states directly.
+
+            // Map msc_type UUID to frontend state value (e.g., 'alert', 'circular')
+            if (draftData.msc_type) {
+                const mappedTypeName = idToTypeMap[draftData.msc_type]; //  Access the state variable
+                if (mappedTypeName) {
+                    draftData.selectedTypeForPreFill = mappedTypeName.toLowerCase(); // e.g., 'Alert' -> 'alert'
+                    console.log("handleEditClick: Mapped msc_type UUID '", draftData.msc_type, "' to frontend state value '", draftData.selectedTypeForPreFill, "'");
+                } else {
+                     console.warn("handleEditClick: Unknown msc_type UUID received:", draftData.msc_type);
+                     draftData.selectedTypeForPreFill = ''; // Fallback
+                }
+            } else {
+                console.log("handleEditClick: msc_type field is missing or null in draftData.");
+                draftData.selectedTypeForPreFill = ''; // Or a default value
+            }
+
+            // Map priority UUID to frontend state value (e.g., 'critical', 'high')
+            if (draftData.priority) {
+                const mappedPriorityName = idToPriorityMap[draftData.priority]; // ✅ Access the state variable
+                if (mappedPriorityName) {
+                    draftData.selectedSeverityForPreFill = mappedPriorityName;
+                    console.log("handleEditClick: Mapped priority UUID '", draftData.priority, "' to frontend state value '", draftData.selectedSeverityForPreFill, "'");
+                } else {
+                     console.warn("handleEditClick: Unknown priority UUID received:", draftData.priority);
+                     draftData.selectedSeverityForPreFill = null;
+                }
+            } else {
+                console.log("handleEditClick: priority field is missing or null in draftData.");
+                draftData.selectedSeverityForPreFill = null;
+            }
+
+            // Map dept UUID to frontend state value (e.g., 'seq', 'technical')
+            if (draftData.dept) {
+                const deptNameFromUuid = idToDeptMap[draftData.dept]; // ✅ Access the state variable
+                if (deptNameFromUuid) {
+                    // Map department name to frontend option ('Deck' -> 'seq', 'Engine' -> 'technical')
+                    const deptNameToOptionMap = { 'Deck': 'seq', 'Engine': 'technical' }; // Adjust as needed
+                    draftData.selectedMainOptionForPreFill = deptNameToOptionMap[deptNameFromUuid] || deptNameFromUuid; // Fallback to name if mapping not found
+                    console.log("handleEditClick: Mapped dept UUID '", draftData.dept, "' (name '", deptNameFromUuid, "') to frontend state value '", draftData.selectedMainOptionForPreFill, "'");
+                } else {
+                     console.warn("handleEditClick: Unknown dept UUID received:", draftData.dept);
+                     draftData.selectedMainOptionForPreFill = null; // Fallback
+                }
+            } else {
+                console.log("handleEditClick: dept field is missing or null in draftData.");
+                draftData.selectedMainOptionForPreFill = null; // Or a default value
+            }
+
+            // Map category name (assuming it's stored as a string like 'internal', 'external')
+            if (draftData.category) {
+                draftData.selectedCategoryForPreFill = draftData.category; // Assume format is correct for setSelectedCategory
+                console.log("handleEditClick: Set category for pre-fill to:", draftData.selectedCategoryForPreFill);
+            } else {
+                console.log("handleEditClick: category field is missing or null in draftData.");
+                draftData.selectedCategoryForPreFill = null; // Or a default value
+            }
+
+            // Map sub_category UUID to frontend state values (Set of names)
+            if (draftData.sub_category) {
+                const subCatName = idToSubCatMap[draftData.sub_category]; // ✅ Access the state variable
+                if (subCatName) {
+                    draftData.selectedSub1ForPreFill = [subCatName];
+                    console.log("handleEditClick: Set selectedSub1ForPreFill to array containing:", subCatName);
+                } else {
+                     console.warn("handleEditClick: Unknown sub_category UUID received:", draftData.sub_category);
+                     draftData.selectedSub1ForPreFill = [];
+                }
+            } else {
+                console.log("handleEditClick: sub_category field is missing or null in draftData.");
+                draftData.selectedSub1ForPreFill = [];
+            }
+
+            // Map second_sub_category UUID to frontend state values (Set of names)
+            if (draftData.second_sub_category) {
+                const secondSubCatName = idToSecondSubCatMap[draftData.second_sub_category]; // ✅ Access the state variable
+                if (secondSubCatName) {
+                    draftData.selectedSub2ForPreFill = [secondSubCatName];
+                    console.log("handleEditClick: Set selectedSub2ForPreFill to array containing:", secondSubCatName);
+                } else {
+                     console.warn("handleEditClick: Unknown second_sub_category UUID received:", draftData.second_sub_category);
+                     draftData.selectedSub2ForPreFill = [];
+                }
+            } else {
+                console.log("handleEditClick: second_sub_category field is missing or null in draftData.");
+                draftData.selectedSub2ForPreFill = [];
+            }
+
+            // --- END Process draftData ---
+
+            console.log("handleEditClick: Processed draft data for pre-fill:", draftData);
+
+            // Store the PROCESSED draft data in localStorage for the main form to use
+            localStorage.setItem('editingDraftData', JSON.stringify(draftData));
+            console.log("handleEditClick: Stored processed draft data in localStorage");
+
+            // CRITICAL: Store the DATABASE ID for the update operation
+            if (draftData.id) {
+                const normalizedDraftId = String(draftData.id).trim().toLowerCase();
+                localStorage.setItem('editingDraftId', normalizedDraftId);
+                localStorage.setItem('editingDraftSrNo', draftData.sr_no);
+                console.log("✅ handleEditClick: Stored editingDraftId (database ID) in localStorage:", normalizedDraftId);
+            } else {
+                console.error("handleEditClick: Draft data does not contain an 'id' field!");
+                alert("Error: Draft data is incomplete. Cannot edit.");
+                return;
+            }
+
+            // --- NEW: Navigate based on user role ---
+            // Determine the primary dashboard route based on the user's role
+            console.log("handleEditClick: Navigated to primary dashboard page");
+            // --- END NEW ---
         } catch (error) {
             console.error("handleEditClick: Error fetching or processing draft ", error);
             alert(`Failed to load draft: ${error.message}`);
@@ -230,8 +345,8 @@ const DraftNotifications = ({ currentUser }) => {
 
 
     // --- Handle Delete Click ---
-    const handleDeleteClick = async (draftId, srNo, displaySrNo) => {
-        console.log("🚀 handleDeleteClick: Delete clicked for draft ID:", draftId, "SR No:", srNo, "Display SR No:", displaySrNo);
+    const handleDeleteClick = async (srNo, displaySrNo) => {
+        console.log("🚀 handleDeleteClick: Delete clicked for SR No:", srNo, "Display SR No:", displaySrNo);
 
         const confirmed = window.confirm(`Are you sure you want to delete draft notification ${displaySrNo}?`);
         console.log("handleDeleteClick: User confirmed:", confirmed);
@@ -242,8 +357,9 @@ const DraftNotifications = ({ currentUser }) => {
         }
 
         try {
-            console.log("handleDeleteClick: Sending delete request for draft ID:", draftId);
-            const response = await fetch(`http://localhost:8000/api/circular/api/drafts/${draftId}/delete/`, {
+            console.log("handleDeleteClick: Sending delete request for SR No:", srNo);
+            // Use the new delete endpoint
+            const response = await fetch(`http://localhost:8000/api/circular/api/draft/${srNo}/delete/`, {
                 method: 'POST', // Using POST to avoid browser compatibility issues
                 headers: {
                     'Content-Type': 'application/json',
@@ -258,7 +374,7 @@ const DraftNotifications = ({ currentUser }) => {
 
                 // Remove the deleted notification from the local state
                 setDraftNotifications(prev => {
-                    const newDrafts = prev.filter(notification => notification.id !== draftId);
+                    const newDrafts = prev.filter(notification => notification.sr_no !== srNo);
                     console.log("handleDeleteClick: Removed notification from state, new count:", newDrafts.length);
                     return newDrafts;
                 });
@@ -409,7 +525,7 @@ const DraftNotifications = ({ currentUser }) => {
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => handleDeleteClick(notification.id, notification.sr_no, notification.sr_no)}
+                                                onClick={() => handleDeleteClick(notification.sr_no, notification.sr_no)}
                                                 className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-red-800 bg-red-200 hover:bg-red-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-400"
                                             >
                                                 Delete

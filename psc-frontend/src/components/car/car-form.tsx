@@ -56,7 +56,6 @@ import {
   useCreateAction,
   useUpdateAction,
   useDeleteAction,
-  useCompleteAction,
   useDeleteEvidence,
 } from '@/hooks/use-cars';
 import {
@@ -543,23 +542,11 @@ interface ActionItemRowProps {
 }
 
 const ActionItemRow: FC<ActionItemRowProps> = ({ action, carId, canEdit }) => {
-  const [showComplete, setShowComplete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDesc, setEditDesc] = useState(action.description);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [remarks, setRemarks] = useState('');
-  const completeAction = useCompleteAction(carId);
   const updateAction = useUpdateAction(carId);
   const deleteAction = useDeleteAction(carId);
-
-  const handleComplete = async () => {
-    await completeAction.mutateAsync({
-      actionId: action.id,
-      completion_remarks: remarks || undefined,
-    });
-    setShowComplete(false);
-    setRemarks('');
-  };
 
   const handleSaveEdit = async () => {
     if (!editDesc.trim()) return;
@@ -631,72 +618,20 @@ const ActionItemRow: FC<ActionItemRowProps> = ({ action, carId, canEdit }) => {
               </div>
             ) : (
               <>
-                <p
-                  className={cn(
-                    'text-sm',
-                    action.is_completed && 'text-neutral-500 line-through'
-                  )}
-                >
-                  {action.description}
-                </p>
+                <p className="text-sm text-neutral-700">{action.description}</p>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
                   {action.owner_name && (
                     <span className="font-medium text-neutral-600">
                       {action.owner_name}
                     </span>
                   )}
-                  {action.is_completed && action.completed_at && (
-                    <span className="text-success-600">
-                      Completed: {formatDate(action.completed_at)}
-                    </span>
-                  )}
                 </div>
-                {action.is_completed && action.completion_remarks && (
-                  <p className="mt-1 text-xs italic text-neutral-500">
-                    {action.completion_remarks}
-                  </p>
-                )}
               </>
-            )}
-
-            {/* Complete action form */}
-            {showComplete && (
-              <div className="mt-2 space-y-2">
-                <Input
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Completion remarks (optional)"
-                  className="text-sm"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleComplete}
-                    disabled={completeAction.isPending}
-                  >
-                    {completeAction.isPending ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Check className="mr-1 h-3 w-3" />
-                    )}
-                    Confirm
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowComplete(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
             )}
           </div>
 
           {/* Actions */}
-          {canEdit && !action.is_completed && !showComplete && !isEditing && (
+          {canEdit && !isEditing && (
             <div className="flex flex-shrink-0 gap-1">
               <Button
                 type="button"
@@ -706,16 +641,6 @@ const ActionItemRow: FC<ActionItemRowProps> = ({ action, carId, canEdit }) => {
                 className="text-xs"
               >
                 Edit
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowComplete(true)}
-                className="text-xs"
-              >
-                <Check className="mr-1 h-3 w-3" />
-                Done
               </Button>
               <button
                 type="button"

@@ -41,6 +41,7 @@ urlpatterns = [
     path('api/user-drafts/', views.get_user_drafts, name='get_user_drafts'),
     path('api/draft/<path:sr_no>/update/', views.update_draft_by_sr_no, name='update_draft_by_sr_no'),
     path('api/drafts/<str:draft_id>/update/', views.update_draft_by_id, name='update_draft_by_id'),
+    path('api/drafts/<str:draft_id>/delete/', views.delete_draft_by_id, name='delete_draft_by_id'),
     path('api/draft/<path:sr_no>/delete/', views.delete_draft_by_sr_no, name='delete_draft_by_sr_no'),
     path('api/draft/<path:sr_no>/', views.get_draft_by_sr_no, name='get_draft_by_sr_no'),
     
@@ -56,5 +57,3 @@ urlpatterns = [
     # Edit Endpoints
     path('api/notifications/<path:notification_id>/edit-pending/', views.edit_pending_notification, name='edit_pending_notification'),
 ]
-
-

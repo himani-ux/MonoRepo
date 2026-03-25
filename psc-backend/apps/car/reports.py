@@ -22,7 +22,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-from reportlab.graphics.shapes import Circle, Drawing, Ellipse, Line, Rect, String
+from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.platypus import (
     Paragraph,
     SimpleDocTemplate,
@@ -259,115 +259,26 @@ def _wrap(text: str, style) -> Paragraph:
     return Paragraph(escaped, style)
 
 
+def _wrap_labeled_text(label: str, value: Any, style, *, multiline: bool = False) -> Paragraph:
+    """Wrap label/value text with a bold label while preserving line breaks."""
+    escaped_label = escape(str(label or '').strip())
+    escaped_value = escape(_safe(value, '—')).replace('\n', '<br/>')
+    separator = '<br/>' if multiline else ' '
+    return Paragraph(f'<b>{escaped_label}</b>{separator}{escaped_value}', style)
+
+
 def _wrap_link(text: str, url: str | None, style) -> Paragraph:
-    """Wrap text in a clickable PDF hyperlink when a URL is available."""
+    """Wrap attachment text in a clickable PDF hyperlink when a URL is available."""
     if not url:
         return _wrap(text, style)
 
     normalized = str(text or '—')
     escaped_text = escape(normalized).replace('\n', '<br/>')
     escaped_url = escape(str(url), quote=True)
-    return Paragraph(f'<link href="{escaped_url}">{escaped_text}</link>', style)
-
-
-def _build_view_icon() -> Drawing:
-    """Build a small eye icon for evidence links in the PDF."""
-    icon_width = 4 * mm
-    icon_height = 3 * mm
-    drawing = Drawing(icon_width, icon_height)
-
-    stroke = colors.HexColor('#2563EB')
-    pupil = colors.HexColor('#1D4ED8')
-
-    # Almond-shaped eye outline.
-    drawing.add(Ellipse(
-        icon_width / 2,
-        icon_height / 2,
-        icon_width / 2 - 0.35 * mm,
-        icon_height / 2 - 0.45 * mm,
-        strokeColor=stroke,
-        fillColor=None,
-        strokeWidth=0.6,
-    ))
-
-    # Iris / pupil.
-    drawing.add(Circle(
-        icon_width / 2,
-        icon_height / 2,
-        0.45 * mm,
-        strokeColor=pupil,
-        fillColor=pupil,
-        strokeWidth=0.4,
-    ))
-
-    # Subtle highlight to improve legibility at small PDF sizes.
-    drawing.add(Circle(
-        icon_width / 2 + 0.12 * mm,
-        icon_height / 2 + 0.12 * mm,
-        0.08 * mm,
-        strokeColor=colors.white,
-        fillColor=colors.white,
-        strokeWidth=0.1,
-    ))
-
-    # Corner strokes make the shape read more clearly as an eye.
-    drawing.add(Line(
-        0.45 * mm,
-        icon_height / 2,
-        0.9 * mm,
-        icon_height / 2 + 0.45 * mm,
-        strokeColor=stroke,
-        strokeWidth=0.4,
-    ))
-    drawing.add(Line(
-        0.45 * mm,
-        icon_height / 2,
-        0.9 * mm,
-        icon_height / 2 - 0.45 * mm,
-        strokeColor=stroke,
-        strokeWidth=0.4,
-    ))
-    drawing.add(Line(
-        icon_width - 0.45 * mm,
-        icon_height / 2,
-        icon_width - 0.9 * mm,
-        icon_height / 2 + 0.45 * mm,
-        strokeColor=stroke,
-        strokeWidth=0.4,
-    ))
-    drawing.add(Line(
-        icon_width - 0.45 * mm,
-        icon_height / 2,
-        icon_width - 0.9 * mm,
-        icon_height / 2 - 0.45 * mm,
-        strokeColor=stroke,
-        strokeWidth=0.4,
-    ))
-    return drawing
-
-
-def _build_view_file_cell(file_name: str, url: str | None, style) -> Any:
-    """Render a clickable filename with a small eye icon aligned on the right."""
-    if not url:
-        return _wrap(file_name, style)
-
-    link = _wrap_link(file_name, url, style)
-    cell_table = Table(
-        [[link, _build_view_icon()]],
-        colWidths=[33.2 * mm, 3.2 * mm],
+    return Paragraph(
+        f'<link href="{escaped_url}"><font color="#1D4ED8"><u>{escaped_text}</u></font></link>',
+        style,
     )
-    cell_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (0, 0), 0.2),
-        ('LEFTPADDING', (1, 0), (1, 0), 0),
-        ('RIGHTPADDING', (1, 0), (1, 0), 0),
-    ]))
-    return cell_table
 
 
 def _normalize_audience(audience: str | None) -> str:
@@ -953,6 +864,21 @@ def _build_review_comments(
     """Main-body office actions with actor/time/comment (PIC and DPA)."""
     elements.append(Paragraph('Office Actions', styles['SectionHeading']))
 
+    del content_width
+
+    def _append_review_block(title: str, actor: str, performed_at: Any, comment: str):
+        """
+        Render a page-break-friendly office action block.
+
+        Large comments stay in Paragraph flowables so ReportLab can split them
+        across pages instead of forcing a single oversized table row.
+        """
+        elements.append(Paragraph(title, styles['BodyBold10']))
+        elements.append(_wrap_labeled_text('Name:', actor, styles['CellText']))
+        elements.append(_wrap_labeled_text('Datetime:', _fmt_date(performed_at), styles['CellText']))
+        elements.append(_wrap_labeled_text('Comment:', comment, styles['CellText'], multiline=True))
+        elements.append(Spacer(1, 2 * mm))
+
     pic_actor, pic_performed_at = _resolve_pic_actor_time(car_data)
     dpa_actor, dpa_performed_at = _resolve_dpa_actor_time(car_data)
     pic_comment = (car_data.get('pic_comment') or '').strip()
@@ -965,27 +891,8 @@ def _build_review_comments(
     pic_comment = pic_comment or '—'
     dpa_comment = dpa_comment or '—'
 
-    cell = styles['CellText']
-    comments_data = [
-        [
-            _wrap('PIC', styles['CellBold']),
-            _wrap(
-                f'Name: {pic_actor}\nDatetime: {_fmt_date(pic_performed_at)}\nComment: {pic_comment}',
-                cell,
-            ),
-        ],
-        [
-            _wrap('DPA', styles['CellBold']),
-            _wrap(
-                f'Name: {dpa_actor}\nDatetime: {_fmt_date(dpa_performed_at)}\nComment: {dpa_comment}',
-                cell,
-            ),
-        ],
-    ]
-
-    comments_table = Table(comments_data, colWidths=[40 * mm, content_width - 40 * mm])
-    comments_table.setStyle(TableStyle(_info_table_style()))
-    elements.append(comments_table)
+    _append_review_block('PIC', pic_actor, pic_performed_at, pic_comment)
+    _append_review_block('DPA', dpa_actor, dpa_performed_at, dpa_comment)
 
 
 def _build_corrective_actions(
@@ -1048,16 +955,13 @@ def _build_evidence_list(elements: list, car_data: dict, styles, content_width: 
 
     cell = styles['CellText']
     col_widths = [8 * mm, 22 * mm, 45 * mm, content_width - 100 * mm, 25 * mm]
-    table_data: list[list[Any]] = [['#', 'Type', 'View File', 'Description', 'Uploaded']]
+    table_data: list[list[Any]] = [['#', 'Type', 'File Name', 'Description', 'Uploaded']]
 
     for idx, ev in enumerate(evidence_list, 1):
-        file_name = _safe(ev.get('file_name'))
-        report_preview_url = ev.get('report_preview_url')
-
         table_data.append([
             str(idx),
             _wrap(_safe(ev.get('evidence_type_display', ev.get('evidence_type'))), cell),
-            _build_view_file_cell(file_name, report_preview_url, cell),
+            _wrap_link(_safe(ev.get('file_name')), ev.get('report_preview_url'), cell),
             _wrap(_safe(ev.get('description')), cell),
             _wrap(_fmt_date(ev.get('uploaded_at')), cell),
         ])

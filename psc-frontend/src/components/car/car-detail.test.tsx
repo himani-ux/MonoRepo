@@ -183,18 +183,26 @@ describe('CARDetail', () => {
   });
 
   it('test_feat_car_010_renders_pic_and_dpa_comments_when_present', () => {
+    const picComment = 'PIC validated corrective actions and attached the full closure narrative for report rendering.';
+    const dpaComment = 'DPA final closure approved with all supporting evidence reviewed.';
+
     render(
       <CARDetail
         car={buildCar({
-          pic_comment: 'PIC validated corrective actions.',
-          dpa_comment: 'DPA final closure approved.',
+          pic_comment: picComment,
+          dpa_comment: dpaComment,
         })}
       />
     );
 
+    const picCommentNode = screen.getByText(picComment);
+    const dpaCommentNode = screen.getByText(dpaComment);
+
     expect(screen.getByText('PIC Comment:')).toBeInTheDocument();
-    expect(screen.getByText('PIC validated corrective actions.')).toBeInTheDocument();
+    expect(picCommentNode).toBeInTheDocument();
+    expect(picCommentNode).toHaveClass('whitespace-pre-wrap', 'break-words');
     expect(screen.getByText('DPA Comment:')).toBeInTheDocument();
-    expect(screen.getByText('DPA final closure approved.')).toBeInTheDocument();
+    expect(dpaCommentNode).toBeInTheDocument();
+    expect(dpaCommentNode).toHaveClass('whitespace-pre-wrap', 'break-words');
   });
 });

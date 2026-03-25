@@ -109,6 +109,48 @@ def _extract_appended_comment(event_description: str | None) -> str:
     return parts[1].strip()
 
 
+def _resolve_pic_review_comment_value(
+    *,
+    stored_comment: str | None,
+    review_comment: str | None,
+    last_action: str | None,
+    last_action_comment: str | None,
+) -> str | None:
+    """
+    Resolve the correct PIC review comment for detail/report output.
+
+    Prefer the dedicated CAR.pic_comment field unless it was clearly overwritten
+    by a later workflow action. Activity-history comments are capped by the
+    500-char event_description column, so they can be truncated for long input.
+    """
+    stored = (stored_comment or '').strip()
+    review = (review_comment or '').strip()
+    if not review:
+        return stored or None
+    if not stored:
+        return review
+    if stored == review:
+        return stored
+
+    # Long comments can be truncated in psc_activity_history.event_description.
+    if stored.startswith(review) and len(stored) > len(review):
+        return stored
+    if review.startswith(stored) and len(review) > len(stored):
+        return review
+
+    normalized_last_action = str(last_action or '').strip().upper()
+    latest_comment = (last_action_comment or '').strip()
+    if (
+        normalized_last_action
+        and normalized_last_action != 'START_PIC_REVIEW'
+        and latest_comment
+        and latest_comment == stored
+    ):
+        return review
+
+    return stored
+
+
 def _lookup_def_code_title(def_code_id: str | None) -> str | None:
     """Resolve deficiency title from PSCDefCode master data."""
     if not def_code_id:
@@ -763,6 +805,7 @@ class CARDetailSerializer(serializers.ModelSerializer):
 
     def get_pic_comment(self, obj):
         """Return the PIC review comment, not the later submit-to-DPA note."""
+        review_comment = ''
         review_events = ActivityHistory.objects.filter(
             entity_type='CAR',
             entity_id=obj.id,
@@ -772,9 +815,14 @@ class CARDetailSerializer(serializers.ModelSerializer):
         for event in review_events:
             review_comment = _extract_appended_comment(event.event_description)
             if review_comment:
-                return review_comment
+                break
 
-        return obj.pic_comment
+        return _resolve_pic_review_comment_value(
+            stored_comment=obj.pic_comment,
+            review_comment=review_comment,
+            last_action=obj.last_action,
+            last_action_comment=obj.last_action_comment,
+        )
 
     def get_activity_history(self, obj):
         """Get activity history for this CAR."""

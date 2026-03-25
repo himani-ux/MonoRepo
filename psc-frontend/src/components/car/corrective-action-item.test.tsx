@@ -37,7 +37,7 @@ describe('CorrectiveActionItem', () => {
     expect(container.firstChild).toHaveClass('border-error-300');
   });
 
-  it('test_feat_car_012_completed_action_shows_completion_date_and_remarks', () => {
+  it('test_feat_car_012_completed_action_hides_completion_date_and_keeps_remarks', () => {
     render(
       <CorrectiveActionItem
         index={2}
@@ -55,7 +55,8 @@ describe('CorrectiveActionItem', () => {
       />
     );
 
-    expect(screen.getByText(/Completed \d{2}/)).toBeInTheDocument();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.queryByText(/Completed \d{2}/)).not.toBeInTheDocument();
     expect(
       screen.getByText('Completed and verified by chief engineer')
     ).toBeInTheDocument();

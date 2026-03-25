@@ -2271,6 +2271,43 @@ def delete_draft_by_sr_no(request, sr_no):
         traceback.print_exc()
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def delete_draft_by_id(request, draft_id):
+    """Soft delete a draft by its database ID."""
+    print(f"=== delete_draft_by_id: Starting function for draft_id = {draft_id} ===")
+
+    if request.method != 'POST':
+        print(f"delete_draft_by_id: Invalid method {request.method}, returning 405")
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    try:
+        normalized_draft_id = str(uuid.UUID(str(draft_id).strip()))
+        print(f"delete_draft_by_id: Looking for draft with ID {normalized_draft_id} to soft-delete")
+
+        updated_count = MscData.objects.filter(
+            id=normalized_draft_id,
+            publish_status=0,
+            is_deleted=False,
+        ).update(is_deleted=True)
+
+        if updated_count > 0:
+            print(f"delete_draft_by_id: Successfully soft-deleted draft {normalized_draft_id}")
+            return JsonResponse({'success': True, 'message': 'Draft deleted successfully'})
+
+        print(f"delete_draft_by_id: Draft with ID {normalized_draft_id} not found or not editable")
+        return JsonResponse({'error': 'Draft not found'}, status=404)
+
+    except (ValueError, TypeError, AttributeError) as exc:
+        print(f"delete_draft_by_id: Invalid draft ID '{draft_id}' - {exc}")
+        return JsonResponse({'error': 'Invalid draft ID format'}, status=400)
+    except Exception as e:
+        print(f"delete_draft_by_id: Error occurred during deletion - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
 def _update_draft_record_from_request(request, draft_record, log_label):
     print(f"{log_label}: Found draft SR No {draft_record.sr_no}, current status: {draft_record.publish_status}")
 
