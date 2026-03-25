@@ -213,7 +213,7 @@ class MscCategory(models.Model):
     
 
 class MscData(models.Model):
-    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sr_no = models.CharField(max_length=255, null=True, blank=True)
     msc_type = models.ForeignKey(MscType, on_delete=models.SET_NULL, null=True, blank=True, db_column='msc_type') # Links to MscType.id
     dept =  models.UUIDField(null=True, blank=True)
