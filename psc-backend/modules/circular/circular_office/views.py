@@ -188,6 +188,15 @@ def _infer_circular_type_name_from_sr_no(sr_no):
     return None
 
 
+def _normalize_circular_type_name(doc_type_name):
+    raw_value = str(doc_type_name or "").strip().lower()
+    return "".join(ch for ch in raw_value if ch.isalnum())
+
+
+def _should_stack_footer_metadata(doc_type_name):
+    return _normalize_circular_type_name(doc_type_name) == "workinstruction"
+
+
 def _acquire_circular_sr_lock(cursor, prefix):
     lock_resource = f"circular-sr:{hashlib.sha256(prefix.encode('utf-8')).hexdigest()}"
     cursor.execute(
@@ -279,26 +288,44 @@ def _draw_pdf_subject_block(canvas_obj, width, margin, subject_y, subject_text):
     return current_y
 
 
-def _draw_fixed_footer(canvas_obj, width, margin, left_text, center_text, right_text):
+def _draw_fixed_footer(
+    canvas_obj,
+    width,
+    margin,
+    left_text,
+    center_text,
+    right_text,
+    stack_metadata_below_left=False,
+):
     canvas_obj.setStrokeColor(navy)
     canvas_obj.line(margin, PDF_FIXED_FOOTER_LINE_Y, width - margin, PDF_FIXED_FOOTER_LINE_Y)
     canvas_obj.setStrokeColor(black)
     canvas_obj.setFillColor(black)
     canvas_obj.setFont(PDF_FONT_NAME, PDF_FOOTER_FONT_SIZE)
-    canvas_obj.drawString(margin, PDF_FIXED_FOOTER_Y, left_text)
+
+    metadata_lines = []
     if center_text:
         if isinstance(center_text, (list, tuple)):
-            center_lines = [line for line in center_text if line]
-            if len(center_lines) == 1:
-                canvas_obj.drawCentredString(width / 2, PDF_FIXED_FOOTER_Y, center_lines[0])
-            else:
-                first_line_y = PDF_FIXED_FOOTER_Y + 2
-                for index, line in enumerate(center_lines):
-                    canvas_obj.drawCentredString(width / 2, first_line_y - (index * 10), line)
+            metadata_lines = [line for line in center_text if line]
         else:
-            canvas_obj.drawCentredString(width / 2, PDF_FIXED_FOOTER_Y, center_text)
+            metadata_lines = [center_text]
+
+    left_text_y = PDF_FIXED_FOOTER_Y + 8 if stack_metadata_below_left and metadata_lines else PDF_FIXED_FOOTER_Y
+    canvas_obj.drawString(margin, left_text_y, left_text)
+
+    if metadata_lines:
+        if stack_metadata_below_left:
+            for index, line in enumerate(metadata_lines):
+                canvas_obj.drawString(margin, left_text_y - ((index + 1) * 10), line)
+        elif len(metadata_lines) == 1:
+            canvas_obj.drawCentredString(width / 2, PDF_FIXED_FOOTER_Y, metadata_lines[0])
+        else:
+            first_line_y = PDF_FIXED_FOOTER_Y + 2
+            for index, line in enumerate(metadata_lines):
+                canvas_obj.drawCentredString(width / 2, first_line_y - (index * 10), line)
+
     if right_text:
-        canvas_obj.drawRightString(width - margin, PDF_FIXED_FOOTER_Y, right_text)
+        canvas_obj.drawRightString(width - margin, left_text_y, right_text)
 
 
 def _merge_footer_onto_pdf_page(page_obj, margin, left_text, center_text, right_text):
@@ -919,7 +946,8 @@ def _add_footer_to_page(canvas_obj, width, margin, notification_data, page_numbe
         margin,
         f"Sr. No: {notification_data['formatted_id']}",
         created_by_part,
-        f"Created At: {notification_data['current_date']} | Page {page_number}"
+        f"Created At: {notification_data['current_date']} | Page {page_number}",
+        stack_metadata_below_left=_should_stack_footer_metadata(notification_data.get('doc_type_name')),
     )
 
 
@@ -1536,8 +1564,95 @@ def _add_footer_to_page_update(canvas_obj, width, margin, notification_obj, page
         margin,
         f"Sr. No: {notification_obj.sr_no}",
         [created_by_part, approved_by_part],
-        f"{approved_at_part} | Page {page_number}"
+        f"{approved_at_part} | Page {page_number}",
+        stack_metadata_below_left=_should_stack_footer_metadata(
+            _infer_circular_type_name_from_sr_no(notification_obj.sr_no)
+        ),
     )
+
+
+def _build_delivery_status_records(notification_records):
+    records = list(notification_records)
+    if not records:
+        return []
+
+    crew_ids = []
+    for record in records:
+        crew_id = str(record.crew_id or "").strip()
+        if crew_id and crew_id not in crew_ids:
+            crew_ids.append(crew_id)
+
+    crew_lookup = {}
+    if crew_ids:
+        placeholders = ", ".join(["%s"] * len(crew_ids))
+        delivery_lookup_sql = f"""
+            WITH latest_onboarding AS (
+                SELECT
+                    coh.CrewID,
+                    coh.Vessel,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY coh.CrewID
+                        ORDER BY
+                            CASE WHEN ISNULL(coh.is_active, 0) = 1 THEN 0 ELSE 1 END,
+                            coh.updated_date DESC,
+                            coh.created_date DESC,
+                            coh.SignOnDate DESC,
+                            coh.id DESC
+                    ) AS rn
+                FROM Crew_Onboarding_History coh
+                WHERE coh.CrewID IN ({placeholders})
+                  AND ISNULL(coh.is_deleted, 0) = 0
+            )
+            SELECT
+                LTRIM(RTRIM(h.CrewID)) AS crew_id,
+                LTRIM(RTRIM(COALESCE(h.first_name, ''))) AS first_name,
+                LTRIM(RTRIM(COALESCE(h.surname, ''))) AS surname,
+                LTRIM(RTRIM(COALESCE(mar.rank_name, ''))) AS rank_name,
+                LTRIM(RTRIM(COALESCE(v.VesselName, v.vesselCode, ''))) AS vessel_name
+            FROM HRM501 h
+            LEFT JOIN master_applied_rank mar
+                ON mar.id = TRY_CONVERT(uniqueidentifier, h.rank_name)
+            LEFT JOIN latest_onboarding lo
+                ON lo.CrewID = h.CrewID
+               AND lo.rn = 1
+            LEFT JOIN VesselData v
+                ON v.id = TRY_CONVERT(uniqueidentifier, lo.Vessel)
+            WHERE h.CrewID IN ({placeholders})
+              AND ISNULL(h.is_deleted, 0) = 0
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(delivery_lookup_sql, crew_ids + crew_ids)
+            for row in cursor.fetchall():
+                crew_id, first_name, surname, rank_name, vessel_name = row
+                normalized_crew_id = str(crew_id or "").strip()
+                if not normalized_crew_id:
+                    continue
+                full_name = " ".join(
+                    part for part in [str(first_name or "").strip(), str(surname or "").strip()] if part
+                ) or None
+                crew_lookup[normalized_crew_id] = {
+                    "resolved_crew_id": normalized_crew_id,
+                    "crew_name": full_name,
+                    "rank_name": str(rank_name or "").strip() or None,
+                    "vessel_name": str(vessel_name or "").strip() or None,
+                }
+
+    delivery_records = []
+    for record in records:
+        raw_crew_id = str(record.crew_id or "").strip()
+        lookup_row = crew_lookup.get(raw_crew_id, {})
+        delivery_records.append({
+            "crew_id": raw_crew_id,
+            "resolved_crew_id": lookup_row.get("resolved_crew_id") or raw_crew_id or None,
+            "crew_name": lookup_row.get("crew_name"),
+            "rank_name": lookup_row.get("rank_name"),
+            "vessel_name": lookup_row.get("vessel_name"),
+            "seen_at": record.seen_at.isoformat() if record.seen_at else None,
+            "reminder_sent_at": record.reminder_sent_at.isoformat() if record.reminder_sent_at else None,
+        })
+
+    return delivery_records
     
 def add_cover_to_pdf(original_pdf_path, output_pdf_path, logo_path, company_name, address):
     # Read original PDF
@@ -3646,10 +3761,11 @@ def link_notification_to_ranks(request, notification_sr_no):
 @permission_classes([AllowAny])
 def get_crew_ids_and_status_by_notification_sr_no(request, notification_sr_no):
     """
-    Fetches the list of crew IDs and their seen_at and reminder_sent_at status
-    from the msc_notification table for a specific notification SR No.
+    Fetches delivery status rows for a notification, enriched with crew, rank,
+    and vessel display data for office users.
     Expects the notification SR No in the URL path.
-    Returns a JSON array of objects containing crew_id, seen_at, and reminder_sent_at.
+    Returns a JSON array of objects containing crew_id, resolved_crew_id,
+    crew_name, rank_name, vessel_name, seen_at, and reminder_sent_at.
     """
     print(f"=== get_crew_ids_and_status_by_notification_sr_no: Starting for notification SR No {notification_sr_no} ===")
 
@@ -3662,15 +3778,7 @@ def get_crew_ids_and_status_by_notification_sr_no(request, notification_sr_no):
         print(f"get_crew_ids_and_status_by_notification_sr_no: Fetching crew delivery records for notification SR No '{notification_sr_no}' from msc_notification table...")
         notification_records = MscNotification.objects.filter(msc_sr_no=notification_sr_no)
 
-        # Prepare the response data as a list of dictionaries
-        result = []
-        for record in notification_records:
-            result.append({
-                'crew_id': record.crew_id, # The crew member's ID
-                'seen_at': record.seen_at.isoformat() if record.seen_at else None, # Convert datetime to ISO string or None
-                'reminder_sent_at': record.reminder_sent_at.isoformat() if record.reminder_sent_at else None, # Convert datetime to ISO string or None
-                # Add other fields if needed, e.g., 'delivered_at': record.delivered_at.isoformat() if record.delivered_at else None,
-            })
+        result = _build_delivery_status_records(notification_records)
 
         print(f"get_crew_ids_and_status_by_notification_sr_no: Found {len(result)} delivery records for notification {notification_sr_no}")
 
@@ -3930,6 +4038,9 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                  approved_by_part = f"Approved By: {notification.published_by}" if notification.published_by else "Approved By: Pending"
                  edited_at_part = f"Edited At: {django_timezone.now().strftime('%d-%m-%Y %H:%M:%S')}"
                  footer_middle_text = [created_by_part, approved_by_part]
+                 should_stack_footer_metadata = _should_stack_footer_metadata(
+                     _infer_circular_type_name_from_sr_no(notification.sr_no)
+                 )
 
                  if body_text:
                      body_lines = _wrap_text_simple(c, body_text, width - 2 * margin, PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
@@ -3947,7 +4058,8 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                                  margin,
                                  f"Sr. No: {notification.sr_no}",
                                  footer_middle_text,
-                                 f"{edited_at_part} | Page {page_number}"
+                                 f"{edited_at_part} | Page {page_number}",
+                                 stack_metadata_below_left=should_stack_footer_metadata,
                              )
                              c.showPage()
                              page_number += 1
@@ -3968,7 +4080,8 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                          margin,
                          f"Sr. No: {notification.sr_no}",
                          footer_middle_text,
-                         f"{edited_at_part} | Page {page_number}"
+                         f"{edited_at_part} | Page {page_number}",
+                         stack_metadata_below_left=should_stack_footer_metadata,
                      )
                  else:
                      print("--- END: Office Instructions Generation (Update/Edit) ---")
@@ -3978,7 +4091,8 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                          margin,
                          f"Sr. No: {notification.sr_no}",
                          footer_middle_text,
-                         f"{edited_at_part} | Page {page_number}"
+                         f"{edited_at_part} | Page {page_number}",
+                         stack_metadata_below_left=should_stack_footer_metadata,
                      )
 
                  c.save()

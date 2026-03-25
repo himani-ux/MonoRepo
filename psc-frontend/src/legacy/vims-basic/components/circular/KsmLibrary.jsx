@@ -75,6 +75,7 @@ const KsmLibrary = ({
   const [crewList, setCrewList] = useState([]);
   const [crewLoading, setCrewLoading] = useState(false);
   const [sendingCrewReminder, setSendingCrewReminder] = useState(null);
+  const [expandedTitle, setExpandedTitle] = useState(null);
   const [remindedCrewByNotification, setRemindedCrewByNotification] = useState(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -94,6 +95,16 @@ const KsmLibrary = ({
       console.error("Failed to persist reminder state:", error);
     }
   }, [remindedCrewByNotification]);
+
+  const openTitleModal = (title) => {
+    const normalizedTitle = String(title || "").trim();
+    if (!normalizedTitle) return;
+    setExpandedTitle(normalizedTitle);
+  };
+
+  const closeTitleModal = () => {
+    setExpandedTitle(null);
+  };
 
   // 📥 Fetch notifications
   useEffect(() => {
@@ -504,9 +515,17 @@ const KsmLibrary = ({
                       {getTypeIcon(notification.type) || <FileText className="h-4 w-4" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[17px] font-semibold leading-7 text-neutral-900" title={notification.title}>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openTitleModal(notification.title);
+                        }}
+                        className="block w-full truncate text-left text-[17px] font-semibold leading-7 text-neutral-900 hover:text-primary-700"
+                        title="Click to view full title"
+                      >
                         {notification.title}
-                      </div>
+                      </button>
                     </div>
                   </div>
 
@@ -538,9 +557,14 @@ const KsmLibrary = ({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="truncate text-base font-semibold text-neutral-800">
+                        <button
+                          type="button"
+                          onClick={() => openTitleModal(selectedNotification.title)}
+                          className="truncate text-left text-base font-semibold text-neutral-800 hover:text-primary-700"
+                          title="Click to view full title"
+                        >
                           {selectedNotification.title}
-                        </h3>
+                        </button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -720,6 +744,27 @@ const KsmLibrary = ({
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {expandedTitle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeTitleModal}>
+          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-neutral-900">Full Title</h2>
+              <button
+                type="button"
+                onClick={closeTitleModal}
+                className="rounded-md p-1 text-gray-500 transition hover:bg-neutral-100 hover:text-gray-700"
+                aria-label="Close full title modal"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="px-6 py-5 text-sm leading-7 text-neutral-800 break-words">
+              {expandedTitle}
+            </div>
+          </div>
         </div>
       )}
     </div>

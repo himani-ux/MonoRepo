@@ -51,6 +51,51 @@ const ApprovedNotificationsLibrary = () => {
     const [typeUuidToNameMap, setTypeUuidToNameMap] = useState({});
     const [priorityUuidToNameMap, setPriorityUuidToNameMap] = useState({});
     const [loadingLookupMaps, setLoadingLookupMaps] = useState(true); // To track loading of lookup data
+    const [expandedTitle, setExpandedTitle] = useState(null);
+
+    const getCrewPrimaryLabel = (record) => {
+        const primaryParts = [record?.rank_name, record?.vessel_name].filter(Boolean);
+        if (primaryParts.length) {
+            return primaryParts.join(" | ");
+        }
+        return record?.resolved_crew_id || record?.crew_id || "Unknown Crew";
+    };
+
+    const getCrewSecondaryLabel = (record) => {
+        const secondaryParts = [];
+        if (record?.crew_name) {
+            secondaryParts.push(record.crew_name);
+        }
+        if (record?.resolved_crew_id) {
+            secondaryParts.push(`Crew ID: ${record.resolved_crew_id}`);
+        } else if (record?.crew_id) {
+            secondaryParts.push(`Crew Ref: ${record.crew_id}`);
+        }
+        return secondaryParts.join(" | ");
+    };
+
+    const getCrewSearchText = (record) => {
+        return [
+            record?.rank_name,
+            record?.vessel_name,
+            record?.crew_name,
+            record?.resolved_crew_id,
+            record?.crew_id,
+        ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+    };
+
+    const openTitleModal = (title) => {
+        const normalizedTitle = String(title || '').trim();
+        if (!normalizedTitle) return;
+        setExpandedTitle(normalizedTitle);
+    };
+
+    const closeTitleModal = () => {
+        setExpandedTitle(null);
+    };
 
 
 
@@ -59,7 +104,7 @@ const ApprovedNotificationsLibrary = () => {
     const filteredSeenCrewsData = seenCrewsData.filter((record) => {
         const query = crewSearchQuery.trim().toLowerCase();
         if (!query) return true;
-        return String(record.crew_id || '').toLowerCase().includes(query);
+        return getCrewSearchText(record).includes(query);
     });
 
 
@@ -348,9 +393,10 @@ const ApprovedNotificationsLibrary = () => {
 
 
     // --- NEW: Handler for Send Individual Reminder Button ---
-    const handleSendIndividualReminder = async (notificationSrNo, crewId) => {
+    const handleSendIndividualReminder = async (notificationSrNo, crewId, crewLabel = null) => {
+        const targetCrewLabel = crewLabel || crewId;
         console.log(`🔔 handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
-        const confirmed = window.confirm(`Are you sure you want to send a reminder to crew ${crewId} for notification ${notificationSrNo}?`);
+        const confirmed = window.confirm(`Are you sure you want to send a reminder to ${targetCrewLabel} for notification ${notificationSrNo}?`);
         if (!confirmed) {
             console.log("handleSendIndividualReminder: User cancelled individual reminder.");
             return; // Stop if user cancels
@@ -375,7 +421,7 @@ const ApprovedNotificationsLibrary = () => {
 
             if (response.ok) {
                 console.log("✅ handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
-                alert(`Reminder sent successfully to crew ${crewId}.`);
+                alert(`Reminder sent successfully to ${targetCrewLabel}.`);
                 setSeenCrewsData((prev) =>
                     prev.map((record) =>
                         record.crew_id === crewId
@@ -767,14 +813,40 @@ const ApprovedNotificationsLibrary = () => {
                                             <FileText className="h-4 w-4" />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="truncate text-[17px] font-semibold leading-7 text-neutral-900" title={n.title || n.sr_no}>
+                                            <button
+                                                type="button"
+                                                onClick={() => openTitleModal(n.title || n.sr_no)}
+                                                className="block w-full truncate text-left text-[17px] font-semibold leading-7 text-neutral-900 hover:text-primary-700"
+                                                title="Click to view full title"
+                                            >
                                                 {n.title || n.sr_no}
-                                            </div>
+                                            </button>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
                         ))}
+                    </div>
+                )}
+
+                {expandedTitle && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeTitleModal}>
+                        <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl" onClick={(event) => event.stopPropagation()}>
+                            <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+                                <h2 className="text-lg font-semibold text-neutral-900">Full Title</h2>
+                                <button
+                                    type="button"
+                                    onClick={closeTitleModal}
+                                    className="rounded-md p-1 text-gray-500 transition hover:bg-neutral-100 hover:text-gray-700"
+                                    aria-label="Close full title modal"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                            <div className="px-6 py-5 text-sm leading-7 text-neutral-800 break-words">
+                                {expandedTitle}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -804,7 +876,7 @@ const ApprovedNotificationsLibrary = () => {
                                             type="text"
                                             value={crewSearchQuery}
                                             onChange={(e) => setCrewSearchQuery(e.target.value)}
-                                            placeholder="Search crew ID..."
+                                            placeholder="Search rank, vessel, crew name or crew ID..."
                                             className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                                         />
                                     </div>
@@ -823,7 +895,10 @@ const ApprovedNotificationsLibrary = () => {
                                                 {filteredSeenCrewsData.map((record, index) => (
                                                     <div key={index} className={`p-3 rounded-lg ${record.seen_at ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'} flex items-center justify-between`}>
                                                         <div className="flex-1">
-                                                            <span className="font-medium">{record.crew_id}</span>
+                                                            <div className="font-medium text-slate-900">{getCrewPrimaryLabel(record)}</div>
+                                                            {getCrewSecondaryLabel(record) && (
+                                                                <div className="text-xs text-slate-500 mt-1">{getCrewSecondaryLabel(record)}</div>
+                                                            )}
                                                             {record.seen_at ? (
                                                                 <span className="text-sm text-green-700 ml-2">Seen at: {new Date(record.seen_at).toLocaleString()}</span>
                                                             ) : (
@@ -835,20 +910,20 @@ const ApprovedNotificationsLibrary = () => {
                                                             record.reminder_sent_at ? (
                                                                 <div
                                                                     className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-1 text-xs font-medium text-warning-700"
-                                                                    title={`Reminder already sent to ${record.crew_id}`}
+                                                                    title={`Reminder already sent to ${getCrewPrimaryLabel(record)}`}
                                                                 >
                                                                     <BellRing size={14} />
                                                                     Reminded
                                                                 </div>
                                                             ) : (
                                                                 <button
-                                                                    onClick={() => handleSendIndividualReminder(viewingSeenCrews, record.crew_id)} // Pass the SR No and crew ID
+                                                                    onClick={() => handleSendIndividualReminder(viewingSeenCrews, record.crew_id, getCrewPrimaryLabel(record))} // Pass the SR No and crew ID
                                                                     disabled={sendingIndividualReminder === record.crew_id}
                                                                     className="ml-2 rounded-full bg-amber-100 p-1 text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
                                                                     title={
                                                                         sendingIndividualReminder === record.crew_id
-                                                                            ? `Sending reminder to ${record.crew_id}`
-                                                                            : `Send reminder to ${record.crew_id}`
+                                                                            ? `Sending reminder to ${getCrewPrimaryLabel(record)}`
+                                                                            : `Send reminder to ${getCrewPrimaryLabel(record)}`
                                                                     }
                                                                 >
                                                                     <Bell size={16} className={sendingIndividualReminder === record.crew_id ? 'animate-pulse' : ''} />

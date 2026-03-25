@@ -454,6 +454,8 @@ const Admin = ({ onNotificationSubmit }) => {
 
                     const mappedRequests = publishedRequests.map(req => ({
                         id: req.sr_no || req.id,
+                        raw_id: req.id,
+                        sr_no: req.sr_no || req.id,
                         type: req.msc_type?.toLowerCase() || 'alert',
                         priority: req.priority || 'Medium',
                         submitted: req.created_at
@@ -497,8 +499,9 @@ const Admin = ({ onNotificationSubmit }) => {
                     : [];
 
                 const mappedRequests = pendingRequests.map(req => ({
-                    id: req.id,
-                    sr_no: req.sr_no,
+                    id: req.sr_no || req.id,
+                    raw_id: req.id,
+                    sr_no: req.sr_no || req.id,
                     type: req.msc_type?.toLowerCase() || 'alert',
                     priority: req.priority || 'Medium',
                     submitted: req.created_at
@@ -3113,7 +3116,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="text-xs font-medium">ID</TableHead>
+                                    <TableHead className="text-xs font-medium">MSC SR No</TableHead>
                                     <TableHead className="text-xs font-medium">Type</TableHead>
                                     <TableHead className="text-xs font-medium">Priority</TableHead>
                                     <TableHead className="text-xs font-medium">Submitted at</TableHead>
@@ -3124,7 +3127,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             <TableBody>
                                 {submittedRequests.map((req) => (
                                     <TableRow key={req.id} className="hover:bg-sky-50/40">
-                                        <TableCell className="text-xs font-medium">{req.id}</TableCell>
+                                        <TableCell className="text-xs font-medium">{req.sr_no || req.id}</TableCell>
 
                                         <TableCell>{renderTypeBadge(req.type)}</TableCell>
                                         <TableCell>{renderPriorityBadge(req.priority)}</TableCell>
@@ -3176,7 +3179,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <div><strong>ID:</strong> {viewingRequest.id}</div>
+                                <div><strong>MSC SR No:</strong> {viewingRequest.sr_no || viewingRequest.id}</div>
                                 <div><strong>Type:</strong> {viewingRequest.type === 'alert' ? 'Alert' : viewingRequest.type === 'circular' ? 'Circular' : 'Work Instruction'}</div>
                                 <div><strong>Priority:</strong> {viewingRequest.priority}</div>
                                 <div><strong>created at:</strong> {viewingRequest.submitted}</div>
@@ -3264,7 +3267,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-xs font-medium">ID</TableHead>
+                                        <TableHead className="text-xs font-medium">MSC SR No</TableHead>
                                         <TableHead className="text-xs font-medium">Type</TableHead>
                                         <TableHead className="text-xs font-medium">Priority</TableHead>
                                         <TableHead className="text-xs font-medium">Submitted</TableHead>
@@ -3350,7 +3353,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div><strong>ID:</strong> {viewingRequest.sr_no}</div>
+                            <div><strong>MSC SR No:</strong> {viewingRequest.sr_no}</div>
                             <div><strong>Type:</strong> {viewingRequest.type === 'alert' ? 'Alert' : viewingRequest.type === 'circular' ? 'Circular' : 'Work Instruction'}</div>
                             <div><strong>Priority:</strong> {viewingRequest.priority}</div>
                             <div><strong>Submitted:</strong> {viewingRequest.submitted}</div>
