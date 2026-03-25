@@ -43,6 +43,25 @@ const getTypeIcon = (type) => {
 
 const getTypeVariant = (type) => "outline";
 
+const normalizeNotificationTitle = (item) => {
+  const titleCandidates = [
+    item?.title,
+    item?.notification_title,
+    item?.notificationTitle,
+    item?.subject,
+  ];
+
+  for (const candidate of titleCandidates) {
+    if (typeof candidate !== "string") continue;
+    const normalizedTitle = candidate.replace(/\r\n|\n/g, " ").trim();
+    if (normalizedTitle) {
+      return normalizedTitle;
+    }
+  }
+
+  return "No title";
+};
+
 const KsmLibrary = ({
   user,
   // Permission props
@@ -151,7 +170,7 @@ const KsmLibrary = ({
 
         return {
           id: item.sr_no || 'N/A',
-          title: item.title?.replace(/\r\n|\n/g, ' ') || 'No title',
+          title: normalizeNotificationTitle(item),
           type: item.type || 'Alert',
           criticality: item.criticality || 'Medium',
           hashtags: Array.isArray(item.hashtags) ? item.hashtags : [],

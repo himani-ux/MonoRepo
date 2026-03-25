@@ -1183,7 +1183,7 @@ def get_user_notifications(request):
         # Use .values() to get specific fields, including attachment_name
         notifications = notifications_queryset.values(
             'id', 'sr_no', 'msc_type', 'dept', 'category',
-            'sub_category', 'second_sub_category', 'office_instructions',
+            'sub_category', 'second_sub_category', 'title', 'office_instructions',
             'hashtags', 'created_at',  'publish_status', 'priority',
             'attachment_path', 'attachment_name', 'created_by', 'published_by', 'published_on', 'publish_comment', 'is_deleted',
         )
@@ -2110,6 +2110,7 @@ def get_single_notification(request, notification_id):
         notification_data = {
             'id': str(notification.id),
             'sr_no': notification.sr_no,
+            'title': notification.title,
             'msc_type': notification.msc_type,
             'dept': notification.dept,
             'category': notification.category,
@@ -2216,7 +2217,7 @@ def get_user_drafts(request):
 
         notifications = notifications_queryset.values(
             'id', 'sr_no', 'msc_type', 'dept', 'category',
-            'sub_category', 'second_sub_category', 'office_instructions',
+            'sub_category', 'second_sub_category', 'title', 'office_instructions',
             'hashtags', 'created_at','publish_status', 'priority',
             'attachment_path', 'attachment_name', 'created_by', 'published_by', 'published_on', 'publish_comment'
         )
@@ -2695,7 +2696,7 @@ def get_approved_notifications(request):
         # Use .values() to get specific fields, including attachment_name
         notifications = notifications_queryset.values(
             'id', 'sr_no', 'msc_type', 'dept', 'category',
-            'sub_category', 'second_sub_category', 'office_instructions',
+            'sub_category', 'second_sub_category', 'title', 'office_instructions',
             'hashtags', 'created_at', 'publish_status', 'priority',
             'attachment_path', 'attachment_name', 'created_by', 'published_by', 'published_on', 'publish_comment','is_superseeded'
         )
@@ -3190,6 +3191,7 @@ def get_notification_details_by_sr_no(request, notification_sr_no): #  Changed p
         notification_data = {
             'id': str(notification.id), # Keep the database ID for internal use if needed (convert UUID to string)
             'sr_no': notification.sr_no, # ✅ Include the SR No
+            'title': notification.title,
             'msc_type': notification.msc_type,
             'dept': notification.dept, # This is the crucial field for fetching crews
             'dept_name': _get_department_master_name(notification.dept),

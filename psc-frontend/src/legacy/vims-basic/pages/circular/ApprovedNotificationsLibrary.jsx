@@ -53,6 +53,17 @@ const ApprovedNotificationsLibrary = () => {
     const [loadingLookupMaps, setLoadingLookupMaps] = useState(true); // To track loading of lookup data
     const [expandedTitle, setExpandedTitle] = useState(null);
 
+    const normalizeNotificationTitle = (notification) => {
+        const rawTitle = notification?.title;
+        if (typeof rawTitle === "string") {
+            const normalizedTitle = rawTitle.replace(/\r\n|\n/g, " ").trim();
+            if (normalizedTitle) {
+                return normalizedTitle;
+            }
+        }
+        return "No title";
+    };
+
     const getCrewPrimaryLabel = (record) => {
         const primaryParts = [record?.rank_name, record?.vessel_name].filter(Boolean);
         if (primaryParts.length) {
@@ -205,7 +216,7 @@ const ApprovedNotificationsLibrary = () => {
 
                 const notificationsWithNames = data.map(notification => ({
                     ...notification,
-                    title: notification.office_instructions || notification.title || '',
+                    title: normalizeNotificationTitle(notification),
                     msc_type: typeUuidToNameMap[notification.msc_type] || notification.msc_type,
                     priority: priorityUuidToNameMap[notification.priority] || notification.priority,
                 }));
