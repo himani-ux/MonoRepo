@@ -1,12 +1,15 @@
-import type { FC, MouseEvent } from 'react';
-import { FileText, Image, AlertTriangle, Upload } from 'lucide-react';
+import { type FC, useState, type MouseEvent } from 'react';
+import { FileText, Image, AlertTriangle, Trash2, Upload } from 'lucide-react';
 import { Card, CardContent, Button } from '@/components/ui';
+import { ConfirmDialog } from '@/components/shared';
 import { apiClient } from '@/lib/api/client';
 import { EVIDENCE_TYPES } from '@/lib/utils/constants';
+import { useDeleteEvidence } from '@/hooks/use-cars';
 import type { Evidence } from '@/types';
 
 export interface EvidenceSectionProps {
   evidence: Evidence[];
+  carId?: string | number;
   onUpload?: () => void;
   className?: string;
 }
@@ -67,49 +70,76 @@ async function openEvidenceWithAuth(
 
 interface EvidenceItemProps {
   item: Evidence;
+  carId?: string | number;
 }
 
-const EvidenceItem: FC<EvidenceItemProps> = ({ item }) => {
+const EvidenceItem: FC<EvidenceItemProps> = ({ item, carId }) => {
   const evidenceUrl = resolveEvidenceUrl(item);
+  const deleteEvidence = useDeleteEvidence(carId ?? '');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className="flex items-start gap-3 rounded-md border border-neutral-200 bg-white p-3">
-    {/* Thumbnail / Icon */}
-    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-neutral-100">
-      {isImage(item.mime_type) ? (
-        <Image className="h-6 w-6 text-primary-500" />
-      ) : (
-        <FileText className="h-6 w-6 text-error-500" />
-      )}
-    </div>
+    <>
+      <div className="flex items-start gap-3 rounded-md border border-neutral-200 bg-white p-3">
+        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded bg-neutral-100">
+          {isImage(item.mime_type) ? (
+            <Image className="h-6 w-6 text-primary-500" />
+          ) : (
+            <FileText className="h-6 w-6 text-error-500" />
+          )}
+        </div>
 
-    {/* Details */}
-    <div className="min-w-0 flex-1">
-      <a
-        href={evidenceUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block truncate text-sm font-medium text-primary-600 hover:underline"
-        onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-          event.preventDefault();
-          void openEvidenceWithAuth(evidenceUrl, item.file_name, item.mime_type);
+        <div className="min-w-0 flex-1">
+          <a
+            href={evidenceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block truncate text-sm font-medium text-primary-600 hover:underline"
+            onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+              event.preventDefault();
+              void openEvidenceWithAuth(evidenceUrl, item.file_name, item.mime_type);
+            }}
+          >
+            {item.file_name}
+          </a>
+          <p className="text-xs text-gray-500">{item.description}</p>
+          <p className="mt-1 text-xs text-gray-400">
+            {formatDate(item.uploaded_at)} &middot; {formatFileSize(item.file_size)}
+          </p>
+        </div>
+
+        {carId && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            aria-label={`Delete evidence ${item.file_name}`}
+            className="flex-shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-error-500"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete Evidence"
+        description={`Are you sure you want to delete "${item.file_name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        confirmDisabled={deleteEvidence.isPending}
+        onConfirm={async () => {
+          await deleteEvidence.mutateAsync(item.id);
+          setConfirmDelete(false);
         }}
-      >
-        {item.file_name}
-      </a>
-      <p className="text-xs text-gray-500">
-        {item.description}
-      </p>
-      <p className="mt-1 text-xs text-gray-400">
-        {formatDate(item.uploaded_at)} &middot; {formatFileSize(item.file_size)}
-      </p>
-    </div>
-  </div>
+      />
+    </>
   );
 };
 
 export const EvidenceSection: FC<EvidenceSectionProps> = ({
   evidence,
+  carId,
   onUpload,
   className,
 }) => {
@@ -164,7 +194,7 @@ export const EvidenceSection: FC<EvidenceSectionProps> = ({
                 </h3>
                 <div className="space-y-2">
                   {before.map((item) => (
-                    <EvidenceItem key={item.id} item={item} />
+                    <EvidenceItem key={item.id} item={item} carId={carId} />
                   ))}
                 </div>
               </div>
@@ -178,7 +208,7 @@ export const EvidenceSection: FC<EvidenceSectionProps> = ({
                 </h3>
                 <div className="space-y-2">
                   {after.map((item) => (
-                    <EvidenceItem key={item.id} item={item} />
+                    <EvidenceItem key={item.id} item={item} carId={carId} />
                   ))}
                 </div>
               </div>
@@ -192,7 +222,7 @@ export const EvidenceSection: FC<EvidenceSectionProps> = ({
                 </h3>
                 <div className="space-y-2">
                   {other.map((item) => (
-                    <EvidenceItem key={item.id} item={item} />
+                    <EvidenceItem key={item.id} item={item} carId={carId} />
                   ))}
                 </div>
               </div>

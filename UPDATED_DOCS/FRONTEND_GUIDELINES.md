@@ -1,12 +1,12 @@
 # FRONTEND_GUIDELINES.md — Engineering Rules & Component Architecture
 ## Inspection Module — PSC/RS/Audit Close-out System
-**Version:** 1.1 | **Date:** 2026-02-04
+**Version:** 1.1 | **Date:** 2026-03-26
 
 ---
 
 ## 0. Current Implementation Override
 
-### Update (2026-03-10)
+### Update (2026-03-26)
 This document was reviewed against the current frontend under `psc-frontend/src`.
 
 The original structure block below is the v1.0 baseline. The live frontend now uses these route files and supporting modules:
@@ -74,6 +74,42 @@ Current routing/permission notes:
 - the default landing route is permission-driven: dashboard-capable users go to `/dashboard`, others to `/cars`
 - `/reports` and `/settings` are production routes in the current implementation
 - auth and navigation visibility are driven by `form_ids` and `process_ids` stored in the auth store
+
+Permission mapping snapshot:
+
+- `msc_profiles` is the shared database source for the frontend `form_ids` and `process_ids`
+- `PSC_F_001` to `PSC_F_008` control the main Inspection sidebar and bottom navigation groups
+- `PSC_P_001` to `PSC_P_016` control the Inspection screen actions, including dashboard, inspections, deficiencies, CARs, notifications, sync, reports, and settings
+- Circular permissions are mapped per screen as follows:
+
+  | Circular Screen / Area | `form_ids` | `process_ids` |
+  |---|---|---|
+  | Office / admin workspace | `PSC_F_009` | `PSC_P_017`, `PSC_P_018`, `PSC_P_019`, `PSC_P_024` |
+  | Overlay / modal workspace | `PSC_F_010` | - |
+  | Follow-up / approval panel | `PSC_F_011` | `PSC_P_025`, `PSC_P_026`, `PSC_P_027` |
+  | Dashboard filters | `PSC_F_012` | `PSC_P_028`, `PSC_P_029` |
+  | Notifications workspace | `PSC_F_013` | `PSC_P_030`, `PSC_P_031`, `PSC_P_032`, `PSC_P_033`, `PSC_P_034`, `PSC_P_035`, `PSC_P_036` |
+  | Approved notifications library actions | - | `PSC_P_020`, `PSC_P_021`, `PSC_P_022`, `PSC_P_023` |
+- ORB permissions are mapped per screen as follows:
+
+  | ORB Screen / Area | `form_ids` | `process_ids` |
+  |---|---|---|
+  | Entry form | `PSC_F_014` | `PSC_P_043` |
+  | Draft / table workspace | `PSC_F_015` | `PSC_P_037`, `PSC_P_038` |
+  | Pending entries view | `PSC_F_016` | `PSC_P_040`, `PSC_P_041` |
+  | Approved entries view | `PSC_F_017` | `PSC_P_042` |
+  | Report filter | `PSC_F_018` | `PSC_P_039` |
+  | Report view | `PSC_F_019` | - |
+- Circular header actions are driven by legacy `user_type` and `role_name` after the auth bridge maps modern users into the legacy store
+- ORB header actions are driven by the active `/orb` route and the current `user_type`, with vessel users remaining on the legacy route tree and office users using the native approved-entries page
+
+Merged module notes:
+
+- `/circular/*` and `/orb/*` are mounted as authenticated module roots on top of the Inspection shell
+- `routes/circular/page.tsx` wraps the legacy Circular tree in `LegacyBasicProvider` and `RootLayout`
+- `routes/orb/page.tsx` branches by auth type: vessel users get legacy ORB routes, office users get the native approved-entries page
+- the shared `header.tsx` component now renders `CircularHeaderActions` and `OrbHeaderActions` based on the current pathname
+- `legacy/vims-basic/module-provider.tsx` bridges modern auth into the legacy store and maps vessel users to legacy `ship` users
 
 ## 1. Project Structure
 

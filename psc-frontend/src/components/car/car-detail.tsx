@@ -171,6 +171,7 @@ export const CARDetail: FC<CARDetailProps> = ({
       {/* Evidence */}
       <EvidenceSection
         evidence={car.evidence}
+        carId={car.id}
         onUpload={onUploadEvidence}
       />
 

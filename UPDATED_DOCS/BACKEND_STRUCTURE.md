@@ -1,6 +1,6 @@
 # BACKEND_STRUCTURE.md — Database Schema & API Contracts
 ## Inspection Module — PSC/RS/Audit Close-out System
-**Version:** 1.1 | **Baseline Date:** 2026-02-04 | **Later Updates:** 2026-03-10 | **Status:** APPROVED WITH LATER ADDITIONS
+**Version:** 1.1 | **Baseline Date:** 2026-02-04 | **Later Updates:** 2026-03-26 | **Status:** APPROVED WITH LATER ADDITIONS
 
 ---
 
@@ -56,10 +56,13 @@ The following endpoints were added later and are part of the current implementat
 - `GET /api/psc/auth/crew/?vessel_id=<uuid>`
 - `GET /api/psc/auth/company-logo/`
 - `POST /api/psc/auth/company-logo/`
+- `GET /api/circular/api/...` office-side Circular endpoints for document authoring, notification management, and delivery tracking
+- `GET /api/circular/api/...` ship-side Circular endpoints for notification consumption, acknowledgments, reminders, and PDF reporting
+- `GET /api/orb/api/...` ORB endpoints for vessel lookup, entry workflow, approval/rejection, and PDF archive management
 
 ### 0.5 Current Implementation Snapshot
 
-### Update (2026-03-10)
+### Update (2026-03-26)
 This document was reviewed against the current Django URL configuration in `psc-backend/core/urls.py`, the app URL files under `psc-backend/apps/*/urls*.py`, and the live `ksm_inspection` SQL Server schema.
 
 Current root route groups:
@@ -77,6 +80,8 @@ Current root route groups:
 - `/api/psc/dashboard/`
 - `/api/psc/reports/`
 - `/api/psc/notifications/`
+- `/api/circular/`
+- `/api/orb/`
 
 Endpoints confirmed in the current code but not part of the original baseline route summaries include:
 
@@ -96,6 +101,19 @@ Endpoints confirmed in the current code but not part of the original baseline ro
 - `GET /api/psc/masters/psc-def-categories/`
 - `GET /api/psc/masters/clc-categories/`
 - `GET /api/psc/masters/clc/hierarchy/`
+
+### 0.6 Circular and ORB Database Note
+
+- the Circular and ORB merges do not introduce new `ksm_inspection` tables, foreign keys, or stored procedures
+- the merged modules are integrated through frontend routing, shared shell layout, and legacy auth bridging rather than schema changes
+- the live database inventory for the current PSC implementation remains the same set of PSC, auth, mapping, sync, notification, and reporting tables documented below
+
+### 0.7 Circular and ORB Backend Flow Overview
+
+- Circular backend code is split into office and ship packages under `psc-backend/modules/circular/`, with office endpoints handling authoring, metadata lookup, publishing, superseding, and delivery tracking, and ship endpoints handling inbox, acknowledgments, reminders, and report downloads
+- ORB backend code lives under `psc-backend/modules/orb/orb/` and manages vessel lookup, tank lookup, code lookup, operation entry lifecycle, approval/rejection, soft delete, print/PDF metadata, and archive listing
+- both modules reuse unmanaged models against the shared `ksm_inspection` database rather than introducing new migration-managed tables
+- both modules also depend on shared master tables and user mapping tables already used by the Inspection module
 
 ## 1. Database Overview
 
@@ -132,6 +150,33 @@ The live database currently contains the PSC module tables below in addition to 
 | `psc_sync_token` | Last sync checkpoint per vessel |
 | `psc_opensource_import_run` | OpenSource import run summary |
 | `psc_opensource_deficiency_record` | Normalized/deduplicated OpenSource rows |
+
+The tables below are already present in the reviewed `ksm_inspection` schema and are reused by the merged backend; the merge itself did not add new Circular- or ORB-specific tables.
+
+### 1.2A Circular and ORB Live Tables
+
+The merged backend modules also read and write the tables below in `ksm_inspection`:
+
+| Table | Purpose |
+|------|---------|
+| `department` | Department lookup used for Circular SR numbering and filtering |
+| `msc_type` | Circular document type master |
+| `msc_sub_cat` | Circular first-level sub-category master |
+| `msc_2nd_sub_cat` | Circular second-level sub-category master |
+| `msc_category` | Circular notification category master |
+| `msc_priority` | Circular priority master |
+| `msc_data` | Circular document/notification header |
+| `msc_notification` | Circular ship delivery/acknowledgment tracking |
+| `msc_ship_notification` | Vessel assignment mapping for Circular notifications |
+| `msc_reminder` | Circular reminder history |
+| `final_crew_list` | Circular office crew selection helper |
+| `vessel_tank_type` | ORB tank type lookup |
+| `vessel_tank_details` | Vessel tank master used by ORB code-to-tank filtering |
+| `ORBCodes` | ORB code master |
+| `mapping_ORBCode_TankType` | ORB code to tank-type mapping |
+| `Operations` | ORB entry transaction table |
+| `current_vessel` | Active vessel context for ORB entry creation |
+| `GeneratedPDFs` | ORB PDF archive metadata |
 
 ### 1.3 Current FK Relationships Verified in SQL Server
 
@@ -1809,6 +1854,127 @@ client_id: uuid (optional, for offline)
 
 ---
 
+### 10.14 Circular Backend Endpoints
+
+The Circular backend is mounted under `/api/circular/`, and the inner legacy urlconfs keep their own `api/` prefixes. The live paths therefore resolve as nested routes such as `/api/circular/api/notifications/` and `/api/circular/api/ship/notifications/`.
+
+#### Office-side Circular endpoints
+
+**Lookup and master-data endpoints**
+- `GET /api/circular/api/roles/`
+- `GET /api/circular/api/mapping-role-users/`
+- `GET /api/circular/api/users/`
+- `GET /api/circular/api/document-types/`
+- `GET /api/circular/api/departments/`
+- `GET /api/circular/api/priorities/`
+- `GET /api/circular/api/sub-categories/`
+- `GET /api/circular/api/second-sub-categories/`
+- `GET /api/circular/api/vessels/`
+- `GET /api/circular/api/master-applied-ranks/`
+- `GET /api/circular/api/ranks/`
+
+**Notification authoring and publishing**
+- `POST /api/circular/api/notifications/`
+- `GET /api/circular/api/submitted/`
+- `GET /api/circular/api/submitted/<path:sr_no>/`
+- `GET /api/circular/api/submitted/<uuid:notification_id>/`
+- `DELETE /api/circular/api/notifications/<path:sr_no>/delete/`
+- `POST /api/circular/api/notifications/<path:sr_no>/supersede/`
+- `POST /api/circular/api/notifications/<path:notification_sr_no>/update-status/`
+- `POST /api/circular/api/notifications/send-emails/`
+- `POST /api/circular/api/notifications/<path:notification_sr_no>/link-ranks/`
+- `GET /api/circular/api/notifications/<path:notification_sr_no>/crew-delivery-status/`
+- `POST /api/circular/api/notifications/<path:notification_sr_no>/send-individual-reminder/`
+- `POST /api/circular/api/notifications/create-delivery-records/`
+
+**Draft and edit lifecycle**
+- `GET /api/circular/api/notifications/draft/`
+- `GET /api/circular/api/user-drafts/`
+- `GET /api/circular/api/draft/<path:sr_no>/`
+- `POST /api/circular/api/draft/<path:sr_no>/update/`
+- `POST /api/circular/api/drafts/<str:draft_id>/update/`
+- `DELETE /api/circular/api/drafts/<str:draft_id>/delete/`
+- `DELETE /api/circular/api/draft/<path:sr_no>/delete/`
+
+**Office views and exports**
+- `GET /api/circular/api/approved-notifications/`
+- `GET /api/circular/api/approved-notifications/download-csv/`
+- `GET /api/circular/api/user-notifications/`
+- `GET /api/circular/api/crews-by-department/`
+- `GET /api/circular/api/crews-by-department-and-vessel/`
+- `POST /api/circular/api/notifications/<path:notification_id>/edit-pending/`
+
+**Circular office workflow summary**
+1. Office users create or edit a document using the master-data endpoints for roles, departments, document types, priorities, and crew mappings.
+2. The backend writes the notification into `msc_data` and uses `msc_ship_notification` to scope vessel delivery.
+3. Per-crew delivery, read, and reminder state is tracked in `msc_notification` and `msc_reminder`.
+4. Drafts can be updated, deleted, or promoted, and later superseded documents retain a visible historical trail.
+5. Approved notification views and CSV export are derived from the same persisted records and are used for office reporting.
+
+#### Ship-side Circular endpoints
+
+- `GET /api/circular/api/ship/notifications/`
+- `GET /api/circular/api/crew/notifications/`
+- `GET /api/circular/api/msc/pdf-url/`
+- `POST /api/circular/api/msc/read-ack/`
+- `POST /api/circular/api/msc/remind-crew/`
+- `GET /api/circular/api/crew/list/`
+- `GET /api/circular/api/crew/status/`
+- `GET /api/circular/api/notifications/<path:id>/crew-status/`
+- `GET /api/circular/api/reports/download-pdf/`
+
+**Circular ship workflow summary**
+1. Ship users retrieve their vessel-scoped notification list and corresponding PDF links.
+2. Crew acknowledgments are persisted through the read-ack endpoint.
+3. Reminder actions and crew-status lookups update and expose the delivery state for the vessel.
+4. The report endpoint exports the filtered ship-side circular view as a PDF.
+
+### 10.15 ORB Backend Endpoints
+
+The ORB backend is mounted under `/api/orb/`, and the inner router and helper paths still carry their own `api/` prefixes in the live code. The current route family therefore includes paths such as `/api/orb/api/operations/` and `/api/orb/operations/<str:pk>/`.
+
+#### Lookup and context endpoints
+
+- `GET /api/orb/api/vessels/`
+- `GET /api/orb/api/tanks/?vessel_id=<uuid>`
+- `GET /api/orb/api/codes/`
+- `GET /api/orb/api/current-vessel/`
+- `GET /api/orb/api/get-current-user-vessel/`
+- `GET /api/orb/api/get_last_page_number/`
+- `GET /api/orb/api/latest-entry-date/`
+- `GET /api/orb/api/get-internal-ip/`
+- `GET /api/orb/operations/<str:pk>/`
+
+#### Operation lifecycle endpoints
+
+- `GET /api/orb/api/operations/`
+- `POST /api/orb/api/operations/`
+- `GET /api/orb/api/operations/<uuid:pk>/`
+- `PUT /api/orb/api/operations/<uuid:pk>/`
+- `PATCH /api/orb/api/operations/<uuid:pk>/`
+- `DELETE /api/orb/api/operations/<uuid:pk>/`
+- `POST /api/orb/api/operations/<uuid:pk>/soft_delete/`
+- `POST /api/orb/api/operations/<str:id>/approve/`
+- `POST /api/orb/api/operations/<str:id>/reject/`
+
+#### Archive, print, and status endpoints
+
+- `GET /api/orb/api/non-deleted-entries/`
+- `GET /api/orb/api/deleted-entries/`
+- `GET /api/orb/api/rejected-entries/`
+- `GET /api/orb/api/approved-entries/`
+- `POST /api/orb/api/update-print-status/`
+- `POST /api/orb/api/save-pdf-metadata/`
+- `GET /api/orb/api/list-pdfs/`
+- `GET /api/orb/api/download-pdf/<uuid:pdf_id>/`
+
+**ORB workflow summary**
+1. The client selects a vessel explicitly or the backend falls back to the active `current_vessel` record.
+2. `OperationEntryViewSet.create` normalizes the vessel UUID, validates the timestamp against the vessel's latest non-deleted entry, and resolves the ORB code through `ORBCodes`.
+3. The backend generates the next `entry_no`, persists the record in `Operations`, and stores hierarchical parent-child links through `parent_entry_id` when needed.
+4. Approve and reject endpoints move entries into the corresponding workflow buckets, while soft delete keeps archive visibility without physical removal.
+5. PDF metadata and archive rows are persisted through `GeneratedPDFs`; tank filtering uses `mapping_ORBCode_TankType` and `vessel_tank_details`.
+
 ## 11. Role-Based Access Control (RBAC)
 
 ### 11.1 Permission Matrix
@@ -1860,6 +2026,45 @@ Current behavior:
 - mapped global PIC/DPA reviewers can bypass vessel filtering
 - `GET /api/psc/auth/me/` includes `has_global_vessel_access`
 - dashboard vessel dropdown returns all active vessels for global reviewers
+
+### 11.3A Permission Mapping Source
+
+The live permission mapping model used by the merged frontend is:
+
+- `msc_profiles.form_ids` controls sidebar and navigation visibility
+- `msc_profiles.process_ids` controls action-level permissions inside the Inspection workflows
+- `mapping_role_user` maps office users to profile rows that carry those permissions
+- Circular and ORB do not use new PSC permission tables; they rely on the bridged auth payload plus legacy `user_type` / `role_name` checks in the frontend shell
+- Circular legacy pages still consume the following per-screen permissions:
+
+  | Circular Screen / Area | `form_ids` | `process_ids` |
+  |---|---|---|
+  | Office / admin workspace | `PSC_F_009` | `PSC_P_017`, `PSC_P_018`, `PSC_P_019`, `PSC_P_024` |
+  | Overlay / modal workspace | `PSC_F_010` | - |
+  | Follow-up / approval panel | `PSC_F_011` | `PSC_P_025`, `PSC_P_026`, `PSC_P_027` |
+  | Dashboard filters | `PSC_F_012` | `PSC_P_028`, `PSC_P_029` |
+  | Notifications workspace | `PSC_F_013` | `PSC_P_030`, `PSC_P_031`, `PSC_P_032`, `PSC_P_033`, `PSC_P_034`, `PSC_P_035`, `PSC_P_036` |
+  | Approved notifications library actions | - | `PSC_P_020`, `PSC_P_021`, `PSC_P_022`, `PSC_P_023` |
+- ORB legacy pages still consume the following per-screen permissions:
+
+  | ORB Screen / Area | `form_ids` | `process_ids` |
+  |---|---|---|
+  | Entry form | `PSC_F_014` | `PSC_P_043` |
+  | Draft / table workspace | `PSC_F_015` | `PSC_P_037`, `PSC_P_038` |
+  | Pending entries view | `PSC_F_016` | `PSC_P_040`, `PSC_P_041` |
+  | Approved entries view | `PSC_F_017` | `PSC_P_042` |
+  | Report filter | `PSC_F_018` | `PSC_P_039` |
+  | Report view | `PSC_F_019` | - |
+- the legacy `permissionUtils.js` helpers normalize these IDs before comparing them against the bridged auth payload
+- office/global reviewer behavior still uses the existing mapping tables and does not require separate Circular/ORB permission rows
+
+### 11.4 Circular and ORB Access Rules
+
+- Circular office routes are gated by legacy `user_type === 'office'`; ship routes are gated by `user_type === 'ship'`
+- ORB vessel routes are gated by legacy `user_type === 'vessel'`; the office e-ORB screen is rendered only for office users
+- Circular office endpoints are driven by office-side user context, notification metadata, and vessel assignment tables; ship endpoints are scoped by `crew_id` and vessel membership
+- ORB vessel workflows are driven by the authenticated vessel context and the current vessel selection, while the office-side approved-entry view uses the same data but renders an office review surface
+- many legacy module handlers are decorated with `AllowAny` and rely on request parameters plus downstream business validation, so the documented route behavior matters as much as the model layer
 
 ---
 
@@ -1933,6 +2138,11 @@ backend/
     └── test_sync.py
 ```
 
+Additional live backend code now also exists under:
+
+- `psc-backend/modules/circular/` for the Circular office and ship workflows
+- `psc-backend/modules/orb/` for the ORB workflows and archive helpers
+
 ---
 
 ## Document References
@@ -1949,6 +2159,6 @@ backend/
 
 **Document Control:**
 - Created: 2026-02-04
-- Updated: 2026-03-10
+- Updated: 2026-03-26
 - Author: System Generated
 - Database Version: 1.0

@@ -179,7 +179,7 @@ describe('CARDetailPage', () => {
       isVessel: false,
       isOffice: true,
       isDPA: false,
-      isPIC: true,
+      isPIC: false,
     });
     carDetailPageMocks.useCAR.mockReturnValue({
       data: buildCar({ physical_verification: { id: 1, status: 'OPEN', verifier_user_id: 'EMP999' } }),

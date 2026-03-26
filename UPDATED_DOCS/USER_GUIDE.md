@@ -13,10 +13,11 @@ The items below were added or changed later on after the original guide baseline
 - dashboard landing page and separate deficiency workflow page were added
 - reports now include DefIntel/OpenSource tools, not only exports
 - settings now includes company logo management for PDF reports
+- Circular and ORB were merged into the same authenticated shell as Inspection
 - office reviewer mapping can be vessel-scoped or global depending on the external mapping tables
 - CAR workflow now uses the unified operational statuses shown in the status section at the end of this guide
 
-### Update (2026-03-10)
+### Update (2026-03-26)
 This guide was reviewed against the current frontend routes/components and backend API permissions.
 
 ---
@@ -46,11 +47,38 @@ Your role determines what you can see and do:
 - **Reports** is a working screen for OpenSource import, checklist preview/export, and prediction
 - **Settings** now includes company logo upload/status for PDF reports
 
+Permission mapping snapshot:
+
+| UI Area | Controlled By | Source |
+|--------|---------------|--------|
+| Dashboard / Inspections / Deficiencies / CARs / Notifications / Sync / Reports / Settings | `form_ids` | `msc_profiles` through the auth payload |
+| Screen-level actions inside Inspection flows | `process_ids` | `msc_profiles` through the auth payload |
+| Circular office / admin workspace | `form_ids` + `process_ids` | `PSC_F_009` and `PSC_P_017`, `PSC_P_018`, `PSC_P_019`, `PSC_P_024` through the legacy auth bridge |
+| Circular modal workspace | `form_ids` | `PSC_F_010` through the legacy auth bridge |
+| Circular follow-up / approval panel | `form_ids` + `process_ids` | `PSC_F_011` and `PSC_P_025`, `PSC_P_026`, `PSC_P_027` through the legacy auth bridge |
+| Circular dashboard filters | `form_ids` + `process_ids` | `PSC_F_012` and `PSC_P_028`, `PSC_P_029` through the legacy auth bridge |
+| Circular notifications workspace | `form_ids` + `process_ids` | `PSC_F_013` and `PSC_P_030` to `PSC_P_036` through the legacy auth bridge |
+| Circular approved notifications library | `process_ids` | `PSC_P_020` to `PSC_P_023` through the legacy auth bridge |
+| ORB entry form | `form_ids` + `process_ids` | `PSC_F_014` and `PSC_P_043` through the legacy auth bridge |
+| ORB draft / table workspace | `form_ids` + `process_ids` | `PSC_F_015` and `PSC_P_037`, `PSC_P_038` through the legacy auth bridge |
+| ORB pending entries view | `form_ids` + `process_ids` | `PSC_F_016` and `PSC_P_040`, `PSC_P_041` through the legacy auth bridge |
+| ORB approved entries view | `form_ids` + `process_ids` | `PSC_F_017` and `PSC_P_042` through the legacy auth bridge |
+| ORB report filter | `form_ids` + `process_ids` | `PSC_F_018` and `PSC_P_039` through the legacy auth bridge |
+| ORB report view | `form_ids` | `PSC_F_019` through the legacy auth bridge |
+| ORB office approved-entries view | `user_type` + route root `/orb` | Native office ORB page; action-level details still follow the ORB permission payload |
+
 Reports access:
 
 - Office users can access the reports workspace
 - Vessel users in Master, CO, CE, and 2/E categories can access reports
 - OpenSource import is office-only
+
+### 1B. Circular and ORB
+
+- **Circular** is available at `/circular` and keeps the legacy office/ship route structure inside the shared VIMS header and layout
+- **ORB** is available at `/orb`; vessel users stay on the legacy ORB workflow while office users see the native approved-entries page
+- both modules reuse the same authentication, notifications, and logout controls as Inspection
+- module-specific quick actions appear in the header only while the current path belongs to Circular or ORB
 
 ---
 

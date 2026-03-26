@@ -1114,18 +1114,11 @@ class CARAvailableActionsView(APIView):
                 'message': 'CAR not found.'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        from apps.inspection.workflow import get_available_actions, WorkflowAction
-        from .validators import validate_car_submission
+        from apps.inspection.workflow import get_available_actions
         actions = get_available_actions(car, request.user)
 
-        # Omit SUBMIT_TO_PIC if content validation fails
-        filtered = [
-            a for a in actions
-            if a['action'] != WorkflowAction.SUBMIT_TO_PIC or not validate_car_submission(car)
-        ]
-
         return Response({
-            'data': filtered,
+            'data': actions,
         })
 
 

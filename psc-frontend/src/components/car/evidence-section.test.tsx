@@ -5,8 +5,58 @@
  * Validation Reference: Docs/VALIDATION_RULES.md Section 6.1
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const evidenceSectionMocks = vi.hoisted(() => ({
+  deleteEvidenceMutateAsync: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-cars', () => ({
+  useDeleteEvidence: () => ({
+    mutateAsync: evidenceSectionMocks.deleteEvidenceMutateAsync,
+    isPending: false,
+  }),
+}));
+
+vi.mock('@/components/shared', () => ({
+  ConfirmDialog: ({
+    open,
+    title,
+    description,
+    confirmLabel = 'Confirm',
+    confirmDisabled,
+    onConfirm,
+    onOpenChange,
+    children,
+  }: {
+    open: boolean;
+    title: string;
+    description?: string;
+    confirmLabel?: string;
+    confirmDisabled?: boolean;
+    onConfirm?: () => void;
+    onOpenChange?: (open: boolean) => void;
+    children?: React.ReactNode;
+  }) =>
+    open ? (
+      <div>
+        <h2>{title}</h2>
+        {description ? <p>{description}</p> : null}
+        {children}
+        <button
+          type="button"
+          disabled={confirmDisabled}
+          onClick={() => onConfirm?.()}
+        >
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={() => onOpenChange?.(false)}>
+          Close
+        </button>
+      </div>
+    ) : null,
+}));
 
 import { EvidenceSection } from './evidence-section';
 
@@ -25,6 +75,11 @@ function buildEvidence(overrides: Record<string, unknown> = {}) {
 }
 
 describe('EvidenceSection', () => {
+  beforeEach(() => {
+    evidenceSectionMocks.deleteEvidenceMutateAsync.mockReset();
+    evidenceSectionMocks.deleteEvidenceMutateAsync.mockResolvedValue(undefined);
+  });
+
   it('test_feat_car_003_empty_state_shows_missing_before_and_after_warning_and_upload_trigger', () => {
     const onUpload = vi.fn();
 
@@ -89,5 +144,21 @@ describe('EvidenceSection', () => {
     expect(screen.getByText('after.jpg')).toBeInTheDocument();
     expect(screen.getByText('report.pdf')).toBeInTheDocument();
     expect(screen.queryByText(/Missing .* evidence/)).not.toBeInTheDocument();
+  });
+
+  it('test_feat_car_003_delete_button_deletes_evidence_when_car_id_is_available', async () => {
+    render(
+      <EvidenceSection
+        carId="car-1"
+        evidence={[buildEvidence({ id: 'ev-before', file_name: 'before.jpg' })]}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText('Delete evidence before.jpg'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(evidenceSectionMocks.deleteEvidenceMutateAsync).toHaveBeenCalledWith('ev-before');
+    });
   });
 });

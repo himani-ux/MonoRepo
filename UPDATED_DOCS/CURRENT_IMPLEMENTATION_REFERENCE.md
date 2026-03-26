@@ -1,6 +1,6 @@
 # CURRENT_IMPLEMENTATION_REFERENCE.md
 ## VIMS Inspection Current Snapshot
-**Date:** 2026-03-10
+**Date:** 2026-03-26
 
 This document was added in `UPDATED_DOCS` to capture the current implementation snapshot without changing the original `Docs` baseline files.
 
@@ -25,6 +25,8 @@ This document was added in `UPDATED_DOCS` to capture the current implementation 
 | `/notifications` | Notification center | `psc-frontend/src/routes/notifications/page.tsx` |
 | `/reports` | DefIntel/OpenSource workspace | `psc-frontend/src/routes/reports/page.tsx` |
 | `/settings` | Company logo settings page | `psc-frontend/src/routes/settings/page.tsx` |
+| `/circular/*` | Integrated Circular module inside the shared VIMS shell. Office users see the Circular office/admin/user workflow; ship users see the ship dashboard. | `psc-frontend/src/routes/circular/page.tsx`, `psc-frontend/src/legacy/vims-basic/routes/circular/CircularRoutes.jsx` |
+| `/orb/*` | Integrated ORB module. Vessel users use the legacy ORB route tree, including dashboard, all entries, approved/rejected/deleted entries, PDF archive, and guidelines; office users see the native approved-entries page. | `psc-frontend/src/routes/orb/page.tsx`, `psc-frontend/src/legacy/vims-basic/routes/orb/OrbRoutes.jsx`, `psc-frontend/src/routes/orb/office-approved-entries.tsx` |
 | `/sync` | Offline/sync status page | `psc-frontend/src/routes/sync/page.tsx` |
 
 ---
@@ -47,6 +49,8 @@ All backend APIs are rooted under `/api/psc/`.
 | `/dashboard/` | aggregate dashboard response |
 | `/reports/` | OpenSource import, vessel prep preview/export, DefIntel prediction |
 | `/notifications/` | list, mark-read, mark-all-read |
+| `/api/circular/` | Circular office and ship backend endpoints, including document lookup, authoring, delivery tracking, acknowledgments, and PDF reporting | `psc-backend/modules/circular/circular_office/urls.py`, `psc-backend/modules/circular/circular_ship/urls.py` |
+| `/api/orb/` | ORB backend endpoints for vessel lookup, entry lifecycle, approval/rejection, archive listing, and PDF metadata | `psc-backend/modules/orb/orb/urls.py` |
 
 ---
 
@@ -80,6 +84,44 @@ Current frontend process guards:
 - `PSC_P_014` View sync
 - `PSC_P_015` View reports
 - `PSC_P_016` View settings
+
+Current frontend form guards:
+
+- `PSC_F_001` Dashboard
+- `PSC_F_002` Inspections
+- `PSC_F_003` Deficiencies
+- `PSC_F_004` CARs
+- `PSC_F_005` Notifications
+- `PSC_F_006` Sync
+- `PSC_F_007` Reports
+- `PSC_F_008` Settings
+
+Module access rules:
+
+- Inspection uses `form_ids` for sidebar and bottom-nav visibility, while `process_ids` gate the screen actions within each inspection workflow
+- `msc_profiles` is the database source that carries the `form_ids` and `process_ids` consumed by the frontend guards
+- Circular legacy permission gates are organized per screen as follows:
+
+  | Circular Screen / Area | `form_ids` | `process_ids` |
+  |---|---|---|
+  | Office / admin workspace | `PSC_F_009` | `PSC_P_017`, `PSC_P_018`, `PSC_P_019`, `PSC_P_024` |
+  | Overlay / modal workspace | `PSC_F_010` | - |
+  | Follow-up / approval panel | `PSC_F_011` | `PSC_P_025`, `PSC_P_026`, `PSC_P_027` |
+  | Dashboard filters | `PSC_F_012` | `PSC_P_028`, `PSC_P_029` |
+  | Notifications workspace | `PSC_F_013` | `PSC_P_030`, `PSC_P_031`, `PSC_P_032`, `PSC_P_033`, `PSC_P_034`, `PSC_P_035`, `PSC_P_036` |
+  | Approved notifications library actions | - | `PSC_P_020`, `PSC_P_021`, `PSC_P_022`, `PSC_P_023` |
+- ORB legacy permission gates are organized per screen as follows:
+
+  | ORB Screen / Area | `form_ids` | `process_ids` |
+  |---|---|---|
+  | Entry form | `PSC_F_014` | `PSC_P_043` |
+  | Draft / table workspace | `PSC_F_015` | `PSC_P_037`, `PSC_P_038` |
+  | Pending entries view | `PSC_F_016` | `PSC_P_040`, `PSC_P_041` |
+  | Approved entries view | `PSC_F_017` | `PSC_P_042` |
+  | Report filter | `PSC_F_018` | `PSC_P_039` |
+  | Report view | `PSC_F_019` | - |
+- Circular access is split by legacy `user_type`: office users see the office routes and ship users see the ship dashboard and document viewer flows
+- ORB access is split by legacy `user_type`: vessel users see the legacy ORB route tree and office users see the native approved-entries page
 
 Access notes:
 
@@ -133,3 +175,10 @@ Shared/reference tables actively used by the current code:
 - `PSC_Def_Code`
 - `CLC_Category`
 - `CLC_Item`
+
+## 5. Module Integration Snapshot
+
+- the merged frontend is still a single authenticated VIMS shell, with Inspection as the base module and Circular/ORB mounted as nested route trees
+- `Header` now renders module-specific actions for `/circular` and `/orb` paths without changing the global notifications or user menu
+- `LegacyBasicProvider` bridges modern auth into the legacy stores and maps modern vessel users to legacy `ship` users so the embedded Circular and ORB routes continue to work
+- the backend module packages live under `psc-backend/modules/circular/` and `psc-backend/modules/orb/`, and they continue to use the same `ksm_inspection` database as the base Inspection module

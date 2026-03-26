@@ -1,10 +1,10 @@
 # TECH_STACK.md — Locked Technology Versions
 ## Inspection Module — PSC/RS/Audit Close-out System
-**Version:** 1.1 | **Date:** 2026-03-10 | **Status:** UPDATED TO MATCH CURRENT IMPLEMENTATION
+**Version:** 1.1 | **Date:** 2026-03-26 | **Status:** UPDATED TO MATCH CURRENT IMPLEMENTATION
 
 ---
 
-### Update (2026-03-10)
+### Update (2026-03-26)
 This document was compared against `psc-frontend/package.json`, `psc-backend/requirements.txt`, and `psc-backend/core/settings.py`.
 
 Key corrections:
@@ -14,6 +14,7 @@ Key corrections:
 - the configured database name is `ksm_inspection`
 - SQL Server access is currently configured with `ODBC Driver 18 for SQL Server`
 - the frontend currently includes `recharts`, `vitest`, `@testing-library/*`, and `jsdom`
+- the Circular and ORB merge did not introduce any additional database package dependency or schema-specific runtime requirement
 
 ## ⚠️ VERSION LOCK POLICY
 
@@ -210,12 +211,14 @@ All versions are **pinned** to ensure reproducibility.
 
 ### 3.2 Connection String Pattern
 ```
-Driver={ODBC Driver 17 for SQL Server};
+Driver={ODBC Driver 18 for SQL Server};
 Server=<server>;
 Database=ksm_inspection;
 UID=<username>;
 PWD=<password>;
 ```
+
+The merged Circular and ORB modules continue to use the same `ksm_inspection` database connection as the base Inspection module.
 
 ---
 

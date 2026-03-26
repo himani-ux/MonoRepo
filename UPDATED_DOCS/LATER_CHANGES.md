@@ -1,6 +1,6 @@
 # Later Changes Record
 
-Last updated: 2026-03-10
+Last updated: 2026-03-26
 
 This file records implementation changes that were made later on after the initial v1.0 documentation baseline in `docs/APP_FLOW.md` (2026-02-03) and `docs/BACKEND_STRUCTURE.md` (2026-02-04).
 
@@ -106,3 +106,13 @@ These files are part of the later implementation context and data/mapping review
 - `psc-backend/master_role_export.sql`
 - `psc-backend/mapping_role_user_export.sql`
 - `psc-backend/msc_profiles_export.sql`
+
+## 6. Circular and ORB Module Integration
+
+- `psc-frontend/src/App.tsx` now mounts `/circular/*` and `/orb/*` as authenticated module roots inside the existing VIMS shell
+- `psc-frontend/src/components/layout/header.tsx` now renders `CircularHeaderActions` and `OrbHeaderActions` when the current pathname belongs to those modules
+- `psc-frontend/src/legacy/vims-basic/module-provider.tsx` bridges modern auth into the legacy stores and maps modern vessel users to legacy `ship` users
+- `psc-frontend/src/routes/circular/page.tsx` keeps Circular inside `LegacyBasicProvider` + `RootLayout` for both office and ship users
+- `psc-frontend/src/routes/orb/page.tsx` keeps vessel ORB users on the legacy route tree and sends office users to the native approved-entries page
+- no new backend API family was introduced for the merged modules; the integration is primarily frontend routing, shared shell composition, and legacy auth bridging
+- the backend module packages are live under `psc-backend/modules/circular/` and `psc-backend/modules/orb/`, and both continue to use the shared `ksm_inspection` database

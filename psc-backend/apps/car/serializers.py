@@ -856,14 +856,9 @@ class CARDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not hasattr(request, 'user'):
             return []
-        from apps.inspection.workflow import get_available_actions, WorkflowAction
-        from .validators import validate_car_submission
+        from apps.inspection.workflow import get_available_actions
         actions = get_available_actions(obj, request.user)
-        # Omit SUBMIT_TO_PIC if content validation fails
-        return [
-            a for a in actions
-            if a['action'] != WorkflowAction.SUBMIT_TO_PIC or not validate_car_submission(obj)
-        ]
+        return actions
 
 
 class CARUpdateSerializer(serializers.Serializer):

@@ -1,6 +1,6 @@
 # APP_FLOW.md — Application Flow & Screen Inventory
 ## Inspection Module — PSC/RS/Audit Close-out System
-**Version:** 1.1 | **Baseline Date:** 2026-02-03 | **Later Updates:** 2026-03-10
+**Version:** 1.1 | **Baseline Date:** 2026-02-03 | **Later Updates:** 2026-03-26
 
 ---
 
@@ -44,6 +44,8 @@ The route block above is the original v1.0 baseline. The live application was ch
 /notifications              -> Notification Center
 /reports                    -> Reports / DefIntel Workspace
 /settings                   -> User Settings
+/circular/*                 -> Circular Module
+/orb/*                      -> ORB Module
 /sync                       -> Sync Status
 ```
 
@@ -55,9 +57,12 @@ These changes were made later on after the original v1.0 screen inventory:
 - `/deficiencies` was added as a dedicated workflow screen for deficiency allocation and review
 - `/reports` was expanded into a real DefIntel/OpenSource workspace
 - `/settings` now includes company logo management for PDF reports
+- `/circular/*` was added as an embedded legacy module inside the shared VIMS shell
+- `/orb/*` was added as a hybrid module, with vessel users staying on the legacy ORB route tree and office users using the native approved-entries page
+- the shared header now exposes Circular and ORB quick actions only when the current path starts with the corresponding module root
 - older v1.0 journey examples that mention legacy CAR states such as `DRAFT` and `PIC_ACCEPTED` should be read as historical baseline text; the live CAR workflow now uses the unified workflow documented in `docs/LATER_CHANGES.md`
 
-### Update (2026-03-10)
+### Update (2026-03-26)
 This document was reviewed against the current React router in `psc-frontend/src/App.tsx`.
 
 Current implementation notes:
@@ -66,6 +71,57 @@ Current implementation notes:
 - `/reports` and `/settings` are implemented routes, not placeholders
 - `/deficiencies` is a dedicated workflow route backed by a real page component and API hooks
 - login success returns to the protected route the user originally attempted, otherwise the app falls back to the default permission-based redirect logic
+
+### 1.3 Shared App Shell (Added Later)
+
+The current post-login UI is a shared shell used by Inspection, Circular, and ORB.
+
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ Header: VIMS logo | Circular actions | ORB actions | Notifications | User   │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Sidebar / Mobile Drawer                                                      │
+│ ┌ Inspection                                                                 │
+│ │ └ PSC                                                                     │
+│ │   ├ Dashboard                                                             │
+│ │   ├ Inspections                                                           │
+│ │   ├ Deficiencies                                                          │
+│ │   ├ CARs                                                                  │
+│ │   ├ Notifications                                                         │
+│ │   ├ Sync                                                                  │
+│ │   ├ Reports                                                               │
+│ │   └ Settings                                                              │
+│ ├ Circular                                                                  │
+│ └ ORB                                                                       │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Main content area                                                            │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Shell Behavior:**
+- the `Inspection` node is the primary navigation group and expands to `PSC` plus the existing module destinations
+- `Circular` and `ORB` are separate module links in the same authenticated shell
+- the header keeps the global notification bell and user menu on every authenticated screen
+- module-specific quick actions appear only when the route starts with `/circular` or `/orb`
+- `Inspection` visibility is driven by `form_ids`, while the in-screen actions use `process_ids`
+- `Circular` and `ORB` visibility is driven by legacy auth context after the modern login payload is bridged into the legacy store
+
+**Permission View:**
+| Module | Screen / Area | `form_ids` | `process_ids` |
+|---|---|---|---|
+| Inspection | Sidebar, bottom nav, and core PSC workflow | `PSC_F_001` to `PSC_F_008` | `PSC_P_001` to `PSC_P_016` |
+| Circular | Office / admin workspace | `PSC_F_009` | `PSC_P_017`, `PSC_P_018`, `PSC_P_019`, `PSC_P_024` |
+| Circular | Overlay / modal workspace | `PSC_F_010` | - |
+| Circular | Follow-up / approval panel | `PSC_F_011` | `PSC_P_025`, `PSC_P_026`, `PSC_P_027` |
+| Circular | Dashboard filters | `PSC_F_012` | `PSC_P_028`, `PSC_P_029` |
+| Circular | Notifications workspace | `PSC_F_013` | `PSC_P_030`, `PSC_P_031`, `PSC_P_032`, `PSC_P_033`, `PSC_P_034`, `PSC_P_035`, `PSC_P_036` |
+| Circular | Approved notifications library actions | - | `PSC_P_020`, `PSC_P_021`, `PSC_P_022`, `PSC_P_023` |
+| ORB | Entry form | `PSC_F_014` | `PSC_P_043` |
+| ORB | Draft / table workspace | `PSC_F_015` | `PSC_P_037`, `PSC_P_038` |
+| ORB | Pending entries view | `PSC_F_016` | `PSC_P_040`, `PSC_P_041` |
+| ORB | Approved entries view | `PSC_F_017` | `PSC_P_042` |
+| ORB | Report filter | `PSC_F_018` | `PSC_P_039` |
+| ORB | Report view | `PSC_F_019` | - |
 
 ---
 
@@ -957,6 +1013,259 @@ Current implementation notes:
 - vessel users have read-only visibility of logo status
 - accepted formats are PNG/JPG up to 2 MB
 
+## 2.8 Circular Module
+
+#### SCREEN: Circular Shell (`/circular/*`)
+**Purpose:** Legacy Circular workflow embedded in the shared VIMS shell
+**Data Required:** Legacy Circular routes/services plus bridged auth state
+**User Roles:** Office, Ship
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [≡] VIMS                      [Circular Actions] [🔔] [👤]  │
+├─────────────────────────────────────────────────────────────┤
+│ Sidebar / Drawer                                            │
+│ ┌ Inspection                                               │
+│ │ └ PSC                                                    │
+│ │   ├ Dashboard                                            │
+│ │   ├ Inspections                                          │
+│ │   ├ Deficiencies                                         │
+│ │   ├ CARs                                                 │
+│ │   ├ Notifications                                        │
+│ │   ├ Sync                                                 │
+│ │   ├ Reports                                              │
+│ │   └ Settings                                             │
+│ ├ Circular                                                 │
+│ └ ORB                                                      │
+├─────────────────────────────────────────────────────────────┤
+│ Main content area                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Route Map:**
+| Route | Purpose | Role |
+|------|---------|------|
+| `/circular` | Role-based entry redirect | Office / Ship |
+| `/circular/dashboard` | Circular office dashboard | Office |
+| `/circular/office` | Circular office user panel | Office |
+| `/circular/admin` | Circular admin panel | Office admin |
+| `/circular/admin/all-notifications` | Admin-wide notification queue | Office admin |
+| `/circular/user/notifications` | User notification inbox | Office |
+| `/circular/user/drafts` | Draft notification workspace | Office |
+| `/circular/approved-library` | Approved notification library | Shared |
+| `/circular/ship-dashboard` | Ship-side dashboard | Ship |
+| `/circular/pdf-viewer` | PDF review and acknowledgment flow | Shared |
+
+**Current Behavior:**
+- `LegacyBasicProvider` maps modern vessel users to the legacy `ship` user type
+- the default route sends office users to `dashboard`, ship users to `ship-dashboard`, and unknown users to `role-landing`
+- Circular keeps its legacy document and notification flows inside the modern shell without altering Inspection screens
+
+#### SCREEN: Circular Office Panel (`/circular/office`)
+**Purpose:** Create and manage circular notifications
+**Data Required:** Legacy circular master data, vessel/rank selectors, notification metadata
+**User Roles:** Office
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [←] Circular Office Panel                  [Submit] [Save] │
+├─────────────────────────────────────────────────────────────┤
+│ CORE DATA                                                   │
+│ ┌ Document Type ▼ ┐ ┌ Department ▼ ┐ ┌ Priority ▼ ┐        │
+│ ┌ Subject ───────────────────────────────────────────────┐ │
+│ ┌ Body / Notification text ──────────────────────────────┐ │
+│ ┌ Attachments / Files ──────────────────────────────────┐ │
+│                                                             │
+│ RECIPIENTS                                                  │
+│ ┌ Vessel selector ───────────────────────────────────────┐ │
+│ ┌ Rank selector / grouped ranks ─────────────────────────┐ │
+│                                                             │
+│ ACTIONS                                                     │
+│ [Send] [Save Draft] [View Pending] [View Submitted]         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Current Behavior:**
+- office users can compose notifications, target vessels/ranks, and work with draft and submitted request states
+- admin users can access the broader notification administration route
+
+#### SCREEN: Circular PDF Viewer (`/circular/pdf-viewer`)
+**Purpose:** Review a circular attachment and acknowledge it after reading
+**Data Required:** `notificationId` query param, crew identity, PDF attachment URL
+**User Roles:** Shared
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [Review Document]                         [Download PDF]    │
+├─────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────┐│
+│ │ Scrollable PDF canvas / rendered pages                 ││
+│ │                                                         ││
+│ │ Page 1 ... Page N                                      ││
+│ └─────────────────────────────────────────────────────────┘│
+│                                                             │
+│ [Acknowledge] appears after scrolling to the bottom         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Current Behavior:**
+- the document URL is resolved from the backend using the notification and crew identity
+- the acknowledgment action appears only after the viewer reaches the bottom of the document
+- the page supports direct PDF download before acknowledgment
+
+## 2.9 ORB Module
+
+#### SCREEN: ORB Shell (`/orb/*`)
+**Purpose:** Integrated ORB workflow and report archive
+**Data Required:** Legacy ORB routes/services for vessel users, native approved-entries page for office users
+**User Roles:** Vessel, Office
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [≡] VIMS                      [ORB Actions] [🔔] [👤]      │
+├─────────────────────────────────────────────────────────────┤
+│ Sidebar / Drawer                                            │
+│ ┌ Inspection                                               │
+│ │ └ PSC                                                    │
+│ │   ├ Dashboard                                            │
+│ │   ├ Inspections                                          │
+│ │   ├ Deficiencies                                         │
+│ │   ├ CARs                                                 │
+│ │   ├ Notifications                                        │
+│ │   ├ Sync                                                 │
+│ │   ├ Reports                                              │
+│ │   └ Settings                                             │
+│ ├ Circular                                                 │
+│ └ ORB                                                      │
+├─────────────────────────────────────────────────────────────┤
+│ Main content area                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Route Map:**
+| Route | Purpose | Role |
+|------|---------|------|
+| `/orb` | Role-based entry redirect | Vessel / Office |
+| `/orb/dashboard` | Legacy ORB operational dashboard | Vessel |
+| `/orb/all-entries` | All non-deleted ORB entries | Vessel |
+| `/orb/approved-entries` | Approved entry table | Vessel |
+| `/orb/rejected-entries` | Rejected entry table | Vessel |
+| `/orb/deleted-entries` | Deleted entry table | Vessel |
+| `/orb/pdf-archive` | Paginated PDF archive | Vessel |
+| `/orb/orb-guidelines` | ORB guidance documents | Vessel |
+
+**Current Behavior:**
+- vessel users stay on the legacy ORB route tree
+- office users are redirected to the native `e-ORB` approved-entries page
+- the shared ORB header exposes Approved, Rejected, Deleted, PDFs, and Guidelines shortcuts only while the route starts with `/orb`
+
+#### SCREEN: ORB Vessel Dashboard (`/orb/dashboard`)
+**Purpose:** Vessel-side ORB workspace for drafting, reviewing, and approving entries
+**Data Required:** ORB operations, codes, tanks, latest entry date, vessel list
+**User Roles:** Vessel
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [ORB Dashboard]                                             │
+├─────────────────────────────────────────────────────────────┤
+│ ENTRY FORM                                                  │
+│ ┌ Code ▼ ┐ ┌ Vessel ▼ ┐ ┌ Tank ▼ ┐                          │
+│ ┌ Details / operation fields ─────────────────────────────┐ │
+│ ┌ Date / time / position inputs ─────────────────────────┐ │
+│                                                             │
+│ TABLE / DRAFTS                                              │
+│ ┌ Rows of draft entries with edit/delete actions          ┐ │
+│                                                             │
+│ PENDING / APPROVED PANELS                                   │
+│ ┌ Pending Entries Card ┐ ┌ Approved Entries Card          ┐ │
+│ ┌ Report Filter        ┐ ┌ Report View                    ┐ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Current Behavior:**
+- the dashboard combines entry creation, draft editing, approval workflow, and report generation views
+- permissions determine which cards, actions, and tables are visible
+
+#### SCREEN: ORB Approved Entries (`/orb/approved-entries`)
+**Purpose:** View approved vessel ORB entries
+**Data Required:** Approved entries API plus vessel context
+**User Roles:** Vessel
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Approved ORB Entries                                        │
+├─────────────────────────────────────────────────────────────┤
+│ Vessel: MV Example        [Refresh]                         │
+├─────────────────────────────────────────────────────────────┤
+│ ┌ Date ┐ ┌ Code ┐ ┌ Item No. ┐ ┌ Record of operations... ┐ │
+│ │ rows split line-by-line for review and traceability      │ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Current Behavior:**
+- each approved record is expanded into line-level rows so the item numbering remains traceable
+- the table supports refresh without losing the current vessel context
+
+#### SCREEN: ORB Office e-ORB (`/orb`)
+**Purpose:** Office-approved entries workspace for fleet-wide review
+**Data Required:** Vessel list, approved entries list, date filter, code filter
+**User Roles:** Office
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [e-ORB]                      Office view of approved ORB   │
+├─────────────────────────────────────────────────────────────┤
+│ Filters: [From date] [To date] [Code ▼] [Load]              │
+├─────────────────────────────────────────────────────────────┤
+│ Vessel selector                                             │
+│ ┌ Approved ORB entry table with parsed line-item rows      │
+│ └ Empty state / loading skeleton                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Current Behavior:**
+- office users can switch vessels and filter by date range or code
+- the page renders the same line-splitting logic as the vessel approved view, but across the fleet
+
+#### SCREEN: ORB PDF Archive (`/orb/pdf-archive`)
+**Purpose:** Browse downloadable ORB PDFs
+**Data Required:** PDF archive API and vessel context
+**User Roles:** Vessel
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ PDF Archive                                                 │
+├─────────────────────────────────────────────────────────────┤
+│ Vessel: MV Example                                          │
+│ ┌ Title ┐ ┌ Description ┐ ┌ Created By ┐ ┌ Created At ┐     │
+│ ┌ Download buttons per row                                  │
+│ [Previous]  Page X of Y  [Next]                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### SCREEN: ORB Guidelines (`/orb/orb-guidelines`)
+**Purpose:** Show the correct-entry and software guideline documents
+**Data Required:** Static guideline PDFs
+**User Roles:** Vessel
+
+**Layout:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Guidelines                                                  │
+├─────────────────────────────────────────────────────────────┤
+│ [ORB Correct Entries Guidelines]                            │
+│ [Software Guidelines]                                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 3. Navigation Structure
@@ -966,30 +1275,35 @@ Later navigation behavior added after the original baseline:
 - users with dashboard permission now land on `/dashboard`; others land on `/cars`
 - navigation visibility is permission-driven via form/process IDs
 - `/deficiencies` and `/reports` are not placeholder routes; they are implemented screens in the current frontend
+- `/circular` and `/orb` are now first-class authenticated module roots inside the same shell as Inspection
+- module-specific action buttons are rendered in the shared header only when the current path belongs to that module
 
 ### 3.1 Main Navigation (Sidebar/Bottom Tab)
 
-**Vessel User:**
+**Shared Shell Navigation:**
 ```
-┌─────────────────┐
-│ 🚢 Inspections  │ → /inspections
-│ 📋 CARs         │ → /cars
-│ 🔔 Notifications│ → /notifications
-│ 🔄 Sync         │ → /sync
-│ ⚙️ Settings     │ → /settings
-└─────────────────┘
+┌─────────────────────────────────────┐
+│ Inspection ▾                         │
+│   PSC ▾                              │
+│     Dashboard                        │
+│     Inspections                      │
+│     Deficiencies                     │
+│     CARs                             │
+│     Notifications                    │
+│     Sync                             │
+│     Reports                          │
+│     Settings                         │
+│ Circular                             │
+│ ORB                                  │
+└─────────────────────────────────────┘
 ```
 
-**Office User:**
-```
-┌─────────────────┐
-│ 🚢 Inspections  │ → /inspections
-│ 📋 CARs         │ → /cars
-│ 🔔 Notifications│ → /notifications
-│ 📊 Reports      │ → /reports
-│ ⚙️ Settings     │ → /settings
-└─────────────────┘
-```
+Navigation notes:
+
+- `Inspection` is the primary group in the authenticated shell
+- `PSC` opens automatically when any PSC route is active
+- `Circular` and `ORB` are sibling module roots and remain visible in the same sidebar tree
+- the mobile bottom nav continues to expose the core Inspection workflow destinations only
 
 ### 3.2 User Journeys
 
@@ -1033,6 +1347,34 @@ Inspection List → Select PSC Inspection → Inspection Detail
     → [Register Follow-up] → Inspection Detail (follow-up linked)
 ```
 
+#### Journey 6: Office User Opens Circular
+```
+Login → Shared Shell → Sidebar: Circular → /circular
+    → Role-based redirect → Circular Dashboard or Ship Dashboard
+    → Open Office Panel / Notifications / Drafts / PDF Viewer
+```
+
+#### Journey 7: Ship User Uses Circular PDF Viewer
+```
+Login → Shared Shell → Sidebar: Circular → /circular/ship-dashboard
+    → Open notification → /circular/pdf-viewer?notificationId=...
+    → Read document → Scroll to bottom → Acknowledge
+```
+
+#### Journey 8: Vessel User Works in ORB
+```
+Login → Shared Shell → Sidebar: ORB → /orb
+    → Dashboard → Entry Form / Draft Table / Pending / Approved / Reports
+    → Review entries → Approved / Rejected / Deleted / PDF Archive
+```
+
+#### Journey 9: Office User Reviews e-ORB Entries
+```
+Login → Shared Shell → Sidebar: ORB → native office approved-entries page
+    → Select vessel → Apply date/code filters
+    → Review parsed line-item table → Refresh or change vessel
+```
+
 ---
 
 Note on later workflow changes:
@@ -1058,5 +1400,5 @@ Note on later workflow changes:
 
 **Document Control:**
 - Created: 2026-02-03
-- Updated: 2026-03-10
+- Updated: 2026-03-26
 - Author: System Generated
