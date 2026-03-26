@@ -3,6 +3,7 @@ CAR report export views.
 
 Source: BACKEND_STRUCTURE.md Section 10.5
 Implements: PRD.md FEAT-RPT-001
+
 """
 
 import uuid
@@ -18,7 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.accounts.models import RoleCodes
 from apps.inspection.deficiency_models import CAR
 from core.db_utils import car_vessel_name_annotation
-from .evidence_links import build_report_evidence_url
+from .evidence_links import attach_report_evidence_urls
 from .serializers import CARDetailSerializer
 from .reports import generate_car_pdf
 
@@ -121,15 +122,11 @@ class CARExportPDFView(APIView):
 
         # Serialize CAR detail data (same as CARDetailView)
         serializer = CARDetailSerializer(car, context={'request': request})
-        car_data = serializer.data
-        for evidence_item in car_data.get('evidence') or []:
-            evidence_id = evidence_item.get('id')
-            if evidence_id:
-                evidence_item['report_preview_url'] = build_report_evidence_url(
-                    request,
-                    evidence_id=evidence_id,
-                    car_id=car.id,
-                )
+        car_data = attach_report_evidence_urls(
+            request,
+            car_id=car.id,
+            car_data=serializer.data,
+        )
         vessel_name = (getattr(car, 'vessel_name', '') or '').strip()
         if not vessel_name:
             vessel_name = _lookup_vessel_name(
@@ -151,7 +148,7 @@ class CARExportPDFView(APIView):
         # Return as file download
         car_number = car_data.get('car_number', 'CAR')
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{car_number.replace('-', '_')}_{timestamp}_Report.pdf"
+        filename = f"{car_number.replace('-', '')}{timestamp}_Report.pdf"
 
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'

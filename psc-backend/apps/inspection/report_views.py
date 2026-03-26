@@ -19,6 +19,7 @@ from django.db import connection
 from django.shortcuts import get_object_or_404
 
 from apps.accounts.models import RoleCodes
+from apps.car.evidence_links import attach_report_evidence_urls
 from apps.inspection.deficiency_models import CAR
 from apps.car.serializers import CARDetailSerializer
 from apps.car.reports import generate_car_pdf
@@ -226,8 +227,13 @@ class BulkCARExportView(APIView):
         if len(car_list) == 1:
             car = car_list[0]
             serializer = CARDetailSerializer(car, context={'request': request})
-            pdf_bytes = generate_car_pdf(serializer.data)
-            car_number = serializer.data.get('car_number', 'CAR')
+            car_data = attach_report_evidence_urls(
+                request,
+                car_id=car.id,
+                car_data=serializer.data,
+            )
+            pdf_bytes = generate_car_pdf(car_data)
+            car_number = car_data.get('car_number', 'CAR')
             filename = f"{car_number.replace('-', '_')}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
@@ -242,8 +248,13 @@ class BulkCARExportView(APIView):
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             for car in car_list:
                 serializer = CARDetailSerializer(car, context={'request': request})
-                pdf_bytes = generate_car_pdf(serializer.data)
-                car_number = serializer.data.get('car_number', 'CAR')
+                car_data = attach_report_evidence_urls(
+                    request,
+                    car_id=car.id,
+                    car_data=serializer.data,
+                )
+                pdf_bytes = generate_car_pdf(car_data)
+                car_number = car_data.get('car_number', 'CAR')
                 zf.writestr(f"{car_number.replace('-', '_')}_Report.pdf", pdf_bytes)
 
         zip_buffer.seek(0)

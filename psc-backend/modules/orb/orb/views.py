@@ -641,6 +641,7 @@ class OperationEntryViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
                 vessel_id = request.query_params.get('vessel_id')
                 is_deleted = request.query_params.get('is_deleted', '0')
+                status_filter = request.query_params.get('status')
 
                 # Convert 'false' → 0, 'true' → 1
                 is_deleted = 1 if is_deleted.lower() == 'true' else 0
@@ -650,7 +651,7 @@ class OperationEntryViewSet(viewsets.ModelViewSet):
 
                 try:
                     with connection.cursor() as cursor:
-                        cursor.execute("""
+                        sql = """
                             SELECT 
                                 o.id,
                                 o.date,
@@ -666,8 +667,15 @@ class OperationEntryViewSet(viewsets.ModelViewSet):
                             FROM dbo.Operations o
                             INNER JOIN dbo.ORBCodes c ON o.orb_code_id = c.id
                             WHERE o.vessel = %s AND o.is_deleted = %s
-                            ORDER BY o.date DESC
-                        """, [vessel_id, is_deleted])
+                        """
+                        params = [vessel_id, is_deleted]
+
+                        if status_filter:
+                            sql += " AND o.status = %s"
+                            params.append(status_filter)
+
+                        sql += " ORDER BY o.date DESC"
+                        cursor.execute(sql, params)
                         rows = dictfetchall(cursor)
                     return Response(rows)
                 except Exception as e:

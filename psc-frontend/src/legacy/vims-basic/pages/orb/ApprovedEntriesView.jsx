@@ -9,7 +9,7 @@ const ApprovedEntriesView = () => {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [vesselId] = useState(user?.vessel_id); // Get vessel ID from user object
+  const vesselId = user?.vessel_id || localStorage.getItem("selectedVesselId") || ''; // Resolve vessel ID after auth initializes
   // Add state for vessel name and imo number
   const [vessel, setVessel] = useState(null);
 

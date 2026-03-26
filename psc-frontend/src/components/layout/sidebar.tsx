@@ -111,7 +111,7 @@ const pscPriorityOrder = [
 
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
-  const { hasForm, user } = useAuth();
+  const { hasForm, user, isOffice, isVessel } = useAuth();
   const { data: unreadCount = 0 } = useUnreadCount();
 
   // Filter nav items based on user role
@@ -157,7 +157,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       label: 'ORB',
       href: ROUTES.ORB,
       icon: BookOpenCheck,
-      visible: user?.user_type === 'vessel',
+      visible: isVessel || isOffice,
     },
   ].filter((item) => item.visible);
   const [inspectionOpen, setInspectionOpen] = useState(hasActivePscItem);

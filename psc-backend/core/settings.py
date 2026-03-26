@@ -109,14 +109,13 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
-        'NAME': 'ksm_inspection',
-        'USER': 'sa',
-        'PASSWORD': 'Yadavdy2002@',
-        'HOST': 'localhost',
-        'PORT': '1433',
-          'OPTIONS': {
+        'NAME': 'ksm_marine_live',
+        'USER': 'localhost',                 
+        # 'HOST': '.',
+        # 'PORT': '1433',
+        'OPTIONS': {
             'driver': 'ODBC Driver 18 for SQL Server',
-            'extra_params': 'TrustServerCertificate=yes;',
+            'extra_params': 'Encrypt=no;TrustServerCertificate=yes;Trusted_Connection=yes;',
         },
     }
 }

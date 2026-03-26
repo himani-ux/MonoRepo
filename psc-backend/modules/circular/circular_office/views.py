@@ -14,6 +14,7 @@ from datetime import timezone as datetime_timezone
 from django.http import JsonResponse
 from django.db import transaction
 from django.db import connection
+from django.db import DatabaseError
 from reportlab.lib.colors import navy, black, red, white
 from django.conf import settings
 from reportlab.lib.pagesizes import letter, A4
@@ -37,6 +38,7 @@ from django.conf import settings as django_settings
 from django.core.mail import EmailMultiAlternatives 
 from django.db.models import Q
 from django.db.models.expressions import RawSQL
+from django.core.exceptions import ValidationError
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
@@ -57,6 +59,368 @@ if not os.path.exists(font_path):
     raise FileNotFoundError(f"Font not found at {font_path}")
 
 pdfmetrics.registerFont(TTFont("bookos", font_path))
+
+
+CIRCULAR_SR_LOCK_TIMEOUT_MS = 15000
+PDF_FONT_NAME = "bookos"
+PDF_HEADER_FONT_SIZE = 12
+PDF_TITLE_FONT_SIZE = 16
+PDF_META_FONT_SIZE = 10
+PDF_SUBJECT_FONT_SIZE = 12
+PDF_SUBJECT_LINE_HEIGHT = 16
+PDF_BODY_FONT_SIZE = 11
+PDF_FOOTER_FONT_SIZE = 9
+PDF_LINE_HEIGHT = 15
+PDF_HEADER_GAP = 12
+PDF_FIXED_FOOTER_Y = 42
+PDF_FIXED_FOOTER_LINE_Y = PDF_FIXED_FOOTER_Y + 16
+PDF_BODY_STOP_Y = PDF_FIXED_FOOTER_LINE_Y + 24
+PDF_HEADER_TEXT = "KAIZEN SHIP MANAGEMENT CO. LTD"
+
+# Keep existing SR prefixes stable for known departments while still
+# falling back to the department master when new departments are added.
+SR_NO_DEPARTMENT_DISPLAY_OVERRIDES = {
+    '8949308c-aa8a-ee11-987c-7413ea3d6a70': 'SEQ',
+    '8a49308c-aa8a-ee11-987c-7413ea3d6a70': 'Technical',
+}
+
+
+def _get_department_display_name_for_sr_no(dept_id_string):
+    if not dept_id_string:
+        return 'Unknown Dept'
+
+    override_display_name = SR_NO_DEPARTMENT_DISPLAY_OVERRIDES.get(str(dept_id_string).lower())
+    if override_display_name:
+        return override_display_name
+
+    department_name = (
+        Department.objects
+        .filter(id=dept_id_string)
+        .values_list('department_name', flat=True)
+        .first()
+    )
+    if department_name and department_name.strip():
+        return department_name.strip()
+
+    return 'Unknown Dept'
+
+
+def _get_department_master_name(dept_id_string):
+    if not dept_id_string:
+        return None
+
+    legacy_department_map = {
+        '0': 'Deck',
+        '1': 'Engine',
+        'seq': 'Deck',
+        'technical': 'Engine',
+        'deck': 'Deck',
+        'engine': 'Engine',
+    }
+    normalized_value = str(dept_id_string).strip()
+    if normalized_value.lower() in legacy_department_map:
+        return legacy_department_map[normalized_value.lower()]
+
+    try:
+        department_name = (
+            Department.objects
+            .filter(id=normalized_value)
+            .values_list('department_name', flat=True)
+            .first()
+        )
+    except (ValidationError, ValueError, TypeError):
+        return normalized_value or None
+
+    if department_name and department_name.strip():
+        return department_name.strip()
+
+    return normalized_value or None
+
+
+def _clean_uuid_string(value):
+    """Return a normalized UUID string or None when the value is empty/invalid."""
+    if value is None:
+        return None
+
+    cleaned_value = str(value).strip().strip("'\"()[] ")
+    if not cleaned_value:
+        return None
+
+    try:
+        return str(uuid.UUID(cleaned_value))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def _safe_get_lookup_name_by_id(model_class, raw_id, fallback_value=None):
+    if raw_id is None:
+        return fallback_value
+
+    normalized_value = _clean_uuid_string(raw_id)
+    if not normalized_value:
+        stripped_value = str(raw_id).strip()
+        if stripped_value:
+            return stripped_value if fallback_value is None else fallback_value
+        return fallback_value
+
+    try:
+        table_name = model_class._meta.db_table
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT TOP 1 name FROM {table_name} WHERE id = CAST(%s AS UNIQUEIDENTIFIER)",
+                [normalized_value]
+            )
+            row = cursor.fetchone()
+
+        resolved_name = row[0] if row else None
+        if resolved_name and str(resolved_name).strip():
+            return str(resolved_name).strip()
+    except Exception as exc:
+        print(f"_safe_get_lookup_name_by_id: Failed to resolve {model_class.__name__} for value '{normalized_value}': {exc}")
+
+    return normalized_value if fallback_value is None else fallback_value
+
+
+def _infer_circular_type_name_from_sr_no(sr_no):
+    sr_no_parts = str(sr_no or "").split('/')
+    if len(sr_no_parts) >= 2:
+        return sr_no_parts[1]
+    return None
+
+
+def _normalize_circular_type_name(doc_type_name):
+    raw_value = str(doc_type_name or "").strip().lower()
+    return "".join(ch for ch in raw_value if ch.isalnum())
+
+
+def _should_stack_footer_metadata(doc_type_name):
+    return _normalize_circular_type_name(doc_type_name) == "workinstruction"
+
+
+def _acquire_circular_sr_lock(cursor, prefix):
+    lock_resource = f"circular-sr:{hashlib.sha256(prefix.encode('utf-8')).hexdigest()}"
+    cursor.execute(
+        """
+        DECLARE @lock_result INT;
+        EXEC @lock_result = sp_getapplock
+            @Resource = %s,
+            @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction',
+            @LockTimeout = %s;
+        SELECT @lock_result;
+        """,
+        [lock_resource, CIRCULAR_SR_LOCK_TIMEOUT_MS]
+    )
+    lock_row = cursor.fetchone()
+    lock_result = lock_row[0] if lock_row else -999
+    if lock_result < 0:
+        raise RuntimeError(
+            f"Unable to acquire circular SR lock for prefix '{prefix}'. SQL result: {lock_result}"
+        )
+
+
+def _generate_unique_circular_sr_no(cursor, doc_type_display_name, dept_display_name, created_at):
+    doc_type_segment = (doc_type_display_name or 'Unknown').strip() or 'Unknown'
+    dept_segment = (dept_display_name or 'Unknown Dept').strip() or 'Unknown Dept'
+    prefix = f"KSM/{doc_type_segment}/{dept_segment}/{created_at.year}-"
+
+    _acquire_circular_sr_lock(cursor, prefix)
+
+    cursor.execute(
+        """
+        SELECT MAX(
+            TRY_CAST(SUBSTRING(sr_no, LEN(%s) + 1, LEN(sr_no) - LEN(%s)) AS INT)
+        )
+        FROM msc_data WITH (UPDLOCK, HOLDLOCK)
+        WHERE sr_no IS NOT NULL
+          AND LEN(sr_no) > LEN(%s)
+          AND LEFT(sr_no, LEN(%s)) = %s
+        """,
+        [prefix, prefix, prefix, prefix, prefix]
+    )
+    max_row = cursor.fetchone()
+    next_serial = (max_row[0] or 0) + 1
+
+    while True:
+        candidate_sr_no = f"{prefix}{next_serial:04d}"
+        cursor.execute(
+            "SELECT COUNT(1) FROM msc_data WITH (UPDLOCK, HOLDLOCK) WHERE sr_no = %s",
+            [candidate_sr_no]
+        )
+        existing_row = cursor.fetchone()
+        if not existing_row or existing_row[0] == 0:
+            return candidate_sr_no
+        next_serial += 1
+
+
+def _draw_pdf_supersede_notice(canvas_obj, margin, ref_date_y, supersede_reference):
+    if not supersede_reference:
+        return ref_date_y - 35
+
+    supersede_y = ref_date_y - 18
+    canvas_obj.setFillColor(red)
+    canvas_obj.setFont(PDF_FONT_NAME, PDF_META_FONT_SIZE)
+    canvas_obj.drawString(
+        margin,
+        supersede_y,
+        f"Supersedes {supersede_reference}"
+    )
+    canvas_obj.setFillColor(black)
+    return supersede_y - 28
+
+
+def _draw_pdf_subject_block(canvas_obj, width, margin, subject_y, subject_text):
+    subject_value = subject_text or ""
+    subject_lines = _wrap_text_simple(
+        canvas_obj,
+        f"SUBJECT: {subject_value}",
+        width - (2 * margin),
+        PDF_FONT_NAME,
+        PDF_SUBJECT_FONT_SIZE
+    )
+
+    canvas_obj.setFont(PDF_FONT_NAME, PDF_SUBJECT_FONT_SIZE)
+    current_y = subject_y
+    for line in subject_lines:
+        canvas_obj.drawString(margin, current_y, line)
+        current_y -= PDF_SUBJECT_LINE_HEIGHT
+
+    return current_y
+
+
+def _draw_fixed_footer(
+    canvas_obj,
+    width,
+    margin,
+    left_text,
+    center_text,
+    right_text,
+    stack_metadata_below_left=False,
+):
+    canvas_obj.setStrokeColor(navy)
+    canvas_obj.line(margin, PDF_FIXED_FOOTER_LINE_Y, width - margin, PDF_FIXED_FOOTER_LINE_Y)
+    canvas_obj.setStrokeColor(black)
+    canvas_obj.setFillColor(black)
+    canvas_obj.setFont(PDF_FONT_NAME, PDF_FOOTER_FONT_SIZE)
+
+    metadata_lines = []
+    if center_text:
+        if isinstance(center_text, (list, tuple)):
+            metadata_lines = [line for line in center_text if line]
+        else:
+            metadata_lines = [center_text]
+
+    left_text_y = PDF_FIXED_FOOTER_Y + 8 if stack_metadata_below_left and metadata_lines else PDF_FIXED_FOOTER_Y
+    canvas_obj.drawString(margin, left_text_y, left_text)
+
+    if metadata_lines:
+        if stack_metadata_below_left:
+            for index, line in enumerate(metadata_lines):
+                canvas_obj.drawString(margin, left_text_y - ((index + 1) * 10), line)
+        elif len(metadata_lines) == 1:
+            canvas_obj.drawCentredString(width / 2, PDF_FIXED_FOOTER_Y, metadata_lines[0])
+        else:
+            first_line_y = PDF_FIXED_FOOTER_Y + 2
+            for index, line in enumerate(metadata_lines):
+                canvas_obj.drawCentredString(width / 2, first_line_y - (index * 10), line)
+
+    if right_text:
+        canvas_obj.drawRightString(width - margin, left_text_y, right_text)
+
+
+def _merge_footer_onto_pdf_page(page_obj, margin, left_text, center_text, right_text):
+    overlay_buffer = io.BytesIO()
+    page_width = float(page_obj.mediabox.width)
+    page_height = float(page_obj.mediabox.height)
+    overlay_canvas = canvas.Canvas(overlay_buffer, pagesize=(page_width, page_height))
+    _draw_fixed_footer(overlay_canvas, page_width, margin, left_text, center_text, right_text)
+    overlay_canvas.save()
+    overlay_buffer.seek(0)
+    page_obj.merge_page(PdfReader(overlay_buffer).pages[0])
+    return page_obj
+
+
+def _get_circular_attachment_paths(formatted_id):
+    media_path = os.path.join(settings.MEDIA_ROOT, 'circular', 'attachments')
+    safe_formatted_id = formatted_id.replace('/', '_')
+    merged_path = os.path.join(media_path, f"merged_{safe_formatted_id}.pdf")
+    original_path = os.path.join(media_path, f"original_{safe_formatted_id}.pdf")
+    return media_path, merged_path, original_path
+
+
+def _get_original_attachment_copy_path(merged_attachment_path):
+    if not merged_attachment_path:
+        return None
+
+    directory, filename = os.path.split(merged_attachment_path)
+    if filename.startswith("merged_"):
+        return os.path.join(directory, f"original_{filename[len('merged_'):]}")
+
+    return None
+
+
+def _is_system_generated_circular_page(page_obj, sr_no):
+    try:
+        page_text = " ".join((page_obj.extract_text() or "").split())
+    except Exception as exc:
+        print(f"_is_system_generated_circular_page: text extraction failed for {sr_no}: {exc}")
+        return False
+
+    if not page_text:
+        return False
+
+    return (
+        PDF_HEADER_TEXT in page_text and
+        f"Sr. No: {sr_no}" in page_text and
+        any(marker in page_text for marker in ("Created By:", "Approved By:", "Created At:", "Approved At:", "Edited At:"))
+    )
+
+
+def _count_leading_system_generated_pages(pdf_reader, sr_no):
+    generated_page_count = 0
+
+    for page in pdf_reader.pages:
+        if _is_system_generated_circular_page(page, sr_no):
+            generated_page_count += 1
+        else:
+            break
+
+    return generated_page_count
+
+
+def _resolve_attachment_reader_for_merge(merged_attachment_path, sr_no):
+    original_attachment_copy_path = _get_original_attachment_copy_path(merged_attachment_path)
+    if original_attachment_copy_path and os.path.exists(original_attachment_copy_path):
+        try:
+            print(f"_resolve_attachment_reader_for_merge: Using preserved original attachment {original_attachment_copy_path}")
+            return PdfReader(original_attachment_copy_path), 0
+        except Exception as exc:
+            print(f"_resolve_attachment_reader_for_merge: Failed to read preserved original attachment {original_attachment_copy_path}: {exc}")
+
+    merged_reader = PdfReader(merged_attachment_path)
+    attachment_start_index = _count_leading_system_generated_pages(merged_reader, sr_no)
+    print(
+        f"_resolve_attachment_reader_for_merge: Falling back to merged PDF split for {sr_no}. "
+        f"Attachment pages start at index {attachment_start_index}."
+    )
+    return merged_reader, attachment_start_index
+
+
+def _draw_pdf_continuation_header(c, width, height, margin, logo_path, logo_width, logo_height, document_id, page_number):
+    divider_y = draw_pdf_header(
+        c, width, height, margin,
+        logo_path, logo_width, logo_height
+    )
+
+    c.setFont(PDF_FONT_NAME, PDF_META_FONT_SIZE)
+    c.drawString(margin, divider_y - 20, f"Document: {document_id}")
+    c.drawRightString(width - margin, divider_y - 20, f"Page {page_number}")
+
+    c.setStrokeColor(navy)
+    c.line(margin, divider_y - 40, width - margin, divider_y - 40)
+    c.setStrokeColor(black)
+
+    return divider_y - 55
 
 
 
@@ -152,71 +516,20 @@ def create_notification(request):
             doc_type_display_name = 'Unknown'
         
         # --- Validate required fields ---
-         # --- Validate required fields ---
-        # Get the department ID as a string (UUID)
-        dept_id_string = request.POST.get('department') # Get the UUID string directly from the frontend
+        dept_id_string = clean_uuid_string(request.POST.get('department'), 'department')
         print(f"create_notification: Received department ID string from frontend: {dept_id_string}")
-
-        # You might want to validate the UUID format here
-        # try:
-        #     uuid.UUID(dept_id_string)
-        # except ValueError:
-        #     print(f"create_notification: Invalid UUID format for department: {dept_id_string}")
-        #     return JsonResponse({'error': 'Invalid department ID format'}, status=400)
-
-        # DO NOT convert dept_id_string to int
-        # dept_value = int(dept_value) # ❌ Remove this line
 
         if not doc_type_uuid_verified or not dept_id_string: # Check for the string, not an integer
             print("create_notification: Missing type or department, returning 400")
             return JsonResponse({'error': 'type and department are required'}, status=400)
 
-        # Determine the department display name based on the received UUID string
-        # This mapping should ideally come from the database or a config file,
-        # but for now, let's keep it here as a constant.
-        DEPT_ID_TO_DISPLAY_NAME = {
-            '8949308c-aa8a-ee11-987c-7413ea3d6a70': 'SEQ', # Assuming this UUID maps to 'SEQ'
-            '8a49308c-aa8a-ee11-987c-7413ea3d6a70': 'Technical', # Assuming this UUID maps to 'Technical'
-            # Add other mappings if needed
-        }
-        dept_display_name = DEPT_ID_TO_DISPLAY_NAME.get(dept_id_string, 'Unknown Dept') # Get display name, default to 'Unknown Dept' if UUID not found in map
+        # Resolve the department label that becomes part of the SR prefix.
+        dept_display_name = _get_department_display_name_for_sr_no(dept_id_string)
         print(f"create_notification: Mapped department ID {dept_id_string} to display name: {dept_display_name}")
 
-        current_year = datetime.datetime.now().year
-        print(f"create_notification: dept_display_name: {dept_display_name}, current_year: {current_year}")
-
-        # --- 2. Get next serial number using raw SQL ---
-        print("create_notification: Calculating next serial number...")
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT TOP 1 sr_no FROM msc_data 
-                WHERE msc_type = CAST(%s AS UNIQUEIDENTIFIER) 
-                AND YEAR(created_at) = %s 
-                AND sr_no IS NOT NULL 
-                ORDER BY sr_no DESC
-                """,
-                [doc_type_uuid_verified, current_year]
-            )
-            last_row = cursor.fetchone()
-
-        if last_row and last_row[0]:
-            try:
-                last_serial = int(last_row[0].split('-')[-1])
-                next_serial = last_serial + 1
-                print(f"create_notification: Last serial was {last_serial}, next will be {next_serial}")
-            except (ValueError, IndexError):
-                next_serial = 1
-                print("create_notification: Error parsing last serial, defaulting to 1")
-        else:
-            next_serial = 1
-            print("create_notification: No previous records found, starting with 1")
-
-       
         now = django_timezone.now()
-        formatted_id = f"KSM/{doc_type_display_name}/{dept_display_name}/{current_year}-{next_serial:04d}"
-        print(f"create_notification: Generated SR No: {formatted_id}")
+        current_year = now.year
+        print(f"create_notification: dept_display_name: {dept_display_name}, current_year: {current_year}")
 
         # --- Get created_by ---
         created_by_employee_id = request.POST.get('created_by')
@@ -256,34 +569,6 @@ def create_notification(request):
         # --- Handle file attachment ---
         attachment_path = None
         attachment_name = None
-        
-        if request.FILES.get('attachment'):
-            uploaded_file = request.FILES['attachment']
-            print("create_notification: Processing file attachment...")
-            
-            pdf_data = {
-                'title': request.POST.get('title', ''),
-                'body': request.POST.get('body', ''),
-                'doc_type_name': doc_type_display_name,
-                'formatted_id': formatted_id,
-                'current_date': now.strftime('%d-%m-%Y'),
-                'superseding_old_notification_sr_no': superseding_old_notification_sr_no,
-                'created_by_employee_id': created_by_employee_id,
-            }
-            
-            merged_pdf_buffer = generate_pdf_with_cover_and_original(uploaded_file, pdf_data)
-            
-            filename = f"merged_{formatted_id.replace('/', '_')}.pdf"
-            media_path = os.path.join(settings.MEDIA_ROOT, 'circular', 'attachments')
-            os.makedirs(media_path, exist_ok=True)
-            filepath = os.path.join(media_path, filename)
-            
-            with open(filepath, 'wb') as f:
-                f.write(merged_pdf_buffer.getvalue())
-            
-            attachment_path = filepath
-            attachment_name = filename
-            print(f"create_notification: PDF saved at {filepath}")
 
         # --- Get and clean Vessel IDs ---
         received_vessel_ids = request.POST.getlist('vessel_ids')
@@ -296,124 +581,156 @@ def create_notification(request):
         vessel_id_str = ', '.join(cleaned_vessel_ids) if cleaned_vessel_ids else None
         print(f"create_notification: vessel_ids: {vessel_id_str}")
 
-        # --- Create notification record using RAW SQL ---
         received_title = request.POST.get('title', '')   
-        print(f"create_notification: Creating MscData record using raw SQL...")
-        
-        # Format datetime for SQL Server
         created_at_str = now.strftime('%Y-%m-%d %H:%M:%S')
         published_on_str = published_on_datetime.strftime('%Y-%m-%d %H:%M:%S') if published_on_datetime else None
-        
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO msc_data (
-                    sr_no, msc_type, dept, category, sub_category, second_sub_category,
-                    title, office_instructions, hashtags, created_by, created_at,
-                    publish_status, published_by, published_on, is_active, is_deleted,
-                    priority, attachment_name, attachment_path, vessel_id
-                ) VALUES (
-                    %s,
-                    CAST(%s AS UNIQUEIDENTIFIER),
-                    %s, %s, -- dept is now the UUID string, category is a string
-                    CAST(%s AS UNIQUEIDENTIFIER),
-                    CAST(%s AS UNIQUEIDENTIFIER),
-                    %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s,
-                    CAST(%s AS UNIQUEIDENTIFIER),
-                    %s, %s, %s
+        notification_id = 'unknown'
+        formatted_id = None
+
+        with transaction.atomic():
+            print("create_notification: Generating SR No under transaction lock...")
+            with connection.cursor() as cursor:
+                formatted_id = _generate_unique_circular_sr_no(
+                    cursor,
+                    doc_type_display_name,
+                    dept_display_name,
+                    now
                 )
-                """,
-                [
-                    formatted_id,
-                    doc_type_uuid_verified, # UUID string for msc_type_id
-                    dept_id_string,         # UUID string for dept (changed from dept_value)
-                    request.POST.get('category'), # String for category
-                    sub_cat_uuid_verified,  # UUID string for sub_category_id
-                    second_sub_cat_uuid_verified, # UUID string for second_sub_category_id
-                    received_title,
-                    body,
-                    request.POST.get('hashtags'),
-                    created_by_employee_id,
-                    created_at_str,
-                    initial_publish_status,
-                    published_by_id,
-                    published_on_str,
-                    True,  # is_active
-                    False, # is_deleted
-                    priority_uuid_verified, # UUID string for priority_id
-                    attachment_name,
-                    attachment_path,
-                    vessel_id_str
-                ]
-            )
-        print(f"create_notification: Record inserted - SR No: {formatted_id}")
+            print(f"create_notification: Generated SR No: {formatted_id}")
 
-        # --- Finalize Supersede ---
-        if superseding_old_notification_sr_no:
-            print(f"create_notification: Finalizing supersede...")
-            try:
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        UPDATE msc_data 
-                        SET is_superseeded = 1, superseeded_by = %s 
-                        WHERE sr_no = %s
-                        """,
-                        [superseding_old_notification_sr_no, formatted_id]
+            if request.FILES.get('attachment'):
+                uploaded_file = request.FILES['attachment']
+                print("create_notification: Processing file attachment...")
+                uploaded_file_bytes = uploaded_file.read()
+
+                pdf_data = {
+                    'title': request.POST.get('title', ''),
+                    'body': request.POST.get('body', ''),
+                    'doc_type_name': doc_type_display_name,
+                    'formatted_id': formatted_id,
+                    'current_date': now.strftime('%d-%m-%Y'),
+                    'superseding_old_notification_sr_no': superseding_old_notification_sr_no,
+                    'created_by_employee_id': created_by_employee_id,
+                }
+
+                merged_pdf_buffer = generate_pdf_with_cover_and_original(io.BytesIO(uploaded_file_bytes), pdf_data)
+
+                media_path, merged_filepath, original_filepath = _get_circular_attachment_paths(formatted_id)
+                os.makedirs(media_path, exist_ok=True)
+                filename = os.path.basename(merged_filepath)
+
+                with open(merged_filepath, 'wb') as f:
+                    f.write(merged_pdf_buffer.getvalue())
+
+                with open(original_filepath, 'wb') as f:
+                    f.write(uploaded_file_bytes)
+
+                attachment_path = merged_filepath
+                attachment_name = filename
+                print(f"create_notification: Merged PDF saved at {merged_filepath}")
+                print(f"create_notification: Original attachment preserved at {original_filepath}")
+
+            print("create_notification: Creating MscData record using raw SQL...")
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO msc_data (
+                        sr_no, msc_type, dept, category, sub_category, second_sub_category,
+                        title, office_instructions, hashtags, created_by, created_at,
+                        publish_status, published_by, published_on, is_active, is_deleted,
+                        priority, attachment_name, attachment_path, vessel_id
                     )
-                print(f"create_notification: Supersede updated")
-            except Exception as e:
-                print(f"create_notification: Supersede error: {e}")
+                    OUTPUT INSERTED.id
+                    VALUES (
+                        %s,
+                        CAST(%s AS UNIQUEIDENTIFIER),
+                        %s, %s,
+                        CAST(%s AS UNIQUEIDENTIFIER),
+                        CAST(%s AS UNIQUEIDENTIFIER),
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        CAST(%s AS UNIQUEIDENTIFIER),
+                        %s, %s, %s
+                    )
+                    """,
+                    [
+                        formatted_id,
+                        doc_type_uuid_verified,
+                        dept_id_string,
+                        request.POST.get('category'),
+                        sub_cat_uuid_verified,
+                        second_sub_cat_uuid_verified,
+                        received_title,
+                        body,
+                        request.POST.get('hashtags'),
+                        created_by_employee_id,
+                        created_at_str,
+                        initial_publish_status,
+                        published_by_id,
+                        published_on_str,
+                        True,
+                        False,
+                        priority_uuid_verified,
+                        attachment_name,
+                        attachment_path,
+                        vessel_id_str
+                    ]
+                )
+                inserted_row = cursor.fetchone()
+                notification_id = inserted_row[0] if inserted_row else 'unknown'
+            print(f"create_notification: Record inserted - SR No: {formatted_id}")
 
-        # --- Store Delivery Records (for published notifications) ---
-        if initial_publish_status == 2:
-            print(f"create_notification: Creating delivery records...")
-            try:
-                dept_name_for_crews = 'Deck' if dept_value == 0 else 'Engine' if dept_value == 1 else None
-                if dept_name_for_crews:
-                    DEPARTMENT_NAME_TO_UUID = {
-                        'Deck': '8949308c-aa8a-ee11-987c-7413ea3d6a70',
-                        'Engine': '8a49308c-aa8a-ee11-987c-7413ea3d6a70'
-                    }
-                    dept_uuid = DEPARTMENT_NAME_TO_UUID.get(dept_name_for_crews)
+            if superseding_old_notification_sr_no:
+                print("create_notification: Finalizing supersede...")
+                try:
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            UPDATE msc_data
+                            SET is_superseeded = 1, superseeded_by = %s
+                            WHERE sr_no = %s AND is_deleted = 0
+                            """,
+                            [formatted_id, superseding_old_notification_sr_no]
+                        )
+                        rows_updated = cursor.rowcount
+                    if rows_updated == 0:
+                        raise ValueError(
+                            f"Superseded circular '{superseding_old_notification_sr_no}' was not found."
+                        )
+                    print("create_notification: Supersede updated")
+                except Exception as e:
+                    print(f"create_notification: Supersede error: {e}")
+                    raise
 
-                    if dept_uuid:
-                        hrm_records_for_dept = HRM501.objects.filter(department_name=dept_uuid)
-                        hrm_ids_for_dept = [rec.id for rec in hrm_records_for_dept]
+            if initial_publish_status == 2:
+                print("create_notification: Creating delivery records...")
+                try:
+                    hrm_records_for_dept = HRM501.objects.filter(department_name=dept_id_string)
+                    hrm_ids_for_dept = [rec.id for rec in hrm_records_for_dept]
 
-                        if hrm_ids_for_dept:
-                            final_crew_list_for_dept = FinalCrewList.objects.filter(Crew_ref_id__in=hrm_ids_for_dept)
-                            final_crew_ids_for_dept = [crew.CrewID for crew in final_crew_list_for_dept]
+                    if hrm_ids_for_dept:
+                        final_crew_list_for_dept = FinalCrewList.objects.filter(Crew_ref_id__in=hrm_ids_for_dept)
+                        final_crew_ids_for_dept = [crew.CrewID for crew in final_crew_list_for_dept]
 
-                            relevant_final_crew_ids = final_crew_ids_for_dept
-                            if cleaned_vessel_ids:
-                                try:
-                                    uuid_vessel_ids = [uuid.UUID(v_id) for v_id in cleaned_vessel_ids]
-                                    onboardings_for_vessels = CrewOnboardingHistory.objects.filter(
-                                        CrewID__in=final_crew_ids_for_dept,
-                                        vessel__in=uuid_vessel_ids
-                                    )
-                                    relevant_final_crew_ids = list(onboardings_for_vessels.values_list('CrewID', flat=True))
-                                except ValueError as ve:
-                                    print(f"create_notification: Vessel UUID error: {ve}")
+                        relevant_final_crew_ids = final_crew_ids_for_dept
+                        if cleaned_vessel_ids:
+                            try:
+                                uuid_vessel_ids = [uuid.UUID(v_id) for v_id in cleaned_vessel_ids]
+                                onboardings_for_vessels = CrewOnboardingHistory.objects.filter(
+                                    CrewID__in=final_crew_ids_for_dept,
+                                    vessel__in=uuid_vessel_ids
+                                )
+                                relevant_final_crew_ids = list(onboardings_for_vessels.values_list('CrewID', flat=True))
+                            except ValueError as ve:
+                                print(f"create_notification: Vessel UUID error: {ve}")
 
-                            if relevant_final_crew_ids:
-                                print(f"create_notification: {len(relevant_final_crew_ids)} crews to notify")
+                        if relevant_final_crew_ids:
+                            print(f"create_notification: {len(relevant_final_crew_ids)} crews to notify")
 
-            except Exception as e:
-                print(f"create_notification: Delivery records error: {e}")
-                import traceback
-                traceback.print_exc()
-
-        # --- Get the inserted record's ID ---
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id FROM msc_data WHERE sr_no = %s",
-                [formatted_id]
-            )
-            id_row = cursor.fetchone()
-            notification_id = id_row[0] if id_row else 'unknown'
+                except Exception as e:
+                    print(f"create_notification: Delivery records error: {e}")
+                    import traceback
+                    traceback.print_exc()
 
         print("=== create_notification: Completed successfully ===")
         return JsonResponse({
@@ -457,7 +774,7 @@ def generate_pdf_with_cover_and_original(uploaded_file, notification_data):
     # -------------------------------
     # Document Title
     # -------------------------------
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont(PDF_FONT_NAME, PDF_TITLE_FONT_SIZE)
     title_y = divider_y - 45
     dynamic_title_text = _get_dynamic_title(notification_data['doc_type_name'])
     c.drawCentredString(width / 2, title_y, dynamic_title_text)
@@ -465,50 +782,45 @@ def generate_pdf_with_cover_and_original(uploaded_file, notification_data):
     # -------------------------------
     # Serial + Date
     # -------------------------------
-    c.setFont("Helvetica", 10)
+    c.setFont(PDF_FONT_NAME, PDF_META_FONT_SIZE)
     ref_date_y = title_y - 30
     c.drawString(margin, ref_date_y, f"Serial_no. : {notification_data['formatted_id']}")
     c.drawRightString(width - margin, ref_date_y, f"Date: {notification_data['current_date']}")
 
-    # Supersedes
-    if notification_data.get('superseding_old_notification_sr_no'):
-        c.setFont("Helvetica-Bold", 10)
-        c.setFillColorRGB(1, 0, 0)
-        c.drawRightString(
-            width - margin, ref_date_y + 10,
-            f"This letter Supersedes {notification_data['superseding_old_notification_sr_no']}"
-        )
-        c.setFillColorRGB(0, 0, 0)
-
     # Subject
-    c.setFont("Helvetica-Bold", 12)
-    subject_y = ref_date_y - 35
-    c.drawString(margin, subject_y, f"SUBJECT: {notification_data['title']}")
+    subject_y = _draw_pdf_supersede_notice(
+        c,
+        margin,
+        ref_date_y,
+        notification_data.get('superseding_old_notification_sr_no')
+    )
+    subject_bottom_y = _draw_pdf_subject_block(
+        c,
+        width,
+        margin,
+        subject_y,
+        notification_data['title']
+    )
 
     # ===============================
     # BODY CONTENT
     # ===============================
-    c.setFont("Helvetica", 11)
-    body_start_y = subject_y - 40
+    c.setFont(PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
+    body_start_y = subject_bottom_y - 20
     y_position = body_start_y
 
     body_lines = _wrap_text_simple(
         c, notification_data['body'],
-        width - 2 * margin, "Helvetica", 11
+        width - 2 * margin, PDF_FONT_NAME, PDF_BODY_FONT_SIZE
     )
-
-    FOOTER_HEIGHT = 80
-    BOTTOM_MARGIN = 40
-    available_bottom_space = FOOTER_HEIGHT + BOTTOM_MARGIN
 
     page_number = 1
     last_body_y_position = y_position
 
     for line in body_lines:
-
-        if y_position > (available_bottom_space + margin):
+        if y_position > PDF_BODY_STOP_Y:
             c.drawString(margin, y_position, line)
-            y_position -= 15
+            y_position -= PDF_LINE_HEIGHT
             last_body_y_position = y_position
 
         else:
@@ -525,26 +837,15 @@ def generate_pdf_with_cover_and_original(uploaded_file, notification_data):
             # ===============================
             # REUSE EXACT SAME HEADER HERE
             # ===============================
-            divider_y = draw_pdf_header(
+            y_position = _draw_pdf_continuation_header(
                 c, width, height, margin,
-                logo_path, logo_width, logo_height
+                logo_path, logo_width, logo_height,
+                notification_data['formatted_id'],
+                page_number
             )
-
-            # Document Info
-            c.setFont("Helvetica", 10)
-            c.drawString(margin, divider_y - 20, f"Document: {notification_data['formatted_id']}")
-            c.drawRightString(width - margin, divider_y - 20, f"Page {page_number}")
-
-            # Divider under doc info
-            c.setStrokeColorRGB(0, 0, 0.5)
-            c.line(margin, divider_y - 40, width - margin, divider_y - 40)
-            c.setStrokeColorRGB(0, 0, 0)
-
-            # Continue body
-            y_position = divider_y - 60
-            c.setFont("Helvetica", 11)
+            c.setFont(PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
             c.drawString(margin, y_position, line)
-            y_position -= 15
+            y_position -= PDF_LINE_HEIGHT
             last_body_y_position = y_position
 
     # Final footer
@@ -612,61 +913,42 @@ def _get_dynamic_title(doc_type_name):
 
 
 def draw_pdf_header(c, width, height, margin, logo_path, logo_width, logo_height):
-    c.setFont("Helvetica-Bold", 12)
-    c.setFillColorRGB(0, 0, 0.5)  # navy
-
+    c.setFont(PDF_FONT_NAME, PDF_HEADER_FONT_SIZE)
+    c.setFillColor(navy)
     text_baseline_y = height - margin
-    text_height = 12
-
-    # Perfect center alignment for ALL pages
-    text_center_y = text_baseline_y - (text_height / 2)
+    text_center_y = text_baseline_y - (PDF_HEADER_FONT_SIZE / 2)
     logo_y = text_center_y - (logo_height / 2)
+    text_width = c.stringWidth(PDF_HEADER_TEXT, PDF_FONT_NAME, PDF_HEADER_FONT_SIZE)
+    text_start_x = max(margin + logo_width + PDF_HEADER_GAP, (width - text_width) / 2)
 
-    # Draw logo
     try:
         c.drawImage(logo_path, margin, logo_y,
                     width=logo_width, height=logo_height, mask='auto')
-        company_x = margin + logo_width + 8
+        company_x = text_start_x
     except:
-        company_x = margin
+        company_x = max(margin, (width - text_width) / 2)
 
-    # Company name
-    c.drawString(company_x, text_baseline_y, "KAIZEN SHIP MANAGEMENT CO. LTD")
-    c.setFillColorRGB(0, 0, 0)
+    c.drawString(company_x, text_baseline_y, PDF_HEADER_TEXT)
+    c.setFillColor(black)
 
-    # Divider line
     divider_y = text_baseline_y - 40
-    c.setStrokeColorRGB(0, 0, 0.5)
+    c.setStrokeColor(navy)
     c.line(margin, divider_y, width - margin, divider_y)
-    c.setStrokeColorRGB(0, 0, 0)
+    c.setStrokeColor(black)
 
     return divider_y
 
 def _add_footer_to_page(canvas_obj, width, margin, notification_data, page_number, last_body_y):
-    """
-    Add footer to the current page, positioned below the last body text with proper spacing
-    """
-    # Calculate footer position based on the last body text position
-    # Add significant padding (e.g., 40 points) below the last body text to avoid overlap
-    footer_y = last_body_y - 40  # Increased from 20 to 40 for better spacing
-    
-    # If the calculated footer position is too low (close to bottom), adjust it
-    min_footer_y = 50  # Minimum Y position for footer (adjust as needed)
-    if footer_y < min_footer_y:
-        footer_y = min_footer_y
-    
-    # Draw a horizontal line above the footer for visual separation
-    canvas_obj.setStrokeColorRGB(0, 0, 0.5)  # navy
-    canvas_obj.line(margin, footer_y + 10, width - margin, footer_y + 10)
-    canvas_obj.setStrokeColorRGB(0, 0, 0)  # black
-    
-    canvas_obj.setFont("Helvetica", 9)
     created_by_part = f"Created By: {notification_data.get('created_by_employee_id', 'Unknown User')}"
-    footer_text = f"Sr. No: {notification_data['formatted_id']} | {created_by_part}"
-    
-    # Draw footer text
-    canvas_obj.drawString(margin, footer_y, footer_text)
-    canvas_obj.drawRightString(width - margin, footer_y, f"Created At: {notification_data['current_date']} | Page {page_number}")
+    _draw_fixed_footer(
+        canvas_obj,
+        width,
+        margin,
+        f"Sr. No: {notification_data['formatted_id']}",
+        created_by_part,
+        f"Created At: {notification_data['current_date']} | Page {page_number}",
+        stack_metadata_below_left=_should_stack_footer_metadata(notification_data.get('doc_type_name')),
+    )
 
 
 
@@ -812,89 +1094,63 @@ def get_notification_details(request, sr_no):
         return JsonResponse({'error': 'Only GET allowed'}, status=405)
 
     try:
-        # Use filter().first() to get one record, even if sr_no is not unique
-        # This avoids MultipleObjectsReturned error, but might lead to fetching the wrong record if sr_no is duplicated.
-        # The ideal fix is to make sr_no unique in the database.
-        # --- CHANGED: Only select_related for ACTUAL ForeignKey fields ---
-        # 'category' is a CharField, so it's excluded from select_related.
-        notification = MscData.objects.filter(
-            sr_no=sr_no, is_deleted=False
-        ).select_related(
-            'msc_type', 'sub_category', 'second_sub_category', 'priority' # Only these are ForeignKeys
-        ).first()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 1
+                    id, sr_no, msc_type, dept, category, sub_category, second_sub_category,
+                    office_instructions, hashtags, created_by, created_at, publish_status,
+                    publish_comment, published_by, published_on, is_superseeded,
+                    superseeded_by, is_active, is_deleted, priority,
+                    attachment_name, attachment_path
+                FROM msc_data
+                WHERE sr_no = %s AND is_deleted = 0
+                ORDER BY created_at DESC, id DESC
+                """,
+                [sr_no]
+            )
+            row = cursor.fetchone()
+            columns = [column[0] for column in cursor.description] if cursor.description else []
 
-        if not notification:
-             print(f"get_notification_details: Notification with SR No {sr_no} not found or is deleted.")
-             return JsonResponse({'error': f'Notification with SR No {sr_no} not found or is deleted.'}, status=404)
+        if not row:
+            print(f"get_notification_details: Notification with SR No {sr_no} not found or is deleted.")
+            return JsonResponse({'error': f'Notification with SR No {sr_no} not found or is deleted.'}, status=404)
 
-        print(f"get_notification_details: Found notification. ID: {notification.id}, SR No: {notification.sr_no}")
+        notification = dict(zip(columns, row))
+        print(f"get_notification_details: Found notification. ID: {notification.get('id')}, SR No: {notification.get('sr_no')}")
 
-        # --- SAFE ACCESS FOR FOREIGN KEY FIELDS (with error handling) ---
-        # Access related object names with error handling during serialization
-        # This handles cases where the *_id column might contain an invalid UUID or point to a non-existent record.
-        def safe_get_fk_name(obj, field_name, display_name):
-            """
-            Safely gets the name of a related object.
-            Returns the name string if successful, an error message if the lookup fails.
-            """
-            try:
-                related_obj = getattr(obj, field_name)
-                if related_obj:
-                    return related_obj.name
-                else:
-                    # If the ForeignKey field is nullable and the value is NULL
-                    return f"No {display_name} assigned"
-            except AttributeError as ae:
-                # This happens if the related object doesn't exist (e.g., ID in DB doesn't match any MscType record)
-                # The error occurs when trying to access obj.msc_type.name if obj.msc_type (the related object fetch) itself fails.
-                # The initial select_related should have prevented this AttributeError for the object access itself,
-                # but if the related object exists but lacks a 'name' attribute, this catches that.
-                print(f"get_notification_details: AttributeError accessing {display_name} name for notification {obj.sr_no}: {ae}")
-                # Attempt to get the raw ID field name (e.g., 'msc_type_id' for field 'msc_type')
-                id_field_name = f"{field_name}_id"
-                raw_id = getattr(obj, id_field_name, 'N/A')
-                return f"Error fetching {display_name} (ID: {raw_id}): Attribute Error"
-            except Exception as e: # Catch any other potential errors during access
-                print(f"get_notification_details: Error accessing {display_name} for notification {obj.sr_no}: {e}")
-                # Attempt to get the raw ID field name (e.g., 'msc_type_id' for field 'msc_type')
-                id_field_name = f"{field_name}_id"
-                raw_id = getattr(obj, id_field_name, 'N/A')
-                return f"Error fetching {display_name}: {type(e).__name__} - {e} (ID: {raw_id})"
+        inferred_type_name = _infer_circular_type_name_from_sr_no(notification.get('sr_no'))
+        resolved_type_name = _safe_get_lookup_name_by_id(
+            MscType,
+            notification.get('msc_type'),
+            inferred_type_name
+        ) or inferred_type_name
 
-        # --- END SAFE ACCESS ---
-
-        # Serialize the notification data to JSON
-        # You can customize this to include only the fields you need
         notification_data = {
-            'id': str(notification.id), # Convert UUID to string for JSON serialization (if id is UUIDField)
-            'sr_no': notification.sr_no,
-            # --- CHANGED: Use safe access for ForeignKey names ---
-            'msc_type': safe_get_fk_name(notification, 'msc_type', 'MscType'),
-            'dept': notification.dept,
-            # --- CHANGED: Access 'category' as a direct CharField (name string) ---
-            'category': notification.category, # Access the name string directly
-            # --- END CHANGED ---
-            'sub_category': safe_get_fk_name(notification, 'sub_category', 'MscSubCat'),
-            'second_sub_category': safe_get_fk_name(notification, 'second_sub_category', 'Msc2ndSubCat'),
-            'office_instructions': notification.office_instructions,
-            'hashtags': notification.hashtags,
-            'created_by': notification.created_by,
-            'created_at': notification.created_at.isoformat() if notification.created_at else None,
-            'publish_status': notification.publish_status,
-            'publish_comment': notification.publish_comment,
-            'published_by': notification.published_by,
-            'published_on': notification.published_on.isoformat() if notification.published_on else None,
-            'is_superseeded': notification.is_superseeded,
-            'superseeded_by': notification.superseeded_by,
-            'is_active': notification.is_active,
-            'is_deleted': notification.is_deleted,
-            'priority': safe_get_fk_name(notification, 'priority', 'MscPriority'),
-            'attachment_name': notification.attachment_name,
-            'attachment_path': notification.attachment_path,
-            # --- NEW: Generate attachment_url ---
-            'attachment_url': f"{settings.MEDIA_URL}circular/attachments/{notification.attachment_name}" if notification.attachment_name else None,
-            # --- END NEW ---
-            # Add any other fields you need for the vessel list logic or display
+            'id': str(notification.get('id')) if notification.get('id') is not None else None,
+            'sr_no': notification.get('sr_no'),
+            'msc_type': resolved_type_name,
+            'dept': str(notification.get('dept')) if notification.get('dept') is not None else None,
+            'dept_name': _get_department_master_name(notification.get('dept')),
+            'category': notification.get('category'),
+            'sub_category': _safe_get_lookup_name_by_id(MscSubCat, notification.get('sub_category')),
+            'second_sub_category': _safe_get_lookup_name_by_id(Msc2ndSubCat, notification.get('second_sub_category')),
+            'office_instructions': notification.get('office_instructions'),
+            'hashtags': notification.get('hashtags'),
+            'created_by': notification.get('created_by'),
+            'created_at': notification.get('created_at').isoformat() if notification.get('created_at') else None,
+            'publish_status': notification.get('publish_status'),
+            'publish_comment': notification.get('publish_comment'),
+            'published_by': notification.get('published_by'),
+            'published_on': notification.get('published_on').isoformat() if notification.get('published_on') else None,
+            'is_superseeded': notification.get('is_superseeded'),
+            'superseeded_by': notification.get('superseeded_by'),
+            'is_active': notification.get('is_active'),
+            'is_deleted': notification.get('is_deleted'),
+            'priority': _safe_get_lookup_name_by_id(MscPriority, notification.get('priority')),
+            'attachment_name': notification.get('attachment_name'),
+            'attachment_path': notification.get('attachment_path'),
+            'attachment_url': f"{settings.MEDIA_URL}circular/attachments/{notification.get('attachment_name')}" if notification.get('attachment_name') else None,
         }
 
         print("get_notification_details: Returning notification data.")
@@ -927,7 +1183,7 @@ def get_user_notifications(request):
         # Use .values() to get specific fields, including attachment_name
         notifications = notifications_queryset.values(
             'id', 'sr_no', 'msc_type', 'dept', 'category',
-            'sub_category', 'second_sub_category', 'office_instructions',
+            'sub_category', 'second_sub_category', 'title', 'office_instructions',
             'hashtags', 'created_at',  'publish_status', 'priority',
             'attachment_path', 'attachment_name', 'created_by', 'published_by', 'published_on', 'publish_comment', 'is_deleted',
         )
@@ -1045,10 +1301,12 @@ def update_notification_status(request, notification_sr_no):
                     # Continue with the status update even if PDF update fails
                 else:
                     print(f"update_notification_status: Found notification with attachment path: {notification_to_update.attachment_path}")
-                    print("update_notification_status: Reading existing PDF for cover replacement...")
+                    print("update_notification_status: Resolving attachment PDF for cover replacement...")
 
-                    # 1. Read the existing PDF (this is the original PDF created by create_notification)
-                    original_pdf_reader = PdfReader(notification_to_update.attachment_path)
+                    attachment_pdf_reader, attachment_start_index = _resolve_attachment_reader_for_merge(
+                        notification_to_update.attachment_path,
+                        notification_to_update.sr_no
+                    )
 
                     # 2. Generate the UPDATED COVER PAGE (with approval info and body) - NOW GENERATE ALL PAGES
                     print("update_notification_status: Generating updated cover page with approval info and body...")
@@ -1059,51 +1317,22 @@ def update_notification_status(request, notification_sr_no):
                     width, height = letter
                     margin = 50
                     
-                    # Define constants for spacing
-                    FOOTER_HEIGHT = 80      # space footer occupies
-                    BOTTOM_PADDING = 40     # extra gap between text & footer
-                    STOP_Y = FOOTER_HEIGHT + BOTTOM_PADDING
-                    
                     page_number = 1  # Track page number for headers
-
-                    # --- Page 1: Header and Title ---
-                    # Company Header (with Logo)
-                    c.setFont("Helvetica-Bold", 12)
-                    c.setFillColor(navy)
-
                     logo_path = os.path.join(settings.BASE_DIR, "static", "ksm-logo.png")
                     logo_width = 30
                     logo_height = 50
-                    
-                    # Calculate the vertical center for the logo based on the text baseline
-                    # The text is drawn at height - margin, and text height is approximately 12 points
-                    text_baseline_y = height - margin
-                    text_height = 12  # Approximate font height
-                    text_vertical_center = text_baseline_y - (text_height / 2)
-                    
-                    # Position the logo so its vertical center aligns with the text's vertical center
-                    logo_y = text_vertical_center - (logo_height / 2)
-                    logo_x = margin  # Keep at left margin
 
-                    try:
-                        c.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height, mask='auto')
-                        company_name_x = logo_x + logo_width + 8  # Position text to the right of logo
-                    except Exception as logo_err:
-                        print(f"⚠️ Could not load or draw logo for updated cover: {logo_err}")
-                        company_name_x = margin  # If logo fails, start text at margin
+                    # --- Page 1: Header and Title ---
+                    # Company Header (with Logo)
+                    divider_y = draw_pdf_header(
+                        c, width, height, margin,
+                        logo_path, logo_width, logo_height
+                    )
 
-                    # Draw the company name at the baseline
-                    c.drawString(company_name_x, height - margin, "KAIZEN SHIP MANAGEMENT CO. LTD")
-                    c.setFillColor(black)
 
-                    # Divider Line - Adjust this to be closer to the company name
-                    divider_y = height - margin - 40  # This puts it 30 points below the text baseline
-                    c.setStrokeColor(navy)
-                    c.line(margin, divider_y, width - margin, divider_y)
-                    c.setStrokeColor(black)
 
                     # Document Title
-                    c.setFont("Helvetica-Bold", 16)
+                    c.setFont(PDF_FONT_NAME, PDF_TITLE_FONT_SIZE)
                     title_y = divider_y - 45
 
                     # --- CRITICAL FIX: Safely access msc_type name ---
@@ -1151,33 +1380,32 @@ def update_notification_status(request, notification_sr_no):
                     # --- END CRITICAL FIX ---
 
                     # Ref & Date
-                    c.setFont("Helvetica", 10)
+                    c.setFont(PDF_FONT_NAME, PDF_META_FONT_SIZE)
                     ref_date_y = title_y - 30
                     c.drawString(margin, ref_date_y, f"Serial_no. : {notification_to_update.sr_no}")
                     c.drawRightString(width - margin, ref_date_y,
                                     f"Date: {notification_to_update.created_at.strftime('%d-%m-%Y') if notification_to_update.created_at else 'N/A'}")
 
-                    # Supersedes Text (optional)
-                    if notification_to_update.superseeded_by:
-                        supersede_y = ref_date_y + 10
-                        c.setFont("Helvetica-Bold", 10)
-                        c.setFillColor(red)
-                        c.drawRightString(width - margin, supersede_y,
-                                        f"This letter Supersedes {notification_to_update.superseeded_by}")
-                        c.setFillColor(black)
-                        print(f"🖨️ Added 'Supersedes {notification_to_update.superseeded_by}' to cover.")
-                    else :
-                         print("🖨️ No 'superseeded_by' found on notification object, skipping 'Supersedes' text.")
-                    
+
                     # Subject
-                    c.setFont("Helvetica-Bold", 12)
-                    subject_y = ref_date_y - 35
-                    c.drawString(margin, subject_y, f"SUBJECT: {notification_to_update.title or notification_to_update.sr_no}")
+                    subject_y = _draw_pdf_supersede_notice(
+                        c,
+                        margin,
+                        ref_date_y,
+                        notification_to_update.superseeded_by
+                    )
+                    subject_bottom_y = _draw_pdf_subject_block(
+                        c,
+                        width,
+                        margin,
+                        subject_y,
+                        notification_to_update.title or notification_to_update.sr_no
+                    )
 
                     # Office Instructions (Main Body Content)
                     print("--- START: Office Instructions Generation (Update/Approval) ---")
-                    c.setFont("Helvetica", 11)
-                    body_start_y = subject_y - 40
+                    c.setFont(PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
+                    body_start_y = subject_bottom_y - 20
                     y_position = body_start_y
 
                     body_text = notification_to_update.office_instructions or ""
@@ -1185,63 +1413,32 @@ def update_notification_status(request, notification_sr_no):
 
                     if body_text:
                         # Prepare the body text for multi-page handling
-                        body_lines = _wrap_text_simple(c, body_text, width - 2 * margin, "Helvetica", 11)
+                        body_lines = _wrap_text_simple(c, body_text, width - 2 * margin, PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
                         
                         # Variable to track the last Y position of body text on each page
                         last_body_y_position = y_position
 
                         for line in body_lines:
-                            if y_position > STOP_Y:
+                            if y_position > PDF_BODY_STOP_Y:
                                 c.drawString(margin, y_position, line)
-                                y_position -= 15  # Move down for the next line
-                                last_body_y_position = y_position  # Update the last Y position
+                                y_position -= PDF_LINE_HEIGHT
+                                last_body_y_position = y_position
                             else:
-                                # Not enough space on current page, add footer and start new page
                                 _add_footer_to_page_update(c, width, margin, notification_to_update, page_number, last_body_y_position, published_by_id, published_on_datetime)
-                                
+
                                 c.showPage()
                                 page_number += 1
-                                
-                                # Reset for the new page - add header again
-                                # Use the same header drawing logic as page 1
-                                c.setFont("Helvetica-Bold", 12)
-                                c.setFillColor(navy)
-                                try:
-                                    logo_path = os.path.join(settings.BASE_DIR, "static", "ksm-logo.png")
-                                    c.drawImage(logo_path, margin, height - margin - 50, width=logo_width, height=logo_height, mask='auto')
-                                    company_name_x = margin + logo_width + 8
-                                except:
-                                    company_name_x = margin
-                                c.drawString(company_name_x, height - margin, "KAIZEN SHIP MANAGEMENT CO. LTD")
-                                c.setFillColor(black)
 
-                                # Divider
-                                divider_y = height - margin - 40
-                                c.setStrokeColor(navy)
-                                c.line(margin, divider_y, width - margin, divider_y)
-                                c.setStrokeColor(black)
-
-                                # Document info
-                                c.setFont("Helvetica", 10)
-                                c.drawString(margin, divider_y - 20, f"Document: {notification_to_update.sr_no}")
-                                c.drawRightString(width - margin, divider_y - 20, f"Page {page_number}")
-
-                                # Divider below document info
-                                c.setStrokeColor(navy)
-                                c.line(margin, divider_y - 40, width - margin, divider_y - 40)
-                                c.setStrokeColor(black)
-
-                                # Subject (only on first page of body content, maybe skip on subsequent pages or add a different header)
-                                # For simplicity, let's add a continuation header instead of repeating subject
-                                c.setFont("Helvetica-Bold", 12)
-                                c.drawString(margin, divider_y - 50, f"Continued from previous page...") # Or just continue content
-                                
-                                # Reset Y position for content on the new page
-                                y_position = divider_y - 70  # Start below the new header/subject area
-                                c.setFont("Helvetica", 11)  # Reset font for body text
-                                c.drawString(margin, y_position, line) # Add the current line that didn't fit on the previous page
-                                y_position -= 15  # Move down for the next line
-                                last_body_y_position = y_position  # Update the last Y position
+                                y_position = _draw_pdf_continuation_header(
+                                    c, width, height, margin,
+                                    logo_path, logo_width, logo_height,
+                                    notification_to_update.sr_no,
+                                    page_number
+                                )
+                                c.setFont(PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
+                                c.drawString(margin, y_position, line)
+                                y_position -= PDF_LINE_HEIGHT
+                                last_body_y_position = y_position
 
                         # After all body lines are processed, add the final footer for the last page of body content
                         _add_footer_to_page_update(c, width, margin, notification_to_update, page_number, last_body_y_position, published_by_id, published_on_datetime)
@@ -1262,17 +1459,12 @@ def update_notification_status(request, notification_sr_no):
                     for page in new_cover_reader.pages:
                         merger.add_page(page)
 
-                    # Add ALL *remaining* pages from the original uploaded file
-                    # This logic assumes the *original* file content starts from page index 1 of the `original_pdf_reader`
-                    # If the `original_pdf_reader` contains only the original uploaded file content (e.g., from `create_notification` where the cover was already added),
-                    # then appending its pages starting from index 1 is correct.
-                    # If `original_pdf_reader` contained the *entire* previously generated PDF (cover + original content),
-                    # then appending pages from index 1 would mean the *old* cover page is removed, and the *new* cover is added via `new_cover_reader`,
-                    # followed by the *original* content pages (which might have been page 1, 2, ... of the `original_pdf_reader`).
-                    # This logic aims to replace the *initial* cover generated during `create_notification` with the *new* cover generated here.
-                    print(f"update_notification_status: Appending original PDF pages starting from index 1 (skipping old cover page if it existed at index 0)...")
-                    for i in range(1, len(original_pdf_reader.pages)): # Start from page 1, skipping the first page (old cover)
-                        merger.add_page(original_pdf_reader.pages[i])
+                    print(
+                        f"update_notification_status: Appending attachment pages from index "
+                        f"{attachment_start_index} without modifying the attachment PDF..."
+                    )
+                    for i in range(attachment_start_index, len(attachment_pdf_reader.pages)):
+                        merger.add_page(attachment_pdf_reader.pages[i])
 
                     # 4. Save the MERGED PDF (overwrite the original attachment path)
                     output_path = notification_to_update.attachment_path
@@ -1363,39 +1555,104 @@ def _wrap_text_simple(canvas_obj, text, max_width, font_name, font_size):
 
 
 def _add_footer_to_page_update(canvas_obj, width, margin, notification_obj, page_number, last_body_y, published_by_id, published_on_datetime):
-    """
-    Add footer to the current page, positioned below the last body text with proper spacing
-    """
-    # Calculate footer position based on the last body text position
-    # Add significant padding (e.g., 40 points) below the last body text to avoid overlap
-    footer_y = last_body_y - 40  # Increased from 20 to 40 for better spacing
-    
-    # If the calculated footer position is too low (close to bottom), adjust it
-    min_footer_y = 50  # Minimum Y position for footer (adjust as needed)
-    if footer_y < min_footer_y:
-        footer_y = min_footer_y
-    
-    # Draw a horizontal line above the footer for visual separation
-    canvas_obj.setStrokeColorRGB(0, 0, 0.5)  # navy
-    canvas_obj.line(margin, footer_y + 10, width - margin, footer_y + 10)
-    canvas_obj.setStrokeColorRGB(0, 0, 0)  # black
-    
-    canvas_obj.setFont("Helvetica", 9)
-    
-    # Get the original creator (from the notification object)
     created_by_part = f"Created By: {notification_obj.created_by}" if notification_obj.created_by else "Created By: Unknown User"
-    # Get the new approver (from the function parameters)
     approved_by_part = f"Approved By: {published_by_id}" if published_by_id else "Approved By: Pending"
-    # Use the approval timestamp (from the function parameters)
     approved_at_part = f"Approved At: {published_on_datetime.strftime('%d-%m-%Y %H:%M:%S') if published_on_datetime else django_timezone.now().strftime('%d-%m-%Y %H:%M:%S')}"
+    _draw_fixed_footer(
+        canvas_obj,
+        width,
+        margin,
+        f"Sr. No: {notification_obj.sr_no}",
+        [created_by_part, approved_by_part],
+        f"{approved_at_part} | Page {page_number}",
+        stack_metadata_below_left=_should_stack_footer_metadata(
+            _infer_circular_type_name_from_sr_no(notification_obj.sr_no)
+        ),
+    )
 
-    # Combine parts for the footer text
-    footer_middle_text = f"{created_by_part}, {approved_by_part}"
 
-    # Draw footer text
-    canvas_obj.drawString(margin, footer_y, f"Sr. No: {notification_obj.sr_no}")
-    canvas_obj.drawCentredString(width / 2, footer_y, footer_middle_text)
-    canvas_obj.drawRightString(width - margin, footer_y, approved_at_part)
+def _build_delivery_status_records(notification_records):
+    records = list(notification_records)
+    if not records:
+        return []
+
+    crew_ids = []
+    for record in records:
+        crew_id = str(record.crew_id or "").strip()
+        if crew_id and crew_id not in crew_ids:
+            crew_ids.append(crew_id)
+
+    crew_lookup = {}
+    if crew_ids:
+        placeholders = ", ".join(["%s"] * len(crew_ids))
+        delivery_lookup_sql = f"""
+            WITH latest_onboarding AS (
+                SELECT
+                    coh.CrewID,
+                    coh.Vessel,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY coh.CrewID
+                        ORDER BY
+                            CASE WHEN ISNULL(coh.is_active, 0) = 1 THEN 0 ELSE 1 END,
+                            coh.updated_date DESC,
+                            coh.created_date DESC,
+                            coh.SignOnDate DESC,
+                            coh.id DESC
+                    ) AS rn
+                FROM Crew_Onboarding_History coh
+                WHERE coh.CrewID IN ({placeholders})
+                  AND ISNULL(coh.is_deleted, 0) = 0
+            )
+            SELECT
+                LTRIM(RTRIM(h.CrewID)) AS crew_id,
+                LTRIM(RTRIM(COALESCE(h.first_name, ''))) AS first_name,
+                LTRIM(RTRIM(COALESCE(h.surname, ''))) AS surname,
+                LTRIM(RTRIM(COALESCE(mar.rank_name, ''))) AS rank_name,
+                LTRIM(RTRIM(COALESCE(v.VesselName, v.vesselCode, ''))) AS vessel_name
+            FROM HRM501 h
+            LEFT JOIN master_applied_rank mar
+                ON mar.id = TRY_CONVERT(uniqueidentifier, h.rank_name)
+            LEFT JOIN latest_onboarding lo
+                ON lo.CrewID = h.CrewID
+               AND lo.rn = 1
+            LEFT JOIN VesselData v
+                ON v.id = TRY_CONVERT(uniqueidentifier, lo.Vessel)
+            WHERE h.CrewID IN ({placeholders})
+              AND ISNULL(h.is_deleted, 0) = 0
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(delivery_lookup_sql, crew_ids + crew_ids)
+            for row in cursor.fetchall():
+                crew_id, first_name, surname, rank_name, vessel_name = row
+                normalized_crew_id = str(crew_id or "").strip()
+                if not normalized_crew_id:
+                    continue
+                full_name = " ".join(
+                    part for part in [str(first_name or "").strip(), str(surname or "").strip()] if part
+                ) or None
+                crew_lookup[normalized_crew_id] = {
+                    "resolved_crew_id": normalized_crew_id,
+                    "crew_name": full_name,
+                    "rank_name": str(rank_name or "").strip() or None,
+                    "vessel_name": str(vessel_name or "").strip() or None,
+                }
+
+    delivery_records = []
+    for record in records:
+        raw_crew_id = str(record.crew_id or "").strip()
+        lookup_row = crew_lookup.get(raw_crew_id, {})
+        delivery_records.append({
+            "crew_id": raw_crew_id,
+            "resolved_crew_id": lookup_row.get("resolved_crew_id") or raw_crew_id or None,
+            "crew_name": lookup_row.get("crew_name"),
+            "rank_name": lookup_row.get("rank_name"),
+            "vessel_name": lookup_row.get("vessel_name"),
+            "seen_at": record.seen_at.isoformat() if record.seen_at else None,
+            "reminder_sent_at": record.reminder_sent_at.isoformat() if record.reminder_sent_at else None,
+        })
+
+    return delivery_records
     
 def add_cover_to_pdf(original_pdf_path, output_pdf_path, logo_path, company_name, address):
     # Read original PDF
@@ -1427,10 +1684,10 @@ def add_cover_to_pdf(original_pdf_path, output_pdf_path, logo_path, company_name
             print("Logo drawing error:", e)
 
         # Header text
-        can.setFont("Helvetica-Bold", 14)
+        can.setFont(PDF_FONT_NAME, 14)
         can.drawString(COMPANY_X, COMPANY_Y, company_name)
 
-        can.setFont("Helvetica", 10)
+        can.setFont(PDF_FONT_NAME, 10)
         can.drawString(ADDRESS_X, ADDRESS_Y, address)
 
         can.save()
@@ -1451,43 +1708,11 @@ def add_cover_to_pdf(original_pdf_path, output_pdf_path, logo_path, company_name
 
 
 def draw_header(c, width, height, margin, logo_path, logo_w=40, logo_h=40, font_size=12):
-    from reportlab.lib.colors import navy, black
-
-    c.setFont("Helvetica-Bold", font_size)
-    c.setFillColor(navy)
-
-    text_height = font_size  # because font size ≈ text height in ReportLab
-    text_baseline_y = height - margin
-    text_center_y = text_baseline_y - (text_height / 2)
-
-    # Option A: Logo vertically centered with text baseline
-    logo_y = text_center_y - (logo_h / 2)
-
-    # Draw logo
-    try:
-        c.drawImage(logo_path, margin, logo_y, width=logo_w, height=logo_h, mask='auto')
-        company_x = margin + logo_w + 8
-    except:
-        company_x = margin
-
-    # Draw company name
-    c.drawString(company_x, text_baseline_y, "KAIZEN SHIP MANAGEMENT CO. LTD")
-
-    # Divider
-    divider_y = text_baseline_y - 40
-    c.setStrokeColor(navy)
-    c.line(margin, divider_y, width - margin, divider_y)
-
-    # Reset
-    c.setStrokeColor(black)
-    c.setFillColor(black)
-    c.setFont("Helvetica", 10)
-
-    return divider_y
-
+    return draw_pdf_header(c, width, height, margin, logo_path, logo_w, logo_h)
 
 
 @api_view(['GET'])
+
 @permission_classes([AllowAny])
 def get_document_types(request):
     types = list( MscType.objects.values_list('id','name'))
@@ -1652,21 +1877,21 @@ def create_cover_page(sr_no, title, body):
     width, height = letter
 
     # Title
-    c.setFont("Helvetica-Bold", 16)
+    c.setFont(PDF_FONT_NAME, 16)
     c.drawString(50, height - 100, "Circular / Alert / Work Instruction")
 
     # SR No
-    c.setFont("Helvetica", 12)
+    c.setFont(PDF_FONT_NAME, 12)
     c.drawString(50, height - 140, f"SR. No: {sr_no}")
 
     # Title
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont(PDF_FONT_NAME, 14)
     c.drawString(50, height - 180, f"Title: {title}")
 
     # Body/Instruction
-    c.setFont("Helvetica", 11)
+    c.setFont(PDF_FONT_NAME, 11)
     text = c.beginText(50, height - 220)
-    text.setFont("Helvetica", 11)
+    text.setFont(PDF_FONT_NAME, 11)
     for line in body.split('\n'):
         wrapped_lines = []
         while len(line) > 100:  # Wrap long lines
@@ -1885,6 +2110,7 @@ def get_single_notification(request, notification_id):
         notification_data = {
             'id': str(notification.id),
             'sr_no': notification.sr_no,
+            'title': notification.title,
             'msc_type': notification.msc_type,
             'dept': notification.dept,
             'category': notification.category,
@@ -1991,7 +2217,7 @@ def get_user_drafts(request):
 
         notifications = notifications_queryset.values(
             'id', 'sr_no', 'msc_type', 'dept', 'category',
-            'sub_category', 'second_sub_category', 'office_instructions',
+            'sub_category', 'second_sub_category', 'title', 'office_instructions',
             'hashtags', 'created_at','publish_status', 'priority',
             'attachment_path', 'attachment_name', 'created_by', 'published_by', 'published_on', 'publish_comment'
         )
@@ -2018,6 +2244,48 @@ def get_user_drafts(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': 'Internal server error'}, status=500)
+def _get_active_draft_record_by_sr_no(sr_no):
+    normalized_sr_no = str(sr_no or '').strip()
+    if not normalized_sr_no:
+        return None
+
+    return (
+        MscData.objects
+        .filter(
+            sr_no=normalized_sr_no,
+            publish_status=0,
+            is_deleted=False,
+        )
+        .first()
+    )
+
+
+def _serialize_draft_record(draft):
+    draft_data = {
+        'id': str(draft.id),
+        'sr_no': draft.sr_no,
+        'title': draft.title,
+        'msc_type': str(draft.msc_type_id) if draft.msc_type_id else None,
+        'dept': str(draft.dept) if draft.dept else None,
+        'category': draft.category,
+        'sub_category': str(draft.sub_category_id) if draft.sub_category_id else None,
+        'second_sub_category': str(draft.second_sub_category_id) if draft.second_sub_category_id else None,
+        'office_instructions': draft.office_instructions,
+        'hashtags': draft.hashtags,
+        'priority': str(draft.priority_id) if draft.priority_id else None,
+        'attachment_name': draft.attachment_name,
+        'attachment_path': draft.attachment_path,
+        'publish_comment': draft.publish_comment,
+        'publish_status': draft.publish_status,
+        'created_by': draft.created_by,
+    }
+
+    if draft.attachment_name:
+        draft_data['attachment_url'] = f"{settings.MEDIA_URL}circular/attachments/{draft.attachment_name}"
+    else:
+        draft_data['attachment_url'] = None
+
+    return draft_data
 
 
 @api_view(['GET'])
@@ -2031,17 +2299,26 @@ def get_draft_by_sr_no(request, sr_no):
     
     try:
         print(f"get_draft_by_sr_no: Looking for draft with SR No {sr_no}")
-        draft = MscData.objects.get(
-            sr_no=sr_no,
-            publish_status=0,  # Only drafts
-            is_deleted=False   # Only non-deleted
-        )
+        draft = _get_active_draft_record_by_sr_no(sr_no)
+        if not draft:
+            print(f"get_draft_by_sr_no: Draft with SR No {sr_no} not found")
+            return JsonResponse({'error': 'Draft not found'}, status=404)
         
         print(f"get_draft_by_sr_no: Found draft with SR No {draft.sr_no}, created_by: {draft.created_by}")
+        draft_data = _serialize_draft_record(draft)
+
+        if draft_data['attachment_url']:
+            print(f"get_draft_by_sr_no: Generated attachment URL: {draft_data['attachment_url']}")
+        else:
+            print(f"get_draft_by_sr_no: No attachment for draft SR No {draft.sr_no}")
+
+        print(f"get_draft_by_sr_no: Returning draft data for SR No {draft.sr_no}")
+        return JsonResponse(draft_data, safe=False)
         
         draft_data = {
             'id': str(draft.id),  # Convert UUID back to string for JSON serialization
             'sr_no': draft.sr_no,
+            'title': draft.title,
             'msc_type': str(draft.msc_type_id) if draft.msc_type_id else None, # ✅ Access the raw UUID string
             'dept': str(draft.dept) if draft.dept else None, # ✅ Access the raw UUID string
             'category': draft.category,
@@ -2110,75 +2387,234 @@ def delete_draft_by_sr_no(request, sr_no):
         traceback.print_exc()
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
-@api_view(['PUT'])
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def delete_draft_by_id(request, draft_id):
+    """Soft delete a draft by its database ID."""
+    print(f"=== delete_draft_by_id: Starting function for draft_id = {draft_id} ===")
+
+    if request.method != 'POST':
+        print(f"delete_draft_by_id: Invalid method {request.method}, returning 405")
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    try:
+        normalized_draft_id = str(uuid.UUID(str(draft_id).strip()))
+        print(f"delete_draft_by_id: Looking for draft with ID {normalized_draft_id} to soft-delete")
+
+        updated_count = MscData.objects.filter(
+            id=normalized_draft_id,
+            publish_status=0,
+            is_deleted=False,
+        ).update(is_deleted=True)
+
+        if updated_count > 0:
+            print(f"delete_draft_by_id: Successfully soft-deleted draft {normalized_draft_id}")
+            return JsonResponse({'success': True, 'message': 'Draft deleted successfully'})
+
+        print(f"delete_draft_by_id: Draft with ID {normalized_draft_id} not found or not editable")
+        return JsonResponse({'error': 'Draft not found'}, status=404)
+
+    except (ValueError, TypeError, AttributeError) as exc:
+        print(f"delete_draft_by_id: Invalid draft ID '{draft_id}' - {exc}")
+        return JsonResponse({'error': 'Invalid draft ID format'}, status=400)
+    except Exception as e:
+        print(f"delete_draft_by_id: Error occurred during deletion - {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': 'Internal server error'}, status=500)
+
+def _update_draft_record_from_request(request, draft_record, log_label):
+    print(f"{log_label}: Found draft SR No {draft_record.sr_no}, current status: {draft_record.publish_status}")
+
+    if draft_record.publish_status != 0:
+        print(f"{log_label}: Record {draft_record.sr_no} is not a draft (status {draft_record.publish_status}), cannot update via this method.")
+        return JsonResponse({'error': 'Only draft records (status 0) can be updated via this method.'}, status=400)
+
+    title = request.POST.get('title', draft_record.title)
+    body = request.POST.get('body', draft_record.office_instructions)
+    hashtags = request.POST.get('hashtags', draft_record.hashtags)
+    category = request.POST.get('category', draft_record.category)
+    sub_cat_list = request.POST.getlist('sub_cat')
+    second_sub_cat_list = request.POST.getlist('second_sub_cat')
+
+    incoming_msc_type_raw = request.POST.get('type')
+    incoming_dept_raw = request.POST.get('department')
+    incoming_priority_raw = request.POST.get('priority')
+
+    msc_type_id = (
+        _clean_uuid_string(incoming_msc_type_raw)
+        if incoming_msc_type_raw is not None
+        else _clean_uuid_string(draft_record.msc_type_id)
+    )
+    dept_id = (
+        _clean_uuid_string(incoming_dept_raw)
+        if incoming_dept_raw is not None
+        else (str(draft_record.dept).strip() if draft_record.dept is not None else None)
+    )
+    priority_id = (
+        _clean_uuid_string(incoming_priority_raw)
+        if incoming_priority_raw is not None
+        else _clean_uuid_string(draft_record.priority_id)
+    )
+    sub_category_id = (
+        _clean_uuid_string(sub_cat_list[0])
+        if sub_cat_list
+        else _clean_uuid_string(draft_record.sub_category_id)
+    )
+    second_sub_category_id = (
+        _clean_uuid_string(second_sub_cat_list[0])
+        if second_sub_cat_list
+        else _clean_uuid_string(draft_record.second_sub_category_id)
+    )
+
+    if incoming_msc_type_raw is not None and not msc_type_id:
+        print(f"{log_label}: Invalid document type UUID received: {incoming_msc_type_raw}")
+        return JsonResponse({'error': 'Invalid document type value'}, status=400)
+
+    if incoming_priority_raw is not None and not priority_id:
+        print(f"{log_label}: Invalid priority UUID received: {incoming_priority_raw}")
+        return JsonResponse({'error': 'Invalid priority value'}, status=400)
+
+    if incoming_dept_raw is not None and not dept_id:
+        print(f"{log_label}: Invalid department UUID received: {incoming_dept_raw}")
+        return JsonResponse({'error': 'Invalid department value'}, status=400)
+
+    if sub_cat_list and not sub_category_id:
+        print(f"{log_label}: Invalid sub-category UUID received: {sub_cat_list[0]}")
+        return JsonResponse({'error': 'Invalid sub-category value'}, status=400)
+
+    if second_sub_cat_list and not second_sub_category_id:
+        print(f"{log_label}: Invalid second sub-category UUID received: {second_sub_cat_list[0]}")
+        return JsonResponse({'error': 'Invalid second sub-category value'}, status=400)
+
+    publish_status_raw = request.POST.get('publish_status', '1')
+    try:
+        requested_publish_status = int(publish_status_raw)
+    except (TypeError, ValueError):
+        requested_publish_status = 1
+
+    if requested_publish_status not in [0, 1]:
+        requested_publish_status = 1
+
+    print(f"{log_label}: Updated publish_status to {requested_publish_status} for draft {draft_record.sr_no}")
+
+    attachment_name_to_store = draft_record.attachment_name
+    attachment_path_to_store = draft_record.attachment_path
+
+    if request.FILES.get('attachment'):
+        uploaded_file = request.FILES['attachment']
+        uploaded_file_bytes = uploaded_file.read()
+        pdf_data = {
+            'title': title or '',
+            'body': body or '',
+            'doc_type_name': (
+                _safe_get_lookup_name_by_id(
+                    MscType,
+                    msc_type_id,
+                    _infer_circular_type_name_from_sr_no(draft_record.sr_no) or 'Unknown'
+                ) or 'Unknown'
+            ),
+            'formatted_id': draft_record.sr_no,
+            'current_date': django_timezone.now().strftime('%d-%m-%Y'),
+            'superseding_old_notification_sr_no': None,
+            'created_by_employee_id': draft_record.created_by,
+        }
+
+        merged_pdf_buffer = generate_pdf_with_cover_and_original(io.BytesIO(uploaded_file_bytes), pdf_data)
+        media_path, merged_filepath, original_filepath = _get_circular_attachment_paths(draft_record.sr_no)
+        os.makedirs(media_path, exist_ok=True)
+
+        with open(merged_filepath, 'wb') as merged_file:
+            merged_file.write(merged_pdf_buffer.getvalue())
+
+        with open(original_filepath, 'wb') as original_file:
+            original_file.write(uploaded_file_bytes)
+
+        attachment_name_to_store = os.path.basename(merged_filepath)
+        attachment_path_to_store = merged_filepath
+        print(f"{log_label}: Updated attachment for {draft_record.sr_no} at {merged_filepath}")
+
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE msc_data
+                SET
+                    msc_type = CAST(%s AS UNIQUEIDENTIFIER),
+                    dept = %s,
+                    category = %s,
+                    sub_category = CAST(%s AS UNIQUEIDENTIFIER),
+                    second_sub_category = CAST(%s AS UNIQUEIDENTIFIER),
+                    title = %s,
+                    office_instructions = %s,
+                    hashtags = %s,
+                    publish_status = %s,
+                    priority = CAST(%s AS UNIQUEIDENTIFIER),
+                    attachment_name = %s,
+                    attachment_path = %s
+                WHERE sr_no = %s
+                  AND publish_status = 0
+                  AND is_deleted = 0
+                """,
+                [
+                    msc_type_id,
+                    dept_id,
+                    category,
+                    sub_category_id,
+                    second_sub_category_id,
+                    title,
+                    body,
+                    hashtags,
+                    requested_publish_status,
+                    priority_id,
+                    attachment_name_to_store,
+                    attachment_path_to_store,
+                    draft_record.sr_no,
+                ]
+            )
+            rows_updated = cursor.rowcount
+
+    if rows_updated <= 0:
+        print(f"{log_label}: No draft rows were updated for SR No {draft_record.sr_no}")
+        return JsonResponse({'error': 'Draft not found or not editable'}, status=404)
+
+    print(f"{log_label}: Successfully updated draft record ID {draft_record.id} (SR No: {draft_record.sr_no})")
+
+    response_message = (
+        'Draft updated successfully'
+        if requested_publish_status == 0
+        else 'Draft record updated and submitted successfully'
+    )
+
+    return JsonResponse({
+        'success': True,
+        'message': response_message,
+        'updated_sr_no': draft_record.sr_no,
+        'publish_status': requested_publish_status,
+    })
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def update_draft_by_sr_no(request, sr_no):
     """Update an existing draft by its SR No."""
     print(f"=== update_draft_by_sr_no: Starting function for sr_no = {sr_no} ===")
     
-    if request.method != 'POST': # Use POST for updates
+    if request.method != 'POST':
         print(f"update_draft_by_sr_no: Invalid method {request.method}, returning 405")
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
     try:
-        # Find the existing draft record using sr_no
         print(f"update_draft_by_sr_no: Looking for draft with SR No {sr_no} to update")
-        draft = MscData.objects.get(
-            sr_no=sr_no,
-            publish_status=0,  # Only update drafts (status 0)
-            is_deleted=False   # Only update non-deleted drafts
-        )
+        draft = _get_active_draft_record_by_sr_no(sr_no)
+        if not draft:
+            print(f"update_draft_by_sr_no: Draft with SR No {sr_no} not found or not a draft (status != 0)")
+            return JsonResponse({'error': 'Draft not found or not editable'}, status=404)
         
         print(f"update_draft_by_sr_no: Found draft ID {draft.id} (SR No: {draft.sr_no})")
+        return _update_draft_record_from_request(request, draft, 'update_draft_by_sr_no')
 
-        # Get form data from the request
-        # You'll need to handle both regular form data and files
-        title = request.POST.get('title', draft.title) # Use existing value if not provided
-        body = request.POST.get('body', draft.office_instructions) # Map body to office_instructions
-        hashtags = request.POST.get('hashtags', draft.hashtags)
-        priority = request.POST.get('priority', draft.priority)
-        msc_type = request.POST.get('type', draft.msc_type)
-        dept = request.POST.get('department', draft.dept)
-        category = request.POST.get('category', draft.category)
-        sub_category_str = request.POST.get('sub_cat', draft.sub_category)
-        second_sub_category_str = request.POST.get('second_sub_cat', draft.second_sub_category)
-        
-        # Update the draft object with new data
-        draft.title = title
-        draft.office_instructions = body # Map body to office_instructions
-        draft.hashtags = hashtags
-        draft.priority = priority
-        draft.msc_type = msc_type
-        draft.dept = int(dept) if dept else draft.dept
-        draft.category = category
-        draft.sub_category = sub_category_str
-        draft.second_sub_category = second_sub_category_str
-        draft.print_type = int(print_type) if print_type else draft.print_type
-        
-        # Handle file attachment if provided (optional)
-        if 'attachment' in request.FILES:
-            draft.attachment = request.FILES['attachment']
-            draft.attachment_name = request.FILES['attachment'].name
-            # Update attachment_path if needed based on your logic
-
-        # CRITICAL: Change publish_status from 0 (draft) to 1 (pending/approved)
-        draft.publish_status = 1
-        print(f"update_draft_by_sr_no: Changed publish_status to 1 for draft {draft.sr_no}")
-
-        # Save the updated draft
-        draft.save()
-        print(f"update_draft_by_sr_no: Successfully updated draft {draft.sr_no}")
-
-        # Return success response
-        return JsonResponse({
-            'success': True, 
-            'message': 'Draft updated and submitted successfully',
-            'updated_sr_no': draft.sr_no
-        })
-
-    except MscData.DoesNotExist:
-        print(f"update_draft_by_sr_no: Draft with SR No {sr_no} not found or not a draft (status != 0)")
-        return JsonResponse({'error': 'Draft not found or not editable'}, status=404)
     except Exception as e:
         print(f"update_draft_by_sr_no: Error occurred during update - {str(e)}")
         import traceback
@@ -2186,13 +2622,13 @@ def update_draft_by_sr_no(request, sr_no):
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
 
-@api_view(['PUT'])
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def update_draft_by_id(request, draft_id):
     """
     Updates an existing draft record identified by its database ID.
-    Changes publish_status from 0 to 1 and updates other fields if provided.
-    Expects form data (for file uploads).
+    Respects the requested publish_status so a saved draft can remain status 0,
+    while a resubmitted draft can move to status 1.
     """
     print(f"=== update_draft_by_id: Starting for draft_id = {draft_id} ===")
 
@@ -2201,74 +2637,37 @@ def update_draft_by_id(request, draft_id):
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
     try:
-        # Find the specific record by its database ID
-        print(f"update_draft_by_id: Looking for draft with database ID {draft_id}")
-        draft_record = MscData.objects.get(id=draft_id)
-
-        print(f"update_draft_by_id: Found draft SR No {draft_record.sr_no}, current status: {draft_record.publish_status}")
-
-        # Only allow updating drafts (status 0)
-        if draft_record.publish_status != 0:
-            print(f"update_draft_by_id: Record {draft_record.sr_no} is not a draft (status {draft_record.publish_status}), cannot update via this method.")
-            return JsonResponse({'error': 'Only draft records (status 0) can be updated via this method.'}, status=400)
-
-        # Get updated data from the form
-        title = request.POST.get('title', draft_record.title)
-        body = request.POST.get('body', draft_record.office_instructions) # Map body to office_instructions
-        hashtags = request.POST.get('hashtags', draft_record.hashtags)
-        msc_type = request.POST.get('type', draft_record.msc_type)
-        dept_str = request.POST.get('department', draft_record.dept)
-        category = request.POST.get('category', draft_record.category)
-        priority = request.POST.get('priority', draft_record.priority)
-        # created_by = request.POST.get('created_by', draft_record.created_by) # Usually don't change creator
-        sub_cat_list = request.POST.getlist('sub_cat')
-        second_sub_cat_list = request.POST.getlist('second_sub_cat')
-
-        # Update the record object with new data
-        draft_record.title = title
-        draft_record.office_instructions = body # Map body to office_instructions
-        draft_record.hashtags = hashtags
-        draft_record.msc_type = msc_type
+        normalized_draft_id = str(uuid.UUID(str(draft_id).strip()))
+        print(f"update_draft_by_id: Looking for draft with database ID {normalized_draft_id}")
         try:
-            draft_record.dept = int(dept_str) if dept_str else draft_record.dept
-        except (ValueError, TypeError):
-            print(f"update_draft_by_id: Warning - could not convert dept '{dept_str}' to int, keeping original value {draft_record.dept}")
-        draft_record.category = category
-        draft_record.priority = priority
-        try:
-            draft_record.print_type = int(print_type_str) if print_type_str else draft_record.print_type
-        except (ValueError, TypeError):
-            print(f"update_draft_by_id: Warning - could not convert print_type '{print_type_str}' to int, keeping original value {draft_record.print_type}")
+            draft_record = MscData.objects.get(id=normalized_draft_id, is_deleted=False)
+        except DatabaseError as db_exc:
+            print(f"update_draft_by_id: Direct id lookup failed for {normalized_draft_id}, falling back to string comparison. Error: {db_exc}")
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT TOP 1 sr_no
+                    FROM msc_data
+                    WHERE CAST(id AS NVARCHAR(255)) = %s
+                      AND is_deleted = 0
+                    """,
+                    [normalized_draft_id]
+                )
+                fallback_row = cursor.fetchone()
 
-        if sub_cat_list:
-            draft_record.sub_category = ','.join(sub_cat_list) if sub_cat_list else None
-        if second_sub_cat_list:
-            draft_record.second_sub_category = ','.join(second_sub_cat_list) if second_sub_cat_list else None
+            if not fallback_row or not fallback_row[0]:
+                raise MscData.DoesNotExist()
 
-        # CRITICAL: Change publish_status from 0 (draft) to 1 (pending/approved)
-        draft_record.publish_status = 1
-        print(f"update_draft_by_id: Changed publish_status to 1 for draft {draft_record.sr_no}")
+            draft_record = MscData.objects.get(sr_no=fallback_row[0], is_deleted=False)
 
-        # Handle file attachment if provided (optional during update)
-        if 'attachment' in request.FILES:
-            draft_record.attachment = request.FILES['attachment']
-            draft_record.attachment_name = request.FILES['attachment'].name
-            # Update attachment_path if needed based on your logic
-
-        # Save the updated record to the database
-        draft_record.save()
-        print(f"update_draft_by_id: Successfully updated draft record ID {draft_record.id} (SR No: {draft_record.sr_no})")
-
-        # Return success response
-        return JsonResponse({
-            'success': True,
-            'message': 'Draft record updated and submitted successfully',
-            'updated_sr_no': draft_record.sr_no
-        })
+        return _update_draft_record_from_request(request, draft_record, 'update_draft_by_id')
 
     except MscData.DoesNotExist:
         print(f"update_draft_by_id: Draft with ID {draft_id} not found")
         return JsonResponse({'error': 'Draft record not found'}, status=404)
+    except (ValueError, TypeError, AttributeError) as exc:
+        print(f"update_draft_by_id: Invalid draft ID '{draft_id}' - {exc}")
+        return JsonResponse({'error': 'Invalid draft ID format'}, status=400)
     except Exception as e:
         print(f"update_draft_by_id: Error occurred during update - {str(e)}")
         import traceback
@@ -2297,7 +2696,7 @@ def get_approved_notifications(request):
         # Use .values() to get specific fields, including attachment_name
         notifications = notifications_queryset.values(
             'id', 'sr_no', 'msc_type', 'dept', 'category',
-            'sub_category', 'second_sub_category', 'office_instructions',
+            'sub_category', 'second_sub_category', 'title', 'office_instructions',
             'hashtags', 'created_at', 'publish_status', 'priority',
             'attachment_path', 'attachment_name', 'created_by', 'published_by', 'published_on', 'publish_comment','is_superseeded'
         )
@@ -2387,7 +2786,7 @@ def supersede_notification(request, sr_no):
     Marks a notification as superseded by setting is_superseeded=True.
     Expects the SR No of the notification to be superseded in the URL.
     The SR No of the NEW superseding notification should be sent in the request body.
-    The created_by (user ID) of the new notification is stored in superseeded_by.
+    The new circular SR No is stored in superseeded_by.
     """
     print(f"=== supersede_notification: Starting for SR No {sr_no} ===")
     try:
@@ -2397,13 +2796,13 @@ def supersede_notification(request, sr_no):
             body_unicode = request.body.decode('utf-8')
             body_data = json.loads(body_unicode)
             superseding_sr_no = body_data.get('superseding_sr_no')
-            # Also get the created_by (user ID) of the new notification
-            created_by_user_id = body_data.get('created_by') # This should be the employee_id
             print(f"supersede_notification: Superseding SR No from request body: {superseding_sr_no}")
-            print(f"supersede_notification: Created by User ID: {created_by_user_id}")
         except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
             print("supersede_notification: Could not get required data from request body.")
             return JsonResponse({'error': 'Invalid request data.'}, status=400)
+
+        if not superseding_sr_no:
+            return JsonResponse({'error': 'superseding_sr_no is required.'}, status=400)
 
         # --- 2. Perform a direct database update based on the old SR No ---
         # Use filter(sr_no=sr_no) to target the correct row(s) and update() to change fields directly in the DB.
@@ -2412,10 +2811,10 @@ def supersede_notification(request, sr_no):
         
         print(f"supersede_notification: Attempting direct database update for old SR No='{sr_no}'")
         # Update the is_superseeded and superseeded_by fields
-        # Set is_superseeded to True and superseeded_by to the USER ID of the person who created the new notification
+        # Set is_superseeded to True and superseeded_by to the new circular SR No.
         update_data = {
             'is_superseeded': True,
-            'superseeded_by': created_by_user_id  # Store the USER ID here
+            'superseeded_by': superseding_sr_no
         }
 
         rows_affected = MscData.objects.filter(sr_no=sr_no).update(**update_data)
@@ -2430,7 +2829,6 @@ def supersede_notification(request, sr_no):
                 'message': f'Notification with SR No {sr_no} marked as superseded.',
                 'rows_affected': rows_affected,
                 'superseding_sr_no': superseding_sr_no, # Optional: inform frontend
-                'updated_by_user_id': created_by_user_id # Optional: confirm what was stored
             })
         else:
             # Failure: No rows matched the sr_no filter, meaning the record wasn't found.
@@ -2793,8 +3191,10 @@ def get_notification_details_by_sr_no(request, notification_sr_no): #  Changed p
         notification_data = {
             'id': str(notification.id), # Keep the database ID for internal use if needed (convert UUID to string)
             'sr_no': notification.sr_no, # ✅ Include the SR No
+            'title': notification.title,
             'msc_type': notification.msc_type,
             'dept': notification.dept, # This is the crucial field for fetching crews
+            'dept_name': _get_department_master_name(notification.dept),
             'category': notification.category,
             'sub_category': notification.sub_category,
             'second_sub_category': notification.second_sub_category,
@@ -3363,10 +3763,11 @@ def link_notification_to_ranks(request, notification_sr_no):
 @permission_classes([AllowAny])
 def get_crew_ids_and_status_by_notification_sr_no(request, notification_sr_no):
     """
-    Fetches the list of crew IDs and their seen_at and reminder_sent_at status
-    from the msc_notification table for a specific notification SR No.
+    Fetches delivery status rows for a notification, enriched with crew, rank,
+    and vessel display data for office users.
     Expects the notification SR No in the URL path.
-    Returns a JSON array of objects containing crew_id, seen_at, and reminder_sent_at.
+    Returns a JSON array of objects containing crew_id, resolved_crew_id,
+    crew_name, rank_name, vessel_name, seen_at, and reminder_sent_at.
     """
     print(f"=== get_crew_ids_and_status_by_notification_sr_no: Starting for notification SR No {notification_sr_no} ===")
 
@@ -3379,15 +3780,7 @@ def get_crew_ids_and_status_by_notification_sr_no(request, notification_sr_no):
         print(f"get_crew_ids_and_status_by_notification_sr_no: Fetching crew delivery records for notification SR No '{notification_sr_no}' from msc_notification table...")
         notification_records = MscNotification.objects.filter(msc_sr_no=notification_sr_no)
 
-        # Prepare the response data as a list of dictionaries
-        result = []
-        for record in notification_records:
-            result.append({
-                'crew_id': record.crew_id, # The crew member's ID
-                'seen_at': record.seen_at.isoformat() if record.seen_at else None, # Convert datetime to ISO string or None
-                'reminder_sent_at': record.reminder_sent_at.isoformat() if record.reminder_sent_at else None, # Convert datetime to ISO string or None
-                # Add other fields if needed, e.g., 'delivered_at': record.delivered_at.isoformat() if record.delivered_at else None,
-            })
+        result = _build_delivery_status_records(notification_records)
 
         print(f"get_crew_ids_and_status_by_notification_sr_no: Found {len(result)} delivery records for notification {notification_sr_no}")
 
@@ -3565,10 +3958,14 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
 
 
             # 1. Read the existing PDF (if one exists)
-            original_pdf_reader = None
+            attachment_pdf_reader = None
+            attachment_start_index = 0
             if notification.attachment_path and os.path.exists(notification.attachment_path):
                  print("edit_pending_notification: Original attachment found, starting PDF cover regeneration...")
-                 original_pdf_reader = PdfReader(notification.attachment_path)
+                 attachment_pdf_reader, attachment_start_index = _resolve_attachment_reader_for_merge(
+                     notification.attachment_path,
+                     notification.sr_no
+                 )
 
                  # 2. Generate the UPDATED COVER PAGE (with new details)
                  cover_buffer = io.BytesIO()
@@ -3576,37 +3973,22 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                  width, height = letter
                  margin = 50
                  top_section_y_start = height - 50
-
-                 # --- 1. Company Header (with Logo - Conditional) ---
-                 c.setFont("Helvetica-Bold", 12)
-                 c.setFillColor(navy) # Dark blue for header
-
-                 # Define logo dimensions and position (adjust as needed)
                  logo_path = os.path.join(settings.BASE_DIR, "static", "ksm-logo.png")
                  logo_width = 30
                  logo_height = 50
-                 logo_x = margin
-                 logo_y = top_section_y_start - (logo_height / 2)
 
-                 try:
-                     c.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height, mask='auto')
-                     print("✅ Logo added to updated cover.")
-                     company_name_x = logo_x + logo_width + 8 # Adjust based on logo width and desired padding
-                 except Exception as logo_err:
-                     print(f"⚠️ Could not load or draw logo for updated cover: {logo_err}")
-                     company_name_x = margin # Fallback to original position
+                 # --- 1. Company Header (with Logo - Conditional) ---
+                 divider_y = draw_pdf_header(
+                     c, width, height, margin,
+                     logo_path, logo_width, logo_height
+                 )
 
-                 c.drawString(company_name_x, top_section_y_start, "KAIZEN SHIP MANAGEMENT CO. LTD")
-                 c.setFillColor(black) # Reset to black
 
-                 # --- 2. Divider Line ---
-                 divider_y = top_section_y_start - 15
-                 c.setStrokeColor(navy)
-                 c.line(margin, divider_y, width - margin, divider_y)
-                 c.setStrokeColor(black) # Reset
+
+
 
                  # --- 3. Document Title (Dynamic) ---
-                 c.setFont("Helvetica-Bold", 16)
+                 c.setFont(PDF_FONT_NAME, PDF_TITLE_FONT_SIZE)
                  title_y = divider_y - 40
                  # Use notification.msc_type, notification.dept, etc., to determine title
                  # Example logic from create_notification (adapt as needed):
@@ -3622,165 +4004,99 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                  c.drawCentredString(width / 2, title_y, doc_title)
 
                  # --- 4. Ref & Date ---
-                 c.setFont("Helvetica", 10)
+                 c.setFont(PDF_FONT_NAME, PDF_META_FONT_SIZE)
                  ref_date_y = title_y - 30
                  c.drawString(margin, ref_date_y, f"serial_no. : {notification.sr_no}")
                  c.drawRightString(width - margin, ref_date_y,
                                  f"Date: {notification.created_at.strftime('%d-%m-%Y') if notification.created_at else 'N/A'}")
 
 
-                 if notification.superseeded_by:
-                     # Position: Slightly above the date line
-                     supersede_y = ref_date_y + 10 # Move up by 10 points
-                     c.setFont("Helvetica-Bold", 10) # Smaller font for subtle emphasis
-                     c.setFillColor(red) # Set color to red
-                     c.drawRightString(width - margin, supersede_y, f"This letter Supersedes {notification.superseeded_by}")
-                     c.setFillColor(black) # Reset to black for subsequent text
-                     print(f"🖨️ PDF Cover Generation: Added 'Supersedes {notification.superseeded_by}' in RED at top right (during edit).")
-                 else :
-                      print("🖨️ PDF Cover Generation: No 'superseeded_by' found on notification object (during edit), skipping 'Supersedes' text on PDF cover.")
-                 
-                 # --- END NEW ---
+                 subject_y = _draw_pdf_supersede_notice(
+                     c,
+                     margin,
+                     ref_date_y,
+                     notification.superseeded_by
+                 )
 
                  # --- 5. Subject ---
-                 c.setFont("Helvetica-Bold", 12)
-                 subject_y = ref_date_y - 35 # Adjusted spacing to accommodate the Supersedes text if present
-                 c.drawString(margin, subject_y, f"SUBJECT: {notification.title or notification.sr_no}")
+                 subject_bottom_y = _draw_pdf_subject_block(
+                     c,
+                     width,
+                     margin,
+                     subject_y,
+                     notification.title or notification.sr_no
+                 )
 
-                 # --- 6. Office Instructions (Main Body Content) (Multi-Page Support - DEBUGGED) ---
-                 print("--- START: Office Instructions Generation (Update/Edit - DEBUG) ---")
-                 c.setFont("Helvetica", 11)
-                 body_start_y = subject_y - 40 # More space after subject
+                 # --- 6. Office Instructions (Main Body Content) ---
+                 print("--- START: Office Instructions Generation (Update/Edit) ---")
+                 c.setFont(PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
+                 body_start_y = subject_bottom_y - 20
                  y_position = body_start_y
-                 print(f"Office Instructions: Initial y_position: {y_position}, subject_y: {subject_y}, body_start_y: {body_start_y}")
-
+                 page_number = 1
                  body_text = notification.office_instructions or ""
-                 print(f"edit_pending_notification: Adding body content: {body_text[:50]}...") # Log first 50 chars
+                 print(f"edit_pending_notification: Adding body content: {body_text[:50]}...")
+
+                 created_by_part = f"Created By: {notification.created_by}" if notification.created_by else "Created By: Unknown User"
+                 approved_by_part = f"Approved By: {notification.published_by}" if notification.published_by else "Approved By: Pending"
+                 edited_at_part = f"Edited At: {django_timezone.now().strftime('%d-%m-%Y %H:%M:%S')}"
+                 footer_middle_text = [created_by_part, approved_by_part]
+                 should_stack_footer_metadata = _should_stack_footer_metadata(
+                     _infer_circular_type_name_from_sr_no(notification.sr_no)
+                 )
 
                  if body_text:
-                      # Simple text wrapping and drawing with multi-page support
-                      text_object = c.beginText(margin, y_position)
-                      text_object.setFont("Helvetica", 11)
-                      max_width = width - 2 * margin
-                      leading = 15 # Increased line spacing for readability
-                      footer_threshold = 150 # Define the threshold before footer explicitly
-                      print(f"Office Instructions: max_width: {max_width}, leading: {leading}, footer_threshold: {footer_threshold}")
+                     body_lines = _wrap_text_simple(c, body_text, width - 2 * margin, PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
+                     last_body_y_position = y_position
 
-                      lines = body_text.split('\n')
-                      print(f"Office Instructions: Split body into {len(lines)} lines.")
-                      for line_index, line in enumerate(lines):
-                         #  print(f"  Processing body line {line_index + 1}: '{line[:50]}...'") # Log first 50 chars of line
-                          # Basic wrapping logic
-                          words = line.split(' ')
-                          current_line = ""
-                          for word_index, word in enumerate(words): # Add enumerate for index
-                             #  print(f"    Processing word {word_index + 1}: '{word}'")
-                              test_line = f"{current_line} {word}".strip()
-                              test_line_width = c.stringWidth(test_line, "Helvetica", 11)
-                             #  print(f"      Test line: '{test_line}', Width: {test_line_width}, Max allowed: {max_width}")
+                     for line in body_lines:
+                         if y_position > PDF_BODY_STOP_Y:
+                             c.drawString(margin, y_position, line)
+                             y_position -= PDF_LINE_HEIGHT
+                             last_body_y_position = y_position
+                         else:
+                             _draw_fixed_footer(
+                                 c,
+                                 width,
+                                 margin,
+                                 f"Sr. No: {notification.sr_no}",
+                                 footer_middle_text,
+                                 f"{edited_at_part} | Page {page_number}",
+                                 stack_metadata_below_left=should_stack_footer_metadata,
+                             )
+                             c.showPage()
+                             page_number += 1
+                             y_position = _draw_pdf_continuation_header(
+                                 c, width, height, margin,
+                                 logo_path, logo_width, logo_height,
+                                 notification.sr_no,
+                                 page_number
+                             )
+                             c.setFont(PDF_FONT_NAME, PDF_BODY_FONT_SIZE)
+                             c.drawString(margin, y_position, line)
+                             y_position -= PDF_LINE_HEIGHT
+                             last_body_y_position = y_position
 
-                              if test_line_width < max_width:
-                                  current_line = test_line
-                                 #  print(f"      - Added word to current_line. New current_line: '{current_line}'")
-                              else:
-                                  if current_line:
-                                     #  print(f"      - Current line '{current_line}' exceeds max width, finalizing line.")
-                                      # Check if we are running out of space on the current page
-                                      next_line_y_pos = y_position - leading
-                                     #  print(f"      Next line would be at y={next_line_y_pos}. Footer threshold is {footer_threshold}. Space remaining: {next_line_y_pos - footer_threshold}")
-                                      if next_line_y_pos < footer_threshold: # Threshold before footer on current page
-                                          print(f"      >>> NEED TO INSERT NEW PAGE HERE (during edit) <<<")
-                                          # Draw the remaining part of the current line on the current page
-                                          text_object.textLine(current_line)
-                                          y_position -= leading
-                                         #  print(f"      Drew '{current_line}' on current page. y_position now: {y_position}")
+                     _draw_fixed_footer(
+                         c,
+                         width,
+                         margin,
+                         f"Sr. No: {notification.sr_no}",
+                         footer_middle_text,
+                         f"{edited_at_part} | Page {page_number}",
+                         stack_metadata_below_left=should_stack_footer_metadata,
+                     )
+                 else:
+                     print("--- END: Office Instructions Generation (Update/Edit) ---")
+                     _draw_fixed_footer(
+                         c,
+                         width,
+                         margin,
+                         f"Sr. No: {notification.sr_no}",
+                         footer_middle_text,
+                         f"{edited_at_part} | Page {page_number}",
+                         stack_metadata_below_left=should_stack_footer_metadata,
+                     )
 
-                                          # Finalize the current page's text object
-                                          c.drawText(text_object)
-                                         #  print(f"      Finalized text object for current page.")
-
-                                          # Start a new page
-                                          c.showPage()
-                                          print(f"      Started new page (during edit).")
-
-                                          # Reset for the new page
-                                          y_position = height - 100 # Start near the top with some margin
-                                         #  print(f"      Reset y_position for new page to: {y_position}")
-                                          text_object = c.beginText(margin, y_position) # Create new text object for new page
-                                          text_object.setFont("Helvetica", 11)
-                                         #  print(f"      Created new text object for new page at y={y_position}")
-
-                                      # Add the completed line to the text object
-                                     #  print(f"      Adding completed line '{current_line}' to text object.")
-                                      text_object.textLine(current_line)
-                                      y_position -= leading # Move down for next line
-                                     #  print(f"      Moved y_position down by {leading}. New y_position: {y_position}")
-                                  else:
-                                     #  print(f"      - Current line was empty, starting new line with word '{word}'")
-                                        print("nothing")
-                                  current_line = word # Start a new line with the current word
-                                 #  print(f"      - Set current_line to word: '{current_line}'")
-                          if current_line:
-                             #  print(f"    Finalizing part of line '{current_line}'")
-                              # Check space on current page before drawing final part of line
-                              next_line_y_pos = y_position - leading
-                              print(f"      Final part of line would be at y={next_line_y_pos}. Footer threshold is hardcoded to 150. Space remaining: {next_line_y_pos - 150}")
-                              if next_line_y_pos < footer_threshold: # Threshold before footer
-                                  print(f"      >>> NEED TO INSERT NEW PAGE FOR FINAL PART HERE (during edit) <<<")
-                                  # Draw the final part of the current line on the current page
-                                  text_object.textLine(current_line)
-                                  y_position -= leading
-                                  print(f"      Drew final part '{current_line}' on current page. y_position now: {y_position}")
-
-                                  # Finalize the current page's text object
-                                  c.drawText(text_object)
-                                  print(f"      Finalized text object for current page (during edit).")
-
-                                  # Start a new page
-                                  c.showPage()
-                                  print(f"      Started new page (during edit).")
-
-                                  # Reset for the new page
-                                  y_position = height - 100 # Start near the top
-                                 #  print(f"      Reset y_position for new page to: {y_position}")
-                                  text_object = c.beginText(margin, y_position) # Create new text object for new page
-                                  text_object.setFont("Helvetica", 11)
-                                 #  print(f"      Created new text object for new page at y={y_position}")
-
-                             #  print(f"    Adding final part of line '{current_line}' to text object.")
-                              # Add the final part of the line to the text object
-                              text_object.textLine(current_line)
-                              y_position -= leading # Move down for next line
-                             #  print(f"    Moved y_position down by {leading}. New y_position: {y_position}")
-
-                      # Finalize the last page's text object
-                      print(f"Office Instructions: Finalizing text object on final page at y_position {y_position}")
-                      c.drawText(text_object)
-                      print("--- END: Office Instructions Generation (Update/Edit - DEBUG) ---")
-                 else :
-                      print("--- END: Office Instructions Generation (Update/Edit - DEBUG) ---")
-                  # --- END 6. Office Instructions (Multi-Page Support - DEBUGGED) ---
-
-
-                 footer_top_y = 100
-                 c.setFont("Helvetica", 9) # Consistent smaller footer font
-
-                 # Get the original creator (from the notification object)
-                 created_by_part = f"Created By: {notification.created_by}" if notification.created_by else "Created By: Unknown User"
-               
-                 approved_by_part = f"Approved By: {notification.published_by}" if notification.published_by else "Approved By: Pending"
-               
-                 edited_at_part = f"Edited At: {django_timezone.now().strftime('%d-%m-%Y %H:%M:%S')}"
-
-                
-                 footer_middle_text = f"{created_by_part}, {approved_by_part}"
-
-                 c.drawString(margin, footer_top_y, f"Sr. No: {notification.sr_no}")
-                 c.drawCentredString(width / 2, footer_top_y, footer_middle_text)
-                 c.drawRightString(width - margin, footer_top_y, edited_at_part) # Use edited timestamp
-
-                 # Finalize page
-                 c.showPage()
                  c.save()
                  cover_buffer.seek(0)
                  # ===== END: EMBEDDED COVER PAGE GENERATION =====
@@ -3791,12 +4107,11 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
                  new_cover_reader = PdfReader(cover_buffer)
                  merger = PdfWriter()
 
-           
-                 merger.add_page(new_cover_reader.pages[0])
+                 for page in new_cover_reader.pages:
+                     merger.add_page(page)
 
-        
-                 for i in range(1, len(original_pdf_reader.pages)):
-                     merger.add_page(original_pdf_reader.pages[i])
+                 for i in range(attachment_start_index, len(attachment_pdf_reader.pages)):
+                     merger.add_page(attachment_pdf_reader.pages[i])
 
             
                  output_path = notification.attachment_path # Overwrite the original file path

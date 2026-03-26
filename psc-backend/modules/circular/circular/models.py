@@ -213,7 +213,7 @@ class MscCategory(models.Model):
     
 
 class MscData(models.Model):
-    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     sr_no = models.CharField(max_length=255, null=True, blank=True)
     msc_type = models.ForeignKey(MscType, on_delete=models.SET_NULL, null=True, blank=True, db_column='msc_type') # Links to MscType.id
     dept =  models.UUIDField(null=True, blank=True)
@@ -259,53 +259,27 @@ class MscData(models.Model):
         self.save()
 
     def generate_formatted_id(self):
-        """Generates KSM/{type}/{dept_display_name}/{YYYY}-{serial:04d}"""
+        """
+        Return the persisted SR number when present.
+
+        Serial allocation is intentionally centralized in the circular creation
+        workflow so previews and model helpers cannot mint duplicate numbers.
+        """
+        if self.sr_no:
+            return self.sr_no
+
         if not self.msc_type or self.dept is None or not self.created_at:
             return None
-        
-        try:
-            # Map numeric dept value to display name
-            if self.dept == 0:
-                dept_display_name = 'SEQ'
-            elif self.dept == 1:
-                dept_display_name = 'Technical'
-            else:
-                dept_display_name = 'Unknown'
-            
-            # Extract serial number from sr_no if it exists and has the expected format
-            if self.sr_no and '-' in self.sr_no:
-                serial = int(self.sr_no.split('-')[-1])
-                year = self.created_at.year
-                # Use the related object's name for the formatted ID
-                return f"KSM/{self.msc_type.name if self.msc_type else 'Unknown'}/{dept_display_name}/{year}-{serial:04d}"
-            else:
-                # If sr_no doesn't have expected format, reconstruct from available data
-                # Get the next serial number for this type and year
-                # Use the related object's name for filtering
-                last_record = MscData.objects.filter(
-                    msc_type=self.msc_type, # Use the related object
-                    created_at__year=self.created_at.year,
-                    sr_no__isnull=False
-                ).order_by('sr_no').last()
-                
-                if last_record and last_record.sr_no:
-                    try:
-                        last_serial = int(last_record.sr_no.split('-')[-1])
-                        next_serial = last_serial + 1
-                    except (ValueError, IndexError):
-                        next_serial = 1
-                else:
-                    next_serial = 1
-                    
-                year = self.created_at.year
-                # Use the related object's name for the formatted ID
-                return f"KSM/{self.msc_type.name if self.msc_type else 'Unknown'}/{dept_display_name}/{year}-{next_serial:04d}"
-                
-        except (ValueError, IndexError, AttributeError, Exception):
-            # Fallback: return sr_no if available, otherwise basic format
-            if self.sr_no:
-                return self.sr_no
-            return f"KSM/{self.msc_type.name if self.msc_type else 'Unknown'}/{'SEQ' if self.dept == 0 else 'Technical' if self.dept == 1 else 'Unknown'}/{self.created_at.year}-0001"    
+
+        dept_display_name = {
+            '8949308c-aa8a-ee11-987c-7413ea3d6a70': 'SEQ',
+            '8a49308c-aa8a-ee11-987c-7413ea3d6a70': 'Technical',
+        }.get(str(self.dept).lower(), 'Unknown')
+
+        return (
+            f"KSM/{self.msc_type.name if self.msc_type else 'Unknown'}"
+            f"/{dept_display_name}/{self.created_at.year}-TBD"
+        )
         
 
 
