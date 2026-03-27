@@ -541,7 +541,6 @@ const hasProcessAccess = (formId, processId) =>
         { label: "Rejected", path: "/orb/rejected-entries" },
         { label: "Deleted", path: "/orb/deleted-entries" },
         { label: "PDFs", path: "/orb/pdf-archive" },
-        { label: "Guidelines", path: "/orb/orb-guidelines" },
       ].map((item) => (
         <button
           key={item.path}

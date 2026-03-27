@@ -19,7 +19,6 @@ const ORB_HEADER_LINKS: OrbHeaderLink[] = [
   { label: 'Rejected', path: '/orb/rejected-entries' },
   { label: 'Deleted', path: '/orb/deleted-entries' },
   { label: 'PDFs', path: '/orb/pdf-archive' },
-  { label: 'Guidelines', path: '/orb/orb-guidelines' },
 ];
 
 function isOrbLinkActive(currentPath: string, linkPath: string): boolean {
