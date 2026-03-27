@@ -1929,6 +1929,21 @@ The Circular backend is mounted under `/api/circular/`, and the inner legacy url
 3. Reminder actions and crew-status lookups update and expose the delivery state for the vessel.
 4. The report endpoint exports the filtered ship-side circular view as a PDF.
 
+**Circular request/response notes**
+
+| Endpoint group | Request notes | Response notes |
+|---------------|---------------|----------------|
+| `GET /api/circular/api/roles/`, `mapping-role-users/`, `users/`, `document-types/`, `departments/`, `priorities/`, `sub-categories/`, `second-sub-categories/`, `vessels/`, `master-applied-ranks/`, `ranks/` | No request body; these are lookup endpoints used to hydrate the office form and filter lists | JSON list responses or `{success: true, data: [...]}` / `{success: true, ranks: [...]}` structures depending on the handler |
+| `POST /api/circular/api/notifications/` | JSON notification payload with document metadata, vessel scope, and attachment/lookup references | Created notification JSON or a structured error payload on validation failure |
+| `GET /api/circular/api/submitted/`, `GET /api/circular/api/submitted/<path:sr_no>/`, `GET /api/circular/api/submitted/<uuid:notification_id>/` | Path parameter identifies the document or notification to retrieve | Full notification JSON or an empty list when no data is found |
+| `POST /api/circular/api/notifications/<path:sr_no>/delete/`, `POST /api/circular/api/notifications/<path:sr_no>/supersede/`, `POST /api/circular/api/notifications/<path:notification_sr_no>/update-status/`, `POST /api/circular/api/notifications/send-emails/`, `POST /api/circular/api/notifications/<path:notification_sr_no>/link-ranks/`, `POST /api/circular/api/notifications/create-delivery-records/` | JSON body names the SR number and any target vessel/rank/crew lists | Success/error JSON with a message, counts, or the updated document state |
+| `GET /api/circular/api/notifications/draft/`, `GET /api/circular/api/user-drafts/`, `GET /api/circular/api/draft/<path:sr_no>/`, `POST /api/circular/api/draft/<path:sr_no>/update/`, `POST /api/circular/api/drafts/<str:draft_id>/update/`, `DELETE /api/circular/api/drafts/<str:draft_id>/delete/`, `DELETE /api/circular/api/draft/<path:sr_no>/delete/` | Draft identifier or SR number plus updated draft fields for POST/DELETE operations | Draft JSON, list JSON, or success/error JSON; edit handlers reject non-draft records |
+| `GET /api/circular/api/approved-notifications/`, `GET /api/circular/api/approved-notifications/download-csv/`, `GET /api/circular/api/user-notifications/` | Optional filters are query-string based; the CSV endpoint is read-only | JSON list for API calls or a CSV file for the download endpoint |
+| `GET /api/circular/api/crews-by-department/`, `GET /api/circular/api/crews-by-department-and-vessel/`, `POST /api/circular/api/notifications/<path:notification_id>/edit-pending/` | Department name, optional vessel, or notification identifier plus updated fields for edit-pending | Crew lookup JSON or the updated notification JSON |
+| `GET /api/circular/api/ship/notifications/`, `GET /api/circular/api/crew/notifications/`, `GET /api/circular/api/msc/pdf-url/`, `GET /api/circular/api/crew/list/`, `GET /api/circular/api/crew/status/`, `GET /api/circular/api/notifications/<path:id>/crew-status/` | `crew_id` or notification identifier is required in the query/path | Vessel-scoped JSON lists, status rows, or an `attachment_url` response for PDFs |
+| `POST /api/circular/api/msc/read-ack/`, `POST /api/circular/api/msc/remind-crew/` | JSON body contains `msc_sr_no` and `crew_id` | Success/error JSON confirming acknowledgment or reminder tracking |
+| `GET /api/circular/api/reports/download-pdf/` | `crew_id` is required | PDF `HttpResponse` download or a 4xx error when vessel/notification data is missing |
+
 ### 10.15 ORB Backend Endpoints
 
 The ORB backend is mounted under `/api/orb/`, and the inner router and helper paths still carry their own `api/` prefixes in the live code. The current route family therefore includes paths such as `/api/orb/api/operations/` and `/api/orb/operations/<str:pk>/`.
@@ -1974,6 +1989,18 @@ The ORB backend is mounted under `/api/orb/`, and the inner router and helper pa
 3. The backend generates the next `entry_no`, persists the record in `Operations`, and stores hierarchical parent-child links through `parent_entry_id` when needed.
 4. Approve and reject endpoints move entries into the corresponding workflow buckets, while soft delete keeps archive visibility without physical removal.
 5. PDF metadata and archive rows are persisted through `GeneratedPDFs`; tank filtering uses `mapping_ORBCode_TankType` and `vessel_tank_details`.
+
+**ORB request/response notes**
+
+| Endpoint group | Request notes | Response notes |
+|---------------|---------------|----------------|
+| `GET /api/orb/api/vessels/`, `GET /api/orb/api/codes/`, `GET /api/orb/api/current-vessel/`, `GET /api/orb/api/get-current-user-vessel/`, `GET /api/orb/api/get_last_page_number/`, `GET /api/orb/api/latest-entry-date/`, `GET /api/orb/api/get-internal-ip/` | Mostly read-only lookups; `vessel_id` is required for context-specific endpoints | JSON lists or single-object JSON responses used to hydrate the ORB form and vessel context |
+| `GET /api/orb/api/tanks/?vessel_id=<uuid>` | `vessel_id` is required; optional ORB code filtering is handled by the helper view | JSON list of tanks for the selected vessel/code combination or an empty list when no mapping exists |
+| `GET /api/orb/api/operations/`, `POST /api/orb/api/operations/`, `GET /api/orb/api/operations/<uuid:pk>/`, `PUT /api/orb/api/operations/<uuid:pk>/`, `PATCH /api/orb/api/operations/<uuid:pk>/`, `DELETE /api/orb/api/operations/<uuid:pk>/`, `GET /api/orb/operations/<str:pk>/` | Create/update requests send the operation payload with vessel, date, ORB code, item number, and record text; retrieve/delete use the path PK | Serializer-backed JSON on success; validation errors return `{error: ...}` JSON; retrieve returns a single operation JSON document |
+| `POST /api/orb/api/operations/<uuid:pk>/soft_delete/`, `POST /api/orb/api/operations/<str:id>/approve/`, `POST /api/orb/api/operations/<str:id>/reject/` | Approval/rejection requests include the acting user name/remark fields expected by the legacy view | Success/error JSON indicating the new status and any audit metadata written to the record |
+| `GET /api/orb/api/non-deleted-entries/`, `GET /api/orb/api/deleted-entries/`, `GET /api/orb/api/rejected-entries/`, `GET /api/orb/api/approved-entries/`, `GET /api/orb/api/list-pdfs/` | Vessel-scoped query parameters drive all archive/list filters | JSON lists of entry rows or PDF metadata rows |
+| `POST /api/orb/api/update-print-status/`, `POST /api/orb/api/save-pdf-metadata/` | Print status update requires entry IDs, IP, and master print timestamp; PDF save requires the JSON `pdf_data` payload | Success/error JSON; PDF save returns the inserted PDF metadata id on success |
+| `GET /api/orb/api/download-pdf/<uuid:pdf_id>/` | `pdf_id` path parameter identifies the stored archive row | Binary PDF `HttpResponse` or a JSON error payload when the file or metadata is missing |
 
 ## 11. Role-Based Access Control (RBAC)
 

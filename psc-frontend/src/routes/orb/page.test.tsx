@@ -28,10 +28,6 @@ vi.mock('@/legacy/vims-basic/routes/orb/OrbRoutes.jsx', () => ({
   default: () => <div>Legacy ORB Routes</div>,
 }));
 
-vi.mock('./office-approved-entries', () => ({
-  default: () => <div>Office ORB Approved Entries</div>,
-}));
-
 import { ORBModulePage } from './page';
 
 describe('ORBModulePage', () => {
@@ -64,7 +60,7 @@ describe('ORBModulePage', () => {
     expect(screen.getByText('Legacy ORB Routes')).toBeInTheDocument();
   });
 
-  it('renders native office orb approved-entry page for office users', () => {
+  it('redirects office users to dashboard', () => {
     orbRouteMocks.useAuth.mockReturnValue({
       isAuthenticated: true,
       isOffice: true,
@@ -73,7 +69,6 @@ describe('ORBModulePage', () => {
 
     render(<ORBModulePage />);
 
-    expect(screen.getByTestId('root-layout')).toBeInTheDocument();
-    expect(screen.getByText('Office ORB Approved Entries')).toBeInTheDocument();
+    expect(screen.getByText('Navigate:/dashboard')).toBeInTheDocument();
   });
 });

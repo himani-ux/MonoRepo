@@ -157,7 +157,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       label: 'ORB',
       href: ROUTES.ORB,
       icon: BookOpenCheck,
-      visible: isVessel || isOffice,
+      visible: isVessel,
     },
   ].filter((item) => item.visible);
   const [inspectionOpen, setInspectionOpen] = useState(hasActivePscItem);

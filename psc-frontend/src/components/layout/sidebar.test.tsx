@@ -98,7 +98,7 @@ describe('Sidebar', () => {
     render(<Sidebar isOpen />);
 
     expect(screen.getByText('Reports')).toBeInTheDocument();
-    expect(screen.getByText('ORB')).toBeInTheDocument();
+    expect(screen.queryByText('ORB')).not.toBeInTheDocument();
     expect(screen.queryByText('Sync')).not.toBeInTheDocument();
   });
 
