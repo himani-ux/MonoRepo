@@ -14,6 +14,7 @@ import {
 import {
   AlertTriangle,
   FileText,
+  FileSearch,
   Bell,
   BellRing,
   CheckCircle2,
@@ -21,7 +22,6 @@ import {
   Mail,
   FileDown,
   Eye,
-  PanelRightOpen,
   X,
   Trash2
 } from "lucide-react";
@@ -489,10 +489,10 @@ const KsmLibrary = ({
                             event.stopPropagation();
                             setSelectedId(selectedId === notification.id ? null : notification.id);
                           }}
-                          aria-label={`Show details for ${notification.title}`}
-                          title="Details"
+                          aria-label={`Open details for ${notification.title}`}
+                          title="Open details"
                         >
-                          <PanelRightOpen className="h-4 w-4" />
+                          <FileSearch className="h-4 w-4" />
                         </Button>
                       )}
 
