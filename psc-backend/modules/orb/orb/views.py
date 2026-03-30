@@ -1689,7 +1689,7 @@ def list_pdfs(request):
                 'created_by': pdf.created_by,
                 'created_at': pdf.created_at.isoformat(),
                 'vessel_id': str(pdf.vessel_id) if pdf.vessel_id else None,
-                'download_url': f'/api/download-pdf/{pdf.id}/'
+                'download_url': f'/api/orb/api/download-pdf/{pdf.id}/'
             })
 
         return JsonResponse({
@@ -1736,10 +1736,11 @@ def download_pdf(request, pdf_id):
 
         # Ensure the filepath is safe and within the intended directory
         # e.g., MEDIA_ROOT or a specific PDF storage directory
-        full_file_path = os.path.join(settings.MEDIA_ROOT, filepath) # Assuming filepath is relative to MEDIA_ROOT
+        media_root = os.path.abspath(str(settings.MEDIA_ROOT))
+        full_file_path = os.path.abspath(os.path.join(media_root, filepath)) # Assuming filepath is relative to MEDIA_ROOT
 
         # Prevent directory traversal
-        if not full_file_path.startswith(settings.MEDIA_ROOT):
+        if full_file_path != media_root and not full_file_path.startswith(media_root + os.sep):
              print(f"Attempted to access file outside MEDIA_ROOT: {full_file_path}")
              raise Http404("File not found")
 

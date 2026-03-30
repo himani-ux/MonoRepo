@@ -226,9 +226,6 @@ export const usePDFGenerator = () => {
       // Save PDF
       const filename = `ORB-Approved-Entries-${new Date().toISOString().split("T")[0]}.pdf`;
       pdfDoc.save(filename);
-      if (onSuccess) {
-        onSuccess();
-      }
 
       const pdfBlob = pdfDoc.output('blob');
       const title = `Approved Logbook Entries - ${new Date().toISOString().split("T")[0]}`;
@@ -267,6 +264,9 @@ export const usePDFGenerator = () => {
 
           console.log("🧹 Clearing exportedApprovedIds after PDF generation...");
           localStorage.setItem("exportedApprovedIds", JSON.stringify([]));
+          if (onSuccess) {
+            onSuccess();
+          }
         } catch (err) {
           console.error("PDF downloaded, but archive/status update failed:", err);
         }
