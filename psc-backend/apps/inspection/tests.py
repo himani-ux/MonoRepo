@@ -3177,8 +3177,11 @@ class TestFEAT_RPT_002_BulkCARPDFExport(BaseInspectionAPITestCase):
             uploaded_by=str(self.vessel_master.id),
         )
 
-    def _export(self, user=None):
-        request = self.factory.get(f"/api/psc/inspections/{self.inspection.id}/cars/export-pdf/")
+    def _export(self, user=None, audience=None):
+        url = f"/api/psc/inspections/{self.inspection.id}/cars/export-pdf/"
+        if audience:
+            url = f"{url}?audience={audience}"
+        request = self.factory.get(url)
         force_authenticate(request, user=user or self.vessel_master)
         return self.view(request, inspection_id=self.inspection.id)
 
@@ -3196,6 +3199,32 @@ class TestFEAT_RPT_002_BulkCARPDFExport(BaseInspectionAPITestCase):
             preview_url = payload["evidence"][0].get("report_preview_url", "")
             self.assertIn("/api/psc/evidence/", preview_url)
             self.assertIn("report_token=", preview_url)
+
+    @patch("apps.inspection.report_views.generate_car_pdf", return_value=b"%PDF-1.4 bulk")
+    def test_bulk_export_passes_vessel_name_to_pdf_payload(self, mock_generate):
+        vessel_lookup = {
+            str(self.inspection.vessel_id).replace("-", "").lower(): "MV Example",
+        }
+        with patch("apps.inspection.report_views._lookup_vessel_names", return_value=vessel_lookup):
+            response = self._export()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_generate.call_count, 2)
+
+        for call in mock_generate.call_args_list:
+            payload = call.args[0]
+            self.assertEqual(payload["inspection"]["vessel_name"], "MV Example")
+            self.assertEqual(payload["inspection"]["vessel"]["name"], "MV Example")
+
+    @patch("apps.inspection.report_views.generate_car_pdf", return_value=b"%PDF-1.4 bulk")
+    def test_bulk_export_supports_external_audience(self, mock_generate):
+        response = self._export(audience="external")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        self.assertEqual(mock_generate.call_count, 2)
+        for call in mock_generate.call_args_list:
+            self.assertEqual(call.kwargs.get("audience"), "external")
 
 
 class TestFEAT_RPT_002_DeficiencyExcelExport(BaseInspectionAPITestCase):

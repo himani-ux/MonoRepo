@@ -5,6 +5,7 @@
  */
 
 import { apiClient } from './client';
+import type { CARPDFAudience } from './cars';
 import type {
   Inspection,
   InspectionDetail,
@@ -309,10 +310,16 @@ export async function exportDeficiencyExcel(filters?: ExcelExportFilters): Promi
  * Download all CAR PDFs for an inspection.
  * Returns a single PDF if only one CAR, or a ZIP if multiple.
  */
-export async function exportInspectionCARs(inspectionId: string): Promise<Blob> {
+export async function exportInspectionCARs(
+  inspectionId: string,
+  audience: CARPDFAudience = 'internal'
+): Promise<Blob> {
   const response = await apiClient.get(
     `/inspections/${inspectionId}/cars/export-pdf/`,
-    { responseType: 'blob' }
+    {
+      params: { audience },
+      responseType: 'blob',
+    }
   );
   return response.data;
 }

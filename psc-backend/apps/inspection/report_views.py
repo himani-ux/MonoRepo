@@ -38,13 +38,34 @@ def _lookup_vessel_names(vessel_ids):
             return f'{s[:8]}-{s[8:12]}-{s[12:16]}-{s[16:20]}-{s[20:]}'
 
         placeholders = ','.join(['CAST(%s AS uniqueidentifier)'] * len(vessel_ids))
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT id, vesselName FROM VesselData WHERE id IN ({placeholders})",
-                [to_uuid_str(vid) for vid in vessel_ids],
-            )
-            vessel_names = {str(row[0]).replace('-', '').lower(): row[1] for row in cursor.fetchall()}
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT id, vesselName FROM VesselData WHERE id IN ({placeholders})",
+                    [to_uuid_str(vid) for vid in vessel_ids],
+                )
+                vessel_names = {str(row[0]).replace('-', '').lower(): row[1] for row in cursor.fetchall()}
+        except Exception:
+            vessel_names = {}
     return vessel_names
+
+
+def _attach_vessel_name_to_car_data(car_data, vessel_name):
+    """Populate vessel name fields expected by the CAR PDF generator."""
+    vessel_name = str(vessel_name or '').strip()
+    if not vessel_name:
+        return car_data
+
+    inspection = car_data.get('inspection') or {}
+    inspection.setdefault('vessel', {})
+    inspection['vessel']['name'] = inspection['vessel'].get('name') or vessel_name
+    inspection['vessel_name'] = inspection.get('vessel_name') or vessel_name
+    car_data['inspection'] = inspection
+
+    car_data['vessel_name'] = car_data.get('vessel_name') or vessel_name
+    car_data['vessel'] = car_data.get('vessel') or {}
+    car_data['vessel']['name'] = car_data['vessel'].get('name') or vessel_name
+    return car_data
 
 
 class DeficiencyExcelExportView(APIView):
@@ -193,6 +214,15 @@ class BulkCARExportView(APIView):
 
     def get(self, request, inspection_id, *args, **kwargs):
         inspection = get_object_or_404(Inspection, id=inspection_id, is_deleted=False)
+        audience = (request.query_params.get('audience') or 'internal').strip().lower()
+        if audience not in {'internal', 'external'}:
+            return Response(
+                {
+                    'error': 'VALIDATION_ERROR',
+                    'message': "Invalid audience. Use 'internal' or 'external'.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Vessel access check
         access_permission = HasVesselAccess()
@@ -222,6 +252,14 @@ class BulkCARExportView(APIView):
             )
 
         car_list = list(cars)
+        vessel_name = ''
+        if inspection.vessel_id:
+            vessel_name = _lookup_vessel_names({inspection.vessel_id}).get(
+                str(inspection.vessel_id).replace('-', '').lower(),
+                '',
+            )
+        if not vessel_name and request.user.user_type == 'VESSEL':
+            vessel_name = str(getattr(request.user, 'vessel_name', '') or '').strip()
 
         # Single CAR — return PDF directly (no zip overhead)
         if len(car_list) == 1:
@@ -232,9 +270,14 @@ class BulkCARExportView(APIView):
                 car_id=car.id,
                 car_data=serializer.data,
             )
-            pdf_bytes = generate_car_pdf(car_data)
+            car_data = _attach_vessel_name_to_car_data(car_data, vessel_name)
+            pdf_bytes = generate_car_pdf(car_data, audience=audience)
             car_number = car_data.get('car_number', 'CAR')
-            filename = f"{car_number.replace('-', '_')}_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            audience_suffix = 'External' if audience == 'external' else 'Internal'
+            filename = (
+                f"{car_number.replace('-', '_')}_Report_{audience_suffix}_"
+                f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            )
 
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -253,13 +296,19 @@ class BulkCARExportView(APIView):
                     car_id=car.id,
                     car_data=serializer.data,
                 )
-                pdf_bytes = generate_car_pdf(car_data)
+                car_data = _attach_vessel_name_to_car_data(car_data, vessel_name)
+                pdf_bytes = generate_car_pdf(car_data, audience=audience)
                 car_number = car_data.get('car_number', 'CAR')
-                zf.writestr(f"{car_number.replace('-', '_')}_Report.pdf", pdf_bytes)
+                audience_suffix = 'External' if audience == 'external' else 'Internal'
+                zf.writestr(
+                    f"{car_number.replace('-', '_')}_Report_{audience_suffix}.pdf",
+                    pdf_bytes,
+                )
 
         zip_buffer.seek(0)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"CARs_Inspection_{timestamp}.zip"
+        audience_suffix = 'External' if audience == 'external' else 'Internal'
+        filename = f"CARs_Inspection_{audience_suffix}_{timestamp}.zip"
 
         response = HttpResponse(zip_buffer.read(), content_type='application/zip')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'

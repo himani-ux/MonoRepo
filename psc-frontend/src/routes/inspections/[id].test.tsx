@@ -18,6 +18,7 @@ const inspectionDetailPageMocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   toast: vi.fn(),
   deleteMutateAsync: vi.fn(),
+  exportInspectionCARs: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -42,6 +43,10 @@ vi.mock('@/hooks/use-auth', () => ({
 
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: inspectionDetailPageMocks.toast }),
+}));
+
+vi.mock('@/lib/api/inspections', () => ({
+  exportInspectionCARs: (...args: unknown[]) => inspectionDetailPageMocks.exportInspectionCARs(...args),
 }));
 
 vi.mock('@/components/ui', () => ({
@@ -70,6 +75,18 @@ vi.mock('@/components/ui', () => ({
     className?: string;
   }) => (asChild ? children : <button className={className} onClick={onClick}>{children}</button>),
   DropdownMenuSeparator: () => <hr />,
+  Dialog: ({
+    open,
+    children,
+  }: {
+    open: boolean;
+    children: React.ReactNode;
+  }) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
 }));
 
 vi.mock('@/components/layout/root-layout', () => ({
@@ -131,6 +148,7 @@ describe('InspectionDetailPage', () => {
     inspectionDetailPageMocks.useAuth.mockReset();
     inspectionDetailPageMocks.toast.mockReset();
     inspectionDetailPageMocks.deleteMutateAsync.mockReset();
+    inspectionDetailPageMocks.exportInspectionCARs.mockReset();
 
     inspectionDetailPageMocks.useParams.mockReturnValue({ id: '123' });
     inspectionDetailPageMocks.deleteMutateAsync.mockResolvedValue({});
@@ -150,6 +168,11 @@ describe('InspectionDetailPage', () => {
       mutateAsync: vi.fn(),
       isPending: false,
     });
+    inspectionDetailPageMocks.exportInspectionCARs.mockResolvedValue(
+      new Blob(['zip'], { type: 'application/zip' })
+    );
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+    global.URL.revokeObjectURL = vi.fn();
   });
 
   it('test_feat_ins_009_happy_path_vessel_master_can_delete_draft_and_redirect', async () => {
@@ -198,5 +221,59 @@ describe('InspectionDetailPage', () => {
 
     render(<InspectionDetailPage />);
     expect(screen.queryByRole('button', { name: /delete inspection/i })).not.toBeInTheDocument();
+  });
+
+  it('opens audience dialog before downloading all cars and exports internal reports when selected', async () => {
+    inspectionDetailPageMocks.useAuth.mockReturnValue({
+      isVessel: true,
+      isOffice: false,
+      isDPA: false,
+      isPIC: false,
+    });
+    inspectionDetailPageMocks.useInspection.mockReturnValue({
+      data: buildInspection({
+        deficiencies: [{ car: { id: 'car-1' } }],
+      }),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<InspectionDetailPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /download all cars/i }));
+    expect(screen.getByText('Download All CARs')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /internal report/i }));
+
+    await waitFor(() => {
+      expect(inspectionDetailPageMocks.exportInspectionCARs).toHaveBeenCalledWith('123', 'internal');
+    });
+  });
+
+  it('exports external reports when external option is selected in the audience dialog', async () => {
+    inspectionDetailPageMocks.useAuth.mockReturnValue({
+      isVessel: true,
+      isOffice: false,
+      isDPA: false,
+      isPIC: false,
+    });
+    inspectionDetailPageMocks.useInspection.mockReturnValue({
+      data: buildInspection({
+        deficiencies: [{ car: { id: 'car-1' } }],
+      }),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<InspectionDetailPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /download all cars/i }));
+    fireEvent.click(screen.getByRole('button', { name: /external report/i }));
+
+    await waitFor(() => {
+      expect(inspectionDetailPageMocks.exportInspectionCARs).toHaveBeenCalledWith('123', 'external');
+    });
   });
 });

@@ -3,6 +3,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { MoreVertical, Edit, Trash2, FileCheck, Download, Info } from 'lucide-react';
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -28,6 +34,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { ROUTES, INSPECTION_TYPES } from '@/lib/utils/constants';
 import { exportInspectionCARs } from '@/lib/api/inspections';
+import type { CARPDFAudience } from '@/lib/api/cars';
 
 /**
  * Inspection Detail Page
@@ -54,6 +61,7 @@ export default function InspectionDetailPage() {
   // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDeficiencyModal, setShowDeficiencyModal] = useState(false);
+  const [showCARAudienceDialog, setShowCARAudienceDialog] = useState(false);
 
   // Derived state
   const isPSC = inspection?.inspection_type === INSPECTION_TYPES.PSC;
@@ -100,17 +108,18 @@ export default function InspectionDetailPage() {
     });
   };
 
-  const handleDownloadAllCARs = useCallback(async () => {
+  const handleDownloadAllCARs = useCallback(async (audience: CARPDFAudience) => {
     if (!id) return;
     setIsDownloadingCARs(true);
     try {
-      const blob = await exportInspectionCARs(id);
+      const blob = await exportInspectionCARs(id, audience);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       // Content-type determines extension
       const ext = blob.type === 'application/pdf' ? 'pdf' : 'zip';
-      link.download = `CARs_${id.slice(0, 8)}.${ext}`;
+      const suffix = audience === 'external' ? 'External' : 'Internal';
+      link.download = `CARs_${id.slice(0, 8)}_${suffix}.${ext}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -197,7 +206,7 @@ export default function InspectionDetailPage() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={handleDownloadAllCARs}
+                    onClick={() => setShowCARAudienceDialog(true)}
                     disabled={isDownloadingCARs}
                   >
                     <Download className="mr-2 h-4 w-4" />
@@ -255,6 +264,52 @@ export default function InspectionDetailPage() {
         itemName="this inspection"
         onConfirm={handleDelete}
       />
+
+      <Dialog
+        open={showCARAudienceDialog}
+        onOpenChange={(open) => {
+          if (!isDownloadingCARs) {
+            setShowCARAudienceDialog(open);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Download All CARs</DialogTitle>
+            <DialogDescription>
+              Choose which report version should be generated for all CARs in this inspection.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowCARAudienceDialog(false)}
+              disabled={isDownloadingCARs}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCARAudienceDialog(false);
+                handleDownloadAllCARs('external');
+              }}
+              disabled={isDownloadingCARs}
+            >
+              {isDownloadingCARs ? 'Generating...' : 'External Report'}
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCARAudienceDialog(false);
+                handleDownloadAllCARs('internal');
+              }}
+              disabled={isDownloadingCARs}
+            >
+              {isDownloadingCARs ? 'Generating...' : 'Internal Report'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Deficiency Modal */}
       <DeficiencyModal
