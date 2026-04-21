@@ -25,6 +25,7 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -111,7 +112,7 @@ const pscPriorityOrder = [
 
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
-  const { hasForm, user, isOffice, isVessel } = useAuth();
+  const { hasForm, user, isVessel } = useAuth();
   const { data: unreadCount = 0 } = useUnreadCount();
 
   // Filter nav items based on user role
@@ -178,6 +179,8 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       return true;
     });
   };
+
+  const helpActive = isActive(ROUTES.HELP);
 
   return (
     <>
@@ -336,10 +339,32 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-neutral-200 p-4">
-          <p className="text-xs text-neutral-400">
-            VIMS v0.1.0
-          </p>
+        <div className="space-y-3 border-t border-neutral-200 p-4">
+          <NavLink
+            to={ROUTES.HELP}
+            onClick={onClose}
+            className={cn(
+              'flex items-center gap-3 rounded-lg border px-3 py-3 text-sm font-medium transition-colors',
+              helpActive
+                ? 'border-primary-200 bg-primary-50 text-primary-700'
+                : 'border-neutral-200 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+            )}
+          >
+            <LifeBuoy
+              className={cn(
+                'h-5 w-5',
+                helpActive ? 'text-primary-600' : 'text-neutral-500'
+              )}
+            />
+            <div className="min-w-0 flex-1">
+              <p>Help</p>
+              <p className="text-xs font-normal text-neutral-400">
+                User guides by module
+              </p>
+            </div>
+          </NavLink>
+
+          <p className="text-xs text-neutral-400">VIMS v0.1.0</p>
         </div>
       </aside>
     </>

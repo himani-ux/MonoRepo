@@ -154,6 +154,7 @@ export const DATE_FORMAT = {
 export const ROUTES = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
+  HELP: '/help',
   INSPECTIONS: '/inspections',
   INSPECTION_NEW: '/inspections/new',
   INSPECTION_DETAIL: (id: string | number) => `/inspections/${id}`,

@@ -41,6 +41,49 @@ const isCircularFormReload = () => {
     return navigationEntries[0]?.type === 'reload';
 };
 
+const resolveCircularRequestMainOption = (requestLike) => {
+    const request =
+        requestLike && typeof requestLike === 'object' ? requestLike : null;
+    const rawDepartmentValue =
+        request?.dept_name ??
+        request?.dept ??
+        request?.details?.mainOption ??
+        requestLike;
+    const resolvedUiKey = resolveCircularDepartmentUiKey(rawDepartmentValue);
+
+    if (resolvedUiKey === 'seq' || resolvedUiKey === 'technical') {
+        return resolvedUiKey;
+    }
+
+    const fallbackMainOption = String(request?.details?.mainOption || '')
+        .trim()
+        .toLowerCase();
+
+    return fallbackMainOption === 'seq' ? 'seq' : 'technical';
+};
+
+const resolveCircularRequestDepartmentName = (requestLike) => {
+    const request =
+        requestLike && typeof requestLike === 'object' ? requestLike : null;
+    const rawDepartmentValue =
+        request?.dept_name ??
+        request?.dept ??
+        request?.details?.mainOption ??
+        requestLike;
+    const resolvedUiKey = resolveCircularDepartmentUiKey(rawDepartmentValue);
+
+    if (resolvedUiKey === 'seq') {
+        return 'Deck';
+    }
+
+    if (resolvedUiKey === 'technical') {
+        return 'Engine';
+    }
+
+    const normalizedDeptName = String(request?.dept_name || '').trim();
+    return normalizedDeptName || null;
+};
+
 const Admin = ({ onNotificationSubmit }) => {
 
     const navigate = useNavigate();
@@ -146,12 +189,44 @@ const Admin = ({ onNotificationSubmit }) => {
     const [currentAction, setCurrentAction] = useState('');
     const [currentSrNo, setCurrentSrNo] = useState('');
     const [approvingNotificationId, setApprovingNotificationId] = useState(null);
+    const [isApprovalActionPending, setIsApprovalActionPending] = useState(false);
+    const [approvalActionMessage, setApprovalActionMessage] = useState('');
 
     // ================= SUBMISSIONS =================
     const [submittedRequests, setSubmittedRequests] = useState([]);
     const [viewingRequest, setViewingRequest] = useState(null);
     const [showPendingRequests, setShowPendingRequests] = useState(false);
     const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        if (searchParams.get('panel') !== 'pending-requests') {
+            return;
+        }
+
+        setShowPendingRequests(true);
+
+        searchParams.delete('panel');
+        const nextSearch = searchParams.toString();
+        navigate(
+            `${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`,
+            { replace: true }
+        );
+    }, [location.pathname, location.search, navigate]);
+
+    useEffect(() => {
+        if (!showPendingRequests || submittedRequests.length === 0) {
+            return;
+        }
+
+        const frameId = window.requestAnimationFrame(() => {
+            document
+                .getElementById('pending-requests-section')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
+    }, [showPendingRequests, submittedRequests.length]);
 
     // ================= SUPERSEDING =================
     const [supersedingNotificationSrNo, setSupersedingNotificationSrNo] = useState(null);
@@ -465,8 +540,10 @@ const Admin = ({ onNotificationSubmit }) => {
                         status: 'Pending',
                         created_by: req.created_by,
                         attachment_url: req.attachment_url,
+                        dept: req.dept,
+                        dept_name: resolveCircularRequestDepartmentName(req),
                         details: {
-                            mainOption: req.dept === 0 ? 'seq' : 'technical',
+                            mainOption: resolveCircularRequestMainOption(req),
                             category: req.category || 'internal',
                             sub1: req.sub_category ? req.sub_category.split(', ') : [],
                             sub2: req.second_sub_category ? req.second_sub_category.split(', ') : [],
@@ -510,8 +587,10 @@ const Admin = ({ onNotificationSubmit }) => {
                     status: 'Pending',
                     created_by: req.created_by,
                     attachment_url: req.attachment_url,
+                    dept: req.dept,
+                    dept_name: resolveCircularRequestDepartmentName(req),
                     details: {
-                        mainOption: req.dept === 0 ? 'seq' : 'technical',
+                        mainOption: resolveCircularRequestMainOption(req),
                         category: req.category || 'internal',
                         sub1: req.sub_category ? req.sub_category.split(', ') : [],
                         sub2: req.second_sub_category ? req.second_sub_category.split(', ') : [],
@@ -726,6 +805,16 @@ const Admin = ({ onNotificationSubmit }) => {
     };
     // --- END NEW ---
 
+    // Example function to open the vessel selection popup for publishing
+    const handleVesselSelectionForPublishing = () => {
+        if (isApprovalActionPending) {
+            return;
+        }
+
+        setShowVesselPopup(true);
+        console.log("Opening vessel selection popup for publishing.");
+    };
+
 
     // --- NEW: Handler for Vessel Checkbox Change ---
     const handleVesselCheckboxChange = (vesselId) => {
@@ -827,10 +916,17 @@ const Admin = ({ onNotificationSubmit }) => {
     // --- END NEW: Handler for Select All ENGINE Ranks ---
 
 
-    const handleApproveReject = async (sr_no, action) => {
+    const handleApproveReject = (requestOrSrNo, action) => {
+        const request =
+            requestOrSrNo && typeof requestOrSrNo === 'object' ? requestOrSrNo : null;
+        const sr_no = request?.sr_no || requestOrSrNo;
         console.log("🚀 handleApproveReject: Start → SR No:", sr_no, "Action:", action);
 
-        const status = action === "approve" ? 2 : 3;
+        if (!sr_no) {
+            alert('Notification SR No is missing. Please refresh and try again.');
+            return;
+        }
+
         setCurrentAction(action);
         setCurrentSrNo(sr_no);
 
@@ -845,52 +941,26 @@ const Admin = ({ onNotificationSubmit }) => {
            1️⃣ APPROVE → First fetch details → then open vessel popup
            ============================================================ */
         if (action === "approve") {
-            console.log("📌 Approve flow → Fetching notification details...");
+            const deptName = resolveCircularRequestDepartmentName(request);
 
-            try {
-                const detailsResponse = await fetch(
-                    `http://localhost:8000/api/circular/api/submitted/${sr_no}/`
-                );
-
-                if (!detailsResponse.ok) {
-                    throw new Error(
-                        `Failed fetching details: ${detailsResponse.status}`
-                    );
-                }
-
-                const notificationDetails = await detailsResponse.json();
-                console.log("📄 Notification details:", notificationDetails);
-
-                // Store SR No for later update
-                localStorage.setItem(
-                    "approvingNotificationSrNo",
-                    notificationDetails.sr_no
-                );
-
-                // Store dept name for vessel fetching
-                const deptName =
-                    notificationDetails.dept === 0
-                        ? "Deck"
-                        : notificationDetails.dept === 1
-                            ? "Engine"
-                            : "Unknown";
-
-                localStorage.setItem("approvingNotificationDept", deptName);
-
-                console.log(
-                    "💾 Stored dept + sr_no for popup vessel selection",
-                    deptName
-                );
-            } catch (err) {
-                console.error("❌ Failed to fetch details for approval:", err);
-                alert(
-                    `Could not fetch details for approval.\nContinuing without vessel list.\n${err.message}`
-                );
+            localStorage.setItem('approvingNotificationSrNo', sr_no);
+            if (deptName) {
+                localStorage.setItem('approvingNotificationDept', deptName);
+            } else {
+                localStorage.removeItem('approvingNotificationDept');
             }
 
+            setSelectedVesselIds(new Set());
+            setCurrentVesselIdsForComment([]);
+            setCommentInput('');
+            setShowCommentModal(false);
+            setShowRankPopup(false);
             // Show vessel popup and stop here — final approval happens after popup confirm
             setShowVesselPopup(true);
-            console.log("📌 Vessel popup opened.");
+            console.log("📌 Vessel popup opened using existing notification data.", {
+                sr_no,
+                deptName,
+            });
             return;
         }
 
@@ -997,8 +1067,10 @@ const Admin = ({ onNotificationSubmit }) => {
                 status: "Pending",
                 created_by: req.created_by,
                 attachment_url: req.attachment_url,
+                dept: req.dept,
+                dept_name: resolveCircularRequestDepartmentName(req),
                 details: {
-                    mainOption: req.dept === 0 ? "seq" : "technical",
+                    mainOption: resolveCircularRequestMainOption(req),
                     category: req.category || "internal",
                     sub1: req.sub_category ? req.sub_category.split(", ") : [],
                     sub2: req.second_sub_category
@@ -1020,6 +1092,11 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // Replace the existing handleConfirmVesselSelectionForApproval with this
     const handleConfirmVesselSelectionForApproval = async () => {
+        if (isApprovalActionPending) {
+            console.log("handleConfirmVesselSelectionForApproval: Approval action already in progress, ignoring duplicate click.");
+            return;
+        }
+
         console.log("handleConfirmVesselSelectionForApproval: User confirmed vessel selection for approval.");
         const vesselIdsArray = Array.from(selectedVesselIds || []);
         console.log("handleConfirmVesselSelectionForApproval: Selected vessel IDs:", vesselIdsArray);
@@ -1031,7 +1108,14 @@ const Admin = ({ onNotificationSubmit }) => {
         if (!approvingNotificationSrNo) {
             // If creating a new notification, delegate to handleConfirmPublish as before
             console.log("No approvingNotificationSrNo found — treating this as a new submission.");
-            await handleConfirmPublish();
+            setIsApprovalActionPending(true);
+            setApprovalActionMessage("Publishing notification. Please wait...");
+            try {
+                await handleConfirmPublish();
+            } finally {
+                setIsApprovalActionPending(false);
+                setApprovalActionMessage("");
+            }
             return;
         }
 
@@ -1041,12 +1125,18 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         // Store vessel IDs in state so comment modal / final handler can access them
+        setIsApprovalActionPending(true);
+        setApprovalActionMessage("Preparing approval...");
         setCurrentVesselIdsForComment(vesselIdsArray);
         setCurrentAction('approve');
         setCurrentSrNo(approvingNotificationSrNo);
 
-        // Show the comment modal. Do NOT submit server request here.
-        setShowCommentModal(true);
+        setShowVesselPopup(false);
+        window.setTimeout(() => {
+            setShowCommentModal(true);
+            setIsApprovalActionPending(false);
+            setApprovalActionMessage("");
+        }, 0);
         console.log("handleConfirmVesselSelectionForApproval: Opened comment modal — waiting for user to confirm comment.");
     };
 
@@ -1054,6 +1144,11 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // Replaces the existing handleConfirmApprovalWithComment
     const handleConfirmApprovalWithComment = async () => {
+        if (isApprovalActionPending) {
+            console.log("handleConfirmApprovalWithComment: Approval action already in progress, ignoring duplicate click.");
+            return;
+        }
+
         console.log("handleConfirmApprovalWithComment: Confirm clicked in comment modal.");
 
         const comment = commentInput || "";
@@ -1087,6 +1182,8 @@ const Admin = ({ onNotificationSubmit }) => {
         };
 
         console.log("handleConfirmApprovalWithComment: Sending approval payload:", payload);
+        setIsApprovalActionPending(true);
+        setApprovalActionMessage("Approving notification and notifying vessels. Please wait...");
 
         try {
             const response = await fetch(
@@ -1111,6 +1208,14 @@ const Admin = ({ onNotificationSubmit }) => {
             // Store vessel ids for email step (if you keep email separate)
             localStorage.setItem('selectedVesselIdsForNotification', JSON.stringify(vesselIdsForComment));
 
+            // Move the UI to rank selection immediately after approval succeeds.
+            setShowCommentModal(false);
+            setCommentInput('');
+            setCurrentAction('');
+            setCurrentSrNo('');
+            setCurrentVesselIdsForComment([]);
+            setShowRankPopup(true);
+
             // Send emails (optional: you already have this logic elsewhere — keep it here or delegate)
             try {
                 const emailPayload = {
@@ -1134,23 +1239,22 @@ const Admin = ({ onNotificationSubmit }) => {
                 alert('Approved, but email sending failed due to network error.');
             }
 
-            // Close modal and open rank popup
-            setShowCommentModal(false);
-            setCommentInput('');
-            setCurrentAction('');
-            setCurrentSrNo('');
-            setCurrentVesselIdsForComment([]);
-            setShowRankPopup(true);
-
         } catch (err) {
             console.error("handleConfirmApprovalWithComment: Network error during approval:", err);
             alert('Network error during approval.');
+        } finally {
+            setIsApprovalActionPending(false);
+            setApprovalActionMessage("");
         }
     };
 
 
     // New: Confirm reject with comment
     const handleConfirmRejectWithComment = async () => {
+        if (isApprovalActionPending) {
+            return;
+        }
+
         console.log("handleConfirmRejectWithComment: Confirm reject clicked.");
 
         const comment = commentInput || "";
@@ -1174,6 +1278,8 @@ const Admin = ({ onNotificationSubmit }) => {
         };
 
         console.log("handleConfirmRejectWithComment: Sending reject payload:", payload);
+        setIsApprovalActionPending(true);
+        setApprovalActionMessage("Rejecting notification. Please wait...");
 
         try {
             const response = await fetch(
@@ -1215,8 +1321,10 @@ const Admin = ({ onNotificationSubmit }) => {
                 status: 'Pending',
                 created_by: req.created_by,
                 attachment_url: req.attachment_url,
+                dept: req.dept,
+                dept_name: resolveCircularRequestDepartmentName(req),
                 details: {
-                    mainOption: req.dept === 0 ? 'seq' : 'technical',
+                    mainOption: resolveCircularRequestMainOption(req),
                     category: req.category || 'internal',
                     sub1: req.sub_category ? req.sub_category.split(', ') : [],
                     sub2: req.second_sub_category ? req.second_sub_category.split(', ') : [],
@@ -1229,11 +1337,19 @@ const Admin = ({ onNotificationSubmit }) => {
         } catch (err) {
             console.error("handleConfirmRejectWithComment: Network error:", err);
             alert('Network error during rejection.');
+        } finally {
+            setIsApprovalActionPending(false);
+            setApprovalActionMessage("");
         }
     };
 
 
     const handleConfirmRankSelection = async () => {
+        if (isApprovalActionPending) {
+            console.log("handleConfirmRankSelection: Approval action already in progress, ignoring duplicate click.");
+            return;
+        }
+
         console.log("handleConfirmRankSelection: User confirmed rank selection.");
         console.log("handleConfirmRankSelection: Selected rank IDs:", Array.from(selectedRankIds));
 
@@ -1260,6 +1376,8 @@ const Admin = ({ onNotificationSubmit }) => {
         };
 
         console.log("handleConfirmRankSelection: Prepared payload for rank-based crew notification:", rankPayload);
+        setIsApprovalActionPending(true);
+        setApprovalActionMessage("Linking ranks and delivering circulars. Please wait...");
 
         try {
             // Send the selected rank IDs to the backend
@@ -1307,11 +1425,17 @@ const Admin = ({ onNotificationSubmit }) => {
         } catch (rankErr) {
             console.error("handleConfirmRankSelection: Network error during rank selection confirmation:", rankErr);
             alert('Network error during rank confirmation.');
+        } finally {
+            setIsApprovalActionPending(false);
+            setApprovalActionMessage("");
         }
     };
 
     // --- NEW: Handler for Cancel Rank Selection ---
     const handleCancelRankSelection = () => {
+        if (isApprovalActionPending) {
+            return;
+        }
         console.log("handleCancelRankSelection: User cancelled rank selection.");
         // Close the rank popup
         setShowRankPopup(false);
@@ -1586,7 +1710,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 // Optional: Reset form or redirect
                 // resetForm(); // Implement this if you want to clear the form
             } else {
-                alert('Error: ' + result.error);
+                alert(result.error || 'Failed to save draft.');
             }
         } catch (err) {
             console.error('Network error during draft save:', err);
@@ -1814,7 +1938,9 @@ const Admin = ({ onNotificationSubmit }) => {
 
                         // Determine department name for fetching ranks
                         // Assuming dept 0 is 'Deck' and dept 1 is 'Engine' based on your frontend logic
-                        const deptNameForRanks = notificationDetails.dept === 0 ? 'Deck' : notificationDetails.dept === 1 ? 'Engine' : 'Unknown';
+                        const deptNameForRanks =
+                            resolveCircularRequestDepartmentName(notificationDetails) ||
+                            'Unknown';
                         console.log("handleConfirmPublish: Mapped department for rank fetch:", deptNameForRanks);
 
                         if (deptNameForRanks === 'Unknown') {
@@ -2016,7 +2142,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     // }
 
                 } else {
-                    alert('Error creating notification: ' + (result.error || 'Unknown error'));
+                    alert(result.error || 'Failed to create notification.');
                     console.error("Create response error:", result);
                 }
             } catch (err) {
@@ -2044,6 +2170,9 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // --- NEW: Handler for Cancel Publish (Close Popup) ---
     const handleCancelPublish = () => {
+        if (isApprovalActionPending) {
+            return;
+        }
         console.log("Cancel Publish clicked, closing vessel selection popup.");
         setShowVesselPopup(false);
         // Optionally clear selected vessels if user cancels
@@ -2055,6 +2184,11 @@ const Admin = ({ onNotificationSubmit }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (isApprovalActionPending) {
+            console.log("handleSubmit: Submission already in progress, ignoring duplicate click.");
+            return;
+        }
 
         // --- NEW: Check for Supersede at the very beginning ---
         // Get the SR No of the OLD notification to be superseded from localStorage
@@ -2239,6 +2373,9 @@ const Admin = ({ onNotificationSubmit }) => {
             return;
         }
 
+        setIsApprovalActionPending(true);
+        setApprovalActionMessage("Submitting circular for approval. Please wait...");
+
         try {
             let response;
             let result;
@@ -2389,7 +2526,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     // --- END: Enhanced Crew List Display ---
 
                 } else {
-                    alert('Error: ' + result.error);
+                    alert(result.error || 'Failed to create notification.');
                     console.error("Create response error:", result);
                 }
                 // End of creation path
@@ -2398,6 +2535,9 @@ const Admin = ({ onNotificationSubmit }) => {
         } catch (err) {
             console.error('Network error during notification creation/update:', err);
             alert('Network error');
+        } finally {
+            setIsApprovalActionPending(false);
+            setApprovalActionMessage("");
         }
     };
 
@@ -2464,7 +2604,7 @@ const Admin = ({ onNotificationSubmit }) => {
     };
 
     const seqRankNames = [
-        'Master', 'Chief Engineer', 'Second Officer', 'Third Officer',
+        'Master', 'Chief Officer', 'Second Officer', 'Third Officer',
         'Deck Fitter', 'Deck Cadet', 'Bosun', 'Able Bodied Seaman',
         'Ordinary Seaman', 'Cook', 'Messman', 'Welder'
     ].map(name => name.toLowerCase()); // Normalize for comparison
@@ -2693,7 +2833,10 @@ const Admin = ({ onNotificationSubmit }) => {
 
                         {/* Attachments */}
                         <div className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-700">Attachments</label>
+                            <label className="block text-sm font-medium text-gray-700">Attachments (Optional)</label>
+                            <p className="text-xs text-slate-500">
+                                You can submit the circular without uploading a PDF. The system will generate the circular PDF from the form content.
+                            </p>
                             <label className="flex items-center gap-2 w-fit px-3 py-2 border border-sky-200 rounded-md bg-sky-50 hover:bg-sky-100 cursor-pointer text-sm">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M20 14.66V20a2 2 0 01-2 2H6a2 2 0 01-2-2v-5.34"></path>
@@ -2725,6 +2868,11 @@ const Admin = ({ onNotificationSubmit }) => {
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
                                     <div className="p-6">
                                         <h2 className="text-xl font-bold text-gray-800 mb-4">Select Vessels</h2>
+                                        {approvalActionMessage ? (
+                                            <p className="mb-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-700">
+                                                {approvalActionMessage}
+                                            </p>
+                                        ) : null}
 
                                         {/* Vessel List */}
                                         {loadingVessels ? (
@@ -2748,6 +2896,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                             }
                                                         }}
                                                         onChange={handleSelectAllChange} // New handler
+                                                        disabled={isApprovalActionPending}
                                                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                     />
                                                     <label
@@ -2767,6 +2916,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                             id={`vessel-${vessel.id}`}
                                                             checked={selectedVesselIds.has(vessel.id)}
                                                             onChange={() => handleVesselCheckboxChange(vessel.id)}
+                                                            disabled={isApprovalActionPending}
                                                             className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                         />
                                                         <label
@@ -2791,20 +2941,24 @@ const Admin = ({ onNotificationSubmit }) => {
                                             <button
                                                 type="button"
                                                 onClick={handleCancelPublish} // Use existing handler
-                                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 transition"
+                                                disabled={isApprovalActionPending}
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isApprovalActionPending
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                                                    }`}
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={handleConfirmVesselSelectionForApproval} // Call the new handler
-                                                disabled={selectedVesselIds.size === 0} // Disable if no vessels selected
-                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${selectedVesselIds.size === 0
+                                                disabled={selectedVesselIds.size === 0 || isApprovalActionPending} // Disable if no vessels selected
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${selectedVesselIds.size === 0 || isApprovalActionPending
                                                     ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                                     : 'bg-sky-700 hover:bg-sky-800 text-white'
                                                     }`}
                                             >
-                                                Confirm Approval
+                                                {isApprovalActionPending ? 'Processing...' : 'Confirm Approval'}
                                             </button>
                                         </div>
                                     </div>
@@ -2820,6 +2974,11 @@ const Admin = ({ onNotificationSubmit }) => {
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
                                     <div className="p-6">
                                         <h3 className="text-lg font-semibold text-gray-800 mb-2">Add Comment</h3>
+                                        {approvalActionMessage ? (
+                                            <p className="mb-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-700">
+                                                {approvalActionMessage}
+                                            </p>
+                                        ) : null}
                                         <p className="text-sm text-gray-600 mb-4">
                                             Do you want to add a comment for <strong>{currentAction === 'approve' ? 'approval' : 'rejection'}</strong> of notification <strong>{currentSrNo}</strong>?
                                         </p>
@@ -2834,12 +2993,19 @@ const Admin = ({ onNotificationSubmit }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => {
+                                                    if (isApprovalActionPending) {
+                                                        return;
+                                                    }
                                                     setShowCommentModal(false);
                                                     setCommentInput(''); // Clear input when closing
                                                     setCurrentAction(''); // Clear action
                                                     setCurrentSrNo(''); // Clear SR No
                                                 }}
-                                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 transition"
+                                                disabled={isApprovalActionPending}
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isApprovalActionPending
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                                                    }`}
                                             >
                                                 Cancel
                                             </button>
@@ -2855,9 +3021,15 @@ const Admin = ({ onNotificationSubmit }) => {
                                                         alert("Unknown action. Please try again.");
                                                     }
                                                 }}
-                                                className="px-4 py-2 bg-sky-700 text-white rounded-lg text-sm font-medium hover:bg-sky-800 transition"
+                                                disabled={isApprovalActionPending}
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isApprovalActionPending
+                                                    ? 'bg-sky-300 text-white cursor-not-allowed'
+                                                    : 'bg-sky-700 text-white hover:bg-sky-800'
+                                                    }`}
                                             >
-                                                Confirm {currentAction === 'approve' ? 'Approve' : 'Reject'}
+                                                {isApprovalActionPending
+                                                    ? 'Processing...'
+                                                    : `Confirm ${currentAction === 'approve' ? 'Approve' : 'Reject'}`}
                                             </button>
                                         </div>
                                     </div>
@@ -2872,6 +3044,11 @@ const Admin = ({ onNotificationSubmit }) => {
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto"> {/* Increased width for two columns */}
                                     <div className="p-6">
                                         <h2 className="text-xl font-bold text-gray-800 mb-4">Select Ranks</h2>
+                                        {approvalActionMessage ? (
+                                            <p className="mb-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-700">
+                                                {approvalActionMessage}
+                                            </p>
+                                        ) : null}
 
                                         {/* Select All Checkbox (for ALL ranks) */}
                                         <div className="grid grid-cols-[20px_1fr] items-center gap-3 mb-3">
@@ -2886,6 +3063,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                     }
                                                 }}
                                                 onChange={handleSelectAllRanksChange}
+                                                disabled={isApprovalActionPending}
                                                 className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                             />
                                             <label htmlFor="select-all-ranks" className="text-sm font-medium text-gray-700"
@@ -2920,6 +3098,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                                     }
                                                                 }}
                                                                 onChange={() => handleSelectAllDeckRanksChange()} // Call the new handler
+                                                                disabled={isApprovalActionPending}
                                                                 className="ml-4 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                             />
                                                             <label htmlFor="select-all-deck-ranks" className="ml-1 block text-xs font-medium text-gray-600">
@@ -2937,6 +3116,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                                         id={`deck-rank-${rank.id}`} // Unique ID for deck ranks
                                                                         checked={selectedRankIds.has(rank.id)}
                                                                         onChange={() => handleRankCheckboxChange(rank.id)}
+                                                                        disabled={isApprovalActionPending}
                                                                         className="h-4 w-4 shrink-0 text-indigo-600 border-gray-300 rounded"
 
                                                                     />
@@ -2966,6 +3146,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                                     }
                                                                 }}
                                                                 onChange={() => handleSelectAllEngineRanksChange()} // Call the new handler
+                                                                disabled={isApprovalActionPending}
                                                                 className="ml-4 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                             />
                                                             <label htmlFor="select-all-engine-ranks" className="ml-1 block text-xs font-medium text-gray-600">
@@ -2982,6 +3163,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                                         id={`engine-rank-${rank.id}`} // Unique ID for engine ranks
                                                                         checked={selectedRankIds.has(rank.id)}
                                                                         onChange={() => handleRankCheckboxChange(rank.id)}
+                                                                        disabled={isApprovalActionPending}
                                                                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                                     />
                                                                     <label htmlFor={`engine-rank-${rank.id}`} className="ml-3 block text-sm text-gray-700">
@@ -3011,20 +3193,24 @@ const Admin = ({ onNotificationSubmit }) => {
                                             <button
                                                 type="button"
                                                 onClick={handleCancelRankSelection}
-                                                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 transition"
+                                                disabled={isApprovalActionPending}
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isApprovalActionPending
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                                                    }`}
                                             >
                                                 Cancel
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={handleConfirmRankSelection}
-                                                disabled={selectedRankIds.size === 0} // Disable if no ranks selected
-                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${selectedRankIds.size === 0
+                                                disabled={selectedRankIds.size === 0 || isApprovalActionPending} // Disable if no ranks selected
+                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${selectedRankIds.size === 0 || isApprovalActionPending
                                                     ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                                                     : 'bg-sky-700 hover:bg-sky-800 text-white'
                                                     }`}
                                             >
-                                                Confirm
+                                                {isApprovalActionPending ? 'Processing...' : 'Confirm'}
                                             </button>
                                         </div>
                                     </div>
@@ -3036,10 +3222,16 @@ const Admin = ({ onNotificationSubmit }) => {
 
                         {/* Action Buttons */}
                         <div className="flex justify-end gap-2 pt-4">
+                            {approvalActionMessage && !showVesselPopup && !showCommentModal && !showRankPopup ? (
+                                <p className="mr-auto rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-700">
+                                    {approvalActionMessage}
+                                </p>
+                            ) : null}
                             <WithPermission formId="PSC_F_009" processId="PSC_P_017">
                                 <button
                                     type="button"
                                     onClick={handleSaveDraft}
+                                    disabled={isApprovalActionPending}
                                     className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-medium hover:bg-gray-300 transition border border-gray-300"
                                 >
                                     Save Draft
@@ -3049,20 +3241,22 @@ const Admin = ({ onNotificationSubmit }) => {
                                 <button
                                     type="button" // Changed from 'submit' to 'button'
                                     onClick={handleVesselSelectionForPublishing} // Call the new handler
+                                    disabled={isApprovalActionPending}
                                     process-id="PSC_P_024"
                                     className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-sky-700 hover:bg-sky-800 text-white h-9 px-3"
                                 >
-                                    Publish
+                                    {isApprovalActionPending ? 'Processing...' : 'Publish'}
                                 </button>
                             </WithPermission>
                             <WithPermission formId="PSC_F_009" processId="PSC_P_018">
                                 <button
                                     type="button"
                                     onClick={handleSubmit}
+                                    disabled={isApprovalActionPending}
                                     process-id="PSC_P_018"
                                     className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-sky-700 hover:bg-sky-800 text-white h-9 px-3"
                                 >
-                                    Submit for Approval
+                                    {isApprovalActionPending ? 'Processing...' : 'Submit for Approval'}
                                 </button>
                             </WithPermission>
 
@@ -3315,7 +3509,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                         <Button
                                                             size="sm"
                                                             className="bg-emerald-200 hover:bg-emerald-300 text-emerald-800"
-                                                            onClick={() => handleApproveReject(req.sr_no, 'approve')}
+                                                            onClick={() => handleApproveReject(req, 'approve')}
                                                             process-id="PSC_P_026"
                                                         >
                                                             Approve
@@ -3325,7 +3519,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                         <Button
                                                             size="sm"
                                                             className="bg-rose-200 hover:bg-rose-300 text-rose-800"
-                                                            onClick={() => handleApproveReject(req.sr_no, 'reject')}
+                                                            onClick={() => handleApproveReject(req, 'reject')}
                                                             process-id="PSC_P_027"
                                                         >
                                                             Reject

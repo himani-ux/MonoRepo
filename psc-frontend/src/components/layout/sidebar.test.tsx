@@ -133,6 +133,13 @@ describe('Sidebar', () => {
     expect(screen.getByText('7')).toBeInTheDocument();
   });
 
+  it('shows_help_entry_in_footer_for_authenticated_users', () => {
+    render(<Sidebar isOpen />);
+
+    expect(screen.getByText('Help')).toBeInTheDocument();
+    expect(screen.getByText('User guides by module')).toBeInTheDocument();
+  });
+
   it('keeps inspection tree collapsed on circular route until inspection is clicked', () => {
     sidebarMocks.useLocation.mockReturnValue({ pathname: '/circular' });
 
@@ -156,5 +163,13 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Inspections')).toBeInTheDocument();
+  });
+
+  it('marks_help_entry_as_active_on_help_route', () => {
+    sidebarMocks.useLocation.mockReturnValue({ pathname: '/help' });
+
+    render(<Sidebar isOpen />);
+
+    expect(screen.getByRole('link', { name: /help user guides by module/i })).toHaveAttribute('href', '/help');
   });
 });

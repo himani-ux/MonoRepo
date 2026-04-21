@@ -42,6 +42,35 @@ logging.basicConfig(
 )
 
 
+def _normalize_circular_role(role_value):
+    return str(role_value or '').strip().upper()
+
+
+def _is_circular_master_role(role_value):
+    normalized_role = _normalize_circular_role(role_value)
+    return normalized_role == 'MASTER' or normalized_role.endswith('_MASTER')
+
+
+def _sortable_notification_dt(value):
+    return value.isoformat() if value else ''
+
+
+def _select_ack_notification_record(notification_rows):
+    rows = list(notification_rows)
+    if not rows:
+        return None
+
+    return max(
+        rows,
+        key=lambda row: (
+            row.reminder_count if row.reminder_count is not None else -1,
+            _sortable_notification_dt(row.reminder_sent_at),
+            _sortable_notification_dt(row.delivered_at),
+            _sortable_notification_dt(row.seen_at),
+        ),
+    )
+
+
 # Regular font
 FONT_REG = os.path.join(settings.BASE_DIR, 'static', 'fonts', 'BOOKOS.TTF')
 
@@ -740,6 +769,7 @@ def crew_acknowledge_notification(request):
         sr_no = data.get('msc_sr_no')
         crew_id = data.get('crew_id')
         crew_role = data.get('crew_role')
+        is_master_role = _is_circular_master_role(crew_role)
         logging.info(f"TYPE CHECK => sr_no={sr_no} ({type(sr_no)}), crew_id={crew_id} ({type(crew_id)}) , crew_role={crew_role} ({type(crew_role)})")
 
 
@@ -749,10 +779,18 @@ def crew_acknowledge_notification(request):
             return JsonResponse({'error': 'msc_sr_no and crew_id are required'}, status=400)
 
         # fetch crew notification
-        try:
-            obj1 = MscNotification.objects.get(msc_sr_no=sr_no, crew_id=crew_id)
-        except MscNotification.DoesNotExist:
+        notification_rows = list(MscNotification.objects.filter(msc_sr_no=sr_no, crew_id=crew_id))
+        obj1 = _select_ack_notification_record(notification_rows)
+        if obj1 is None:
             return JsonResponse({'error': 'Record not found in msc_notification'}, status=404)
+        if len(notification_rows) > 1:
+            logging.warning(
+                "Multiple msc_notification rows found for acknowledge request: sr_no=%s crew_id=%s count=%s. "
+                "Proceeding with the row carrying the highest reminder state.",
+                sr_no,
+                crew_id,
+                len(notification_rows),
+            )
 
         logging.info('line obj1')
         # fetch acknowledge history
@@ -767,7 +805,7 @@ def crew_acknowledge_notification(request):
                     SET seen_at = GETDATE()
                     WHERE msc_sr_no = %s AND crew_id = %s
                 """,[sr_no,crew_id])
-            if crew_role == 'MASTER':
+            if is_master_role:
                 master_acknowledge_ship_notification(crew_id,sr_no)     
             with connection.cursor() as cursor:
                 cursor.execute("""
@@ -800,7 +838,7 @@ def crew_acknowledge_notification(request):
                 obj1.reminder_count,
                 obj2.id
             ])
-        if crew_role == 'MASTER':
+        if is_master_role:
             logging.info("MASTER check")
             master_acknowledge_ship_notification(crew_id,sr_no)
 

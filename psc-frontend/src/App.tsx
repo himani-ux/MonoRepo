@@ -44,6 +44,7 @@ const SyncStatusPage = lazy(() => import('@/routes/sync/page'));
 const NotificationsPage = lazy(() => import('@/routes/notifications/page'));
 const SettingsPage = lazy(() => import('@/routes/settings/page'));
 const ReportsPage = lazy(() => import('@/routes/reports/page'));
+const HelpPage = lazy(() => import('@/routes/help/page'));
 const CircularModulePage = lazy(() =>
   import('@/routes/circular/page').then((m) => ({ default: m.CircularModulePage }))
 );
@@ -252,6 +253,14 @@ function AppShell() {
               <PermissionGuard requiredProcess={PROCESS_IDS.VIEW_SETTINGS}>
                 <SettingsPage />
               </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.HELP}
+          element={
+            <AuthGuard>
+              <HelpPage />
             </AuthGuard>
           }
         />

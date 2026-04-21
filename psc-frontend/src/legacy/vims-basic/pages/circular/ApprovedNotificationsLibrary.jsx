@@ -52,6 +52,15 @@ const ApprovedNotificationsLibrary = () => {
     const [priorityUuidToNameMap, setPriorityUuidToNameMap] = useState({});
     const [loadingLookupMaps, setLoadingLookupMaps] = useState(true); // To track loading of lookup data
     const [expandedTitle, setExpandedTitle] = useState(null);
+    const [showResendModal, setShowResendModal] = useState(false);
+    const [resendNotification, setResendNotification] = useState(null);
+    const [resendComment, setResendComment] = useState("");
+    const [resendVessels, setResendVessels] = useState([]);
+    const [resendSelectedVesselIds, setResendSelectedVesselIds] = useState(new Set());
+    const [resendRanks, setResendRanks] = useState([]);
+    const [resendSelectedRankIds, setResendSelectedRankIds] = useState(new Set());
+    const [loadingResendOptions, setLoadingResendOptions] = useState(false);
+    const [isResendSubmitting, setIsResendSubmitting] = useState(false);
 
     const normalizeNotificationTitle = (notification) => {
         const rawTitle = notification?.title;
@@ -64,18 +73,34 @@ const ApprovedNotificationsLibrary = () => {
         return "No title";
     };
 
-    const getCrewPrimaryLabel = (record) => {
-        const primaryParts = [record?.rank_name, record?.vessel_name].filter(Boolean);
-        if (primaryParts.length) {
-            return primaryParts.join(" | ");
+    const normalizeHashtags = (value) => {
+        if (Array.isArray(value)) {
+            return value
+                .map((tag) => String(tag || "").trim())
+                .filter(Boolean);
         }
-        return record?.resolved_crew_id || record?.crew_id || "Unknown Crew";
+
+        if (typeof value === "string") {
+            return value
+                .split(/[\s,]+/)
+                .map((tag) => tag.trim())
+                .filter(Boolean);
+        }
+
+        return [];
+    };
+
+    const getCrewPrimaryLabel = (record) => {
+        return record?.crew_name || record?.resolved_crew_id || record?.crew_id || "Unknown Crew";
     };
 
     const getCrewSecondaryLabel = (record) => {
         const secondaryParts = [];
-        if (record?.crew_name) {
-            secondaryParts.push(record.crew_name);
+        if (record?.rank_name) {
+            secondaryParts.push(record.rank_name);
+        }
+        if (record?.vessel_name) {
+            secondaryParts.push(record.vessel_name);
         }
         if (record?.resolved_crew_id) {
             secondaryParts.push(`Crew ID: ${record.resolved_crew_id}`);
@@ -89,6 +114,7 @@ const ApprovedNotificationsLibrary = () => {
         return [
             record?.rank_name,
             record?.vessel_name,
+            record?.crew_status_name,
             record?.crew_name,
             record?.resolved_crew_id,
             record?.crew_id,
@@ -117,6 +143,45 @@ const ApprovedNotificationsLibrary = () => {
         if (!query) return true;
         return getCrewSearchText(record).includes(query);
     });
+
+    const seenCrewStats = {
+        total: seenCrewsData.length,
+        seen: seenCrewsData.filter((record) => Boolean(record?.seen_at)).length,
+        unread: seenCrewsData.filter((record) => !record?.seen_at).length,
+        reminded: seenCrewsData.filter((record) => Boolean(record?.reminder_sent_at)).length,
+    };
+
+    const formatCrewDateTime = (value) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return value;
+        }
+        return parsed.toLocaleString();
+    };
+
+    const seqRankNames = [
+        "Master",
+        "Chief Officer",
+        "Second Officer",
+        "Third Officer",
+        "Deck Fitter",
+        "Deck Cadet",
+        "Bosun",
+        "Able Bodied Seaman",
+        "Ordinary Seaman",
+        "Cook",
+        "Messman",
+        "Welder",
+    ].map((name) => name.toLowerCase());
+
+    const resendDeckRanks = resendRanks.filter((rank) =>
+        seqRankNames.includes((rank.rank_name || rank.name || "").toLowerCase())
+    );
+
+    const resendTechnicalRanks = resendRanks.filter(
+        (rank) => !seqRankNames.includes((rank.rank_name || rank.name || "").toLowerCase())
+    );
 
 
     // --- NEW: Fetch Lookup Maps on Component Mount ---
@@ -189,6 +254,38 @@ const ApprovedNotificationsLibrary = () => {
 
     }, []);
 
+    const loadApprovedNotifications = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch(
+                "http://localhost:8000/api/circular/api/approved-notifications/"
+            );
+            if (!response.ok) {
+                throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+
+            const notificationsWithNames = data.map(notification => {
+                const hashtags = normalizeHashtags(notification.hashtags);
+                return {
+                    ...notification,
+                    title: normalizeNotificationTitle(notification),
+                    hashtags,
+                    hashtagsText: hashtags.join(' '),
+                    msc_type: typeUuidToNameMap[notification.msc_type] || notification.msc_type,
+                    priority: priorityUuidToNameMap[notification.priority] || notification.priority,
+                };
+            });
+
+            setNotifications(notificationsWithNames);
+            setFilteredNotifications(notificationsWithNames);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (loadingLookupMaps) {
@@ -201,37 +298,7 @@ const ApprovedNotificationsLibrary = () => {
             // return;
         }
 
-        const fetchApprovedNotifications = async () => {
-            try {
-                setLoading(true);
-                // console.log("ApprovedNotificationsLibrary: Fetching approved notifications...");
-                const response = await fetch(
-                    "http://localhost:8000/api/circular/api/approved-notifications/"
-                );
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
-                }
-                const data = await response.json();
-                // console.log("ApprovedNotificationsLibrary: Fetched raw notifications ", data);
-
-                const notificationsWithNames = data.map(notification => ({
-                    ...notification,
-                    title: normalizeNotificationTitle(notification),
-                    msc_type: typeUuidToNameMap[notification.msc_type] || notification.msc_type,
-                    priority: priorityUuidToNameMap[notification.priority] || notification.priority,
-                }));
-                // console.log("ApprovedNotificationsLibrary: Mapped notifications data with names:", notificationsWithNames);
-
-                setNotifications(notificationsWithNames);
-                setFilteredNotifications(notificationsWithNames);
-            } catch (err) {
-                // console.error("ApprovedNotificationsLibrary: Error fetching notifications:", err);
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchApprovedNotifications();
+        loadApprovedNotifications();
     }, [loadingLookupMaps, error]);
 
 
@@ -246,7 +313,7 @@ const ApprovedNotificationsLibrary = () => {
             result = result.filter((n) =>
                 (n.title && n.title.toLowerCase().includes(query)) ||
                 (n.sr_no && n.sr_no.toLowerCase().includes(query)) ||
-                (n.hashtags && n.hashtags.toLowerCase().includes(query))
+                (n.hashtagsText && n.hashtagsText.toLowerCase().includes(query))
             );
         }
 
@@ -326,42 +393,206 @@ const ApprovedNotificationsLibrary = () => {
 
 
     // --- NEW: Handler for Send Reminder Button ---
-    const handleSendReminder = async (srNoForReminder) => {
-        console.log("🔔 handleSendReminder: Sending reminder for notification SR No:", srNoForReminder);
-        const confirmed = window.confirm(`Are you sure you want to send a reminder for notification ${srNoForReminder}?`);
-        if (!confirmed) {
-            console.log("handleSendReminder: User cancelled reminder.");
-            return; // Stop if user cancels
+    const closeResendModal = (force = false) => {
+        if (isResendSubmitting && !force) {
+            return;
         }
+
+        setShowResendModal(false);
+        setResendNotification(null);
+        setResendComment("");
+        setResendVessels([]);
+        setResendSelectedVesselIds(new Set());
+        setResendRanks([]);
+        setResendSelectedRankIds(new Set());
+        setLoadingResendOptions(false);
+    };
+
+    const handleOpenResendModal = async (notification) => {
+        setResendNotification(notification);
+        setResendComment(notification?.publish_comment || "");
+        setResendSelectedVesselIds(new Set());
+        setResendSelectedRankIds(new Set());
+        setResendVessels([]);
+        setResendRanks([]);
+        setShowResendModal(true);
+        setLoadingResendOptions(true);
 
         try {
-            // Call the backend endpoint to update the reminder_sent_at field
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoForReminder}/send-reminder/`, { // Use your new reminder endpoint
-                method: 'POST', // Use POST for state-changing actions
-                headers: {
-                    'Content-Type': 'application/json',
-                    // 'X-CSRFToken': getCookie('csrftoken'), // Add if needed
-                },
-                // credentials: 'include' // Include if using sessions/cookies for auth
-            });
+            const [vesselsResponse, ranksResponse] = await Promise.all([
+                fetch("http://localhost:8000/api/circular/api/vessels/"),
+                fetch("http://localhost:8000/api/circular/api/ranks/"),
+            ]);
 
-            const result = await response.json();
-
-            if (response.ok) {
-                console.log("✅ handleSendReminder: Reminder sent successfully for notification", srNoForReminder);
-                alert(`Reminder sent successfully for notification ${srNoForReminder}.`);
-                // Optionally, you could refresh the list here if needed to reflect the updated reminder timestamp
-                // fetchUserNotifications(sortDirection, sortCriteria);
-            } else {
-                console.error("handleSendReminder: Error sending reminder:", result.error);
-                alert(`Error sending reminder: ${result.error || 'Unknown error'}`);
+            if (!vesselsResponse.ok) {
+                throw new Error(`Failed to fetch vessels: ${vesselsResponse.status} ${vesselsResponse.statusText}`);
             }
+
+            if (!ranksResponse.ok) {
+                throw new Error(`Failed to fetch ranks: ${ranksResponse.status} ${ranksResponse.statusText}`);
+            }
+
+            const [vesselsData, ranksData] = await Promise.all([
+                vesselsResponse.json(),
+                ranksResponse.json(),
+            ]);
+
+            setResendVessels(Array.isArray(vesselsData) ? vesselsData : []);
+            setResendRanks(Array.isArray(ranksData) ? ranksData : []);
         } catch (err) {
-            console.error("handleSendReminder: Network error sending reminder for notification", srNoForReminder, err);
-            alert('Network error occurred while sending reminder.');
+            console.error("handleOpenResendModal: Failed to load resend options:", err);
+            alert(`Failed to load resend options: ${err.message}`);
+            setShowResendModal(false);
+            setResendNotification(null);
+        } finally {
+            setLoadingResendOptions(false);
         }
     };
-    // --- END NEW ---
+
+    const handleResendVesselToggle = (vesselId) => {
+        setResendSelectedVesselIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(vesselId)) {
+                next.delete(vesselId);
+            } else {
+                next.add(vesselId);
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAllResendVessels = () => {
+        if (resendSelectedVesselIds.size === resendVessels.length && resendVessels.length > 0) {
+            setResendSelectedVesselIds(new Set());
+            return;
+        }
+
+        setResendSelectedVesselIds(new Set(resendVessels.map((vessel) => vessel.id)));
+    };
+
+    const handleResendRankToggle = (rankId) => {
+        setResendSelectedRankIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(rankId)) {
+                next.delete(rankId);
+            } else {
+                next.add(rankId);
+            }
+            return next;
+        });
+    };
+
+    const toggleResendRankGroup = (ranks) => {
+        const rankIds = new Set(ranks.map((rank) => rank.id));
+        const groupFullySelected = ranks.length > 0 && ranks.every((rank) => resendSelectedRankIds.has(rank.id));
+
+        setResendSelectedRankIds((prev) => {
+            const next = new Set(prev);
+            if (groupFullySelected) {
+                rankIds.forEach((id) => next.delete(id));
+            } else {
+                rankIds.forEach((id) => next.add(id));
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAllResendRanks = () => {
+        if (resendSelectedRankIds.size === resendRanks.length && resendRanks.length > 0) {
+            setResendSelectedRankIds(new Set());
+            return;
+        }
+
+        setResendSelectedRankIds(new Set(resendRanks.map((rank) => rank.id)));
+    };
+
+    const handleConfirmResendApproval = async () => {
+        if (isResendSubmitting) {
+            return;
+        }
+
+        if (!resendNotification?.sr_no) {
+            alert("Circular information is missing. Please try again.");
+            return;
+        }
+
+        if (!user?.employee_id) {
+            alert("You must be logged in to resend a circular.");
+            return;
+        }
+
+        const selectedVesselIds = Array.from(resendSelectedVesselIds);
+        const selectedRankIds = Array.from(resendSelectedRankIds);
+
+        setIsResendSubmitting(true);
+
+        try {
+            const approvalResponse = await fetch(
+                `http://localhost:8000/api/circular/api/notifications/${resendNotification.sr_no}/update-status/`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        publish_status: 2,
+                        publish_comment: resendComment || "",
+                        published_by: user.employee_id,
+                        published_on: new Date().toISOString(),
+                        vessel_ids: selectedVesselIds,
+                        resend_approval: true,
+                    }),
+                }
+            );
+            const approvalResult = await approvalResponse.json();
+            if (!approvalResponse.ok) {
+                throw new Error(approvalResult.error || "Failed to rerun approval.");
+            }
+
+            if (selectedVesselIds.length > 0) {
+                const vesselResponse = await fetch(
+                    "http://localhost:8000/api/circular/api/notifications/send-emails/",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            notification_sr_no: resendNotification.sr_no,
+                            vessel_ids: selectedVesselIds,
+                        }),
+                    }
+                );
+                const vesselResult = await vesselResponse.json();
+                if (!vesselResponse.ok) {
+                    throw new Error(vesselResult.error || "Failed to send circular to selected vessels.");
+                }
+            }
+
+            if (selectedRankIds.length > 0) {
+                const rankResponse = await fetch(
+                    `http://localhost:8000/api/circular/api/notifications/${resendNotification.sr_no}/link-ranks/`,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            notification_sr_no: resendNotification.sr_no,
+                            selected_rank_ids: selectedRankIds,
+                        }),
+                    }
+                );
+                const rankResult = await rankResponse.json();
+                if (!rankResponse.ok) {
+                    throw new Error(rankResult.error || "Failed to link selected ranks.");
+                }
+            }
+
+            await loadApprovedNotifications();
+            closeResendModal(true);
+            alert("Circular approval process repeated successfully.");
+        } catch (err) {
+            console.error("handleConfirmResendApproval: Error while resending circular:", err);
+            alert(err.message || "Failed to resend circular.");
+        } finally {
+            setIsResendSubmitting(false);
+        }
+    };
 
 
 
@@ -805,6 +1036,24 @@ const ApprovedNotificationsLibrary = () => {
                                                 </button>
                                             </WithPermission>
 
+                                            <WithPermission id="PSC_P_044">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenResendModal(n)}
+                                                    disabled={isResendSubmitting && resendNotification?.sr_no === n.sr_no}
+                                                    process-id="PSC_P_044"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-warning-100 bg-warning-50 text-warning-700 shadow-sm transition-colors hover:bg-warning-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    aria-label={`Resend ${n.sr_no}`}
+                                                    title={
+                                                        isResendSubmitting && resendNotification?.sr_no === n.sr_no
+                                                            ? `Repeating approval for ${n.sr_no}`
+                                                            : `Repeat approval for ${n.sr_no}`
+                                                    }
+                                                >
+                                                    <RefreshCcw size={14} className={isResendSubmitting && resendNotification?.sr_no === n.sr_no ? 'animate-spin' : ''} />
+                                                </button>
+                                            </WithPermission>
+
                                             <WithPermission id="PSC_P_023">
                                                 <button
                                                     onClick={() => handleDelete(n.sr_no)}
@@ -834,9 +1083,200 @@ const ApprovedNotificationsLibrary = () => {
                                             </button>
                                         </div>
                                     </div>
+
+                                    {n.hashtags.length > 0 && (
+                                        <div className="mb-3 flex flex-wrap gap-1.5">
+                                            {n.hashtags.map((tag, index) => (
+                                                <span
+                                                    key={`${n.sr_no || n.id}-hashtag-${index}`}
+                                                    className="inline-flex items-center rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700"
+                                                >
+                                                    {tag.startsWith('#') ? tag : `#${tag}`}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         ))}
+                    </div>
+                )}
+
+                {showResendModal && resendNotification && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                        onClick={closeResendModal}
+                    >
+                        <div
+                            className="w-full max-w-5xl rounded-xl bg-white shadow-xl"
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-neutral-900">Repeat Approval</h2>
+                                    <p className="text-sm text-neutral-500">{resendNotification.sr_no}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeResendModal}
+                                    className="rounded-md p-1 text-gray-500 transition hover:bg-neutral-100 hover:text-gray-700"
+                                    aria-label="Close resend modal"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+
+                            <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+                                {loadingResendOptions ? (
+                                    <div className="py-12 text-center">
+                                        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500" />
+                                        <p className="mt-3 text-sm text-neutral-500">Loading vessels and ranks...</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-neutral-700">
+                                                Approval Comment
+                                            </label>
+                                            <textarea
+                                                value={resendComment}
+                                                onChange={(event) => setResendComment(event.target.value)}
+                                                rows={4}
+                                                placeholder="Update the approval comment if needed..."
+                                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-6 lg:grid-cols-2">
+                                            <div className="rounded-xl border border-neutral-200 p-4">
+                                                <div className="mb-3 flex items-center justify-between">
+                                                    <h3 className="text-sm font-semibold text-neutral-900">Select Vessels</h3>
+                                                    <label className="inline-flex items-center gap-2 text-xs text-neutral-600">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={resendVessels.length > 0 && resendVessels.every((vessel) => resendSelectedVesselIds.has(vessel.id))}
+                                                            onChange={handleSelectAllResendVessels}
+                                                        />
+                                                        Select All
+                                                    </label>
+                                                </div>
+                                                <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                                                    {resendVessels.map((vessel) => (
+                                                        <label
+                                                            key={vessel.id}
+                                                            className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={resendSelectedVesselIds.has(vessel.id)}
+                                                                onChange={() => handleResendVesselToggle(vessel.id)}
+                                                            />
+                                                            <span>
+                                                                {vessel.vesselName || vessel.VesselName || vessel.vessel_name || vessel.name || vessel.id}
+                                                                {vessel.vesselCode ? ` (${vessel.vesselCode})` : ""}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-xl border border-neutral-200 p-4">
+                                                <div className="mb-3 flex items-center justify-between">
+                                                    <h3 className="text-sm font-semibold text-neutral-900">Select Ranks</h3>
+                                                    <label className="inline-flex items-center gap-2 text-xs text-neutral-600">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={resendRanks.length > 0 && resendRanks.every((rank) => resendSelectedRankIds.has(rank.id))}
+                                                            onChange={handleSelectAllResendRanks}
+                                                        />
+                                                        Select All
+                                                    </label>
+                                                </div>
+
+                                                <div className="grid gap-4 md:grid-cols-2">
+                                                    <div>
+                                                        <div className="mb-2 flex items-center justify-between">
+                                                            <h4 className="text-xs font-semibold uppercase tracking-wide text-sky-700">Deck</h4>
+                                                            <label className="inline-flex items-center gap-2 text-[11px] text-neutral-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={resendDeckRanks.length > 0 && resendDeckRanks.every((rank) => resendSelectedRankIds.has(rank.id))}
+                                                                    onChange={() => toggleResendRankGroup(resendDeckRanks)}
+                                                                />
+                                                                Select All
+                                                            </label>
+                                                        </div>
+                                                        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                                            {resendDeckRanks.map((rank) => (
+                                                                <label
+                                                                    key={rank.id}
+                                                                    className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={resendSelectedRankIds.has(rank.id)}
+                                                                        onChange={() => handleResendRankToggle(rank.id)}
+                                                                    />
+                                                                    <span>{rank.rank_name || rank.name || rank.id}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="mb-2 flex items-center justify-between">
+                                                            <h4 className="text-xs font-semibold uppercase tracking-wide text-sky-700">Technical</h4>
+                                                            <label className="inline-flex items-center gap-2 text-[11px] text-neutral-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={resendTechnicalRanks.length > 0 && resendTechnicalRanks.every((rank) => resendSelectedRankIds.has(rank.id))}
+                                                                    onChange={() => toggleResendRankGroup(resendTechnicalRanks)}
+                                                                />
+                                                                Select All
+                                                            </label>
+                                                        </div>
+                                                        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                                            {resendTechnicalRanks.map((rank) => (
+                                                                <label
+                                                                    key={rank.id}
+                                                                    className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={resendSelectedRankIds.has(rank.id)}
+                                                                        onChange={() => handleResendRankToggle(rank.id)}
+                                                                    />
+                                                                    <span>{rank.rank_name || rank.name || rank.id}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-end gap-3 border-t border-neutral-200 px-6 py-4">
+                                <button
+                                    type="button"
+                                    onClick={closeResendModal}
+                                    disabled={isResendSubmitting}
+                                    className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmResendApproval}
+                                    disabled={loadingResendOptions || isResendSubmitting}
+                                    className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isResendSubmitting ? "Processing..." : "Repeat Approval"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -865,7 +1305,7 @@ const ApprovedNotificationsLibrary = () => {
 
                 {viewingSeenCrews && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="w-full max-w-md max-h-[80vh] overflow-hidden rounded-xl bg-white shadow-xl">
+                        <div className="w-full max-w-5xl max-h-[88vh] overflow-hidden rounded-xl bg-white shadow-xl">
                             <div className="max-h-[80vh] overflow-y-auto">
                                 <div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-4">
                                     <h2 className="text-lg font-semibold text-gray-800">Seen Crews for {viewingSeenCrews}</h2>
@@ -891,6 +1331,24 @@ const ApprovedNotificationsLibrary = () => {
                                             className="h-10 w-full rounded-lg border border-neutral-300 bg-white pl-10 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
                                         />
                                     </div>
+                                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                        <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                                            <div className="text-xs uppercase tracking-wide text-neutral-500">Total Crew</div>
+                                            <div className="mt-1 text-lg font-semibold text-neutral-900">{seenCrewStats.total}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+                                            <div className="text-xs uppercase tracking-wide text-green-700">Seen</div>
+                                            <div className="mt-1 text-lg font-semibold text-green-800">{seenCrewStats.seen}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                                            <div className="text-xs uppercase tracking-wide text-neutral-500">Unread</div>
+                                            <div className="mt-1 text-lg font-semibold text-neutral-900">{seenCrewStats.unread}</div>
+                                        </div>
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                                            <div className="text-xs uppercase tracking-wide text-amber-700">Reminder Sent</div>
+                                            <div className="mt-1 text-lg font-semibold text-amber-800">{seenCrewStats.reminded}</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="p-6">
 
@@ -902,53 +1360,103 @@ const ApprovedNotificationsLibrary = () => {
                                 ) : (
                                     <>
                                         {filteredSeenCrewsData.length > 0 ? (
-                                            <div className="space-y-2">
+                                            <div className="space-y-3">
+                                                <div className="hidden rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:gap-4">
+                                                    <div>Crew</div>
+                                                    <div>Rank / Vessel</div>
+                                                    <div>Status</div>
+                                                    <div className="text-right">Action</div>
+                                                </div>
                                                 {filteredSeenCrewsData.map((record, index) => (
-                                                    <div key={index} className={`p-3 rounded-lg ${record.seen_at ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'} flex items-center justify-between`}>
-                                                        <div className="flex-1">
-                                                            <div className="font-medium text-slate-900">{getCrewPrimaryLabel(record)}</div>
-                                                            {getCrewSecondaryLabel(record) && (
-                                                                <div className="text-xs text-slate-500 mt-1">{getCrewSecondaryLabel(record)}</div>
-                                                            )}
-                                                            {record.seen_at ? (
-                                                                <span className="text-sm text-green-700 ml-2">Seen at: {new Date(record.seen_at).toLocaleString()}</span>
-                                                            ) : (
-                                                                <span className="text-sm text-gray-500 ml-2">Not Seen</span>
-                                                            )}
-                                                        </div>
-                                                        {/* --- NEW: Send Reminder Button (Bell Icon) for Individual Crew --- */}
-                                                        {!record.seen_at && ( // Only show the button if the crew has NOT seen the notification
-                                                            record.reminder_sent_at ? (
-                                                                <div
-                                                                    className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-50 px-2 py-1 text-xs font-medium text-warning-700"
-                                                                    title={`Reminder already sent to ${getCrewPrimaryLabel(record)}`}
-                                                                >
-                                                                    <BellRing size={14} />
-                                                                    Reminded
+                                                    <div
+                                                        key={`${record.resolved_crew_id || record.crew_id || 'crew'}-${index}`}
+                                                        className={`rounded-xl border p-4 ${
+                                                            record.seen_at
+                                                                ? 'border-green-200 bg-green-50/70'
+                                                                : 'border-neutral-200 bg-white'
+                                                        }`}
+                                                    >
+                                                        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:items-center md:gap-4">
+                                                            <div className="min-w-0">
+                                                                <div className="font-semibold text-slate-900">{getCrewPrimaryLabel(record)}</div>
+                                                                <div className="mt-1 text-xs text-slate-500">
+                                                                    {record?.resolved_crew_id ? `Crew ID: ${record.resolved_crew_id}` : `Crew Ref: ${record?.crew_id || '-'}`}
                                                                 </div>
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => handleSendIndividualReminder(viewingSeenCrews, record.crew_id, getCrewPrimaryLabel(record))} // Pass the SR No and crew ID
-                                                                    disabled={sendingIndividualReminder === record.crew_id}
-                                                                    className="ml-2 rounded-full bg-amber-100 p-1 text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                                                                    title={
-                                                                        sendingIndividualReminder === record.crew_id
-                                                                            ? `Sending reminder to ${getCrewPrimaryLabel(record)}`
-                                                                            : `Send reminder to ${getCrewPrimaryLabel(record)}`
-                                                                    }
-                                                                >
-                                                                    <Bell size={16} className={sendingIndividualReminder === record.crew_id ? 'animate-pulse' : ''} />
-                                                                </button>
-                                                            )
-                                                        )}
-                                                        {/* --- END NEW: Send Reminder Button --- */}
-
-                                                        {/* Optionally display reminder_sent_at */}
-                                                        {record.reminder_sent_at && (
-                                                            <div className="text-xs text-amber-600 ml-2">
-                                                                Reminder sent at: {new Date(record.reminder_sent_at).toLocaleString()}
                                                             </div>
-                                                        )}
+
+                                                            <div className="min-w-0">
+                                                                <div className="text-sm font-medium text-neutral-800">{record?.rank_name || 'Rank not available'}</div>
+                                                                <div className="mt-1 text-xs text-neutral-500">{record?.vessel_name || 'Vessel not available'}</div>
+                                                                <div className="mt-2">
+                                                                    <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                                                                        Status: {record?.crew_status_name || 'Unknown'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="min-w-0">
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                                                        record.seen_at
+                                                                            ? 'bg-green-100 text-green-700'
+                                                                            : 'bg-neutral-100 text-neutral-600'
+                                                                    }`}>
+                                                                        {record.seen_at ? 'Seen' : 'Unread'}
+                                                                    </span>
+                                                                    {record.reminder_sent_at && (
+                                                                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                                                            Reminder Sent
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="mt-2 space-y-1 text-xs text-neutral-500">
+                                                                    <div>
+                                                                        {record.seen_at
+                                                                            ? `Seen at: ${formatCrewDateTime(record.seen_at)}`
+                                                                            : 'Seen at: Not yet read'}
+                                                                    </div>
+                                                                    <div>
+                                                                        {record.reminder_sent_at
+                                                                            ? `Reminder at: ${formatCrewDateTime(record.reminder_sent_at)}`
+                                                                            : 'Reminder at: Not sent'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex justify-start md:justify-end">
+                                                                {!record.seen_at ? (
+                                                                    <button
+                                                                        onClick={() => handleSendIndividualReminder(viewingSeenCrews, record.crew_id, getCrewPrimaryLabel(record))}
+                                                                        disabled={sendingIndividualReminder === record.crew_id}
+                                                                        className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                                                            record.reminder_sent_at
+                                                                                ? 'bg-warning-50 text-warning-700 hover:bg-warning-100'
+                                                                                : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                                                        }`}
+                                                                        title={
+                                                                            sendingIndividualReminder === record.crew_id
+                                                                                ? `Sending reminder to ${getCrewPrimaryLabel(record)}`
+                                                                                : record.reminder_sent_at
+                                                                                    ? `Resend reminder to ${getCrewPrimaryLabel(record)}`
+                                                                                    : `Send reminder to ${getCrewPrimaryLabel(record)}`
+                                                                        }
+                                                                    >
+                                                                        {record.reminder_sent_at ? (
+                                                                            <BellRing size={14} className={sendingIndividualReminder === record.crew_id ? 'animate-pulse' : ''} />
+                                                                        ) : (
+                                                                            <Bell size={14} className={sendingIndividualReminder === record.crew_id ? 'animate-pulse' : ''} />
+                                                                        )}
+                                                                        {sendingIndividualReminder === record.crew_id
+                                                                            ? 'Sending...'
+                                                                            : record.reminder_sent_at
+                                                                                ? 'Resend'
+                                                                                : 'Remind'}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-xs font-medium text-green-700">No action needed</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -963,9 +1471,7 @@ const ApprovedNotificationsLibrary = () => {
                                 )}
 
                                 <div className="mt-4 text-xs text-gray-500">
-                                    {/* * Green background indicates the crew has seen the notification.
-                    <br /> */}
-                                    * Click on Bell icon to send reminder.
+                                    Crew list is ordered by rank sequence where rank-level data is available.
                                 </div>
                                 </div>
                             </div>

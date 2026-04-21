@@ -9,6 +9,7 @@ import logging
 import traceback
 import hashlib
 import requests
+from types import SimpleNamespace
 from datetime import datetime, timezone
 from datetime import timezone as datetime_timezone
 from django.http import JsonResponse
@@ -39,6 +40,13 @@ from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.db.models.expressions import RawSQL
 from django.core.exceptions import ValidationError
+from apps.notifications.signals import (
+    notify_circular_approved,
+    notify_circular_created,
+    notify_circular_distribution,
+    notify_circular_pending_approval,
+    notify_circular_rejected,
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, Image
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
@@ -93,12 +101,7 @@ def _get_department_display_name_for_sr_no(dept_id_string):
     if override_display_name:
         return override_display_name
 
-    department_name = (
-        Department.objects
-        .filter(id=dept_id_string)
-        .values_list('department_name', flat=True)
-        .first()
-    )
+    department_name = _lookup_department_name_by_identifier(dept_id_string)
     if department_name and department_name.strip():
         return department_name.strip()
 
@@ -121,14 +124,14 @@ def _get_department_master_name(dept_id_string):
     if normalized_value.lower() in legacy_department_map:
         return legacy_department_map[normalized_value.lower()]
 
+    normalized_uuid = _clean_uuid_string(normalized_value)
+    if not normalized_uuid:
+        return normalized_value or None
+
     try:
-        department_name = (
-            Department.objects
-            .filter(id=normalized_value)
-            .values_list('department_name', flat=True)
-            .first()
-        )
-    except (ValidationError, ValueError, TypeError):
+        department_name = _lookup_department_name_by_identifier(normalized_uuid)
+    except Exception as exc:
+        print(f"_get_department_master_name: Failed to resolve department '{normalized_value}': {exc}")
         return normalized_value or None
 
     if department_name and department_name.strip():
@@ -150,6 +153,379 @@ def _clean_uuid_string(value):
         return str(uuid.UUID(cleaned_value))
     except (ValueError, AttributeError, TypeError):
         return None
+
+
+def _normalize_uuid_list(values):
+    normalized_values = []
+    seen_values = set()
+
+    for raw_value in values or []:
+        cleaned_value = _clean_uuid_string(raw_value)
+        if not cleaned_value or cleaned_value in seen_values:
+            continue
+        seen_values.add(cleaned_value)
+        normalized_values.append(cleaned_value)
+
+    return normalized_values
+
+
+def _normalize_text_list(values):
+    normalized_values = []
+    seen_values = set()
+
+    for raw_value in values or []:
+        cleaned_value = str(raw_value or "").strip()
+        if not cleaned_value or cleaned_value in seen_values:
+            continue
+        seen_values.add(cleaned_value)
+        normalized_values.append(cleaned_value)
+
+    return normalized_values
+
+
+def _format_pending_draft_doc_type_name(doc_type_display_name):
+    normalized_name = str(doc_type_display_name or '').strip()
+    if not normalized_name:
+        return 'this document type'
+
+    compact_name = normalized_name.replace(' ', '').lower()
+    if compact_name == 'workinstruction':
+        return 'Work Instruction'
+    if compact_name == 'circular':
+        return 'Circular'
+    if compact_name == 'alert':
+        return 'Alert'
+
+    return normalized_name
+
+
+def _build_pending_draft_conflict_message(doc_type_display_name):
+    resolved_doc_type_name = _format_pending_draft_doc_type_name(doc_type_display_name)
+    return (
+        f"There is already a draft pending for {resolved_doc_type_name}. "
+        "Please clear that first to avoid sequence disturbance."
+    )
+
+
+def _get_existing_active_draft_for_creator_and_type(created_by_id, msc_type_id, doc_type_display_name=None):
+    normalized_created_by = str(created_by_id or '').strip()
+    normalized_type_id = _clean_uuid_string(msc_type_id)
+    normalized_doc_type_name = str(doc_type_display_name or '').strip()
+    compact_doc_type_name = normalized_doc_type_name.replace(' ', '').lower()
+
+    if not normalized_created_by or (not normalized_type_id and not compact_doc_type_name):
+        return None
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP 1
+                id,
+                sr_no
+            FROM msc_data
+            WHERE LTRIM(RTRIM(ISNULL(created_by, ''))) = %s
+              AND publish_status = 0
+              AND ISNULL(is_deleted, 0) = 0
+              AND (
+                    (
+                        %s IS NOT NULL
+                        AND LOWER(CONVERT(VARCHAR(36), TRY_CONVERT(uniqueidentifier, msc_type))) = %s
+                    )
+                    OR (
+                        %s <> ''
+                        AND REPLACE(LOWER(LTRIM(RTRIM(CONVERT(NVARCHAR(255), msc_type)))), ' ', '') = %s
+                    )
+              )
+            ORDER BY created_at DESC
+            """,
+            [
+                normalized_created_by,
+                normalized_type_id,
+                normalized_type_id,
+                compact_doc_type_name,
+                compact_doc_type_name,
+            ],
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        return None
+
+    return SimpleNamespace(
+        id=row[0],
+        sr_no=row[1],
+    )
+
+
+def _lookup_department_name_by_identifier(dept_id_string):
+    normalized_value = str(dept_id_string or "").strip().lower()
+    if not normalized_value:
+        return None
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP 1 department_name
+            FROM department
+            WHERE LOWER(LTRIM(RTRIM(CONVERT(VARCHAR(36), id)))) = %s
+            """,
+            [normalized_value],
+        )
+        row = cursor.fetchone()
+
+    return str(row[0]).strip() if row and row[0] else None
+
+
+def _fetch_all_rows_from_cursor(cursor):
+    rows = []
+
+    while True:
+        if cursor.description is not None:
+            rows = cursor.fetchall()
+
+        try:
+            has_next_result = cursor.nextset()
+        except Exception as exc:
+            if "No results" in str(exc):
+                break
+            raise
+
+        if not has_next_result:
+            break
+
+    return rows
+
+
+def _build_uuid_values_clause(uuid_values):
+    if not uuid_values:
+        return "", []
+
+    return ", ".join(["(CAST(%s AS UNIQUEIDENTIFIER))"] * len(uuid_values)), list(uuid_values)
+
+
+def _bulk_insert_ship_delivery_records(notification_sr_no, vessel_ids, delivered_at):
+    normalized_vessel_ids = _normalize_uuid_list(vessel_ids)
+    if not normalized_vessel_ids:
+        return []
+
+    values_clause, sql_params = _build_uuid_values_clause(normalized_vessel_ids)
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_vessels TABLE (
+            vessel_id UNIQUEIDENTIFIER PRIMARY KEY
+        );
+
+        INSERT INTO @target_vessels (vessel_id)
+        VALUES {values_clause};
+
+        DECLARE @inserted_vessels TABLE (
+            vessel_id UNIQUEIDENTIFIER PRIMARY KEY
+        );
+
+        INSERT INTO msc_ship_notification (msc_sr_no_, vessel_id, delivered_at)
+        OUTPUT INSERTED.vessel_id INTO @inserted_vessels (vessel_id)
+        SELECT %s, target.vessel_id, %s
+        FROM @target_vessels target
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM msc_ship_notification existing WITH (UPDLOCK, HOLDLOCK)
+            WHERE existing.msc_sr_no_ = %s
+              AND existing.vessel_id = target.vessel_id
+        );
+
+        SELECT CAST(vessel_id AS VARCHAR(36)) AS vessel_id
+        FROM @inserted_vessels;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
+            sql_params + [notification_sr_no, delivered_at, notification_sr_no],
+        )
+        return _normalize_uuid_list([row[0] for row in _fetch_all_rows_from_cursor(cursor)])
+
+
+def _bulk_insert_rank_assignments(notification_sr_no, rank_ids, assigned_at):
+    normalized_rank_ids = _normalize_uuid_list(rank_ids)
+    if not normalized_rank_ids:
+        return []
+
+    values_clause, sql_params = _build_uuid_values_clause(normalized_rank_ids)
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_ranks TABLE (
+            rank_id UNIQUEIDENTIFIER PRIMARY KEY
+        );
+
+        INSERT INTO @target_ranks (rank_id)
+        VALUES {values_clause};
+
+        DECLARE @inserted_ranks TABLE (
+            rank_id UNIQUEIDENTIFIER PRIMARY KEY
+        );
+
+        INSERT INTO msc_rank_assigned (msc_sr_no, rank_id, assigned_date, is_active, is_deleted)
+        OUTPUT INSERTED.rank_id INTO @inserted_ranks (rank_id)
+        SELECT %s, target.rank_id, %s, 1, 0
+        FROM @target_ranks target
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM msc_rank_assigned existing WITH (UPDLOCK, HOLDLOCK)
+            WHERE existing.msc_sr_no = %s
+              AND existing.rank_id = target.rank_id
+              AND ISNULL(existing.is_deleted, 0) = 0
+        );
+
+        SELECT CAST(rank_id AS VARCHAR(36)) AS rank_id
+        FROM @inserted_ranks;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
+            sql_params + [notification_sr_no, assigned_at, notification_sr_no],
+        )
+        return _normalize_uuid_list([row[0] for row in _fetch_all_rows_from_cursor(cursor)])
+
+
+def _fetch_target_crew_ids_for_ranks(rank_ids):
+    normalized_rank_ids = _normalize_uuid_list(rank_ids)
+    if not normalized_rank_ids:
+        return []
+
+    placeholders = ", ".join(["%s"] * len(normalized_rank_ids))
+    sql = f"""
+        SELECT DISTINCT
+            LTRIM(RTRIM(fcl.CrewID)) AS crew_id
+        FROM final_crew_list fcl
+        INNER JOIN HRM501 hrm
+            ON hrm.id = TRY_CONVERT(UNIQUEIDENTIFIER, fcl.Crew_ref_id)
+        WHERE hrm.rank_name IN ({placeholders})
+          AND ISNULL(hrm.is_deleted, 0) = 0
+          AND LTRIM(RTRIM(ISNULL(fcl.CrewID, ''))) <> ''
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, normalized_rank_ids)
+        return _normalize_text_list([row[0] for row in cursor.fetchall()])
+
+
+def _bulk_insert_crew_delivery_records(notification_sr_no, crew_ids, delivered_at, reminder_count=1):
+    normalized_crew_ids = _normalize_text_list(crew_ids)
+    if not normalized_crew_ids:
+        return []
+
+    values_clause = ", ".join(["(%s)"] * len(normalized_crew_ids))
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_crews TABLE (
+            crew_id NVARCHAR(255) PRIMARY KEY
+        );
+
+        INSERT INTO @target_crews (crew_id)
+        VALUES {values_clause};
+
+        DECLARE @inserted_crews TABLE (
+            crew_id NVARCHAR(255) PRIMARY KEY
+        );
+
+        INSERT INTO msc_notification (msc_sr_no, crew_id, delivered_at, reminder_count)
+        OUTPUT INSERTED.crew_id INTO @inserted_crews (crew_id)
+        SELECT %s, target.crew_id, %s, %s
+        FROM @target_crews target
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM msc_notification existing WITH (UPDLOCK, HOLDLOCK)
+            WHERE existing.msc_sr_no = %s
+              AND LTRIM(RTRIM(existing.crew_id)) = target.crew_id
+        );
+
+        SELECT crew_id
+        FROM @inserted_crews;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
+            normalized_crew_ids + [notification_sr_no, delivered_at, reminder_count, notification_sr_no],
+        )
+        return _normalize_text_list([row[0] for row in _fetch_all_rows_from_cursor(cursor)])
+
+
+def _fetch_vessel_rows_by_ids(vessel_ids):
+    normalized_vessel_ids = _normalize_uuid_list(vessel_ids)
+    if not normalized_vessel_ids:
+        return {}
+
+    values_clause = ", ".join(["(%s)"] * len(normalized_vessel_ids))
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_vessels TABLE (
+            vessel_id NVARCHAR(36) PRIMARY KEY
+        );
+
+        INSERT INTO @target_vessels (vessel_id)
+        VALUES {values_clause};
+
+        SELECT
+            LOWER(LTRIM(RTRIM(CONVERT(VARCHAR(36), vessel.id)))) AS vessel_id,
+            vessel.VesselName,
+            vessel.vesselCode,
+            vessel.email
+        FROM VesselData vessel
+        INNER JOIN @target_vessels target
+            ON LOWER(LTRIM(RTRIM(CONVERT(VARCHAR(36), vessel.id)))) = target.vessel_id;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [value.lower() for value in normalized_vessel_ids])
+        rows = _fetch_all_rows_from_cursor(cursor)
+
+    return {
+        str(row[0]).strip().lower(): {
+            'id': str(row[0]).strip().lower(),
+            'vesselName': row[1],
+            'vesselCode': row[2],
+            'email': row[3],
+        }
+        for row in rows
+        if row and row[0]
+    }
+
+
+def _fetch_existing_ship_delivery_vessel_ids(notification_sr_no, vessel_ids):
+    normalized_vessel_ids = _normalize_uuid_list(vessel_ids)
+    if not normalized_vessel_ids:
+        return set()
+
+    values_clause = ", ".join(["(%s)"] * len(normalized_vessel_ids))
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_vessels TABLE (
+            vessel_id NVARCHAR(36) PRIMARY KEY
+        );
+
+        INSERT INTO @target_vessels (vessel_id)
+        VALUES {values_clause};
+
+        SELECT DISTINCT
+            LOWER(LTRIM(RTRIM(CONVERT(VARCHAR(36), ship_notification.vessel_id)))) AS vessel_id
+        FROM msc_ship_notification ship_notification
+        INNER JOIN @target_vessels target
+            ON LOWER(LTRIM(RTRIM(CONVERT(VARCHAR(36), ship_notification.vessel_id)))) = target.vessel_id
+        WHERE ship_notification.msc_sr_no_ = %s;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, [value.lower() for value in normalized_vessel_ids] + [notification_sr_no])
+        rows = _fetch_all_rows_from_cursor(cursor)
+
+    return set(_normalize_uuid_list([row[0] for row in rows]))
 
 
 def _safe_get_lookup_name_by_id(model_class, raw_id, fallback_value=None):
@@ -235,6 +611,13 @@ def _generate_unique_circular_sr_no(cursor, doc_type_display_name, dept_display_
         WHERE sr_no IS NOT NULL
           AND LEN(sr_no) > LEN(%s)
           AND LEFT(sr_no, LEN(%s)) = %s
+          AND NOT (
+              (
+                  publish_status = 0
+                  AND ISNULL(is_deleted, 0) = 1
+              )
+              OR publish_status = 3
+          )
         """,
         [prefix, prefix, prefix, prefix, prefix]
     )
@@ -244,7 +627,18 @@ def _generate_unique_circular_sr_no(cursor, doc_type_display_name, dept_display_
     while True:
         candidate_sr_no = f"{prefix}{next_serial:04d}"
         cursor.execute(
-            "SELECT COUNT(1) FROM msc_data WITH (UPDLOCK, HOLDLOCK) WHERE sr_no = %s",
+            """
+            SELECT COUNT(1)
+            FROM msc_data WITH (UPDLOCK, HOLDLOCK)
+            WHERE sr_no = %s
+              AND NOT (
+                  (
+                      publish_status = 0
+                      AND ISNULL(is_deleted, 0) = 1
+                  )
+                  OR publish_status = 3
+              )
+            """,
             [candidate_sr_no]
         )
         existing_row = cursor.fetchone()
@@ -357,6 +751,28 @@ def _get_original_attachment_copy_path(merged_attachment_path):
         return os.path.join(directory, f"original_{filename[len('merged_'):]}")
 
     return None
+
+
+def _store_circular_generated_pdf(formatted_id, pdf_data, uploaded_file_bytes=None):
+    uploaded_file_stream = (
+        io.BytesIO(uploaded_file_bytes) if uploaded_file_bytes is not None else None
+    )
+    merged_pdf_buffer = generate_pdf_with_cover_and_original(
+        uploaded_file_stream,
+        pdf_data,
+    )
+
+    media_path, merged_filepath, original_filepath = _get_circular_attachment_paths(formatted_id)
+    os.makedirs(media_path, exist_ok=True)
+
+    with open(merged_filepath, 'wb') as merged_file:
+        merged_file.write(merged_pdf_buffer.getvalue())
+
+    if uploaded_file_bytes is not None:
+        with open(original_filepath, 'wb') as original_file:
+            original_file.write(uploaded_file_bytes)
+
+    return os.path.basename(merged_filepath), merged_filepath
 
 
 def _is_system_generated_circular_page(page_obj, sr_no):
@@ -538,6 +954,27 @@ def create_notification(request):
         # --- Get Initial Publish Status ---
         initial_publish_status = int(request.POST.get('publish_status', 0))
         print(f"create_notification: publish_status: {initial_publish_status}")
+
+        existing_pending_draft = _get_existing_active_draft_for_creator_and_type(
+            created_by_employee_id,
+            doc_type_uuid_verified,
+            doc_type_display_name,
+        )
+        if existing_pending_draft:
+            conflict_message = _build_pending_draft_conflict_message(doc_type_display_name)
+            print(
+                "create_notification: Blocking new notification because an active draft already exists "
+                f"for created_by={created_by_employee_id}, msc_type={doc_type_uuid_verified}, "
+                f"draft_sr_no={existing_pending_draft.sr_no}"
+            )
+            return JsonResponse(
+                {
+                    'error': conflict_message,
+                    'draft_id': str(existing_pending_draft.id),
+                    'draft_sr_no': existing_pending_draft.sr_no,
+                },
+                status=409,
+            )
         
         # --- Initialize publisher variables ---
         published_by_id = None
@@ -598,37 +1035,30 @@ def create_notification(request):
                 )
             print(f"create_notification: Generated SR No: {formatted_id}")
 
+            uploaded_file_bytes = None
             if request.FILES.get('attachment'):
                 uploaded_file = request.FILES['attachment']
                 print("create_notification: Processing file attachment...")
                 uploaded_file_bytes = uploaded_file.read()
+            else:
+                print("create_notification: No attachment uploaded. Generating circular PDF from form content only.")
 
-                pdf_data = {
-                    'title': request.POST.get('title', ''),
-                    'body': request.POST.get('body', ''),
-                    'doc_type_name': doc_type_display_name,
-                    'formatted_id': formatted_id,
-                    'current_date': now.strftime('%d-%m-%Y'),
-                    'superseding_old_notification_sr_no': superseding_old_notification_sr_no,
-                    'created_by_employee_id': created_by_employee_id,
-                }
+            pdf_data = {
+                'title': request.POST.get('title', ''),
+                'body': request.POST.get('body', ''),
+                'doc_type_name': doc_type_display_name,
+                'formatted_id': formatted_id,
+                'current_date': now.strftime('%d-%m-%Y'),
+                'superseding_old_notification_sr_no': superseding_old_notification_sr_no,
+                'created_by_employee_id': created_by_employee_id,
+            }
 
-                merged_pdf_buffer = generate_pdf_with_cover_and_original(io.BytesIO(uploaded_file_bytes), pdf_data)
-
-                media_path, merged_filepath, original_filepath = _get_circular_attachment_paths(formatted_id)
-                os.makedirs(media_path, exist_ok=True)
-                filename = os.path.basename(merged_filepath)
-
-                with open(merged_filepath, 'wb') as f:
-                    f.write(merged_pdf_buffer.getvalue())
-
-                with open(original_filepath, 'wb') as f:
-                    f.write(uploaded_file_bytes)
-
-                attachment_path = merged_filepath
-                attachment_name = filename
-                print(f"create_notification: Merged PDF saved at {merged_filepath}")
-                print(f"create_notification: Original attachment preserved at {original_filepath}")
+            attachment_name, attachment_path = _store_circular_generated_pdf(
+                formatted_id,
+                pdf_data,
+                uploaded_file_bytes=uploaded_file_bytes,
+            )
+            print(f"create_notification: Generated circular PDF saved at {attachment_path}")
 
             print("create_notification: Creating MscData record using raw SQL...")
             with connection.cursor() as cursor:
@@ -679,6 +1109,37 @@ def create_notification(request):
                 inserted_row = cursor.fetchone()
                 notification_id = inserted_row[0] if inserted_row else 'unknown'
             print(f"create_notification: Record inserted - SR No: {formatted_id}")
+
+            if initial_publish_status == 0:
+                transaction.on_commit(
+                    lambda sr_no=formatted_id, circular_title=received_title, creator_id=created_by_employee_id, circular_id=notification_id, type_name=doc_type_display_name: notify_circular_created(
+                        sr_no=sr_no,
+                        title=circular_title,
+                        creator_employee_id=creator_id,
+                        notification_id=str(circular_id) if circular_id else None,
+                        doc_type_name=type_name,
+                    )
+                )
+            elif initial_publish_status == 1:
+                transaction.on_commit(
+                    lambda sr_no=formatted_id, circular_title=received_title, creator_id=created_by_employee_id, circular_id=notification_id, type_name=doc_type_display_name: notify_circular_pending_approval(
+                        sr_no=sr_no,
+                        title=circular_title,
+                        creator_employee_id=creator_id,
+                        notification_id=str(circular_id) if circular_id else None,
+                        doc_type_name=type_name,
+                    )
+                )
+            elif initial_publish_status == 2:
+                transaction.on_commit(
+                    lambda sr_no=formatted_id, circular_title=received_title, creator_id=created_by_employee_id, circular_id=notification_id, type_name=doc_type_display_name: notify_circular_approved(
+                        sr_no=sr_no,
+                        title=circular_title,
+                        creator_employee_id=creator_id,
+                        notification_id=str(circular_id) if circular_id else None,
+                        doc_type_name=type_name,
+                    )
+                )
 
             if superseding_old_notification_sr_no:
                 print("create_notification: Finalizing supersede...")
@@ -1049,6 +1510,7 @@ def get_notifications(request):
             'sr_no': n.sr_no,
             'msc_type': n.msc_type.name if n.msc_type else None, # Access the name via the ForeignKey
             'dept': n.dept,
+            'dept_name': _get_department_master_name(n.dept),
             # --- CHANGED: Access 'category' as a string ---
             'category': n.category, # n.category is the string name, not an object
             'sub_category': n.sub_category.name if n.sub_category else None, # Access the name via the ForeignKey
@@ -1231,6 +1693,9 @@ def update_notification_status(request, notification_sr_no):
         data = json.loads(request.body)
         new_status = data.get('publish_status')
         comment = data.get('publish_comment')
+        allow_repeat_approval = bool(
+            data.get('allow_repeat_approval') or data.get('resend_approval')
+        )
 
         if new_status not in [2, 3]: # Assuming 2 is approve, 3 is reject
             print(f"update_notification_status: Invalid status received: {new_status}")
@@ -1254,7 +1719,7 @@ def update_notification_status(request, notification_sr_no):
                         published_on_datetime = datetime.datetime.fromisoformat(published_on_iso_string)
 
                     if django_settings.USE_TZ and django_timezone.is_naive(published_on_datetime):
-                        published_on_datetime = django_timezone.make_aware(published_on_datetime, django_timezone_utc)
+                        published_on_datetime = django_timezone.make_aware(published_on_datetime, datetime_timezone.utc)
                 except ValueError as e:
                     print(f"⚠️ Warning: Invalid published_on format '{published_on_iso_string}': {e}")
                     published_on_datetime = django_timezone.now()
@@ -1271,7 +1736,24 @@ def update_notification_status(request, notification_sr_no):
             print(f"update_notification_status: Notification with SR No {notification_sr_no} not found.")
             return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
 
-        dept_name_for_crews = 'Deck' if notification_for_dept.dept == 0 else 'Engine' if notification_for_dept.dept == 1 else 'Unknown'
+        is_repeat_approval = (
+            allow_repeat_approval
+            and new_status == 2
+            and notification_for_dept.publish_status == 2
+        )
+
+        if notification_for_dept.publish_status == new_status and not is_repeat_approval:
+            already_message = 'Notification already approved.' if new_status == 2 else 'Notification already rejected.'
+            print(f"update_notification_status: {already_message} Skipping duplicate status update for {notification_sr_no}.")
+            return JsonResponse({'success': True, 'message': already_message, 'already_processed': True})
+
+        if is_repeat_approval:
+            print(
+                f"update_notification_status: Re-running approval flow for already approved notification "
+                f"{notification_sr_no}."
+            )
+
+        dept_name_for_crews = _get_department_master_name(notification_for_dept.dept) or 'Unknown'
         print(f"update_notification_status: Department determined from notification details: {dept_name_for_crews} (Dept Value: {notification_for_dept.dept})")
 
         # Get vessel IDs from the request data (sent during approval)
@@ -1291,12 +1773,8 @@ def update_notification_status(request, notification_sr_no):
         if new_status == 2:  # Only update cover if status is changing to 2 (approved)
             print(f"update_notification_status: Status is 2, checking for PDF to update cover for {notification_sr_no}")
             try:
-                # Find the notification object again to get its current state and attachment path
-                notification_to_update = MscData.objects.filter(sr_no=notification_sr_no).first()
-                if not notification_to_update:
-                    print(f"update_notification_status: Notification {notification_sr_no} not found for PDF update.")
-                    # Continue with the status update even if PDF update fails
-                elif not notification_to_update.attachment_path:
+                notification_to_update = notification_for_dept
+                if not notification_to_update.attachment_path:
                     print(f"update_notification_status: Notification {notification_sr_no} has no attachment path, skipping PDF cover update.")
                     # Continue with the status update even if PDF update fails
                 else:
@@ -1515,7 +1993,31 @@ def update_notification_status(request, notification_sr_no):
             print(f" ❌ Warning: No rows updated. Notification with SR No {notification_sr_no} might not exist or be deleted.")
             return JsonResponse({'error': 'Notification not found or could not be updated.'}, status=404)
 
-        message = f'Notification status updated to {new_status}'
+        resolved_doc_type_name = (
+            _infer_circular_type_name_from_sr_no(notification_for_dept.sr_no)
+            or _safe_get_lookup_name_by_id(MscType, notification_for_dept.msc_type_id, 'Circular')
+            or 'Circular'
+        )
+
+        if new_status == 2 and not is_repeat_approval:
+            notify_circular_approved(
+                sr_no=notification_for_dept.sr_no,
+                title=notification_for_dept.title,
+                creator_employee_id=notification_for_dept.created_by,
+                notification_id=str(notification_for_dept.id) if notification_for_dept.id else None,
+                doc_type_name=resolved_doc_type_name,
+            )
+        else:
+            notify_circular_rejected(
+                sr_no=notification_for_dept.sr_no,
+                title=notification_for_dept.title,
+                creator_employee_id=notification_for_dept.created_by,
+                notification_id=str(notification_for_dept.id) if notification_for_dept.id else None,
+                doc_type_name=resolved_doc_type_name,
+                comment=comment,
+            )
+
+        message = 'Notification approval rerun successfully.' if is_repeat_approval else f'Notification status updated to {new_status}'
         if comment:
             message += f" with comment: {comment[:50]}{'...' if len(comment) > 50 else ''}" # Truncate for log
         print(f"✅ {message}")
@@ -1602,29 +2104,69 @@ def _build_delivery_status_records(notification_records):
                 FROM Crew_Onboarding_History coh
                 WHERE coh.CrewID IN ({placeholders})
                   AND ISNULL(coh.is_deleted, 0) = 0
+            ),
+            latest_final_crew AS (
+                SELECT
+                    LTRIM(RTRIM(fcl.CrewID)) AS crew_id,
+                    fcl.Crew_Status,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY LTRIM(RTRIM(fcl.CrewID))
+                        ORDER BY
+                            CASE WHEN ISNULL(fcl.is_active, 0) = 1 THEN 0 ELSE 1 END,
+                            fcl.updated_date DESC,
+                            fcl.created_date DESC,
+                            fcl.id DESC
+                    ) AS rn
+                FROM Final_crew_list fcl
+                WHERE LTRIM(RTRIM(ISNULL(fcl.CrewID, ''))) IN ({placeholders})
+                  AND ISNULL(fcl.is_delete, 0) = 0
+            ),
+            latest_hrm AS (
+                SELECT
+                    LTRIM(RTRIM(h.CrewID)) AS crew_id,
+                    LTRIM(RTRIM(COALESCE(h.first_name, ''))) AS first_name,
+                    LTRIM(RTRIM(COALESCE(h.surname, ''))) AS surname,
+                    LTRIM(RTRIM(COALESCE(h.rank_name, ''))) AS raw_rank_name,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY LTRIM(RTRIM(h.CrewID))
+                        ORDER BY
+                            CASE WHEN ISNULL(h.is_active, 0) = 1 THEN 0 ELSE 1 END,
+                            h.updated_date DESC,
+                            h.created_date DESC,
+                            h.id DESC
+                    ) AS rn
+                FROM HRM501 h
+                WHERE LTRIM(RTRIM(ISNULL(h.CrewID, ''))) IN ({placeholders})
+                  AND ISNULL(h.is_deleted, 0) = 0
             )
             SELECT
-                LTRIM(RTRIM(h.CrewID)) AS crew_id,
-                LTRIM(RTRIM(COALESCE(h.first_name, ''))) AS first_name,
-                LTRIM(RTRIM(COALESCE(h.surname, ''))) AS surname,
-                LTRIM(RTRIM(COALESCE(mar.rank_name, ''))) AS rank_name,
-                LTRIM(RTRIM(COALESCE(v.VesselName, v.vesselCode, ''))) AS vessel_name
-            FROM HRM501 h
+                lh.crew_id,
+                lh.first_name,
+                lh.surname,
+                LTRIM(RTRIM(COALESCE(mar.rank_name, lh.raw_rank_name, ''))) AS rank_name,
+                mar.rank_level,
+                LTRIM(RTRIM(COALESCE(v.VesselName, v.vesselCode, ''))) AS vessel_name,
+                LTRIM(RTRIM(COALESCE(cs.CrewStatusName, ''))) AS crew_status_name
+            FROM latest_hrm lh
             LEFT JOIN master_applied_rank mar
-                ON mar.id = TRY_CONVERT(uniqueidentifier, h.rank_name)
+                ON mar.id = TRY_CONVERT(uniqueidentifier, lh.raw_rank_name)
             LEFT JOIN latest_onboarding lo
-                ON lo.CrewID = h.CrewID
+                ON lo.CrewID = lh.crew_id
                AND lo.rn = 1
+            LEFT JOIN latest_final_crew lfc
+                ON lfc.crew_id = lh.crew_id
+               AND lfc.rn = 1
             LEFT JOIN VesselData v
                 ON v.id = TRY_CONVERT(uniqueidentifier, lo.Vessel)
-            WHERE h.CrewID IN ({placeholders})
-              AND ISNULL(h.is_deleted, 0) = 0
+            LEFT JOIN ksm_marine_live.dbo.CrewStatus cs
+                ON cs.id = lfc.Crew_Status
+            WHERE lh.rn = 1
         """
 
         with connection.cursor() as cursor:
-            cursor.execute(delivery_lookup_sql, crew_ids + crew_ids)
+            cursor.execute(delivery_lookup_sql, crew_ids + crew_ids + crew_ids)
             for row in cursor.fetchall():
-                crew_id, first_name, surname, rank_name, vessel_name = row
+                crew_id, first_name, surname, rank_name, rank_level, vessel_name, crew_status_name = row
                 normalized_crew_id = str(crew_id or "").strip()
                 if not normalized_crew_id:
                     continue
@@ -1635,24 +2177,80 @@ def _build_delivery_status_records(notification_records):
                     "resolved_crew_id": normalized_crew_id,
                     "crew_name": full_name,
                     "rank_name": str(rank_name or "").strip() or None,
+                    "rank_level": rank_level if rank_level is not None else None,
                     "vessel_name": str(vessel_name or "").strip() or None,
+                    "crew_status_name": str(crew_status_name or "").strip() or None,
                 }
 
-    delivery_records = []
+    delivery_records_by_crew = {}
     for record in records:
         raw_crew_id = str(record.crew_id or "").strip()
         lookup_row = crew_lookup.get(raw_crew_id, {})
-        delivery_records.append({
+        dedupe_key = lookup_row.get("resolved_crew_id") or raw_crew_id or str(uuid.uuid4())
+        normalized_record = {
             "crew_id": raw_crew_id,
             "resolved_crew_id": lookup_row.get("resolved_crew_id") or raw_crew_id or None,
             "crew_name": lookup_row.get("crew_name"),
             "rank_name": lookup_row.get("rank_name"),
+            "rank_level": lookup_row.get("rank_level"),
             "vessel_name": lookup_row.get("vessel_name"),
-            "seen_at": record.seen_at.isoformat() if record.seen_at else None,
-            "reminder_sent_at": record.reminder_sent_at.isoformat() if record.reminder_sent_at else None,
-        })
+            "crew_status_name": lookup_row.get("crew_status_name"),
+            "seen_at_raw": record.seen_at,
+            "reminder_sent_at_raw": record.reminder_sent_at,
+        }
 
-    return delivery_records
+        existing_record = delivery_records_by_crew.get(dedupe_key)
+        if existing_record is None:
+            delivery_records_by_crew[dedupe_key] = normalized_record
+            continue
+
+        if normalized_record["seen_at_raw"] and (
+            existing_record["seen_at_raw"] is None
+            or normalized_record["seen_at_raw"] > existing_record["seen_at_raw"]
+        ):
+            existing_record["seen_at_raw"] = normalized_record["seen_at_raw"]
+
+        if normalized_record["reminder_sent_at_raw"] and (
+            existing_record["reminder_sent_at_raw"] is None
+            or normalized_record["reminder_sent_at_raw"] > existing_record["reminder_sent_at_raw"]
+        ):
+            existing_record["reminder_sent_at_raw"] = normalized_record["reminder_sent_at_raw"]
+
+        if not existing_record.get("crew_name") and normalized_record.get("crew_name"):
+            existing_record["crew_name"] = normalized_record["crew_name"]
+        if not existing_record.get("rank_name") and normalized_record.get("rank_name"):
+            existing_record["rank_name"] = normalized_record["rank_name"]
+        if existing_record.get("rank_level") is None and normalized_record.get("rank_level") is not None:
+            existing_record["rank_level"] = normalized_record["rank_level"]
+        if not existing_record.get("vessel_name") and normalized_record.get("vessel_name"):
+            existing_record["vessel_name"] = normalized_record["vessel_name"]
+        if not existing_record.get("crew_status_name") and normalized_record.get("crew_status_name"):
+            existing_record["crew_status_name"] = normalized_record["crew_status_name"]
+
+    delivery_records = list(delivery_records_by_crew.values())
+    delivery_records.sort(
+        key=lambda row: (
+            row["rank_level"] if row["rank_level"] is not None else 9999,
+            str(row.get("rank_name") or "").lower(),
+            str(row.get("crew_name") or "").lower(),
+            str(row.get("vessel_name") or "").lower(),
+            str(row.get("resolved_crew_id") or "").lower(),
+        )
+    )
+
+    return [
+        {
+            "crew_id": row["crew_id"],
+            "resolved_crew_id": row["resolved_crew_id"],
+            "crew_name": row["crew_name"],
+            "rank_name": row["rank_name"],
+            "vessel_name": row["vessel_name"],
+            "crew_status_name": row["crew_status_name"],
+            "seen_at": row["seen_at_raw"].isoformat() if row["seen_at_raw"] else None,
+            "reminder_sent_at": row["reminder_sent_at_raw"].isoformat() if row["reminder_sent_at_raw"] else None,
+        }
+        for row in delivery_records
+    ]
     
 def add_cover_to_pdf(original_pdf_path, output_pdf_path, logo_path, company_name, address):
     # Read original PDF
@@ -2402,11 +3000,18 @@ def delete_draft_by_id(request, draft_id):
         normalized_draft_id = str(uuid.UUID(str(draft_id).strip()))
         print(f"delete_draft_by_id: Looking for draft with ID {normalized_draft_id} to soft-delete")
 
-        updated_count = MscData.objects.filter(
-            id=normalized_draft_id,
-            publish_status=0,
-            is_deleted=False,
-        ).update(is_deleted=True)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE msc_data
+                SET is_deleted = 1
+                WHERE id = TRY_CONVERT(uniqueidentifier, %s)
+                  AND publish_status = 0
+                  AND ISNULL(is_deleted, 0) = 0
+                """,
+                [normalized_draft_id],
+            )
+            updated_count = cursor.rowcount
 
         if updated_count > 0:
             print(f"delete_draft_by_id: Successfully soft-deleted draft {normalized_draft_id}")
@@ -2502,38 +3107,37 @@ def _update_draft_record_from_request(request, draft_record, log_label):
     attachment_name_to_store = draft_record.attachment_name
     attachment_path_to_store = draft_record.attachment_path
 
+    pdf_data = {
+        'title': title or '',
+        'body': body or '',
+        'doc_type_name': (
+            _safe_get_lookup_name_by_id(
+                MscType,
+                msc_type_id,
+                _infer_circular_type_name_from_sr_no(draft_record.sr_no) or 'Unknown'
+            ) or 'Unknown'
+        ),
+        'formatted_id': draft_record.sr_no,
+        'current_date': django_timezone.now().strftime('%d-%m-%Y'),
+        'superseding_old_notification_sr_no': None,
+        'created_by_employee_id': draft_record.created_by,
+    }
+
     if request.FILES.get('attachment'):
         uploaded_file = request.FILES['attachment']
         uploaded_file_bytes = uploaded_file.read()
-        pdf_data = {
-            'title': title or '',
-            'body': body or '',
-            'doc_type_name': (
-                _safe_get_lookup_name_by_id(
-                    MscType,
-                    msc_type_id,
-                    _infer_circular_type_name_from_sr_no(draft_record.sr_no) or 'Unknown'
-                ) or 'Unknown'
-            ),
-            'formatted_id': draft_record.sr_no,
-            'current_date': django_timezone.now().strftime('%d-%m-%Y'),
-            'superseding_old_notification_sr_no': None,
-            'created_by_employee_id': draft_record.created_by,
-        }
-
-        merged_pdf_buffer = generate_pdf_with_cover_and_original(io.BytesIO(uploaded_file_bytes), pdf_data)
-        media_path, merged_filepath, original_filepath = _get_circular_attachment_paths(draft_record.sr_no)
-        os.makedirs(media_path, exist_ok=True)
-
-        with open(merged_filepath, 'wb') as merged_file:
-            merged_file.write(merged_pdf_buffer.getvalue())
-
-        with open(original_filepath, 'wb') as original_file:
-            original_file.write(uploaded_file_bytes)
-
-        attachment_name_to_store = os.path.basename(merged_filepath)
-        attachment_path_to_store = merged_filepath
-        print(f"{log_label}: Updated attachment for {draft_record.sr_no} at {merged_filepath}")
+        attachment_name_to_store, attachment_path_to_store = _store_circular_generated_pdf(
+            draft_record.sr_no,
+            pdf_data,
+            uploaded_file_bytes=uploaded_file_bytes,
+        )
+        print(f"{log_label}: Updated attachment for {draft_record.sr_no} at {attachment_path_to_store}")
+    elif not attachment_path_to_store:
+        attachment_name_to_store, attachment_path_to_store = _store_circular_generated_pdf(
+            draft_record.sr_no,
+            pdf_data,
+        )
+        print(f"{log_label}: Created generated circular PDF for draft {draft_record.sr_no} at {attachment_path_to_store}")
 
     with transaction.atomic():
         with connection.cursor() as cursor:
@@ -2586,6 +3190,15 @@ def _update_draft_record_from_request(request, draft_record, log_label):
         if requested_publish_status == 0
         else 'Draft record updated and submitted successfully'
     )
+
+    if requested_publish_status == 1:
+        notify_circular_pending_approval(
+            sr_no=draft_record.sr_no,
+            title=title,
+            creator_employee_id=draft_record.created_by,
+            notification_id=str(draft_record.id) if draft_record.id else None,
+            doc_type_name=pdf_data.get('doc_type_name'),
+        )
 
     return JsonResponse({
         'success': True,
@@ -3349,7 +3962,6 @@ You have a new {notification_type_name.lower()} notification:
 SR No: {notification_details.sr_no}
 Title: {notification_details.title}
 
-Please find the attached document for details.
 
 Best regards,
 Kaizen Ship Management
@@ -3499,6 +4111,139 @@ Kaizen Ship Management
     except Exception as e:
         print(f"send_emails_to_vessels: UNEXPECTED ERROR - {type(e).__name__}: {str(e)}")
         import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_emails_to_vessels(request):
+    """
+    Optimized/idempotent delivery for vessel notifications.
+    Keeps email sending best-effort while preventing duplicate delivery rows on repeat clicks.
+    """
+    print("=== send_emails_to_vessels[v2]: Starting function ===")
+    print(f"send_emails_to_vessels[v2]: Request body: {request.body.decode('utf-8', errors='ignore')}")
+
+    if request.method != 'POST':
+        print(f"send_emails_to_vessels[v2]: Invalid method {request.method}, returning 405")
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        notification_sr_no = data.get('notification_sr_no')
+        vessel_ids_list = _normalize_uuid_list(data.get('vessel_ids', []))
+
+        if not notification_sr_no or not vessel_ids_list:
+            print(
+                f"send_emails_to_vessels[v2]: Missing required data - "
+                f"notification_sr_no: {notification_sr_no}, vessel_ids: {vessel_ids_list}"
+            )
+            return JsonResponse({'error': 'notification_sr_no and vessel_ids list are required'}, status=400)
+
+        try:
+            notification_details = MscData.objects.get(sr_no=notification_sr_no)
+        except MscData.DoesNotExist:
+            print(f"send_emails_to_vessels[v2]: Notification with SR No {notification_sr_no} not found.")
+            return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
+
+        sr_no_parts = notification_sr_no.split('/')
+        extracted_type_name = sr_no_parts[1] if len(sr_no_parts) >= 2 else "Unknown Type"
+
+        vessel_lookup = _fetch_vessel_rows_by_ids(vessel_ids_list)
+
+        if not vessel_lookup:
+            return JsonResponse({
+                'success': True,
+                'message': 'No valid vessel records found to notify.',
+                'emails_sent': 0,
+                'delivery_records_created': 0,
+                'already_processed': 0,
+                'total_requested': len(vessel_ids_list),
+            })
+
+        existing_delivery_vessels = _fetch_existing_ship_delivery_vessel_ids(
+            notification_sr_no,
+            vessel_ids_list,
+        )
+        pending_vessel_ids = [
+            vessel_id for vessel_id in vessel_ids_list
+            if vessel_id in vessel_lookup and vessel_id not in existing_delivery_vessels
+        ]
+
+        print(
+            f"send_emails_to_vessels[v2]: {len(existing_delivery_vessels)} vessels already processed, "
+            f"{len(pending_vessel_ids)} remaining for notification {notification_sr_no}."
+        )
+
+        emails_sent_count = 0
+        successful_vessel_ids = []
+        for vessel_id_str in pending_vessel_ids:
+            vessel_details = vessel_lookup.get(vessel_id_str)
+            if not vessel_details:
+                continue
+
+            vessel_name = vessel_details.get('vesselName')
+            vessel_email = vessel_details.get('email')
+            if not vessel_email:
+                print(f"send_emails_to_vessels[v2]: Vessel {vessel_name} has no email. Skipping.")
+                continue
+
+            subject = f"New {extracted_type_name} Notification: {notification_details.sr_no}"
+            body_text = f"""
+Hello,
+
+You have a new {extracted_type_name.lower()} notification:
+
+SR No: {notification_details.sr_no}
+Title: {notification_details.title}
+
+
+Best regards,
+Kaizen Ship Management
+            """.strip()
+
+            try:
+                email_message = EmailMultiAlternatives(
+                    subject=subject,
+                    body=body_text,
+                    from_email=django_settings.DEFAULT_FROM_EMAIL,
+                    to=[vessel_email],
+                )
+                email_message.send()
+                emails_sent_count += 1
+                successful_vessel_ids.append(vessel_id_str)
+                print(f"send_emails_to_vessels[v2]: Email sent successfully to {vessel_email} for {vessel_name}.")
+            except Exception as single_vessel_error:
+                print(
+                    f"send_emails_to_vessels[v2]: Error sending to vessel {vessel_id_str}: "
+                    f"{single_vessel_error}"
+                )
+                traceback.print_exc()
+
+        created_vessel_ids = _bulk_insert_ship_delivery_records(
+            notification_sr_no,
+            successful_vessel_ids,
+            django_timezone.now(),
+        )
+        delivery_records_created_count = len(created_vessel_ids)
+
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'Emails sent successfully to {emails_sent_count} vessels and '
+                f'{delivery_records_created_count} delivery records created.'
+            ),
+            'emails_sent': emails_sent_count,
+            'delivery_records_created': delivery_records_created_count,
+            'already_processed': len(existing_delivery_vessels),
+            'total_requested': len(vessel_ids_list),
+        })
+    except json.JSONDecodeError as je:
+        print(f"send_emails_to_vessels[v2]: JSON Decode Error: {je}")
+        return JsonResponse({'error': 'Invalid JSON data in request body.'}, status=400)
+    except Exception as e:
+        print(f"send_emails_to_vessels[v2]: UNEXPECTED ERROR - {type(e).__name__}: {str(e)}")
         traceback.print_exc()
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
 
@@ -3685,6 +4430,19 @@ def link_notification_to_ranks(request, notification_sr_no):
 
         print(f"link_notification_to_ranks: Successfully created {created_notification_records_count} delivery records in MscNotification table for notification {notification.sr_no} based on selected rank UUIDs.")
 
+        if created_notification_records_count > 0:
+            notify_circular_distribution(
+                sr_no=notification.sr_no,
+                title=notification.title,
+                crew_ids=[record.CrewID for record in final_crew_records],
+                notification_id=str(notification.id) if notification.id else None,
+                doc_type_name=(
+                    _infer_circular_type_name_from_sr_no(notification.sr_no)
+                    or _safe_get_lookup_name_by_id(MscType, notification.msc_type_id, 'Circular')
+                    or 'Circular'
+                ),
+            )
+
 
 
         created_rank_assignment_records_count = 0
@@ -3759,6 +4517,84 @@ def link_notification_to_ranks(request, notification_sr_no):
 
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def link_notification_to_ranks(request, notification_sr_no):
+    """
+    Optimized/idempotent rank linking for approved circulars.
+    """
+    print(f"=== link_notification_to_ranks[v2]: Starting for notification SR No {notification_sr_no} ===")
+    print(f"link_notification_to_ranks[v2]: Request body: {request.body.decode('utf-8', errors='ignore')}")
+
+    if request.method != 'POST':
+        print(f"link_notification_to_ranks[v2]: Invalid method {request.method}, returning 405")
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        selected_rank_uuids = _normalize_uuid_list(data.get('selected_rank_ids', []))
+
+        if not selected_rank_uuids:
+            print("link_notification_to_ranks[v2]: No selected_rank_ids provided in request body.")
+            return JsonResponse({'error': 'selected_rank_ids list is required'}, status=400)
+
+        try:
+            notification = MscData.objects.get(sr_no=notification_sr_no)
+        except MscData.DoesNotExist:
+            print(f"link_notification_to_ranks[v2]: Notification with SR No {notification_sr_no} not found.")
+            return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
+
+        target_crew_ids = _fetch_target_crew_ids_for_ranks(selected_rank_uuids)
+        created_crew_ids = _bulk_insert_crew_delivery_records(
+            notification.sr_no,
+            target_crew_ids,
+            django_timezone.now(),
+            reminder_count=1,
+        )
+        inserted_rank_ids = _bulk_insert_rank_assignments(
+            notification.sr_no,
+            selected_rank_uuids,
+            django_timezone.now(),
+        )
+
+        if created_crew_ids:
+            notify_circular_distribution(
+                sr_no=notification.sr_no,
+                title=notification.title,
+                crew_ids=created_crew_ids,
+                notification_id=str(notification.id) if notification.id else None,
+                doc_type_name=(
+                    _infer_circular_type_name_from_sr_no(notification.sr_no)
+                    or _safe_get_lookup_name_by_id(MscType, notification.msc_type_id, 'Circular')
+                    or 'Circular'
+                ),
+            )
+
+        print(
+            f"link_notification_to_ranks[v2]: crews_found={len(target_crew_ids)}, "
+            f"records_created={len(created_crew_ids)}, rank_assignments_created={len(inserted_rank_ids)}"
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'Notifications sent to {len(created_crew_ids)} crew members based on selected rank UUIDs. '
+                f'{len(inserted_rank_ids)} rank assignments recorded.'
+            ),
+            'crews_found': len(target_crew_ids),
+            'records_created': len(created_crew_ids),
+            'rank_assignments_created': len(inserted_rank_ids),
+            'notification_sr_no': notification.sr_no,
+        })
+    except json.JSONDecodeError as je:
+        print(f"link_notification_to_ranks[v2]: JSON Decode Error: {je}")
+        return JsonResponse({'error': 'Invalid JSON data in request body.'}, status=400)
+    except Exception as e:
+        print(f"link_notification_to_ranks[v2]: UNEXPECTED ERROR - {type(e).__name__}: {str(e)}")
+        traceback.print_exc()
+        return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_crew_ids_and_status_by_notification_sr_no(request, notification_sr_no):
@@ -3801,6 +4637,71 @@ def get_crew_ids_and_status_by_notification_sr_no(request, notification_sr_no):
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
     
 
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_notification_reminder(request, notification_sr_no):
+    """
+    Updates reminder metadata for every unread crew delivery record associated
+    with a notification SR No so the office can resend a circular reminder.
+    """
+    print(f"=== send_notification_reminder: Starting for notification SR No {notification_sr_no} ===")
+
+    if request.method != 'POST':
+        print(f"send_notification_reminder: Invalid method {request.method}, returning 405")
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    try:
+        current_time = django_timezone.now()
+        print(
+            "send_notification_reminder: Updating unread delivery records "
+            f"for notification {notification_sr_no} at {current_time}"
+        )
+
+        update_sql = """
+            UPDATE msc_notification
+            SET reminder_sent_at = %s,
+                reminder_count = ISNULL(reminder_count, 0) + 1
+            WHERE msc_sr_no = %s
+              AND seen_at IS NULL
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(update_sql, [current_time, notification_sr_no])
+            rows_affected = cursor.rowcount
+
+        print(f"send_notification_reminder: Raw SQL update affected {rows_affected} rows.")
+
+        if rows_affected == 0:
+            print(
+                "send_notification_reminder: No unread delivery records found "
+                f"for notification {notification_sr_no}."
+            )
+            return JsonResponse({
+                'success': True,
+                'message': f'No unread delivery records found for notification {notification_sr_no}.',
+                'notification_sr_no': notification_sr_no,
+                'rows_affected': 0,
+                'reminder_sent_at': current_time.isoformat(),
+            }, status=200)
+
+        print(
+            "send_notification_reminder: Successfully updated unread reminder metadata "
+            f"for notification {notification_sr_no}."
+        )
+        return JsonResponse({
+            'success': True,
+            'message': f'Reminder sent successfully for notification {notification_sr_no}.',
+            'notification_sr_no': notification_sr_no,
+            'rows_affected': rows_affected,
+            'reminder_sent_at': current_time.isoformat(),
+        })
+    except Exception as e:
+        print(f"send_notification_reminder: UNEXPECTED ERROR - {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
 
 
 @api_view(['POST'])
