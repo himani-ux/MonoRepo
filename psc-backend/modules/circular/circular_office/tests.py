@@ -1,16 +1,27 @@
+import io
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
+from django.utils.datastructures import MultiValueDict
 from rest_framework.test import APIRequestFactory
+from PyPDF2.errors import DependencyError
 
 from .views import (
+    MAX_CIRCULAR_ATTACHMENT_FILES,
+    CircularAttachmentValidationError,
     _build_delivery_status_records,
+    _extract_uploaded_pdf_attachments_from_request_files,
+    _get_latest_notification_record_by_sr_no,
     _build_pending_draft_conflict_message,
     _get_existing_active_draft_for_creator_and_type,
     _generate_unique_circular_sr_no,
+    _open_uploaded_pdf_reader,
+    create_delivery_records,
     delete_draft_by_id,
+    get_notification_details_by_sr_no,
 )
 
 
@@ -106,12 +117,42 @@ class CircularSrNumberTests(SimpleTestCase):
 
         self.assertEqual(result, 'KSM/Alert/Technical/2026-0005')
         self.assertEqual(len(cursor.calls), 2)
+        mock_lock.assert_called_once_with(cursor, 'type-seq:alert')
+        self.assertEqual(cursor.calls[0][1], ['KSM/Alert/', 'KSM/Alert/'])
+        self.assertEqual(cursor.calls[1][1], ['KSM/Alert/', 'KSM/Alert/', 5])
         self.assertIn('publish_status = 0', cursor.calls[0][0])
         self.assertIn('ISNULL(is_deleted, 0) = 1', cursor.calls[0][0])
         self.assertIn('publish_status = 3', cursor.calls[0][0])
         self.assertIn('publish_status = 0', cursor.calls[1][0])
         self.assertIn('ISNULL(is_deleted, 0) = 1', cursor.calls[1][0])
         self.assertIn('publish_status = 3', cursor.calls[1][0])
+
+    @patch('modules.circular.circular_office.views._acquire_circular_sr_lock')
+    def test_generate_unique_circular_sr_no_continues_across_department_and_year(self, mock_lock):
+        class CursorStub:
+            def __init__(self):
+                self.calls = []
+                self._fetchone_values = [(129,), (0,)]
+
+            def execute(self, sql, params):
+                self.calls.append((sql, params))
+
+            def fetchone(self):
+                return self._fetchone_values.pop(0)
+
+        cursor = CursorStub()
+
+        result = _generate_unique_circular_sr_no(
+            cursor,
+            'Alert',
+            'SEQ',
+            datetime(2027, 1, 5, 10, 0, 0),
+        )
+
+        self.assertEqual(result, 'KSM/Alert/SEQ/2027-0130')
+        mock_lock.assert_called_once_with(cursor, 'type-seq:alert')
+        self.assertEqual(cursor.calls[0][1], ['KSM/Alert/', 'KSM/Alert/'])
+        self.assertEqual(cursor.calls[1][1], ['KSM/Alert/', 'KSM/Alert/', 130])
 
 
 class PendingDraftValidationTests(SimpleTestCase):
@@ -151,3 +192,141 @@ class PendingDraftValidationTests(SimpleTestCase):
                 'workinstruction',
             ],
         )
+
+
+class NotificationLookupTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    @patch('modules.circular.circular_office.views.MscData.objects')
+    def test_get_latest_notification_record_by_sr_no_uses_first_instead_of_get(self, mock_objects):
+        expected_record = SimpleNamespace(id='note-1', sr_no='KSM/Circular/Technical/2026-0001')
+        mock_ordered_queryset = mock_objects.filter.return_value.order_by.return_value
+        mock_ordered_queryset.first.return_value = expected_record
+        mock_ordered_queryset.count.return_value = 2
+
+        result = _get_latest_notification_record_by_sr_no(' KSM/Circular/Technical/2026-0001 ')
+
+        self.assertIs(result, expected_record)
+        mock_objects.filter.assert_called_once_with(
+            sr_no='KSM/Circular/Technical/2026-0001',
+            is_deleted=False,
+        )
+        mock_objects.get.assert_not_called()
+
+    @patch('modules.circular.circular_office.views._get_latest_notification_record_by_sr_no')
+    def test_get_notification_details_by_sr_no_uses_latest_helper(self, mock_lookup):
+        mock_lookup.return_value = SimpleNamespace(
+            id='note-1',
+            sr_no='KSM/Circular/Technical/2026-0001',
+            title='Circular title',
+            msc_type='type-1',
+            dept='dept-1',
+            category='category',
+            sub_category='sub-cat',
+            second_sub_category='sub-cat-2',
+            office_instructions='Body',
+            hashtags='#tag',
+            created_at=None,
+            publish_status=2,
+            priority='priority-1',
+            created_by='EMP001',
+            published_by='EMP002',
+            published_on=None,
+            is_superseeded=False,
+            superseeded_by=None,
+            is_active=True,
+            is_deleted=False,
+            attachment_name='circular.pdf',
+            attachment_path='uploads/circular.pdf',
+        )
+
+        response = get_notification_details_by_sr_no(
+            self.factory.get('/api/circular/api/submitted/KSM/Circular/Technical/2026-0001/'),
+            'KSM/Circular/Technical/2026-0001',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_lookup.assert_called_once_with('KSM/Circular/Technical/2026-0001')
+
+    @patch('modules.circular.circular_office.views.MscNotification')
+    @patch('modules.circular.circular_office.views._get_latest_notification_record_by_sr_no')
+    def test_create_delivery_records_uses_latest_helper(self, mock_lookup, mock_notification_model):
+        mock_lookup.return_value = SimpleNamespace(
+            id='note-1',
+            sr_no='KSM/Circular/Technical/2026-0001',
+        )
+
+        response = create_delivery_records(
+            self.factory.post(
+                '/api/circular/api/notifications/create-delivery-records/',
+                {
+                    'notification_sr_no': 'KSM/Circular/Technical/2026-0001',
+                    'crew_ids': ['CREW001', 'CREW002'],
+                },
+                format='json',
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_lookup.assert_called_once_with('KSM/Circular/Technical/2026-0001')
+        self.assertEqual(mock_notification_model.call_count, 2)
+
+
+class CircularAttachmentValidationTests(SimpleTestCase):
+    def test_extract_uploaded_pdf_attachments_accepts_up_to_maximum(self):
+        request_files = MultiValueDict(
+            {
+                'attachment': [
+                    SimpleUploadedFile('one.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    SimpleUploadedFile('two.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    SimpleUploadedFile('three.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                ]
+            }
+        )
+
+        extracted_files = _extract_uploaded_pdf_attachments_from_request_files(request_files)
+        self.assertEqual(len(extracted_files), MAX_CIRCULAR_ATTACHMENT_FILES)
+
+    def test_extract_uploaded_pdf_attachments_rejects_more_than_maximum(self):
+        request_files = MultiValueDict(
+            {
+                'attachment': [
+                    SimpleUploadedFile('one.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    SimpleUploadedFile('two.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    SimpleUploadedFile('three.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    SimpleUploadedFile('four.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                ]
+            }
+        )
+
+        with self.assertRaises(CircularAttachmentValidationError) as exc_info:
+            _extract_uploaded_pdf_attachments_from_request_files(request_files)
+
+        self.assertIn('maximum', str(exc_info.exception).lower())
+
+    def test_extract_uploaded_pdf_attachments_rejects_non_pdf(self):
+        request_files = MultiValueDict(
+            {
+                'attachment': [
+                    SimpleUploadedFile('one.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    SimpleUploadedFile('notes.txt', b'hello', content_type='text/plain'),
+                ]
+            }
+        )
+
+        with self.assertRaises(CircularAttachmentValidationError) as exc_info:
+            _extract_uploaded_pdf_attachments_from_request_files(request_files)
+
+        self.assertIn('only pdf', str(exc_info.exception).lower())
+
+    @patch(
+        'modules.circular.circular_office.views.PdfReader',
+        side_effect=DependencyError('PyCryptodome is required for AES algorithm'),
+    )
+    def test_open_uploaded_pdf_reader_surfaces_attachment_validation_error(self, mock_pdf_reader):
+        with self.assertRaises(CircularAttachmentValidationError) as exc_info:
+            _open_uploaded_pdf_reader(io.BytesIO(b'%PDF-1.4'))
+
+        self.assertIn('encryption', str(exc_info.exception).lower())
+        mock_pdf_reader.assert_called_once()

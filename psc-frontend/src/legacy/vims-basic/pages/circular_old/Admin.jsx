@@ -2461,7 +2461,7 @@ const Admin = ({ onNotificationSubmit }) => {
     };
 
     const seqRankNames = [
-        'Master', 'Chief Engineer', 'Second Officer', 'Third Officer',
+        'Master', 'Acting Master', 'Chief Engineer', 'Second Officer', 'Third Officer',
         'Deck Fitter', 'Deck Cadet', 'Bosun', 'Able Bodied Seaman',
         'Ordinary Seaman', 'Cook', 'Messman', 'Welder'
     ].map(name => name.toLowerCase()); // Normalize for comparison

@@ -41,6 +41,9 @@ const isCircularFormReload = () => {
     return navigationEntries[0]?.type === 'reload';
 };
 
+const MAX_CIRCULAR_ATTACHMENT_FILES = 3;
+const CIRCULAR_ATTACHMENT_ACCEPT = '.pdf';
+
 const resolveCircularRequestMainOption = (requestLike) => {
     const request =
         requestLike && typeof requestLike === 'object' ? requestLike : null;
@@ -85,7 +88,6 @@ const resolveCircularRequestDepartmentName = (requestLike) => {
 };
 
 const Admin = ({ onNotificationSubmit }) => {
-
     const navigate = useNavigate();
     const location = useLocation();
     const draftRequestSrNoRef = useRef(null);
@@ -1450,16 +1452,15 @@ const Admin = ({ onNotificationSubmit }) => {
         const newFiles = Array.from(e.target.files);
         console.log("handleFileChange: Received files:", newFiles);
 
-        // Validate each file's type
         const validFiles = [];
         const invalidFiles = [];
 
         newFiles.forEach(file => {
-            // Check if the file type is 'application/pdf'
-            // Note: This relies on the browser's detection, which might not be 100% foolproof
-            // for files with incorrect extensions but valid PDF content.
-            // However, it's a good first-line check.
-            if (file.type === 'application/pdf') {
+            const normalizedFileName = String(file?.name || '').trim().toLowerCase();
+            const isPdfByMimeType = file.type === 'application/pdf';
+            const isPdfByExtension = normalizedFileName.endsWith('.pdf');
+
+            if (isPdfByMimeType || isPdfByExtension) {
                 validFiles.push(file);
             } else {
                 invalidFiles.push(file.name);
@@ -1471,12 +1472,32 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         if (validFiles.length > 0) {
-            // Add only the valid PDF files to the state
-            setFiles(prevFiles => [...prevFiles, ...validFiles]);
-            console.log("handleFileChange: Added valid PDF files to state:", validFiles);
+            const availableSlots = Math.max(0, MAX_CIRCULAR_ATTACHMENT_FILES - files.length);
+            const filesToAdd = validFiles.slice(0, availableSlots);
+            const skippedFiles = validFiles.slice(availableSlots).map((file) => file.name);
+
+            if (filesToAdd.length > 0) {
+                setFiles(prevFiles => [...prevFiles, ...filesToAdd]);
+            }
+
+            console.log("handleFileChange: Added valid PDF files to state:", filesToAdd);
+
+            if (skippedFiles.length > 0) {
+                alert(`Maximum ${MAX_CIRCULAR_ATTACHMENT_FILES} PDFs allowed. These files were not added: ${skippedFiles.join(', ')}`);
+            }
         } else {
             console.log("handleFileChange: No valid PDF files were selected.");
         }
+
+        e.target.value = '';
+    };
+
+    const handleRemoveAttachedFile = (indexToRemove) => {
+        setFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleClearAttachedFiles = () => {
+        setFiles([]);
     };
     // --- END NEW ---
 
@@ -2604,7 +2625,7 @@ const Admin = ({ onNotificationSubmit }) => {
     };
 
     const seqRankNames = [
-        'Master', 'Chief Officer', 'Second Officer', 'Third Officer',
+        'Master', 'Acting Master', 'Chief Officer', 'Second Officer', 'Third Officer',
         'Deck Fitter', 'Deck Cadet', 'Bosun', 'Able Bodied Seaman',
         'Ordinary Seaman', 'Cook', 'Messman', 'Welder'
     ].map(name => name.toLowerCase()); // Normalize for comparison
@@ -2835,7 +2856,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         <div className="space-y-2">
                             <label className="block text-sm font-medium text-gray-700">Attachments (Optional)</label>
                             <p className="text-xs text-slate-500">
-                                You can submit the circular without uploading a PDF. The system will generate the circular PDF from the form content.
+                                You can submit the circular without uploading a PDF. The system will generate the circular PDF from the form content. Maximum {MAX_CIRCULAR_ATTACHMENT_FILES} PDF files can be attached.
                             </p>
                             <label className="flex items-center gap-2 w-fit px-3 py-2 border border-sky-200 rounded-md bg-sky-50 hover:bg-sky-100 cursor-pointer text-sm">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2844,15 +2865,36 @@ const Admin = ({ onNotificationSubmit }) => {
                                     <path d="M12 14v6"></path>
                                 </svg>
                                 <span>Add files…</span>
-                                <input type="file" className="hidden" multiple onChange={handleFileChange} accept=".pdf" />
+                                <input type="file" className="hidden" multiple onChange={handleFileChange} accept={CIRCULAR_ATTACHMENT_ACCEPT} />
                             </label>
                             {files.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-600">
-                                    {Array.from(files).map((file, i) => (
-                                        <span key={i} className="px-2 py-1 rounded-full border border-sky-200 bg-white">
-                                            {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                                        </span>
-                                    ))}
+                                <div className="mt-2 space-y-2 text-xs text-slate-600">
+                                    <div className="flex items-center justify-between">
+                                        <span>{files.length} file(s) selected</span>
+                                        <button
+                                            type="button"
+                                            onClick={handleClearAttachedFiles}
+                                            className="text-red-600 hover:text-red-700 underline"
+                                        >
+                                            Clear all
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Array.from(files).map((file, i) => (
+                                            <span key={i} className="inline-flex items-center gap-2 px-2 py-1 rounded-full border border-sky-200 bg-white">
+                                                <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveAttachedFile(i)}
+                                                    className="font-semibold text-red-600 hover:text-red-700"
+                                                    aria-label={`Remove ${file.name}`}
+                                                    title={`Remove ${file.name}`}
+                                                >
+                                                    x
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>

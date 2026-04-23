@@ -21,6 +21,7 @@ from django.conf import settings
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfgen import canvas
 from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2.errors import DependencyError, PdfReadError
 from django.utils import timezone as django_timezone 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -70,6 +71,7 @@ pdfmetrics.registerFont(TTFont("bookos", font_path))
 
 
 CIRCULAR_SR_LOCK_TIMEOUT_MS = 15000
+MAX_CIRCULAR_ATTACHMENT_FILES = 3
 PDF_FONT_NAME = "bookos"
 PDF_HEADER_FONT_SIZE = 12
 PDF_TITLE_FONT_SIZE = 16
@@ -84,6 +86,10 @@ PDF_FIXED_FOOTER_Y = 42
 PDF_FIXED_FOOTER_LINE_Y = PDF_FIXED_FOOTER_Y + 16
 PDF_BODY_STOP_Y = PDF_FIXED_FOOTER_LINE_Y + 24
 PDF_HEADER_TEXT = "KAIZEN SHIP MANAGEMENT CO. LTD"
+
+
+class CircularAttachmentValidationError(ValueError):
+    pass
 
 # Keep existing SR prefixes stable for known departments while still
 # falling back to the department master when new departments are added.
@@ -598,18 +604,25 @@ def _acquire_circular_sr_lock(cursor, prefix):
 def _generate_unique_circular_sr_no(cursor, doc_type_display_name, dept_display_name, created_at):
     doc_type_segment = (doc_type_display_name or 'Unknown').strip() or 'Unknown'
     dept_segment = (dept_display_name or 'Unknown Dept').strip() or 'Unknown Dept'
-    prefix = f"KSM/{doc_type_segment}/{dept_segment}/{created_at.year}-"
+    display_prefix = f"KSM/{doc_type_segment}/{dept_segment}/{created_at.year}-"
+    type_prefix = f"KSM/{doc_type_segment}/"
+    type_sequence_lock_key = _normalize_circular_type_name(doc_type_segment) or doc_type_segment.lower()
 
-    _acquire_circular_sr_lock(cursor, prefix)
+    # The visible SR format includes department/year for readability, but the
+    # numeric serial is global per document type and must continue across years.
+    _acquire_circular_sr_lock(cursor, f"type-seq:{type_sequence_lock_key}")
 
     cursor.execute(
         """
         SELECT MAX(
-            TRY_CAST(SUBSTRING(sr_no, LEN(%s) + 1, LEN(sr_no) - LEN(%s)) AS INT)
+            CASE
+                WHEN CHARINDEX('-', sr_no) > 0
+                THEN TRY_CAST(RIGHT(sr_no, CHARINDEX('-', REVERSE(sr_no)) - 1) AS INT)
+                ELSE NULL
+            END
         )
         FROM msc_data WITH (UPDLOCK, HOLDLOCK)
         WHERE sr_no IS NOT NULL
-          AND LEN(sr_no) > LEN(%s)
           AND LEFT(sr_no, LEN(%s)) = %s
           AND NOT (
               (
@@ -619,18 +632,26 @@ def _generate_unique_circular_sr_no(cursor, doc_type_display_name, dept_display_
               OR publish_status = 3
           )
         """,
-        [prefix, prefix, prefix, prefix, prefix]
+        [type_prefix, type_prefix]
     )
     max_row = cursor.fetchone()
     next_serial = (max_row[0] or 0) + 1
 
     while True:
-        candidate_sr_no = f"{prefix}{next_serial:04d}"
+        candidate_sr_no = f"{display_prefix}{next_serial:04d}"
         cursor.execute(
             """
             SELECT COUNT(1)
             FROM msc_data WITH (UPDLOCK, HOLDLOCK)
-            WHERE sr_no = %s
+            WHERE sr_no IS NOT NULL
+              AND LEFT(sr_no, LEN(%s)) = %s
+              AND (
+                    CASE
+                        WHEN CHARINDEX('-', sr_no) > 0
+                        THEN TRY_CAST(RIGHT(sr_no, CHARINDEX('-', REVERSE(sr_no)) - 1) AS INT)
+                        ELSE NULL
+                    END
+                  ) = %s
               AND NOT (
                   (
                       publish_status = 0
@@ -639,7 +660,7 @@ def _generate_unique_circular_sr_no(cursor, doc_type_display_name, dept_display_
                   OR publish_status = 3
               )
             """,
-            [candidate_sr_no]
+            [type_prefix, type_prefix, next_serial]
         )
         existing_row = cursor.fetchone()
         if not existing_row or existing_row[0] == 0:
@@ -753,12 +774,74 @@ def _get_original_attachment_copy_path(merged_attachment_path):
     return None
 
 
-def _store_circular_generated_pdf(formatted_id, pdf_data, uploaded_file_bytes=None):
-    uploaded_file_stream = (
-        io.BytesIO(uploaded_file_bytes) if uploaded_file_bytes is not None else None
-    )
+def _is_pdf_attachment_upload(uploaded_file):
+    file_name = str(getattr(uploaded_file, "name", "") or "").strip().lower()
+    content_type = str(getattr(uploaded_file, "content_type", "") or "").strip().lower()
+    return file_name.endswith(".pdf") or content_type in {"application/pdf", "application/x-pdf"}
+
+
+def _extract_uploaded_pdf_attachments_from_request_files(request_files):
+    if request_files is None:
+        return []
+
+    uploaded_files = list(request_files.getlist("attachment") or [])
+    alternate_field_files = list(request_files.getlist("attachments") or [])
+    if alternate_field_files:
+        uploaded_files.extend(alternate_field_files)
+
+    deduped_uploaded_files = []
+    seen_markers = set()
+    for uploaded_file in uploaded_files:
+        marker = id(uploaded_file)
+        if marker in seen_markers:
+            continue
+        seen_markers.add(marker)
+        deduped_uploaded_files.append(uploaded_file)
+
+    if len(deduped_uploaded_files) > MAX_CIRCULAR_ATTACHMENT_FILES:
+        raise CircularAttachmentValidationError(
+            f"You can upload a maximum of {MAX_CIRCULAR_ATTACHMENT_FILES} PDF files."
+        )
+
+    invalid_file_names = [
+        str(getattr(uploaded_file, "name", "Unknown file"))
+        for uploaded_file in deduped_uploaded_files
+        if not _is_pdf_attachment_upload(uploaded_file)
+    ]
+    if invalid_file_names:
+        raise CircularAttachmentValidationError(
+            "Only PDF attachments are allowed. Invalid files: "
+            + ", ".join(invalid_file_names)
+        )
+
+    return deduped_uploaded_files
+
+
+def _merge_uploaded_pdf_bytes(uploaded_file_bytes_list):
+    normalized_bytes_list = [file_bytes for file_bytes in (uploaded_file_bytes_list or []) if file_bytes is not None]
+    if not normalized_bytes_list:
+        return None
+
+    merged_writer = PdfWriter()
+    for file_bytes in normalized_bytes_list:
+        uploaded_pdf_reader = _open_uploaded_pdf_reader(io.BytesIO(file_bytes))
+        for page in uploaded_pdf_reader.pages:
+            merged_writer.add_page(page)
+
+    merged_buffer = io.BytesIO()
+    merged_writer.write(merged_buffer)
+    merged_buffer.seek(0)
+    return merged_buffer.getvalue()
+
+
+def _store_circular_generated_pdf(formatted_id, pdf_data, uploaded_file_bytes_list=None):
+    uploaded_file_streams = [
+        io.BytesIO(file_bytes)
+        for file_bytes in (uploaded_file_bytes_list or [])
+        if file_bytes is not None
+    ]
     merged_pdf_buffer = generate_pdf_with_cover_and_original(
-        uploaded_file_stream,
+        uploaded_file_streams,
         pdf_data,
     )
 
@@ -768,11 +851,47 @@ def _store_circular_generated_pdf(formatted_id, pdf_data, uploaded_file_bytes=No
     with open(merged_filepath, 'wb') as merged_file:
         merged_file.write(merged_pdf_buffer.getvalue())
 
-    if uploaded_file_bytes is not None:
+    original_attachments_pdf_bytes = _merge_uploaded_pdf_bytes(uploaded_file_bytes_list)
+    if original_attachments_pdf_bytes is not None:
         with open(original_filepath, 'wb') as original_file:
-            original_file.write(uploaded_file_bytes)
+            original_file.write(original_attachments_pdf_bytes)
 
     return os.path.basename(merged_filepath), merged_filepath
+
+
+def _open_uploaded_pdf_reader(uploaded_file):
+    if uploaded_file is None:
+        return None
+
+    try:
+        pdf_reader = PdfReader(uploaded_file)
+    except DependencyError as exc:
+        raise CircularAttachmentValidationError(
+            "The uploaded PDF uses encryption that cannot be processed by the current server. "
+            "Please save or print it as an unlocked PDF and upload it again."
+        ) from exc
+    except PdfReadError as exc:
+        raise CircularAttachmentValidationError(
+            "The uploaded PDF could not be read. Please upload a valid, unlocked PDF file."
+        ) from exc
+
+    if getattr(pdf_reader, "is_encrypted", False):
+        try:
+            decrypt_result = pdf_reader.decrypt("")
+        except DependencyError as exc:
+            raise CircularAttachmentValidationError(
+                "The uploaded PDF is encrypted and cannot be processed by the current server. "
+                "Please save or print it as an unlocked PDF and upload it again."
+            ) from exc
+        except Exception:
+            decrypt_result = 0
+
+        if not decrypt_result:
+            raise CircularAttachmentValidationError(
+                "The uploaded PDF is password-protected. Please save or print it as an unlocked PDF and upload it again."
+            )
+
+    return pdf_reader
 
 
 def _is_system_generated_circular_page(page_obj, sr_no):
@@ -1035,11 +1154,16 @@ def create_notification(request):
                 )
             print(f"create_notification: Generated SR No: {formatted_id}")
 
-            uploaded_file_bytes = None
-            if request.FILES.get('attachment'):
-                uploaded_file = request.FILES['attachment']
-                print("create_notification: Processing file attachment...")
-                uploaded_file_bytes = uploaded_file.read()
+            try:
+                uploaded_files = _extract_uploaded_pdf_attachments_from_request_files(request.FILES)
+            except CircularAttachmentValidationError as exc:
+                print(f"create_notification: Attachment validation failed - {exc}")
+                return JsonResponse({'error': str(exc)}, status=400)
+
+            uploaded_file_bytes_list = []
+            if uploaded_files:
+                print(f"create_notification: Processing {len(uploaded_files)} file attachment(s)...")
+                uploaded_file_bytes_list = [uploaded_file.read() for uploaded_file in uploaded_files]
             else:
                 print("create_notification: No attachment uploaded. Generating circular PDF from form content only.")
 
@@ -1053,11 +1177,15 @@ def create_notification(request):
                 'created_by_employee_id': created_by_employee_id,
             }
 
-            attachment_name, attachment_path = _store_circular_generated_pdf(
-                formatted_id,
-                pdf_data,
-                uploaded_file_bytes=uploaded_file_bytes,
-            )
+            try:
+                attachment_name, attachment_path = _store_circular_generated_pdf(
+                    formatted_id,
+                    pdf_data,
+                    uploaded_file_bytes_list=uploaded_file_bytes_list,
+                )
+            except CircularAttachmentValidationError as exc:
+                print(f"create_notification: Attachment validation failed - {exc}")
+                return JsonResponse({'error': str(exc)}, status=400)
             print(f"create_notification: Generated circular PDF saved at {attachment_path}")
 
             print("create_notification: Creating MscData record using raw SQL...")
@@ -1209,9 +1337,9 @@ def create_notification(request):
 # ================ ADD THESE FUNCTIONS AFTER YOUR MAIN FUNCTION ================
 
 
-def generate_pdf_with_cover_and_original(uploaded_file, notification_data):
+def generate_pdf_with_cover_and_original(uploaded_files, notification_data):
     """
-    Generate PDF with cover page + multi-page content, then merge with original PDF.
+    Generate PDF with cover page + multi-page content, then merge with uploaded PDF(s).
     """
     # Create in-memory PDF
     cover_buffer = io.BytesIO()
@@ -1327,12 +1455,20 @@ def generate_pdf_with_cover_and_original(uploaded_file, notification_data):
     for p in cover_pdf.pages:
         writer.add_page(p)
 
-    try:
-        original_pdf = PdfReader(uploaded_file)
-        for p in original_pdf.pages:
-            writer.add_page(p)
-    except:
-        print("Original PDF unreadable, continuing with only generated pages.")
+    normalized_uploaded_files = []
+    if uploaded_files is None:
+        normalized_uploaded_files = []
+    elif isinstance(uploaded_files, (list, tuple)):
+        normalized_uploaded_files = list(uploaded_files)
+    else:
+        normalized_uploaded_files = [uploaded_files]
+
+    for uploaded_file in normalized_uploaded_files:
+        original_pdf = _open_uploaded_pdf_reader(uploaded_file)
+        if original_pdf is None:
+            continue
+        for page in original_pdf.pages:
+            writer.add_page(page)
 
     final_buffer = io.BytesIO()
     writer.write(final_buffer)
@@ -1731,7 +1867,7 @@ def update_notification_status(request, notification_sr_no):
 
         # === Fetch Notification for Department Info (for PDF update) ===
         # This is still needed for the PDF cover generation logic below
-        notification_for_dept = MscData.objects.filter(sr_no=notification_sr_no).first()
+        notification_for_dept = _get_latest_notification_record_by_sr_no(notification_sr_no)
         if not notification_for_dept:
             print(f"update_notification_status: Notification with SR No {notification_sr_no} not found.")
             return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
@@ -2858,6 +2994,34 @@ def _get_active_draft_record_by_sr_no(sr_no):
     )
 
 
+def _get_latest_notification_record_by_sr_no(sr_no):
+    normalized_sr_no = str(sr_no or '').strip()
+    if not normalized_sr_no:
+        return None
+
+    notification_queryset = (
+        MscData.objects
+        .filter(
+            sr_no=normalized_sr_no,
+            is_deleted=False,
+        )
+        .order_by('-created_at', '-id')
+    )
+
+    notification_record = notification_queryset.first()
+    if not notification_record:
+        return None
+
+    duplicate_count = notification_queryset.count()
+    if duplicate_count > 1:
+        print(
+            "_get_latest_notification_record_by_sr_no: Multiple rows found for "
+            f"sr_no={normalized_sr_no}. Using the latest row and ignoring {duplicate_count - 1} duplicates."
+        )
+
+    return notification_record
+
+
 def _serialize_draft_record(draft):
     draft_data = {
         'id': str(draft.id),
@@ -3123,20 +3287,33 @@ def _update_draft_record_from_request(request, draft_record, log_label):
         'created_by_employee_id': draft_record.created_by,
     }
 
-    if request.FILES.get('attachment'):
-        uploaded_file = request.FILES['attachment']
-        uploaded_file_bytes = uploaded_file.read()
-        attachment_name_to_store, attachment_path_to_store = _store_circular_generated_pdf(
-            draft_record.sr_no,
-            pdf_data,
-            uploaded_file_bytes=uploaded_file_bytes,
-        )
+    try:
+        uploaded_files = _extract_uploaded_pdf_attachments_from_request_files(request.FILES)
+    except CircularAttachmentValidationError as exc:
+        print(f"{log_label}: Attachment validation failed - {exc}")
+        return JsonResponse({'error': str(exc)}, status=400)
+
+    if uploaded_files:
+        uploaded_file_bytes_list = [uploaded_file.read() for uploaded_file in uploaded_files]
+        try:
+            attachment_name_to_store, attachment_path_to_store = _store_circular_generated_pdf(
+                draft_record.sr_no,
+                pdf_data,
+                uploaded_file_bytes_list=uploaded_file_bytes_list,
+            )
+        except CircularAttachmentValidationError as exc:
+            print(f"{log_label}: Attachment validation failed - {exc}")
+            return JsonResponse({'error': str(exc)}, status=400)
         print(f"{log_label}: Updated attachment for {draft_record.sr_no} at {attachment_path_to_store}")
     elif not attachment_path_to_store:
-        attachment_name_to_store, attachment_path_to_store = _store_circular_generated_pdf(
-            draft_record.sr_no,
-            pdf_data,
-        )
+        try:
+            attachment_name_to_store, attachment_path_to_store = _store_circular_generated_pdf(
+                draft_record.sr_no,
+                pdf_data,
+            )
+        except CircularAttachmentValidationError as exc:
+            print(f"{log_label}: Attachment validation failed - {exc}")
+            return JsonResponse({'error': str(exc)}, status=400)
         print(f"{log_label}: Created generated circular PDF for draft {draft_record.sr_no} at {attachment_path_to_store}")
 
     with transaction.atomic():
@@ -3271,7 +3448,9 @@ def update_draft_by_id(request, draft_id):
             if not fallback_row or not fallback_row[0]:
                 raise MscData.DoesNotExist()
 
-            draft_record = MscData.objects.get(sr_no=fallback_row[0], is_deleted=False)
+            draft_record = _get_latest_notification_record_by_sr_no(fallback_row[0])
+            if not draft_record:
+                raise MscData.DoesNotExist()
 
         return _update_draft_record_from_request(request, draft_record, 'update_draft_by_id')
 
@@ -3734,7 +3913,9 @@ def create_delivery_records(request):
 
         # Verify the notification exists
         try:
-            notification = MscData.objects.get(sr_no=notification_sr_no)
+            notification = _get_latest_notification_record_by_sr_no(notification_sr_no)
+            if not notification:
+                raise MscData.DoesNotExist()
             print(f"create_delivery_records: Found notification {notification.sr_no} (ID: {notification.id}) to link delivery records to.")
         except MscData.DoesNotExist:
             print(f"create_delivery_records: Notification with SR No {notification_sr_no} not found.")
@@ -3796,7 +3977,9 @@ def get_notification_details_by_sr_no(request, notification_sr_no): #  Changed p
         # Use .filter().first() to handle potential non-uniqueness gracefully if sr_no is not enforced as unique in DB
         # If sr_no is intended to be unique, .get() is fine.
         # For now, let's use .get() assuming it's unique.
-        notification = MscData.objects.get(sr_no=notification_sr_no) # ✅ Query by sr_no instead of id
+        notification = _get_latest_notification_record_by_sr_no(notification_sr_no)
+        if not notification:
+            raise MscData.DoesNotExist()
 
         print(f"get_notification_details_by_sr_no: Found notification. ID (DB): {notification.id}, SR No: {notification.sr_no}") # ✅ Updated log message
 
@@ -3840,10 +4023,6 @@ def get_notification_details_by_sr_no(request, notification_sr_no): #  Changed p
     except MscData.DoesNotExist:
         print(f"get_notification_details_by_sr_no: Notification with SR No {notification_sr_no} not found.") # ✅ Updated log message
         return JsonResponse({'error': 'Notification not found.'}, status=404)
-    except MscData.MultipleObjectsReturned:
-        # This handles the case where sr_no is not unique in the database
-        print(f"get_notification_details_by_sr_no: Multiple notifications found with SR No {notification_sr_no}.") # ✅ Updated log message
-        return JsonResponse({'error': 'Multiple notifications found with this SR No. Please contact your system administrator.'}, status=500) # 500 might be appropriate, or 400 depending on your workflow
     except Exception as e:
         print(f"get_notification_details_by_sr_no: UNEXPECTED ERROR - {type(e).__name__}: {str(e)}") # ✅ Updated log message
         import traceback
@@ -3881,7 +4060,9 @@ def send_emails_to_vessels(request):
 
         # Fetch the notification details to get its title, and attachment path (for email attachment if needed)
         try:
-            notification_details = MscData.objects.get(sr_no=notification_sr_no)
+            notification_details = _get_latest_notification_record_by_sr_no(notification_sr_no)
+            if not notification_details:
+                raise MscData.DoesNotExist()
             print(f"send_emails_to_vessels: Found notification {notification_details.sr_no} (ID: {notification_details.id}) to send emails.")
         except MscData.DoesNotExist:
             print(f"send_emails_to_vessels: Notification with SR No {notification_sr_no} not found.")
@@ -4141,9 +4322,8 @@ def send_emails_to_vessels(request):
             )
             return JsonResponse({'error': 'notification_sr_no and vessel_ids list are required'}, status=400)
 
-        try:
-            notification_details = MscData.objects.get(sr_no=notification_sr_no)
-        except MscData.DoesNotExist:
+        notification_details = _get_latest_notification_record_by_sr_no(notification_sr_no)
+        if not notification_details:
             print(f"send_emails_to_vessels[v2]: Notification with SR No {notification_sr_no} not found.")
             return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
 
@@ -4350,7 +4530,9 @@ def link_notification_to_ranks(request, notification_sr_no):
 
         # Find the notification object using the SR No () to get its details (e.g., for logging)
         try:
-            notification = MscData.objects.get(sr_no=notification_sr_no)
+            notification = _get_latest_notification_record_by_sr_no(notification_sr_no)
+            if not notification:
+                raise MscData.DoesNotExist()
             print(f"link_notification_to_ranks: Found notification object. ID: {notification.id},  Attachment Path: {notification.attachment_path}")
         except MscData.DoesNotExist:
             print(f"link_notification_to_ranks: Notification with SR No {notification_sr_no} not found.")
@@ -4538,9 +4720,8 @@ def link_notification_to_ranks(request, notification_sr_no):
             print("link_notification_to_ranks[v2]: No selected_rank_ids provided in request body.")
             return JsonResponse({'error': 'selected_rank_ids list is required'}, status=400)
 
-        try:
-            notification = MscData.objects.get(sr_no=notification_sr_no)
-        except MscData.DoesNotExist:
+        notification = _get_latest_notification_record_by_sr_no(notification_sr_no)
+        if not notification:
             print(f"link_notification_to_ranks[v2]: Notification with SR No {notification_sr_no} not found.")
             return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
 
@@ -4806,7 +4987,9 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
     try:
         # Find the specific notification record by its SR No (string) - ✅ Changed from 'id' to 'sr_no'
         print(f"edit_pending_notification: Attempting to find notification by SR No: {notification_id}")
-        notification = MscData.objects.get(sr_no=notification_id) # ✅ Use sr_no for fetching
+        notification = _get_latest_notification_record_by_sr_no(notification_id)
+        if not notification:
+            raise MscData.DoesNotExist()
         print(f"edit_pending_notification: Found notification {notification.sr_no} (DB ID: {notification.id}). Current status: {notification.publish_status}")
 
         # Ensure the notification is in the pending state (status 1) before allowing edit
@@ -5047,3 +5230,5 @@ def edit_pending_notification(request, notification_id): #Parameter name is 'not
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': f'Internal server error: {str(e)}'}, status=500)
+
+

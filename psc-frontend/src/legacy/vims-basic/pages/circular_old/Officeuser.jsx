@@ -3023,6 +3023,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
   const seqRankNames = [
     "Master",
+    "Acting Master",
     "Chief Engineer",
     "Second Officer",
     "Third Officer",
