@@ -34,6 +34,10 @@ class NotificationType(models.TextChoices):
     CONFLICT_RESOLVED = 'CONFLICT_RESOLVED', 'Conflict Resolved'
     PHYSICAL_VERIFICATION_CREATED = 'PHYSICAL_VERIFICATION_CREATED', 'Physical Verification Created'
     DEF_ASSIGNED = 'DEF_ASSIGNED', 'Deficiency Assigned'
+    CIRCULAR_CREATED = 'CIRCULAR_CREATED', 'Circular Created'
+    CIRCULAR_PENDING_APPROVAL = 'CIRCULAR_PENDING_APPROVAL', 'Circular Pending Approval'
+    CIRCULAR_APPROVED = 'CIRCULAR_APPROVED', 'Circular Approved'
+    CIRCULAR_REJECTED = 'CIRCULAR_REJECTED', 'Circular Rejected'
 
 
 class Notification(models.Model):

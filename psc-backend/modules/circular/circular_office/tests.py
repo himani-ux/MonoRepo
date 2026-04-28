@@ -1,4 +1,5 @@
 import io
+import json
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,15 +11,19 @@ from rest_framework.test import APIRequestFactory
 from PyPDF2.errors import DependencyError
 
 from .views import (
+    ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP,
     MAX_CIRCULAR_ATTACHMENT_FILES,
     CircularAttachmentValidationError,
     _build_delivery_status_records,
     _extract_uploaded_pdf_attachments_from_request_files,
+    _fetch_target_crew_ids_for_ranks,
+    _filter_crew_ids_by_allowed_status,
     _get_latest_notification_record_by_sr_no,
     _build_pending_draft_conflict_message,
     _get_existing_active_draft_for_creator_and_type,
     _generate_unique_circular_sr_no,
     _open_uploaded_pdf_reader,
+    _resolve_circular_type_label,
     create_delivery_records,
     delete_draft_by_id,
     get_notification_details_by_sr_no,
@@ -60,6 +65,49 @@ class DeliveryStatusRecordTests(SimpleTestCase):
         self.assertEqual(result[1]['crew_status_name'], 'Retired')
         self.assertEqual(result[1]['seen_at'], '2026-04-20T07:00:00')
         self.assertEqual(result[1]['reminder_sent_at'], '2026-04-20T06:00:00')
+
+
+class CrewDeliveryEligibilityTests(SimpleTestCase):
+    @patch('modules.circular.circular_office.views.connection')
+    def test_filter_crew_ids_by_allowed_status_keeps_only_allowed_latest_active_statuses(self, mock_connection):
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchall.return_value = [
+            ('CREW001',),
+            ('CREW003',),
+        ]
+
+        result = _filter_crew_ids_by_allowed_status([
+            'CREW001',
+            'CREW002',
+            'CREW003',
+            'CREW001',
+        ])
+
+        self.assertEqual(result, ['CREW001', 'CREW003'])
+        executed_sql, executed_params = mock_cursor.execute.call_args[0]
+        self.assertIn('Final_crew_list', executed_sql)
+        self.assertIn('CrewStatus', executed_sql)
+        self.assertIn('ISNULL(fcl.is_active, 0) = 1', executed_sql)
+        self.assertIn('ISNULL(fcl.is_delete, 0) = 0', executed_sql)
+        self.assertEqual(
+            executed_params[-len(ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP):],
+            list(ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP),
+        )
+
+    @patch('modules.circular.circular_office.views._filter_crew_ids_by_allowed_status')
+    @patch('modules.circular.circular_office.views.connection')
+    def test_fetch_target_crew_ids_for_ranks_applies_status_filter(self, mock_connection, mock_filter):
+        mock_cursor = mock_connection.cursor.return_value.__enter__.return_value
+        mock_cursor.fetchall.return_value = [
+            ('CREW001',),
+            ('CREW002',),
+        ]
+        mock_filter.return_value = ['CREW001']
+
+        result = _fetch_target_crew_ids_for_ranks(['4f9d4c5d-4ff9-4bb2-ace5-f346785a38f7'])
+
+        self.assertEqual(result, ['CREW001'])
+        mock_filter.assert_called_once_with(['CREW001', 'CREW002'])
 
 
 class DeleteDraftByIdTests(SimpleTestCase):
@@ -193,6 +241,12 @@ class PendingDraftValidationTests(SimpleTestCase):
             ],
         )
 
+    def test_resolve_circular_type_label_normalizes_work_instruction_tokens(self):
+        self.assertEqual(_resolve_circular_type_label('workinstruction'), 'Work Instruction')
+        self.assertEqual(_resolve_circular_type_label('Work Instruction'), 'Work Instruction')
+        self.assertEqual(_resolve_circular_type_label('work_instruction_letter'), 'Work Instruction')
+        self.assertIsNone(_resolve_circular_type_label('all'))
+
 
 class NotificationLookupTests(SimpleTestCase):
     def setUp(self):
@@ -249,13 +303,21 @@ class NotificationLookupTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         mock_lookup.assert_called_once_with('KSM/Circular/Technical/2026-0001')
 
-    @patch('modules.circular.circular_office.views.MscNotification')
+    @patch('modules.circular.circular_office.views._bulk_insert_crew_delivery_records')
+    @patch('modules.circular.circular_office.views._filter_crew_ids_by_allowed_status')
     @patch('modules.circular.circular_office.views._get_latest_notification_record_by_sr_no')
-    def test_create_delivery_records_uses_latest_helper(self, mock_lookup, mock_notification_model):
+    def test_create_delivery_records_uses_latest_helper_and_filters_status(
+        self,
+        mock_lookup,
+        mock_status_filter,
+        mock_bulk_insert,
+    ):
         mock_lookup.return_value = SimpleNamespace(
             id='note-1',
             sr_no='KSM/Circular/Technical/2026-0001',
         )
+        mock_status_filter.return_value = ['CREW001']
+        mock_bulk_insert.return_value = ['CREW001']
 
         response = create_delivery_records(
             self.factory.post(
@@ -270,7 +332,15 @@ class NotificationLookupTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
         mock_lookup.assert_called_once_with('KSM/Circular/Technical/2026-0001')
-        self.assertEqual(mock_notification_model.call_count, 2)
+        mock_status_filter.assert_called_once_with(['CREW001', 'CREW002'])
+        mock_bulk_insert.assert_called_once()
+        bulk_args = mock_bulk_insert.call_args[0]
+        self.assertEqual(bulk_args[0], 'KSM/Circular/Technical/2026-0001')
+        self.assertEqual(bulk_args[1], ['CREW001'])
+        response_data = json.loads(response.content)
+        self.assertEqual(response_data['crew_ids_processed'], 2)
+        self.assertEqual(response_data['crew_ids_eligible'], 1)
+        self.assertEqual(response_data['records_created'], 1)
 
 
 class CircularAttachmentValidationTests(SimpleTestCase):

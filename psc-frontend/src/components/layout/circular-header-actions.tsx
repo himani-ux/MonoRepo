@@ -1,5 +1,6 @@
+import type { ComponentType, SVGProps } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Hourglass, MoreHorizontal, Pencil, SquarePlus, Wallet } from 'lucide-react';
+import { Hourglass, MoreHorizontal, Pencil, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,11 +11,24 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 
+type HeaderIcon = ComponentType<SVGProps<SVGSVGElement>>;
+
+function CreateCircularIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M12 11v6" />
+      <path d="M9 14h6" />
+    </svg>
+  );
+}
+
 interface CircularHeaderLink {
   to: string;
   label: string;
   title: string;
-  icon: typeof SquarePlus;
+  icon: HeaderIcon;
   visible: boolean;
 }
 
@@ -28,7 +42,7 @@ function CircularActionLink({
   to: string;
   label: string;
   title: string;
-  icon: typeof SquarePlus;
+  icon: HeaderIcon;
   isActive: boolean;
 }) {
   return (
@@ -68,9 +82,9 @@ export function CircularHeaderActions() {
   const links: CircularHeaderLink[] = [
     {
       to: '/circular/office',
-      label: 'Open Circular office panel',
-      title: 'Office User Panel',
-      icon: SquarePlus,
+      label: 'Open create circular panel',
+      title: 'Create Circular',
+      icon: CreateCircularIcon,
       visible: isOfficeUser,
     },
     {

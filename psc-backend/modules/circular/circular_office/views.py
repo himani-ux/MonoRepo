@@ -72,6 +72,10 @@ pdfmetrics.registerFont(TTFont("bookos", font_path))
 
 CIRCULAR_SR_LOCK_TIMEOUT_MS = 15000
 MAX_CIRCULAR_ATTACHMENT_FILES = 3
+ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES = ("Available", "On Board", "On Leave")
+ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP = tuple(
+    status_name.lower() for status_name in ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES
+)
 PDF_FONT_NAME = "bookos"
 PDF_HEADER_FONT_SIZE = 12
 PDF_TITLE_FONT_SIZE = 16
@@ -187,6 +191,63 @@ def _normalize_text_list(values):
         normalized_values.append(cleaned_value)
 
     return normalized_values
+
+
+def _filter_crew_ids_by_allowed_status(crew_ids):
+    normalized_crew_ids = _normalize_text_list(crew_ids)
+    if not normalized_crew_ids:
+        return []
+
+    values_clause = ", ".join(["(%s)"] * len(normalized_crew_ids))
+    status_placeholders = ", ".join(["%s"] * len(ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP))
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_crews TABLE (
+            crew_id NVARCHAR(255) PRIMARY KEY
+        );
+
+        INSERT INTO @target_crews (crew_id)
+        VALUES {values_clause};
+
+        WITH latest_final_crew AS (
+            SELECT
+                LTRIM(RTRIM(fcl.CrewID)) AS crew_id,
+                LTRIM(RTRIM(COALESCE(cs.CrewStatusName, ''))) AS crew_status_name,
+                ROW_NUMBER() OVER (
+                    PARTITION BY LTRIM(RTRIM(fcl.CrewID))
+                    ORDER BY
+                        fcl.updated_date DESC,
+                        fcl.created_date DESC,
+                        fcl.id DESC
+                ) AS rn
+            FROM Final_crew_list fcl
+            INNER JOIN @target_crews target
+                ON target.crew_id = LTRIM(RTRIM(fcl.CrewID))
+            LEFT JOIN ksm_marine_live.dbo.CrewStatus cs
+                ON cs.id = fcl.Crew_Status
+            WHERE ISNULL(fcl.is_active, 0) = 1
+              AND ISNULL(fcl.is_delete, 0) = 0
+              AND LTRIM(RTRIM(ISNULL(fcl.CrewID, ''))) <> ''
+        )
+        SELECT crew_id
+        FROM latest_final_crew
+        WHERE rn = 1
+          AND LOWER(crew_status_name) IN ({status_placeholders});
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            sql,
+            normalized_crew_ids + list(ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP),
+        )
+        allowed_crew_ids = {
+            str(row[0] or "").strip()
+            for row in cursor.fetchall()
+            if str(row[0] or "").strip()
+        }
+
+    return [crew_id for crew_id in normalized_crew_ids if crew_id in allowed_crew_ids]
 
 
 def _format_pending_draft_doc_type_name(doc_type_display_name):
@@ -415,7 +476,9 @@ def _fetch_target_crew_ids_for_ranks(rank_ids):
 
     with connection.cursor() as cursor:
         cursor.execute(sql, normalized_rank_ids)
-        return _normalize_text_list([row[0] for row in cursor.fetchall()])
+        target_crew_ids = _normalize_text_list([row[0] for row in cursor.fetchall()])
+
+    return _filter_crew_ids_by_allowed_status(target_crew_ids)
 
 
 def _bulk_insert_crew_delivery_records(notification_sr_no, crew_ids, delivered_at, reminder_count=1):
@@ -573,6 +636,19 @@ def _infer_circular_type_name_from_sr_no(sr_no):
 def _normalize_circular_type_name(doc_type_name):
     raw_value = str(doc_type_name or "").strip().lower()
     return "".join(ch for ch in raw_value if ch.isalnum())
+
+
+def _resolve_circular_type_label(doc_type_name):
+    normalized_type = _normalize_circular_type_name(doc_type_name)
+    if not normalized_type or normalized_type == "all":
+        return None
+    if normalized_type.startswith("workinstruction"):
+        return "Work Instruction"
+    if normalized_type == "circular":
+        return "Circular"
+    if normalized_type == "alert":
+        return "Alert"
+    return str(doc_type_name or "").strip()
 
 
 def _should_stack_footer_metadata(doc_type_name):
@@ -1301,12 +1377,12 @@ def create_notification(request):
                         final_crew_list_for_dept = FinalCrewList.objects.filter(Crew_ref_id__in=hrm_ids_for_dept)
                         final_crew_ids_for_dept = [crew.CrewID for crew in final_crew_list_for_dept]
 
-                        relevant_final_crew_ids = final_crew_ids_for_dept
+                        relevant_final_crew_ids = _filter_crew_ids_by_allowed_status(final_crew_ids_for_dept)
                         if cleaned_vessel_ids:
                             try:
                                 uuid_vessel_ids = [uuid.UUID(v_id) for v_id in cleaned_vessel_ids]
                                 onboardings_for_vessels = CrewOnboardingHistory.objects.filter(
-                                    CrewID__in=final_crew_ids_for_dept,
+                                    CrewID__in=relevant_final_crew_ids,
                                     vessel__in=uuid_vessel_ids
                                 )
                                 relevant_final_crew_ids = list(onboardings_for_vessels.values_list('CrewID', flat=True))
@@ -2695,10 +2771,17 @@ def get_crews_by_department(request):
         # 2. Find FinalCrewList records linked to those HRM IDs
         crews = FinalCrewList.objects.filter(Crew_ref_id__in=hrm_ids)
         print(f"get_crews_by_department: Found {crews.count()} FinalCrewList records for department '{dept_name}'")
+        eligible_crew_ids = set(_filter_crew_ids_by_allowed_status([crew.CrewID for crew in crews]))
+        print(
+            f"get_crews_by_department: Found {len(eligible_crew_ids)} eligible crew records "
+            f"with status in {ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES}"
+        )
 
         # --- Format response ---
         result = []
         for crew in crews:
+            if str(crew.CrewID or "").strip() not in eligible_crew_ids:
+                continue
             result.append({
                 'CrewID': crew.CrewID, # Use the CrewID field from FinalCrewList
                 'Crew_ref_id': crew.Crew_ref_id, # The HRM501.id string this crew links to
@@ -2781,13 +2864,32 @@ def get_crews_by_department_and_vessel(request):
             print(f"get_crews_by_department_and_vessel: No FinalCrewList records found linked to HRM501 records for department '{dept_name}', returning empty list.")
             return JsonResponse([], safe=False)
 
+        eligible_crew_ids = set(
+            _filter_crew_ids_by_allowed_status([crew.CrewID for crew in final_crew_list_for_dept])
+        )
+        eligible_final_crew_records = [
+            crew
+            for crew in final_crew_list_for_dept
+            if str(crew.CrewID or "").strip() in eligible_crew_ids
+        ]
+
+        if not eligible_final_crew_records:
+            print(
+                "get_crews_by_department_and_vessel: No crew found with allowed statuses "
+                f"{ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES} for department '{dept_name}'."
+            )
+            return JsonResponse([], safe=False)
+
         # 3. Get the HRM501 details for the crews found in FinalCrewList to get their rank_name
         print("get_crews_by_department_and_vessel: Fetching HRM501 details for crews to get rank_name...")
         # Use select_related for efficiency if HRM501 is linked via ForeignKey (unlikely here, as FinalCrewList links via Crew_ref_id string)
         # Use prefetch_related if HRM501 has a reverse FK from FinalCrewList (also unlikely based on field names)
         # Since FinalCrewList.Crew_ref_id seems to be a string matching HRM501.id,
         # we'll fetch the HRM records separately based on the Crew_ref_id values from FinalCrewList.
-        crew_ref_ids_from_final = final_crew_list_for_dept.values_list('Crew_ref_id', flat=True).distinct()
+        eligible_final_crew_by_ref = {}
+        for crew in eligible_final_crew_records:
+            eligible_final_crew_by_ref.setdefault(str(crew.Crew_ref_id), crew)
+        crew_ref_ids_from_final = list(eligible_final_crew_by_ref.keys())
         hrm_records_for_crews = HRM501.objects.filter(id__in=crew_ref_ids_from_final)
 
         # --- NEW: Sort the HRM records by rank_name ---
@@ -2806,7 +2908,7 @@ def get_crews_by_department_and_vessel(request):
             # Find the corresponding FinalCrewList record to get the CrewID string
             # There might be multiple FinalCrewList records per HRM501.id if a crew member has multiple entries
             # We'll pick the first one found for this example, or you might want to return all related ones
-            final_crew_record = final_crew_list_for_dept.filter(Crew_ref_id=hrm_record.id).first() # Get first related record
+            final_crew_record = eligible_final_crew_by_ref.get(str(hrm_record.id))
 
             crew_data = {
                 'id': str(hrm_record.id), # HRM501 database ID (UUID as string)
@@ -3693,6 +3795,7 @@ def get_approved_notifications_csv(request):
     search_query = request.GET.get('search')
     sort_by = request.GET.get('sort_by', 'created_at')
     sort_order = request.GET.get('sort_order', 'desc')
+    resolved_msc_type = _resolve_circular_type_label(msc_type)
 
     try:
         # Base query
@@ -3708,8 +3811,8 @@ def get_approved_notifications_csv(request):
         if department_name_uuid:
             notifications_queryset = notifications_queryset.filter(dept=department_name_uuid)
 
-        if msc_type:
-            notifications_queryset = notifications_queryset.filter(msc_type__name__icontains=msc_type)
+        if resolved_msc_type:
+            notifications_queryset = notifications_queryset.filter(msc_type__name__icontains=resolved_msc_type)
 
         if priority:
             notifications_queryset = notifications_queryset.filter(priority__name__icontains=priority)
@@ -3787,10 +3890,10 @@ def get_approved_notifications_csv(request):
         # -----------------------------------------------
         note_text = None
 
-        if msc_type and priority:
-            note_text = f"This is the list of {priority.lower()} {msc_type.lower()} published by KSM."
-        elif msc_type:
-            note_text = f"This is the list of {msc_type.lower()} published by KSM."
+        if resolved_msc_type and priority:
+            note_text = f"This is the list of {priority.lower()} {resolved_msc_type.lower()} published by KSM."
+        elif resolved_msc_type:
+            note_text = f"This is the list of {resolved_msc_type.lower()} published by KSM."
         elif priority:
             note_text = f"This is the list of {priority.lower()} notifications published by KSM."
 
@@ -3921,18 +4024,20 @@ def create_delivery_records(request):
             print(f"create_delivery_records: Notification with SR No {notification_sr_no} not found.")
             return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
 
-        # Create MscNotification records for each crew ID
-        created_records_count = 0
-        for crew_id in crew_ids:
-            delivery_record = MscNotification(
-                msc_sr_no=notification_sr_no, # Link to the SR No of the approved notification
-                crew_id=crew_id,              # Use the specific crew ID
-                delivered_at=django_timezone.now() # Set the delivery timestamp
-                # seen_at and reminder_sent_at remain NULL initially
-            )
-            delivery_record.save()
-            created_records_count += 1
-            print(f"  - Created delivery record for crew {crew_id} linked to notification {notification_sr_no}")
+        eligible_crew_ids = _filter_crew_ids_by_allowed_status(crew_ids)
+        print(
+            "create_delivery_records: "
+            f"{len(eligible_crew_ids)} of {len(_normalize_text_list(crew_ids))} crew IDs are eligible "
+            f"with status in {ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES}."
+        )
+
+        created_crew_ids = _bulk_insert_crew_delivery_records(
+            notification.sr_no,
+            eligible_crew_ids,
+            django_timezone.now(),
+            reminder_count=1,
+        )
+        created_records_count = len(created_crew_ids)
 
         print(f"create_delivery_records: Successfully created {created_records_count} delivery records for notification {notification_sr_no}")
 
@@ -3940,7 +4045,9 @@ def create_delivery_records(request):
             'success': True,
             'message': f'Created {created_records_count} delivery records for notification {notification_sr_no}.',
             'notification_sr_no': notification_sr_no,
-            'crew_ids_processed': len(crew_ids)
+            'crew_ids_processed': len(_normalize_text_list(crew_ids)),
+            'crew_ids_eligible': len(eligible_crew_ids),
+            'records_created': created_records_count,
         })
 
     except json.JSONDecodeError as je:

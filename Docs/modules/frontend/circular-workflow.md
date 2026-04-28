@@ -4,6 +4,7 @@
 
 - `psc-frontend/src/routes/circular/page.tsx`
 - `psc-frontend/src/components/layout/circular-header-actions.tsx`
+- `psc-frontend/src/components/notification/notification-item.tsx`
 - `psc-frontend/src/legacy/vims-basic/routes/circular/CircularRoutes.jsx`
 - `psc-frontend/src/legacy/vims-basic/pages/circular/`
 - `psc-frontend/src/legacy/vims-basic/components/circular/`
@@ -11,7 +12,7 @@
 
 ## Purpose
 
-This module renders the legacy circular system inside the modern React shell. It decides which office or ship screen to show, fetches legacy `/api/circular/` endpoints directly from the browser, and coordinates multi-step authoring and approval flows through component state plus `localStorage`.
+This module renders the legacy circular system inside the modern React shell. It decides which office or ship screen to show, fetches legacy `/api/circular/` endpoints directly from the browser, coordinates multi-step authoring and approval flows through component state plus `localStorage`, and now deep-links circular entries from the shared notification center into the correct legacy screen.
 
 ## Owns
 
@@ -21,12 +22,15 @@ This module renders the legacy circular system inside the modern React shell. It
 - Approved library and crew-delivery status UI
 - Ship dashboard filters, list, detail, PDF viewer, acknowledgement, and crew reminder UI
 - Permission-gated button visibility for the legacy circular pages
+- Shared notification click routing for circular workflow events
+- Header create shortcut icon inside the modern shell
 
 ## Main Files
 
 - `page.tsx`: mounts the legacy circular app inside `RootLayout` and `LegacyBasicProvider`
 - `CircularRoutes.jsx`: route map and role guards
-- `Officeuser.jsx`: main office/admin workbench; this is the dominant file in the module
+- `Officeuser.jsx`: main office workbench; owns create, draft, pending review, approval, vessel selection, and rank selection flows
+- `Admin.jsx`: admin workbench mirroring the office flow with direct-publish and pending-approval actions
 - `MainDashboard.jsx`: office landing wrapper around approved library and nav
 - `ApprovedNotificationsLibrary.jsx`: approved office library, delete/supersede/reminder/status tools
 - `UserNotifications.jsx`: creator-facing approved/rejected history
@@ -36,6 +40,8 @@ This module renders the legacy circular system inside the modern React shell. It
 - `KsmLibrary.jsx`: ship circular card list, crew status modal, and reminder UI
 - `PdfViewer.jsx`: PDF rendering, scroll-to-bottom gating, and acknowledgement
 - `permissionUtils.js`: parses `form_ids` and `process_ids` from auth state and exposes permission helpers
+- `circular-header-actions.tsx`: shell-level create/history/drafts shortcuts; the create affordance now uses a custom inline SVG file-plus style icon without visible text
+- `notification-item.tsx`: shared notification-center click handling for `entity_type === 'CIRCULAR'`
 
 ## Route Map
 
@@ -65,7 +71,7 @@ This module renders the legacy circular system inside the modern React shell. It
 
 ### Office authoring
 
-`Officeuser.jsx` is a single large stateful page that handles:
+`Officeuser.jsx` and `Admin.jsx` are large stateful pages that handle:
 
 - lookup loading for type, department, priority, sub-category, second sub-category, vessels, and ranks
 - circular form state
@@ -76,12 +82,13 @@ This module renders the legacy circular system inside the modern React shell. It
 - pending edit and draft edit prefill
 - vessel popup and rank popup
 - approval and rejection comment modal
+- optional attachment upload with generated-PDF fallback messaging
 
-The file mixes create, review, publish, and edit behavior instead of splitting them into focused screens or hooks.
+Both files still mix create, review, publish, and edit behavior instead of splitting them into focused screens or hooks.
 
 ### Draft and pending edit handoff
 
-The draft and pending screens do not navigate with typed state. They write prefill data into `localStorage`, then redirect back into `Officeuser.jsx`.
+The draft and pending screens do not navigate with typed state. They write prefill data into `localStorage`, then redirect back into the active legacy authoring page (`Officeuser.jsx` or `Admin.jsx`).
 
 Important handoff keys:
 
@@ -109,21 +116,32 @@ Keys used for the supersede prefill:
 
 Approval is staged across multiple UI steps:
 
-1. fetch notification details
+1. use the selected pending-row data directly
 2. store approval context in `localStorage`
 3. open vessel popup
 4. open comment modal
 5. call status update endpoint
-6. call vessel email endpoint
-7. open rank popup
+6. open rank popup immediately after approval succeeds
+7. call vessel email endpoint in the background
 8. call rank-link endpoint
 
 Approval context keys:
 
 - `approvingNotificationSrNo`
-- `approvingNotificationId`
 - `approvingNotificationDept`
 - `selectedVesselIdsForNotification`
+
+This is an intentional change from the older flow. The current pages no longer block approval on an extra `get_notification_details` fetch before opening the vessel popup, which removed the slower failing path that previously surfaced `500` errors during approval.
+
+### Notification center integration
+
+Circular workflow notifications are rendered inside the same shared notification tab used by inspections.
+
+- `notification-item.tsx` recognizes `entity_type === 'CIRCULAR'`.
+- office admin users are routed to `/circular/admin?panel=pending-requests`
+- other office users are routed to `/circular/office?panel=pending-requests`
+- vessel users are routed to `/circular/ship-dashboard`
+- `Officeuser.jsx` and `Admin.jsx` read `panel=pending-requests`, auto-open the pending-request section, and scroll it into view once the list is available
 
 ### Ship flow
 
@@ -157,21 +175,23 @@ The frontend expects several inconsistent response shapes and works around them 
 - sub-categories and second sub-categories arrive as objects
 - some screens expect `dept` to behave like an integer flag
 - other screens expect department UUIDs or department names
+- pending-request lists now also consume backend-provided `dept_name` to reduce local fallback mapping
 
 This is why many pages build their own name-to-id and id-to-name maps locally.
 
 ## Current Risks And Breakpoints
 
-### 1. `Officeuser.jsx` is the module's single point of failure
+### 1. The legacy office workbenches are still the module's main failure points
 
-It is a very large component responsible for almost every office-side state transition. Authoring, review, approval, publish, edit, vessel selection, rank selection, and local storage restoration are all interleaved in one file.
+`Officeuser.jsx` and `Admin.jsx` are still very large components responsible for almost every office-side state transition. Authoring, review, approval, publish, edit, vessel selection, rank selection, and local storage restoration are interleaved instead of being split into focused units.
 
-### 2. The frontend still has endpoint mismatches
+### 2. Approval and delivery are still split across multiple requests
 
-- Draft submit-after-edit currently posts to `/api/circular/api/drafts/{id}/update/`, but the backend exposes `/api/circular/api/draft/<sr_no>/update/`.
-- Approved library has a `send-reminder` button wired to `/api/notifications/{srNo}/send-reminder/`, but the backend only exposes `/send-individual-reminder/`.
+- status update
+- vessel email dispatch
+- rank-link delivery
 
-Those actions are not just awkward; they are currently wired to routes that do not exist in the backend URL map.
+The UI now moves faster by opening the rank popup immediately after approval succeeds, but these side effects are still not wrapped in a single transactional frontend flow. Partial success is still possible.
 
 ### 3. Department semantics are inconsistent across screens
 
@@ -202,11 +222,14 @@ Most requests point directly at `http://localhost:8000/api/circular/...` instead
 
 They do similar work but are not cleanly consolidated, so behavior can drift.
 
-### 7. New shell integration is only partial
+### 7. New shell integration is still only partial
 
-The circular module lives inside the modern shell, but most of the logic still uses legacy hooks, legacy routes, hard-coded URLs, and ad hoc state transfer.
+The circular module lives inside the modern shell, but most of the logic still uses legacy hooks, legacy routes, hard-coded URLs, ad hoc state transfer, and direct `fetch` calls to `http://localhost:8000`.
 
-`circular-header-actions.tsx` also checks `user_type === 'vessel'`, while the legacy circular routes expect `user_type === 'ship'`, so header affordances for ship users can diverge from the route guard model.
+The newer pieces added around it are shell wrappers, not a full modernization:
+
+- the header action icon is modern-shell UI around a legacy route
+- notification center deep-links land inside legacy pages and still depend on query params plus `localStorage`
 
 ## Dependencies
 
@@ -221,5 +244,7 @@ The circular module lives inside the modern shell, but most of the logic still u
 - If you touch office flows, start with `Officeuser.jsx` and trace every `localStorage` key it reads and writes.
 - If you touch draft edit or supersede behavior, verify the redirect target and storage cleanup path.
 - If you touch ship flows, verify both `KsmLibrary.jsx` and `PdfViewer.jsx`; the list and detail flows each send writes.
+- If you touch approval flows, verify all three stages together: `update-status`, `send-emails`, and `link-ranks`.
+- If you touch notification behavior, verify both `notification-item.tsx` deep-link routing and the `panel=pending-requests` handling in `Officeuser.jsx` and `Admin.jsx`.
 - Prefer consolidating API calls behind a shared client before changing endpoint contracts.
 - Any real refactor should split the office page into at least create, review, and publish/routing concerns before adding new features.

@@ -90,6 +90,12 @@ const ApprovedNotificationsLibrary = () => {
         return [];
     };
 
+    const normalizeCircularTypeToken = (value) => {
+        return String(value ?? "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+    };
+
     const getCrewPrimaryLabel = (record) => {
         return record?.crew_name || record?.resolved_crew_id || record?.crew_id || "Unknown Crew";
     };
@@ -319,8 +325,9 @@ const ApprovedNotificationsLibrary = () => {
 
         // Type filter
         if (selectedType !== "all") {
+            const selectedTypeToken = normalizeCircularTypeToken(selectedType);
             result = result.filter(
-                (n) => n.msc_type && n.msc_type.toLowerCase() === selectedType
+                (n) => normalizeCircularTypeToken(n.msc_type) === selectedTypeToken
             );
         }
 
@@ -368,17 +375,23 @@ const ApprovedNotificationsLibrary = () => {
         const type = typeInput; // It's already the name
 
         // Normalize type for safer comparison and mapping
-        const normalizedType = (type || '').toLowerCase();
+        const normalizedType = normalizeCircularTypeToken(type);
         const map = {
             alert: "bg-red-100 text-red-700",
             circular: "bg-blue-100 text-blue-700",
             workinstruction: "bg-amber-100 text-amber-700",
-            work_instruction: "bg-amber-100 text-amber-700", // Handle potential underscore
         };
         const style = map[normalizedType] || "bg-gray-100 text-gray-700";
-        const displayText = normalizedType
-            .replace(/_/g, ' ') // Replace underscores with spaces
-            .split(' ')
+        const displayMap = {
+            alert: "Alert",
+            circular: "Circular",
+            workinstruction: "Work Instruction",
+        };
+        const displayText = displayMap[normalizedType] || String(type || "")
+            .replace(/[_-]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .split(" ")
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
 

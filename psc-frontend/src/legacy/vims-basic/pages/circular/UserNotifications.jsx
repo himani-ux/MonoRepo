@@ -132,7 +132,7 @@ const UserNotifications = ({ currentUser }) => {
           
         <div className="max-w-7xl mx-auto p-4 bg-white rounded-xl shadow-sm">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">My Notifications</h1>
+                <h1 className="text-2xl font-bold text-gray-800">My Submissions</h1>
             </div>
 
             

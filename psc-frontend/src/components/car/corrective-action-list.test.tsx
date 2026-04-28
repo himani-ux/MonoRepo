@@ -37,7 +37,7 @@ describe('CorrectiveActionList', () => {
     expect(screen.getByText('LONG-TERM (2)')).toBeInTheDocument();
   });
 
-  it('test_feat_car_011_applies_sequence_sorting_and_continuous_item_indexing', () => {
+  it('test_feat_car_011_applies_sequence_sorting_and_resets_item_indexing_per_section', () => {
     render(
       <CorrectiveActionList
         actions={
@@ -53,8 +53,8 @@ describe('CorrectiveActionList', () => {
 
     expect(screen.getByText('item:i1:index:1')).toBeInTheDocument();
     expect(screen.getByText('item:i2:index:2')).toBeInTheDocument();
-    expect(screen.getByText('item:l1:index:3')).toBeInTheDocument();
-    expect(screen.getByText('item:l2:index:4')).toBeInTheDocument();
+    expect(screen.getByText('item:l1:index:1')).toBeInTheDocument();
+    expect(screen.getByText('item:l2:index:2')).toBeInTheDocument();
   });
 
   it('test_feat_car_011_empty_actions_shows_placeholder_message', () => {

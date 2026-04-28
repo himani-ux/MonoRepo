@@ -9,7 +9,7 @@
 
 ## Purpose
 
-This is a legacy circular distribution system embedded inside the PSC backend. It covers office-side circular authoring and approval, vessel-level email delivery, crew-level rank assignment, ship-side inbox and acknowledgement tracking, reminder flows, and report exports.
+This is a legacy circular distribution system embedded inside the PSC backend. It covers office-side circular authoring and approval, vessel-level email delivery, crew-level rank assignment, ship-side inbox and acknowledgement tracking, reminder flows, report exports, and workflow event emission into the shared in-app notification system.
 
 The module is split into three Django apps:
 
@@ -24,6 +24,7 @@ The module is split into three Django apps:
 - Approval and rejection workflow
 - Vessel email dispatch and vessel-level delivery tracking
 - Rank-to-crew expansion and crew-level delivery tracking
+- Circular workflow notification triggers into `psc_notification`
 - Ship inbox list, acknowledgement, unread/reminder state, and crew status views
 - Approved library export/report generation
 - Supersede and soft-delete behavior
@@ -37,6 +38,8 @@ The module is split into three Django apps:
 - `circular_ship/urls.py`: ship route inventory
 - `circular_office/models.py`: unmanaged support tables such as `department`, `master_role`, `mapping_role_user`, `users`, and `final_crew_list`
 - `circular_ship/models.py`: unmanaged ship auth and acknowledgement history tables
+- `apps/notifications/models.py`: shared `psc_notification` types now extended for circular workflow events
+- `apps/notifications/signals.py`: helper functions that fan circular events out to office users and crew
 
 ## Core Data Model
 
@@ -79,7 +82,7 @@ Delivery state is not driven by `publish_status` alone.
 ### Office authoring and review APIs
 
 - `create_notification`: create draft, pending, or directly published circular rows and generate attachment PDF cover
-- `get_notifications`: admin/office list for pending, approved, and rejected items
+- `get_notifications`: admin/office list for pending, approved, and rejected items; now also emits `dept_name` to stabilize frontend department resolution
 - `get_notification_details` and `get_notification_details_by_sr_no`: fetch one circular by SR number
 - `get_user_notifications`: creator-facing approved/rejected history
 - `update_notification_status`: approve or reject a pending circular and regenerate the PDF cover with approval footer
@@ -123,9 +126,14 @@ Delivery state is not driven by `publish_status` alone.
 
 - normalizes UUID-like inputs for type, priority, sub-category, second sub-category, and vessels
 - generates the next SR number as `KSM/{type}/{department}/{year}-{serial}`
-- generates a new PDF cover and merges it with the uploaded PDF
+- generates a new circular PDF artifact even when no attachment is uploaded
+- merges the generated cover with the uploaded PDF only when an attachment is provided
 - inserts directly into `msc_data` using raw SQL
 - optionally records supersede metadata on the previous circular
+- emits shared circular notifications on commit:
+  - draft save -> `CIRCULAR_CREATED`
+  - pending approval submission -> `CIRCULAR_PENDING_APPROVAL`
+  - direct publish -> `CIRCULAR_APPROVED`
 
 For office users the frontend usually sends `publish_status = 1`, so the record becomes pending approval. For admin direct-publish flows the frontend sends `publish_status = 2`.
 
@@ -145,6 +153,9 @@ Drafts are just `msc_data` rows with `publish_status = 0`.
 - Rejection writes `publish_status = 3` and the review comment.
 - Approval writes `publish_status = 2`, `published_by`, and `published_on`.
 - On approval it also regenerates the first PDF pages so the published cover includes approval metadata.
+- It now also sends shared circular notifications back to the creator:
+  - approval -> `CIRCULAR_APPROVED`
+  - rejection -> `CIRCULAR_REJECTED`
 
 This endpoint does not create crew delivery rows. That happens later.
 
@@ -167,6 +178,7 @@ After vessel selection, the office UI calls `link_notification_to_ranks`.
 - Matching `FinalCrewList` rows are expanded to ship-facing `CrewID` values.
 - One `msc_notification` row is inserted per crew with `reminder_count = 1`.
 - One `msc_rank_assigned` row is inserted per chosen rank.
+- Unique crew recipients also receive shared in-app notifications through `psc_notification`.
 
 That crew-level row is what drives non-master inbox entries and acknowledgement state.
 
@@ -198,6 +210,30 @@ Non-master flow:
 - `download_filtered_report` builds a ship-side PDF report from the currently visible inbox filters.
 - `get_approved_notifications_csv` actually generates a PDF, not CSV, for the approved office library.
 
+## Shared Notification Integration
+
+Circular workflow events now reuse the shared notifications module instead of introducing any circular-specific notification tables.
+
+- Storage remains the existing `psc_notification` table.
+- No new circular notification migration was added.
+- Circular events are emitted from `circular_office/views.py` into helper functions in `apps/notifications/signals.py`.
+- The current circular notification types are:
+  - `CIRCULAR_CREATED`
+  - `CIRCULAR_PENDING_APPROVAL`
+  - `CIRCULAR_APPROVED`
+  - `CIRCULAR_REJECTED`
+
+Current trigger points:
+
+- `create_notification`
+  - draft save -> creator notified
+  - submit for approval -> creator and reviewer roles notified
+  - direct publish -> creator notified
+- `update_notification_status`
+  - approval/rejection -> creator notified
+- `link_notification_to_ranks`
+  - final crew distribution -> unique crew recipients notified
+
 ## PDF and Attachment Flow
 
 - Uploaded PDFs are stored under `MEDIA_ROOT/circular/attachments/`.
@@ -205,6 +241,9 @@ Non-master flow:
 - Most APIs derive `attachment_url` from `attachment_name` and `MEDIA_URL`.
 - Cover pages are created with ReportLab.
 - Existing PDFs are merged or rewritten with `PyPDF2`.
+- Attachment upload is now optional for circular creation and draft update.
+- When the user skips the upload, the backend still generates a valid circular PDF from form content and stores that generated PDF as the attachment artifact.
+- The preserved `original_...` copy only exists when the user actually uploaded a source PDF.
 
 There are two separate cover-generation paths:
 
@@ -221,21 +260,19 @@ There are two separate cover-generation paths:
 
 ## Current Risks And Breakpoints
 
-### 1. Department handling is internally inconsistent
+### 1. Department handling is still partially inconsistent
 
-The module migrated `dept` toward UUID storage, but large parts of the code still treat it as `0` or `1`.
+The module migrated `dept` toward UUID or master-driven lookup, but some legacy branches still treat it as `0` or `1`.
 
 - `create_notification` inserts the department UUID into `msc_data`.
-- `update_notification_status`, ship inbox scope mapping, office approval popup logic, and multiple frontend pages still branch on integer `0` and `1`.
-- Result: department-dependent behavior can degrade to `Unknown`, especially vessel/rank approval flow and ship-side scope labels.
+- `get_notifications` and detail APIs now emit `dept_name`, which reduces frontend guesswork.
+- Some status-update and ship-scope paths still branch on integer `0` and `1`.
+- Result: department-dependent behavior is improved in pending-request UI flows, but some legacy paths can still degrade to `Unknown`.
 
-### 2. Approval and direct-publish paths contain live runtime errors
+### 2. Approval status handling still contains legacy datetime code
 
-- `create_notification` still references `dept_value` inside the direct-publish delivery branch even though the variable was removed.
-- `update_notification_status` calls `django_timezone_utc`, which is not imported anywhere in the file.
-- `update_draft_by_sr_no` and `update_draft_by_id` reference `print_type` fields that are not defined in the current model/request flow.
-
-These are not theoretical maintainability problems; they are active breakpoints in primary workflows.
+- `update_notification_status` still references `django_timezone_utc` in a legacy published-date parsing branch.
+- The current frontend approval flow usually sends an ISO timestamp and avoids the slower failing details fetch, but this code path is still present and should be cleaned up before deeper refactors.
 
 ### 3. Route and API shapes do not match cleanly
 

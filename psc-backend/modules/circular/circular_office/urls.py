@@ -33,6 +33,7 @@ urlpatterns = [
     path('api/notifications/send-emails/', views.send_emails_to_vessels, name='send_emails_to_vessels'),
     path('api/notifications/<path:notification_sr_no>/link-ranks/', views.link_notification_to_ranks, name='link_notification_to_ranks'),
     path('api/notifications/<path:notification_sr_no>/crew-delivery-status/', views.get_crew_ids_and_status_by_notification_sr_no, name='get_crew_ids_and_status_by_notification_sr_no'),
+    path('api/notifications/<path:notification_sr_no>/send-reminder/', views.send_notification_reminder, name='send_notification_reminder'),
     path('api/notifications/<path:notification_sr_no>/send-individual-reminder/', views.send_individual_notification_reminder, name='send_individual_notification_reminder'),
     path('api/notifications/create-delivery-records/', views.create_delivery_records, name='create_delivery_records'),
     

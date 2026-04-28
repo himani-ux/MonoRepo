@@ -527,7 +527,11 @@ export type NotificationType =
   | 'CONFLICT_DETECTED'
   | 'CONFLICT_RESOLVED'
   | 'PHYSICAL_VERIFICATION_CREATED'
-  | 'DEF_ASSIGNED';
+  | 'DEF_ASSIGNED'
+  | 'CIRCULAR_CREATED'
+  | 'CIRCULAR_PENDING_APPROVAL'
+  | 'CIRCULAR_APPROVED'
+  | 'CIRCULAR_REJECTED';
 
 /** Notification matching backend NotificationListSerializer (12 fields) */
 export interface Notification {

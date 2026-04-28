@@ -62,6 +62,23 @@ const normalizeNotificationTitle = (item) => {
   return "No title";
 };
 
+const normalizeHashtags = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((tag) => String(tag || "").trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(/[\s,]+/)
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 const KsmLibrary = ({
   user,
   // Permission props
@@ -158,12 +175,7 @@ const KsmLibrary = ({
 
       const mapped = rawData.map(item => {
         const scopeLabel = item.scope || 'Other';
-        let hashtags = [];
-        if (typeof item.hashtags === 'string') {
-          hashtags = item.hashtags.split(',').map(h => h.trim()).filter(Boolean);
-        } else if (Array.isArray(item.hashtags)) {
-          hashtags = item.hashtags;
-        }
+        const hashtags = normalizeHashtags(item.hashtags);
         const reminderSentAt = item.reminder_sent_at || null;
         const seenAt = item.seen_at || null;
         const isReminded = !seenAt && (Boolean(reminderSentAt) || Number(item.isReminded) === 1) ? 1 : 0;
@@ -173,7 +185,7 @@ const KsmLibrary = ({
           title: normalizeNotificationTitle(item),
           type: item.type || 'Alert',
           criticality: item.criticality || 'Medium',
-          hashtags: Array.isArray(item.hashtags) ? item.hashtags : [],
+          hashtags,
           publishedDate: item.publishedDate ? item.publishedDate.replace("T", " ").split(".")[0] : "—",
           scope: scopeLabel,
           attachment_url: item.attachment_url || null,
@@ -638,12 +650,14 @@ const KsmLibrary = ({
                       </div>
                     )}
                     <div className="flex items-center gap-2 flex-wrap mt-1">
-                      <Badge
-                        variant="outline"
-                        className="border-primary-200 bg-primary-50 text-primary-700 text-xs"
-                      >
-                        {selectedNotification.hashtags.join(' ')}
-                      </Badge>
+                      {selectedNotification.hashtags.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="border-primary-200 bg-primary-50 text-primary-700 text-xs"
+                        >
+                          {selectedNotification.hashtags.join(' ')}
+                        </Badge>
+                      )}
                       
                       {selectedNotification.attachment_url && (
                         <Button

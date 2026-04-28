@@ -27,6 +27,10 @@ from apps.notifications.signals import (
     notify_car_pic_accepted,
     notify_car_rework_requested,
     notify_car_dpa_closed,
+    notify_circular_created,
+    notify_circular_distribution,
+    notify_circular_pending_approval,
+    notify_circular_rejected,
     notify_psc_follow_up_recorded,
     notify_conflict_detected,
     notify_conflict_resolved,
@@ -534,6 +538,82 @@ class TestFEAT_NOTIF_001_TriggerFunctions(TestCase):
         self.assertEqual(
             mock_create.call_args.kwargs["notification_type"],
             NotificationType.PHYSICAL_VERIFICATION_CREATED,
+        )
+
+    @patch("apps.notifications.signals.create_notification")
+    @patch("apps.notifications.signals._get_office_user_ids_for_roles", return_value=["EMP001", "EMP777"])
+    def test_feat_notif_001_circular_pending_approval_notifies_creator_and_reviewers(
+        self,
+        _mock_reviewer_ids,
+        mock_create,
+    ):
+        """Circular submission should notify the creator and the office approval pool."""
+        notify_circular_pending_approval(
+            sr_no="KSM/Circular/SEQ/2026-0001",
+            title="Bridge familiarization update",
+            creator_employee_id="EMP001",
+            notification_id=str(uuid.uuid4()),
+            doc_type_name="Circular",
+        )
+
+        self.assertEqual(mock_create.call_count, 2)
+        recipients = {call.kwargs["recipient_id"] for call in mock_create.call_args_list}
+        self.assertEqual(recipients, {"EMP001", "EMP777"})
+        self.assertTrue(
+            all(
+                call.kwargs["notification_type"] == NotificationType.CIRCULAR_PENDING_APPROVAL
+                for call in mock_create.call_args_list
+            )
+        )
+
+    @patch("apps.notifications.signals.create_notification")
+    def test_feat_notif_001_circular_created_and_rejected_notifications_target_creator(self, mock_create):
+        """Circular create/reject notifications should be addressed to the circular creator."""
+        circular_id = str(uuid.uuid4())
+
+        notify_circular_created(
+            sr_no="KSM/Circular/SEQ/2026-0002",
+            title="Lifeboat drill update",
+            creator_employee_id="EMP010",
+            notification_id=circular_id,
+            doc_type_name="Circular",
+        )
+        notify_circular_rejected(
+            sr_no="KSM/Circular/SEQ/2026-0002",
+            title="Lifeboat drill update",
+            creator_employee_id="EMP010",
+            notification_id=circular_id,
+            doc_type_name="Circular",
+            comment="Please add the missing vessel scope.",
+        )
+
+        self.assertEqual(mock_create.call_count, 2)
+        types = [call.kwargs["notification_type"] for call in mock_create.call_args_list]
+        self.assertEqual(types, [NotificationType.CIRCULAR_CREATED, NotificationType.CIRCULAR_REJECTED])
+        self.assertTrue(
+            all(call.kwargs["recipient_id"] == "EMP010" for call in mock_create.call_args_list)
+        )
+        self.assertIn("missing vessel scope", mock_create.call_args_list[1].kwargs["message"])
+
+    @patch("apps.notifications.signals.create_notification")
+    def test_feat_notif_001_circular_distribution_notifies_unique_crew_recipients(self, mock_create):
+        """Circular distribution should notify each crew recipient once even if ranks overlap."""
+        notify_circular_distribution(
+            sr_no="KSM/Circular/Technical/2026-0004",
+            title="Engine room permit update",
+            crew_ids=["KSM1001", "KSM1001", "KSM2002"],
+            notification_id=str(uuid.uuid4()),
+            doc_type_name="Circular",
+        )
+
+        self.assertEqual(mock_create.call_count, 2)
+        recipients = {call.kwargs["recipient_id"] for call in mock_create.call_args_list}
+        self.assertEqual(recipients, {"KSM1001", "KSM2002"})
+        self.assertTrue(
+            all(
+                call.kwargs["notification_type"] == NotificationType.CIRCULAR_APPROVED
+                for call in mock_create.call_args_list
+            )
         )
 
 

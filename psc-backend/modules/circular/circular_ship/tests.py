@@ -3,7 +3,11 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from .views import _is_circular_master_role, _select_ack_notification_record
+from .views import (
+    _is_circular_master_role,
+    _select_ack_notification_record,
+    _select_current_onboarding_record,
+)
 
 
 class CircularShipAcknowledgeHelpersTests(SimpleTestCase):
@@ -32,3 +36,43 @@ class CircularShipAcknowledgeHelpersTests(SimpleTestCase):
 
     def test_select_ack_notification_record_returns_none_for_empty_input(self):
         self.assertIsNone(_select_ack_notification_record([]))
+
+    def test_select_current_onboarding_record_prefers_latest_active_vessel(self):
+        older = SimpleNamespace(
+            id='older',
+            Vessel='old-vessel',
+            SignOnDate=datetime(2025, 5, 24, 0, 0, 0),
+            updated_date=None,
+            created_date=datetime(2025, 10, 8, 20, 54, 41),
+        )
+        newer = SimpleNamespace(
+            id='newer',
+            Vessel='new-vessel',
+            SignOnDate=datetime(2026, 4, 9, 0, 0, 0),
+            updated_date=None,
+            created_date=datetime(2026, 4, 10, 13, 42, 25),
+        )
+
+        selected = _select_current_onboarding_record([older, newer])
+
+        self.assertIs(selected, newer)
+
+    def test_select_current_onboarding_record_ignores_rows_without_vessel(self):
+        missing_vessel = SimpleNamespace(
+            id='newer',
+            Vessel=None,
+            SignOnDate=datetime(2026, 4, 9, 0, 0, 0),
+            updated_date=None,
+            created_date=datetime(2026, 4, 10, 13, 42, 25),
+        )
+        older_with_vessel = SimpleNamespace(
+            id='older',
+            Vessel='old-vessel',
+            SignOnDate=datetime(2025, 5, 24, 0, 0, 0),
+            updated_date=None,
+            created_date=datetime(2025, 10, 8, 20, 54, 41),
+        )
+
+        selected = _select_current_onboarding_record([missing_vessel, older_with_vessel])
+
+        self.assertIs(selected, older_with_vessel)

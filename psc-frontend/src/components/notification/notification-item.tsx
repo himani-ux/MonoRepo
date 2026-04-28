@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   FileWarning,
   FileCheck,
+  FilePlus2,
   AlertTriangle,
   Clock,
   Shield,
@@ -19,9 +20,11 @@ import {
   Send,
   CheckCircle2,
   ClipboardCheck,
+  Hourglass,
   UserCheck,
   type LucideIcon,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/lib/utils/constants';
 import type { Notification, NotificationType } from '@/types';
@@ -49,6 +52,10 @@ const NOTIFICATION_STYLES: Record<NotificationType, NotificationStyle> = {
   CONFLICT_RESOLVED: { icon: Shield, iconColor: 'text-success-500' },
   PHYSICAL_VERIFICATION_CREATED: { icon: ClipboardCheck, iconColor: 'text-primary-500' },
   DEF_ASSIGNED: { icon: UserCheck, iconColor: 'text-primary-500' },
+  CIRCULAR_CREATED: { icon: FilePlus2, iconColor: 'text-primary-500' },
+  CIRCULAR_PENDING_APPROVAL: { icon: Hourglass, iconColor: 'text-warning-500' },
+  CIRCULAR_APPROVED: { icon: CheckCircle2, iconColor: 'text-success-500' },
+  CIRCULAR_REJECTED: { icon: AlertTriangle, iconColor: 'text-danger-500' },
 };
 
 // ============================================================================
@@ -65,11 +72,16 @@ export const NotificationItem: FC<NotificationItemProps> = memo(function Notific
   onMarkRead,
 }) {
   const navigate = useNavigate();
+  const { isVessel, role, user } = useAuth();
   const style = NOTIFICATION_STYLES[notification.notification_type] || {
     icon: FileWarning,
     iconColor: 'text-neutral-500',
   };
   const Icon = style.icon;
+  const isCircularAdmin =
+    String(user?.role_name || role || user?.role || '')
+      .trim()
+      .toLowerCase() === 'admin';
 
   const handleClick = () => {
     // Mark as read when clicked
@@ -78,6 +90,20 @@ export const NotificationItem: FC<NotificationItemProps> = memo(function Notific
     }
 
     // Navigate to entity if available
+    if (notification.entity_type === 'CIRCULAR') {
+      if (isVessel) {
+        navigate(`${ROUTES.CIRCULAR}/ship-dashboard`);
+        return;
+      }
+
+      navigate(
+        isCircularAdmin
+          ? `${ROUTES.CIRCULAR}/admin?panel=pending-requests`
+          : `${ROUTES.CIRCULAR}/office?panel=pending-requests`
+      );
+      return;
+    }
+
     if (notification.entity_type && notification.entity_id) {
       if (notification.entity_type === 'CAR') {
         navigate(ROUTES.CAR_DETAIL(notification.entity_id));

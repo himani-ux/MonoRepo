@@ -71,7 +71,7 @@ export const CorrectiveActionList: FC<CorrectiveActionListProps> = ({
                     <CorrectiveActionItem
                       key={action.id}
                       action={action}
-                      index={immediate.length + idx + 1}
+                      index={idx + 1}
                     />
                   ))}
                 </div>

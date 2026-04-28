@@ -253,6 +253,207 @@ def _get_active_crew_member(owner_id):
         return None
 
 
+def _get_office_user_ids_for_roles(role_codes: list[str]) -> list[str]:
+    """Resolve active office employee IDs whose mapped role is in the requested set."""
+    from apps.accounts.backends import PSCAuthenticationBackend
+    from apps.accounts.models import OfficeUser
+
+    backend = PSCAuthenticationBackend()
+    resolved_ids: list[str] = []
+    allowed_roles = set(role_codes or [])
+
+    if not allowed_roles:
+        return resolved_ids
+
+    try:
+        office_users = OfficeUser.objects.filter(
+            is_active=True,
+            is_deleted=False,
+        ).only('employee_id', 'employee_role')
+    except Exception as exc:
+        logger.error(f"Failed to load office users for circular notifications: {exc}")
+        return resolved_ids
+
+    for office_user in office_users:
+        employee_id = str(getattr(office_user, 'employee_id', '') or '').strip()
+        if not employee_id:
+            continue
+
+        try:
+            resolved_role = backend._determine_office_role(office_user.employee_role)
+        except Exception:
+            continue
+
+        if resolved_role in allowed_roles:
+            resolved_ids.append(employee_id)
+
+    return sorted(set(resolved_ids))
+
+
+def _build_circular_label(sr_no: str, doc_type_name: Optional[str] = None) -> str:
+    """Build a user-facing circular label such as 'Circular KSM/...''."""
+    sr_value = str(sr_no or '').strip()
+    doc_type_value = str(doc_type_name or 'Circular').strip() or 'Circular'
+    return f'{doc_type_value} {sr_value}'.strip()
+
+
+def notify_circular_created(
+    *,
+    sr_no: str,
+    title: Optional[str],
+    creator_employee_id: Optional[str],
+    notification_id: Optional[str] = None,
+    doc_type_name: Optional[str] = None,
+):
+    """Notify the circular creator that a draft was created."""
+    creator_id = str(creator_employee_id or '').strip()
+    if not creator_id:
+        return
+
+    circular_label = _build_circular_label(sr_no, doc_type_name)
+    subject = str(title or sr_no or 'Untitled circular').strip()
+
+    create_notification(
+        recipient_type=RecipientType.OFFICE,
+        recipient_id=creator_id,
+        notification_type=NotificationType.CIRCULAR_CREATED,
+        title=f'{circular_label} created',
+        message=f'"{subject}" has been saved in Circulars.',
+        entity_type='CIRCULAR',
+        entity_id=str(notification_id) if notification_id else None,
+    )
+
+
+def notify_circular_pending_approval(
+    *,
+    sr_no: str,
+    title: Optional[str],
+    creator_employee_id: Optional[str],
+    notification_id: Optional[str] = None,
+    doc_type_name: Optional[str] = None,
+):
+    """Notify the creator and office reviewers that a circular is pending approval."""
+    from apps.accounts.models import RoleCodes
+
+    circular_label = _build_circular_label(sr_no, doc_type_name)
+    subject = str(title or sr_no or 'Untitled circular').strip()
+    creator_id = str(creator_employee_id or '').strip()
+
+    if creator_id:
+        create_notification(
+            recipient_type=RecipientType.OFFICE,
+            recipient_id=creator_id,
+            notification_type=NotificationType.CIRCULAR_PENDING_APPROVAL,
+            title=f'{circular_label} submitted',
+            message=f'"{subject}" has been submitted and is awaiting approval.',
+            entity_type='CIRCULAR',
+            entity_id=str(notification_id) if notification_id else None,
+        )
+
+    reviewer_ids = _get_office_user_ids_for_roles(RoleCodes.PIC_REVIEWERS + RoleCodes.DPA_ROLES)
+    for reviewer_id in reviewer_ids:
+        if reviewer_id == creator_id:
+            continue
+        create_notification(
+            recipient_type=RecipientType.OFFICE,
+            recipient_id=reviewer_id,
+            notification_type=NotificationType.CIRCULAR_PENDING_APPROVAL,
+            title=f'{circular_label} pending approval',
+            message=f'"{subject}" is waiting for review in Circulars.',
+            entity_type='CIRCULAR',
+            entity_id=str(notification_id) if notification_id else None,
+        )
+
+
+def notify_circular_approved(
+    *,
+    sr_no: str,
+    title: Optional[str],
+    creator_employee_id: Optional[str],
+    notification_id: Optional[str] = None,
+    doc_type_name: Optional[str] = None,
+):
+    """Notify the creator that a circular has been approved."""
+    creator_id = str(creator_employee_id or '').strip()
+    if not creator_id:
+        return
+
+    circular_label = _build_circular_label(sr_no, doc_type_name)
+    subject = str(title or sr_no or 'Untitled circular').strip()
+
+    create_notification(
+        recipient_type=RecipientType.OFFICE,
+        recipient_id=creator_id,
+        notification_type=NotificationType.CIRCULAR_APPROVED,
+        title=f'{circular_label} approved',
+        message=f'"{subject}" has been approved.',
+        entity_type='CIRCULAR',
+        entity_id=str(notification_id) if notification_id else None,
+    )
+
+
+def notify_circular_rejected(
+    *,
+    sr_no: str,
+    title: Optional[str],
+    creator_employee_id: Optional[str],
+    notification_id: Optional[str] = None,
+    doc_type_name: Optional[str] = None,
+    comment: Optional[str] = None,
+):
+    """Notify the creator that a circular has been rejected."""
+    creator_id = str(creator_employee_id or '').strip()
+    if not creator_id:
+        return
+
+    circular_label = _build_circular_label(sr_no, doc_type_name)
+    subject = str(title or sr_no or 'Untitled circular').strip()
+    message = f'"{subject}" has been rejected.'
+    trimmed_comment = str(comment or '').strip()
+    if trimmed_comment:
+        message = f'{message} Comment: {trimmed_comment[:200]}'
+
+    create_notification(
+        recipient_type=RecipientType.OFFICE,
+        recipient_id=creator_id,
+        notification_type=NotificationType.CIRCULAR_REJECTED,
+        title=f'{circular_label} rejected',
+        message=message,
+        entity_type='CIRCULAR',
+        entity_id=str(notification_id) if notification_id else None,
+    )
+
+
+def notify_circular_distribution(
+    *,
+    sr_no: str,
+    title: Optional[str],
+    crew_ids: list[str],
+    notification_id: Optional[str] = None,
+    doc_type_name: Optional[str] = None,
+):
+    """Notify unique crew recipients when an approved circular is distributed to them."""
+    circular_label = _build_circular_label(sr_no, doc_type_name)
+    subject = str(title or sr_no or 'Untitled circular').strip()
+    notified_ids: set[str] = set()
+
+    for crew_id in crew_ids:
+        normalized_crew_id = str(crew_id or '').strip()
+        if not normalized_crew_id or normalized_crew_id in notified_ids:
+            continue
+
+        notified_ids.add(normalized_crew_id)
+        create_notification(
+            recipient_type=RecipientType.CREW,
+            recipient_id=normalized_crew_id,
+            notification_type=NotificationType.CIRCULAR_APPROVED,
+            title=f'{circular_label} shared with you',
+            message=f'"{subject}" has been approved and assigned to you in Circulars.',
+            entity_type='CIRCULAR',
+            entity_id=str(notification_id) if notification_id else None,
+        )
+
+
 # =============================================================================
 # NOTIFICATION TRIGGER FUNCTIONS (called from views)
 # =============================================================================

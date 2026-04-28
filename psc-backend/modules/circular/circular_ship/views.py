@@ -71,6 +71,33 @@ def _select_ack_notification_record(notification_rows):
     )
 
 
+def _select_current_onboarding_record(onboarding_rows):
+    rows = [row for row in onboarding_rows if getattr(row, 'Vessel', None)]
+    if not rows:
+        return None
+
+    return max(
+        rows,
+        key=lambda row: (
+            _sortable_notification_dt(getattr(row, 'SignOnDate', None)),
+            _sortable_notification_dt(getattr(row, 'updated_date', None)),
+            _sortable_notification_dt(getattr(row, 'created_date', None)),
+            str(getattr(row, 'id', '') or ''),
+        ),
+    )
+
+
+def _get_current_crew_onboarding(crew_id):
+    onboarding_rows = list(
+        CrewOnboardingHistory.objects.filter(
+            CrewID=crew_id,
+            is_active=True,
+            is_deleted=False,
+        )
+    )
+    return _select_current_onboarding_record(onboarding_rows), len(onboarding_rows)
+
+
 # Regular font
 FONT_REG = os.path.join(settings.BASE_DIR, 'static', 'fonts', 'BOOKOS.TTF')
 
@@ -103,19 +130,19 @@ def get_master_notifications(request):
         logging.info("Fetching master notifications")
 
         # 1. Get vessel for this master
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT Vessel
-                FROM Crew_Onboarding_History
-                WHERE CrewID = %s AND is_active = 1;
-            """, [crew_id])
+        onboarding, onboarding_count = _get_current_crew_onboarding(crew_id)
+        if onboarding is None:
+            return JsonResponse([], safe=False)
+        if onboarding_count > 1:
+            logger.warning(
+                "Multiple active onboarding rows found for master notifications: "
+                "crew_id=%s count=%s selected_vessel=%s",
+                crew_id,
+                onboarding_count,
+                onboarding.Vessel,
+            )
 
-            row = cursor.fetchone()
-            logger.info("this is test")
-            if not row or row[0] is None:
-                return JsonResponse([], safe=False)
-
-            coh_vessel = row[0]
+        coh_vessel = onboarding.Vessel
 
 
         # 2. Get all msc_sr_no for this vessel
@@ -484,17 +511,10 @@ def get_total_crew(master_crew_id, sr_no):
     """
     try:
         # STEP 1: Get master's vessel
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT TOP 1 Vessel
-                FROM Crew_Onboarding_History
-                WHERE CrewID = %s AND is_active = 1
-                ORDER BY id DESC;
-            """, [master_crew_id])
-            row = cursor.fetchone()
-            if not row:
-                return 0, 0
-            vessel_id = row[0]
+        onboarding, _ = _get_current_crew_onboarding(master_crew_id)
+        if onboarding is None:
+            return 0, 0
+        vessel_id = onboarding.Vessel
 
         # STEP 2: Count total crew and unread in one query
         with connection.cursor() as cursor:
@@ -542,24 +562,15 @@ def get_crew_list(request):
         if not crew_id or not sr_no:    
             return JsonResponse({'error': 'crew_id and notification_id is required'}, status=400)
         logging.info(f"Fetching crew list for master crew_id and sr_no: {crew_id}, {sr_no}")
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT TOP 1 id, CrewID, Vessel
-                FROM Crew_Onboarding_History
-                WHERE CrewID = %s AND is_active = 1
-                ORDER BY id DESC;
-            """, [crew_id])
 
-            row = cursor.fetchone()
-
-        if not row:
+        onboarding, _ = _get_current_crew_onboarding(crew_id)
+        if onboarding is None:
             return JsonResponse(
                 {'error': 'No active vessel found for this crew_id'},
                 status=404
             )
 
-        # row = (id, CrewID, Vessel)
-        coh_vessel = row[2]     # Vessel
+        coh_vessel = onboarding.Vessel
 
         # ------------------------------------
         # 2. Fetch all CrewIDs on same vessel except current crew
@@ -853,7 +864,27 @@ def crew_acknowledge_notification(request):
 
 def master_acknowledge_ship_notification(crew_id,sr_no):
     logging.info("ack for master")
-    vessel_id = CrewOnboardingHistory.objects.get(CrewID=crew_id, is_active=True).Vessel
+    onboarding, onboarding_count = _get_current_crew_onboarding(crew_id)
+
+    if onboarding is None:
+        logger.warning(
+            "No active onboarding vessel found while acknowledging master notification: crew_id=%s sr_no=%s",
+            crew_id,
+            sr_no,
+        )
+        return False
+
+    if onboarding_count > 1:
+        logger.warning(
+            "Multiple active onboarding rows found while acknowledging master notification: "
+            "crew_id=%s sr_no=%s count=%s selected_vessel=%s",
+            crew_id,
+            sr_no,
+            onboarding_count,
+            onboarding.Vessel,
+        )
+
+    vessel_id = onboarding.Vessel
     with connection.cursor() as cursor:
         cursor.execute("""
             UPDATE msc_ship_notification
@@ -861,7 +892,7 @@ def master_acknowledge_ship_notification(crew_id,sr_no):
             WHERE msc_sr_no_ = %s
                 AND vessel_id = %s
         """,[timezone.now(),sr_no,vessel_id])
-    return
+    return True
 
 
 @api_view(['GET'])
@@ -1047,15 +1078,10 @@ def download_filtered_report(request):
     only_unread = request.GET.get('only_unread', 'false').lower() == 'true'
 
     # STEP 1: Get vessel
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT Vessel FROM Crew_Onboarding_History
-            WHERE CrewID = %s AND is_active = 1;
-        """, [crew_id])
-        row = cursor.fetchone()
-        if not row or row[0] is None:
-            return HttpResponse("No vessel assigned", status=404)
-        vessel = row[0]
+    onboarding, _ = _get_current_crew_onboarding(crew_id)
+    if onboarding is None:
+        return HttpResponse("No vessel assigned", status=404)
+    vessel = onboarding.Vessel
 
     # STEP 2: Get msc_sr_no list for vessel
     with connection.cursor() as cursor:
