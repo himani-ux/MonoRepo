@@ -20,6 +20,11 @@ import {
 import {
     clearCircularDraftEditSession,
 } from '../../utils/circular/draftSession';
+import {
+    getCircularRankDisplayName,
+    getDisplayableCircularRanks,
+    splitCircularRanksByDepartment,
+} from '../../utils/circular/ranks';
 
 const clearCircularPrefillStorage = () => {
     localStorage.removeItem('supersedingNotificationId');
@@ -712,10 +717,11 @@ const Admin = ({ onNotificationSubmit }) => {
                     }
                     const data = await response.json();
                     console.log("Rank Popup: Fetched ALL ranks:", data);
+                    const displayableRanks = getDisplayableCircularRanks(data);
 
                     // Group ranks by department for display
                     const groupedRanks = {};
-                    data.forEach(rank => {
+                    displayableRanks.forEach(rank => {
                         const dept = rank.department || 'Unknown Department'; // Use 'Unknown' if department is missing
                         if (!groupedRanks[dept]) {
                             groupedRanks[dept] = [];
@@ -724,7 +730,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     });
                     // console.log("Rank Popup: Grouped ranks by department:", groupedRanks);
 
-                    setAllRanks(data);
+                    setAllRanks(displayableRanks);
                     setRanksGroupedByDepartment(groupedRanks);
 
                 } catch (err) {
@@ -2624,16 +2630,7 @@ const Admin = ({ onNotificationSubmit }) => {
         }
     };
 
-    const seqRankNames = [
-        'Master', 'Acting Master', 'Chief Officer', 'Second Officer', 'Third Officer',
-        'Deck Fitter', 'Deck Cadet', 'Bosun', 'Able Bodied Seaman',
-        'Ordinary Seaman', 'Cook', 'Messman', 'Welder'
-    ].map(name => name.toLowerCase()); // Normalize for comparison
-
-    // Group the ranks based on their names
-    // Use allRanks state here
-    const seqRanks = allRanks.filter(rank => seqRankNames.includes((rank.rank_name || rank.name || '').toLowerCase()));
-    const technicalRanks = allRanks.filter(rank => !seqRankNames.includes((rank.rank_name || rank.name || '').toLowerCase()));
+    const { deckRanks: seqRanks, technicalRanks } = splitCircularRanksByDepartment(allRanks);
 
 
     return (
@@ -3071,7 +3068,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                             >
                                                 {isApprovalActionPending
                                                     ? 'Processing...'
-                                                    : `Confirm ${currentAction === 'approve' ? 'Approve' : 'Reject'}`}
+                                                    : `Confirm ${currentAction === 'approve' ? 'Approval' : 'Reject'}`}
                                             </button>
                                         </div>
                                     </div>
@@ -3163,7 +3160,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                                                                     />
                                                                     <label htmlFor={`deck-rank-${rank.id}`} className="text-sm text-gray-700 leading-tight">
-                                                                        {rank.rank_name || rank.name || rank.rank_id || 'Unknown Rank'} {/* Adjust field names based on your rank object structure */}
+                                                                        {getCircularRankDisplayName(rank)}
                                                                     </label>
                                                                 </div>
                                                             ))}
@@ -3209,7 +3206,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                                     />
                                                                     <label htmlFor={`engine-rank-${rank.id}`} className="ml-3 block text-sm text-gray-700">
-                                                                        {rank.rank_name || rank.name || rank.rank_id || 'Unknown Rank'} {/* Adjust field names based on your rank object structure */}
+                                                                        {getCircularRankDisplayName(rank)}
                                                                     </label>
                                                                 </div>
                                                             ))}

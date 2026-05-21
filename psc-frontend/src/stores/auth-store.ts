@@ -263,12 +263,10 @@ export const useAuthStore = create<AuthState>()(
           const currentTokens = get().tokens;
 
           if (currentTokens?.access) {
-            // Fetch user info if not already present
-            const { user } = get();
-            if (!user) {
-              const fetchedUser = await authApi.me(currentTokens.access);
-              set({ user: fetchedUser });
-            }
+            // Always refresh the user snapshot so server-side permission seed changes
+            // are reflected even when a stale user object was persisted locally.
+            const fetchedUser = await authApi.me(currentTokens.access);
+            set({ user: fetchedUser });
           }
 
           set({

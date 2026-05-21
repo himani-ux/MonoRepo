@@ -11,12 +11,17 @@ import logging
 from typing import Optional
 
 from django.contrib.auth.backends import BaseBackend
-from django.db import models
+from django.db import DatabaseError, OperationalError, ProgrammingError, connection, models
 from django.contrib.auth.hashers import check_password
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
 
 from .models import HRM501, OfficeUser, RoleCodes, ShipUsersLogin, CrewOnboardingHistory
+from .utils import (
+    resolve_current_office_permission_snapshot,
+    resolve_safety_role_name,
+    resolve_current_vessel_permission_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +51,10 @@ class AuthenticatedUser:
         process_ids: Optional[list[str]] = None,
         login_id: Optional[str] = None,
         has_global_vessel_access: Optional[bool] = None,
+        role_name: Optional[str] = None,
+        safety_role_name: Optional[str] = None,
+        vessel_ids: Optional[list[str]] = None,
+        vessel_names: Optional[list[str]] = None,
     ):
         # 🔐 Primary UUID (DB relations should use this)
         self.user_id = str(user_id)
@@ -70,6 +79,10 @@ class AuthenticatedUser:
         self.form_ids = form_ids or []
         self.process_ids = process_ids or []
         self.has_global_vessel_access = has_global_vessel_access
+        self.role_name = role_name or role
+        self.safety_role_name = safety_role_name or self.role_name
+        self.vessel_ids = vessel_ids or ([str(vessel_id)] if vessel_id else [])
+        self.vessel_names = vessel_names or ([str(vessel_name)] if vessel_name else [])
 
         # Django-like flags
         self.is_authenticated = True
@@ -150,8 +163,11 @@ class AuthenticatedUser:
             "form_ids": self.form_ids,
             "process_ids": self.process_ids,
             "has_global_vessel_access": self.has_global_vessel_access,
+            "vessel_ids": self.vessel_ids,
+            "vessel_names": self.vessel_names,
             "display_name": self.display_name,
-            "role_name": self.role,
+            "role_name": self.role_name,
+            "safety_role_name": self.safety_role_name,
             "username": self.username,
             "UserName": self.username,
             "work_side": self.work_side,
@@ -160,6 +176,75 @@ class AuthenticatedUser:
             "is_chief": self.is_chief,
             "legacy_user_type": self.legacy_user_type,
         }
+
+
+def _assigned_office_vessel_ids(user: AuthenticatedUser) -> list[str]:
+    if (user.user_type or "").upper() != "OFFICE":
+        return list(user.vessel_ids)
+    if user.has_global_vessel_access is True:
+        return []
+
+    try:
+        from core.vessel_access import get_office_user_identifiers, get_office_user_vessel_ids
+
+        vessel_ids = get_office_user_vessel_ids(get_office_user_identifiers(user))
+    except Exception as exc:
+        logger.warning("Failed to populate office vessel assignments for %s: %s", user.username, exc)
+        return []
+
+    if vessel_ids is None:
+        return []
+    return [str(vessel_id) for vessel_id in vessel_ids if vessel_id not in (None, "")]
+
+
+def _lookup_vessel_names(vessel_ids: list[str]) -> list[str]:
+    normalized_ids = [str(vessel_id).strip() for vessel_id in vessel_ids if str(vessel_id or "").strip()]
+    if not normalized_ids:
+        return []
+
+    try:
+        with connection.cursor() as cursor:
+            if connection.vendor == "sqlite":
+                placeholders = ",".join(["%s"] * len(normalized_ids))
+                cursor.execute(
+                    f"""
+                    SELECT id, vesselCode, vesselName
+                    FROM VesselData
+                    WHERE id IN ({placeholders})
+                      AND COALESCE(is_deleted, 0) = 0
+                    """,
+                    normalized_ids,
+                )
+            else:
+                placeholders = ",".join(["CAST(%s AS uniqueidentifier)"] * len(normalized_ids))
+                cursor.execute(
+                    f"""
+                    SELECT id, vesselCode, vesselName
+                    FROM VesselData
+                    WHERE id IN ({placeholders})
+                      AND is_active = 1
+                      AND is_deleted = 0
+                    """,
+                    normalized_ids,
+                )
+            rows = {
+                str(row[0]).strip().lower(): " - ".join(
+                    value for value in (str(row[1] or "").strip(), str(row[2] or "").strip()) if value
+                )
+                for row in cursor.fetchall()
+            }
+    except (DatabaseError, OperationalError, ProgrammingError, ValueError):
+        rows = {}
+
+    return [rows.get(vessel_id.lower(), vessel_id) for vessel_id in normalized_ids]
+
+
+def _assigned_office_vessel_names(user: AuthenticatedUser) -> list[str]:
+    if (user.user_type or "").upper() != "OFFICE":
+        return list(user.vessel_names)
+    if user.has_global_vessel_access is True:
+        return []
+    return _lookup_vessel_names(user.vessel_ids)
 
 # ================= JWT AUTH =================
 
@@ -175,24 +260,87 @@ class PSCJWTAuthentication(JWTAuthentication):
             if not user_id:
                 raise InvalidToken("Token contains no user_id claim")
 
-            return AuthenticatedUser(
+            user_type = validated_token.get("user_type", "")
+            role = validated_token.get("role", "")
+            full_name = validated_token.get("full_name", "")
+            email = validated_token.get("email")
+            employee_id = validated_token.get("employee_id")
+            department = validated_token.get("department")
+            rank = validated_token.get("rank")
+            role_name = validated_token.get("role_name")
+            safety_role_name = validated_token.get("safety_role_name")
+            form_ids = validated_token.get("form_ids") or []
+            process_ids = validated_token.get("process_ids") or []
+            has_global_vessel_access = validated_token.get("has_global_vessel_access")
+
+            try:
+                normalized_user_type = str(user_type or "").upper()
+                if normalized_user_type == "OFFICE":
+                    snapshot = resolve_current_office_permission_snapshot(
+                        login_id=validated_token.get("login_id") or validated_token.get("username"),
+                        employee_id=employee_id or user_id,
+                        role=role,
+                        has_global_vessel_access=has_global_vessel_access,
+                        full_name=full_name,
+                        email=email,
+                        department=department,
+                    )
+                    role = snapshot.get("role") or role
+                    role_name = snapshot.get("role_name") or role_name
+                    safety_role_name = snapshot.get("safety_role_name") or safety_role_name
+                    full_name = snapshot.get("full_name") or full_name
+                    email = snapshot.get("email") or email
+                    employee_id = snapshot.get("employee_id") or employee_id
+                    department = snapshot.get("department") or department
+                    form_ids = snapshot.get("form_ids") or []
+                    process_ids = snapshot.get("process_ids") or []
+                    has_global_vessel_access = snapshot.get("has_global_vessel_access")
+                elif normalized_user_type == "VESSEL":
+                    snapshot = resolve_current_vessel_permission_snapshot(
+                        user_type=user_type,
+                        role=role,
+                        rank=rank,
+                        full_name=full_name,
+                        department=department,
+                    )
+                    role_name = snapshot.get("role_name") or role_name
+                    safety_role_name = snapshot.get("safety_role_name") or safety_role_name
+                    full_name = snapshot.get("full_name") or full_name
+                    department = snapshot.get("department") or department
+                    form_ids = snapshot.get("form_ids") or []
+                    process_ids = snapshot.get("process_ids") or []
+            except Exception as exc:
+                logger.warning(
+                    "JWT permission refresh failed for user %s; using token claims: %s",
+                    user_id,
+                    exc,
+                )
+
+            authenticated_user = AuthenticatedUser(
                 user_id=user_id,
                 login_id=validated_token.get("login_id"),
-                user_type=validated_token.get("user_type", ""),
-                full_name=validated_token.get("full_name", ""),
-                role=validated_token.get("role", ""),
+                user_type=user_type,
+                full_name=full_name,
+                role=role,
                 vessel_id=validated_token.get("vessel_id"),
                 vessel_name=validated_token.get("vessel_name"),  # ✅ FIXED
                 vessel_code=validated_token.get("vessel_code"),
-                email=validated_token.get("email"),
-                employee_id=validated_token.get("employee_id"),
+                email=email,
+                employee_id=employee_id,
                 crew_id=validated_token.get("crew_id"),
-                rank=validated_token.get("rank"),
-                department=validated_token.get("department"),
-                form_ids=validated_token.get("form_ids") or [],
-                process_ids=validated_token.get("process_ids") or [],
-                has_global_vessel_access=validated_token.get("has_global_vessel_access"),
+                rank=rank,
+                department=department,
+                form_ids=form_ids,
+                process_ids=process_ids,
+                has_global_vessel_access=has_global_vessel_access,
+                role_name=role_name,
+                safety_role_name=safety_role_name,
+                vessel_ids=validated_token.get("vessel_ids") or None,
+                vessel_names=validated_token.get("vessel_names") or None,
             )
+            authenticated_user.vessel_ids = _assigned_office_vessel_ids(authenticated_user)
+            authenticated_user.vessel_names = _assigned_office_vessel_names(authenticated_user)
+            return authenticated_user
         except KeyError:
             raise InvalidToken("Token is missing required claims")
 
@@ -350,6 +498,12 @@ class PSCAuthenticationBackend(BaseBackend):
                 department=department,
                 form_ids=form_ids,
                 process_ids=process_ids,
+                role_name=rank_name,
+                safety_role_name=resolve_safety_role_name(
+                    user_type='VESSEL',
+                    role=role,
+                    rank=rank_name,
+                ),
             )
 
         except Exception as e:
@@ -387,15 +541,29 @@ class PSCAuthenticationBackend(BaseBackend):
                 username=normalized_username,
                 employee_id=user.employee_id,
             )
+            role = RoleCodes.OFFICE_PIC
+            initial_safety_role_name = resolve_safety_role_name(
+                user_type='OFFICE',
+                role=role,
+                profile_name=user.employee_role,
+            )
             if mapped_global_role == RoleCodes.DPA:
                 role = RoleCodes.DPA
                 has_global_vessel_access = True
             elif mapped_global_role == RoleCodes.OFFICE_PIC:
                 role = RoleCodes.OFFICE_PIC
                 has_global_vessel_access = True
+            elif initial_safety_role_name == "FM":
+                has_global_vessel_access = True
             else:
                 role = RoleCodes.OFFICE_PIC
                 has_global_vessel_access = False
+
+            safety_role_name = resolve_safety_role_name(
+                user_type='OFFICE',
+                role=role,
+                profile_name=user.employee_role,
+            )
 
             from .utils import get_profile_permissions, get_office_permissions_by_mapping
             form_ids, process_ids = get_office_permissions_by_mapping(
@@ -408,7 +576,7 @@ class PSCAuthenticationBackend(BaseBackend):
                 # Fallback: some profiles are keyed by role codes (OFFICE_PIC, DPA, etc.)
                 form_ids, process_ids = get_profile_permissions(role, work_side=False)
 
-            return AuthenticatedUser(
+            authenticated_user = AuthenticatedUser(
                 user_id=str(user.employee_id),
                 login_id=normalized_username,
                 user_type="OFFICE",
@@ -420,7 +588,12 @@ class PSCAuthenticationBackend(BaseBackend):
                 form_ids=form_ids,
                 process_ids=process_ids,
                 has_global_vessel_access=has_global_vessel_access,
+                role_name=user.employee_role or role,
+                safety_role_name=safety_role_name,
             )
+            authenticated_user.vessel_ids = _assigned_office_vessel_ids(authenticated_user)
+            authenticated_user.vessel_names = _assigned_office_vessel_names(authenticated_user)
+            return authenticated_user
 
         except Exception as e:
             logger.error(f"Error authenticating office user: {e}")

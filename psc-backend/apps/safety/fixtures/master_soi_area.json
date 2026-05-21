@@ -1,0 +1,106 @@
+[
+  {
+    "area_id": 1,
+    "area_name": "External Deck Structure",
+    "section_12_flag": 0,
+    "display_order": 1,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 2,
+    "area_name": "Accommodation",
+    "section_12_flag": 0,
+    "display_order": 2,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 3,
+    "area_name": "Navigating Bridge & Monkey Island",
+    "section_12_flag": 0,
+    "display_order": 3,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 4,
+    "area_name": "Electrical safety",
+    "section_12_flag": 0,
+    "display_order": 4,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 5,
+    "area_name": "Engine Room and Work Shop",
+    "section_12_flag": 0,
+    "display_order": 5,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 6,
+    "area_name": "Other Machinery Spaces",
+    "section_12_flag": 0,
+    "display_order": 6,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 7,
+    "area_name": "All Stores as Applicable",
+    "section_12_flag": 0,
+    "display_order": 7,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 8,
+    "area_name": "Galley / Cold Rooms including work practices and hygiene control",
+    "section_12_flag": 0,
+    "display_order": 8,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 9,
+    "area_name": "All Lifting Equipment",
+    "section_12_flag": 0,
+    "display_order": 9,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 10,
+    "area_name": "Mooring and Access Equipment",
+    "section_12_flag": 0,
+    "display_order": 10,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 11,
+    "area_name": "CO2 Room & Fixed Smothering Systems",
+    "section_12_flag": 0,
+    "display_order": 11,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 12,
+    "area_name": "Compressor House & Motor Room",
+    "section_12_flag": 0,
+    "display_order": 12,
+    "active": 1,
+    "seeded_version": "v1.0"
+  },
+  {
+    "area_id": 13,
+    "area_name": "Cross-cutting Safety & Culture",
+    "section_12_flag": 1,
+    "display_order": 13,
+    "active": 1,
+    "seeded_version": "v1.0"
+  }
+]

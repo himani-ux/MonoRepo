@@ -1,0 +1,53 @@
+category_id,category_name,subcode_id,subcode_description,cause_type
+1,Substandard Acts / Practices,1,Under the Influence of Medicine/Alcohol/Drugs,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,2,Failure to Follow Procedure/Instruction,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,3,Failure to Secure,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,4,Failing to Use Personal Protective Equipment Properly,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,5,Failure to Inform/Warn,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,6,Improper Lifting,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,7,Improper Loading,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,8,Improper Placement,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,9,Improper Position for Task,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,10,Incorrect navigation or ship handling,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,11,Making safety devices inoperable,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,12,Operating at Improper Speed,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,13,Operating Equipment Without Authority,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,14,Removing safety devices,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,15,Inadequate Servicing of Equipment/Machinery in Operation,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,16,Using Defective Tool/Equipment/Machinery/Device,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,17,Improper Operation of Tool/Equipment/Machinery/Device,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,18,"Foul play, Sabotage",IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19,Substandard Act by External Party (not under own control),IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19.1,Pilots,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19.2,Boatmen,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19.3,Terminal personnel,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19.4,Local authorities,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19.5,Incorrect supply of documents/information,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,19.6,Other external party not under the control of the company/shipboard management,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,20,Failure to Comply with Customers/Stakeholders Requirements,IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,21,"Civil Disturbance (Riot, Unrest, Warfare)",IMMEDIATE_SUBSTANDARD_ACT
+1,Substandard Acts / Practices,22,Criminal Activities,IMMEDIATE_SUBSTANDARD_ACT
+2,Substandard Conditions,23,Cargo,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,24,Congestion/Restricted Space for Action,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,25,Defective Tool/Equipment,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,26,Incorrect Material,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,27,Electric current hazards,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,28,Exposure to chemicals,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,29,Exposure to high temperature,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,30,Exposure to low temperature,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,31,Noise Level Over Threshold,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,32,Radiation Hazard Over Threshold,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,33,Presence of Flammable/Explosive Atmosphere,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,34,Exposure to dangerous atmosphere causing suffocation or poisoning,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,35,Inadequate Guard/Barrier,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,36,Insufficient/Excessive Illumination,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,37,Inadequate/Improper Personal Protective Equipment,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,38,Inadequate Ventilation,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,39,Inadequate Warning Systems,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,40,Incorrect/Inadequate Tool/Equipment,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,41,"Outdated charts, publications and other documentation",IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,42,Poor Housekeeping/Order,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,43,Inadequate Condition of Floor/Surface,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,44,Exposure to Adverse Weather Condition,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,45,Extreme adverse sea conditions,IMMEDIATE_SUBSTANDARD_CONDITION
+2,Substandard Conditions,46,Inadequate port and berthing facilities,IMMEDIATE_SUBSTANDARD_CONDITION

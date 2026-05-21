@@ -1,0 +1,175 @@
+category_id,category_name,subcode_id,subcode_description,cause_type
+1,Inadequate Physical/Physiological Capability,1.1,"Inappropriate height/weight/size/strength/reach, etc.",BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.2,Restricted range of body movement,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.3,Limited ability/inability to sustain body positions,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.4,Substance sensitivity/allergy,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.5,Sensitivities to sensory extreme (temperature/sound/etc.),BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.6,Vision deficiency,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.7,Hearing deficiency,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.8,Other sensory deficiency (touch/taste/smell/balance),BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.9,Respiratory incapacity,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.10,Other permanent physical disability,BASIC_CAUSE
+1,Inadequate Physical/Physiological Capability,1.11,Temporary disability,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.1,Fears and phobias,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.2,Emotional disturbance,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.3,Mental illness,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.4,Intelligence level,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.5,Inability to comprehend,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.6,Poor coordination,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.7,Slow reaction time,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.8,Low mechanical aptitude,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.9,Low learning aptitude,BASIC_CAUSE
+2,Inadequate Mental/Psychological Capability,2.10,Memory failure/lapse,BASIC_CAUSE
+3,Physical/Physiological Stress,3.1,Injury or illness,BASIC_CAUSE
+3,Physical/Physiological Stress,3.2,Fatigue due to task load or duration,BASIC_CAUSE
+3,Physical/Physiological Stress,3.3,Fatigue due to lack of rest,BASIC_CAUSE
+3,Physical/Physiological Stress,3.4,Fatigue due to sensory overload,BASIC_CAUSE
+3,Physical/Physiological Stress,3.5,Exposure to health hazard,BASIC_CAUSE
+3,Physical/Physiological Stress,3.6,Exposure to temperature extreme,BASIC_CAUSE
+3,Physical/Physiological Stress,3.7,Oxygen deficiency,BASIC_CAUSE
+3,Physical/Physiological Stress,3.8,Atmospheric pressure variation,BASIC_CAUSE
+3,Physical/Physiological Stress,3.9,Constrained movement,BASIC_CAUSE
+3,Physical/Physiological Stress,3.10,Blood sugar insufficiency,BASIC_CAUSE
+3,Physical/Physiological Stress,3.11,Alcohol/Drugs/Other Self-Imposed Stress,BASIC_CAUSE
+4,Mental/Psychological Stress,4.1,Emotional overload,BASIC_CAUSE
+4,Mental/Psychological Stress,4.2,Fatigue due to mental task load or speed,BASIC_CAUSE
+4,Mental/Psychological Stress,4.3,Extreme judgment/decision demands,BASIC_CAUSE
+4,Mental/Psychological Stress,4.4,Routine/monotony/boredom/overly routine tasks,BASIC_CAUSE
+4,Mental/Psychological Stress,4.5,Extreme concentration/perception demands,BASIC_CAUSE
+4,Mental/Psychological Stress,4.6,Meaningless/degrading activities,BASIC_CAUSE
+4,Mental/Psychological Stress,4.7,Confusing directions/demands,BASIC_CAUSE
+4,Mental/Psychological Stress,4.8,Conflicting demands/directions,BASIC_CAUSE
+4,Mental/Psychological Stress,4.9,Preoccupation with problems/Distraction by concern,BASIC_CAUSE
+4,Mental/Psychological Stress,4.10,Frustration,BASIC_CAUSE
+4,Mental/Psychological Stress,4.11,Mental illness,BASIC_CAUSE
+5,Lack of Competence,5.1,Inadequate experience,BASIC_CAUSE
+5,Lack of Competence,5.2,Inadequate orientation/induction,BASIC_CAUSE
+5,Lack of Competence,5.3,Inadequate initial training,BASIC_CAUSE
+5,Lack of Competence,5.4,Inadequate update/refresher training,BASIC_CAUSE
+5,Lack of Competence,5.5,Misunderstood instruction/information,BASIC_CAUSE
+5,Lack of Competence,5.6,Lack of situational awareness/risk perception/risk awareness,BASIC_CAUSE
+5,Lack of Competence,5.7,Inadequate initial instruction/skill training,BASIC_CAUSE
+5,Lack of Competence,5.8,Inadequate practice,BASIC_CAUSE
+5,Lack of Competence,5.9,Infrequent performance,BASIC_CAUSE
+5,Lack of Competence,5.10,Inadequate coaching,BASIC_CAUSE
+5,Lack of Competence,5.11,Inadequate review instruction,BASIC_CAUSE
+6,Improper Motivation,6.1,Improper performance/behaviour is tolerated/rewarded,BASIC_CAUSE
+6,Improper Motivation,6.2,Proper performance/behaviour is discouraged/punished,BASIC_CAUSE
+6,Improper Motivation,6.3,Lack of incentive,BASIC_CAUSE
+6,Improper Motivation,6.4,Improper production incentive,BASIC_CAUSE
+6,Improper Motivation,6.5,Improper Cost Reduction Incentive,BASIC_CAUSE
+6,Improper Motivation,6.6,Excessive frustration,BASIC_CAUSE
+6,Improper Motivation,6.7,Inappropriate aggression,BASIC_CAUSE
+6,Improper Motivation,6.8,Improper attempt to save time/effort,BASIC_CAUSE
+6,Improper Motivation,6.9,Improper attempt to avoid discomfort,BASIC_CAUSE
+6,Improper Motivation,6.10,Improper attempt to gain attention,BASIC_CAUSE
+6,Improper Motivation,6.11,Inadequate discipline,BASIC_CAUSE
+6,Improper Motivation,6.12,Inappropriate peer pressure,BASIC_CAUSE
+6,Improper Motivation,6.13,Improper leadership example,BASIC_CAUSE
+6,Improper Motivation,6.14,Inadequate performance feedback,BASIC_CAUSE
+6,Improper Motivation,6.15,Inadequate reinforcement of proper behaviour,BASIC_CAUSE
+6,Improper Motivation,6.16,Abuse (intentionally),BASIC_CAUSE
+6,Improper Motivation,6.17,Misuse (unintentionally),BASIC_CAUSE
+7,Unclear Organizational Structure,7.1,Unclear/conflicting reporting relationship,BASIC_CAUSE
+7,Unclear Organizational Structure,7.2,Unclear/conflicting assignment of function/role,BASIC_CAUSE
+7,Unclear Organizational Structure,7.3,Unclear/conflicting accountability/responsibility/task,BASIC_CAUSE
+8,Inadequate Leadership,8.1,Inadequate HSEQ/asset strategy,BASIC_CAUSE
+8,Inadequate Leadership,8.2,Inadequate leadership development,BASIC_CAUSE
+8,Inadequate Leadership,8.3,Inadequate delegation,BASIC_CAUSE
+8,Inadequate Leadership,8.4,Inadequate standards,BASIC_CAUSE
+8,Inadequate Leadership,8.5,Inadequate communication/implementation of policy/procedure/practice,BASIC_CAUSE
+8,Inadequate Leadership,8.6,Conflicting policy/procedure/practice,BASIC_CAUSE
+8,Inadequate Leadership,8.7,Inadequate work/process planning/programming,BASIC_CAUSE
+8,Inadequate Leadership,8.8,Condone deviation from policy/procedure/practice,BASIC_CAUSE
+8,Inadequate Leadership,8.9,Condone misuse of equipment/tool,BASIC_CAUSE
+8,Inadequate Leadership,8.10,Condone improper/inappropriate behavior,BASIC_CAUSE
+8,Inadequate Leadership,8.11,Inadequate management information,BASIC_CAUSE
+8,Inadequate Leadership,8.12,Inadequate monitoring/closure of audit actions,BASIC_CAUSE
+9,Inadequate Supervision/Coaching,9.1,Inadequate instruction/orientation/training,BASIC_CAUSE
+9,Inadequate Supervision/Coaching,9.2,Inadequate information documents in supervision/coaching,BASIC_CAUSE
+9,Inadequate Supervision/Coaching,9.3,Lack of supervisory/management job knowledge,BASIC_CAUSE
+9,Inadequate Supervision/Coaching,9.4,Inadequate match between qualifications and job/task requirements,BASIC_CAUSE
+9,Inadequate Supervision/Coaching,9.5,Inadequate performance measurement and evaluation,BASIC_CAUSE
+9,Inadequate Supervision/Coaching,9.6,Inadequate performance feedback,BASIC_CAUSE
+10,Inadequate Management of Change,10.1,Inadequate hazard identification/risk evaluation in design,BASIC_CAUSE
+10,Inadequate Management of Change,10.2,Inadequate identification of failure mode,BASIC_CAUSE
+10,Inadequate Management of Change,10.3,Inadequate evaluation of customer/stakeholder requirement,BASIC_CAUSE
+10,Inadequate Management of Change,10.4,Inadequate identification of legal requirement,BASIC_CAUSE
+10,Inadequate Management of Change,10.5,Inadequate consideration of human/ergonomic factor in design,BASIC_CAUSE
+10,Inadequate Management of Change,10.6,Inadequate design process / standard / specification / criterion,BASIC_CAUSE
+10,Inadequate Management of Change,10.7,Inadequate process control automation,BASIC_CAUSE
+10,Inadequate Management of Change,10.8,Inadequate (technical) standard/specification or absence thereof,BASIC_CAUSE
+10,Inadequate Management of Change,10.9,Inadequate review of project risks,BASIC_CAUSE
+10,Inadequate Management of Change,10.10,Inadequate monitoring of construction / fabrication / assembly,BASIC_CAUSE
+10,Inadequate Management of Change,10.11,Inadequate assessment of operational readiness,BASIC_CAUSE
+10,Inadequate Management of Change,10.12,Inadequate commissioning/handover process,BASIC_CAUSE
+10,Inadequate Management of Change,10.13,Inadequate monitoring of initial operation,BASIC_CAUSE
+10,Inadequate Management of Change,10.14,Inadequate management of change process,BASIC_CAUSE
+10,Inadequate Management of Change,10.15,Design/MOC Governance — Independent Review Absent,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.1,Inadequate specification on requisition/purchase order,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.2,Inadequate research on material / equipment / tool / supply / etc,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.3,Inadequate specification to vendor,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.4,Inadequate mode/route of shipment,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.5,Inadequate receiving inspection/acceptance,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.6,Inadequate communication of information about hazards,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.7,Improper handling of material,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.8,Improper storage of material,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.9,Improper transporting of material,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.10,Inadequate shelf life/validation for re-use of materials/equipment,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.11,Inadequate identification of material,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.12,Improper salvage/waste disposal,BASIC_CAUSE
+11,Inadequate Supply Chain Management,11.13,Inadequate selection of contractor/supplier,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.1,Inadequate assessment of preventive maintenance needs,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.2,Inadequate preventive lubrication and servicing,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.3,Inadequate adjustment/assembly,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.4,Inadequate preventive cleaning/resurfacing,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.5,Inadequate communication of corrective maintenance needs,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.6,Inadequate scheduling of maintenance work,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.7,Inadequate assessment of repair needs,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.8,Inadequate parts substitution/replacement,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.9,Inadequate inspection method/interval,BASIC_CAUSE
+12,Inadequate Maintenance/Inspection,12.10,Unable to inspect,BASIC_CAUSE
+13,Excessive Wear/Tear,13.1,Inadequate planning of use,BASIC_CAUSE
+13,Excessive Wear/Tear,13.2,Improper decision on extension of service life,BASIC_CAUSE
+13,Excessive Wear/Tear,13.3,Inadequate inspection/monitoring,BASIC_CAUSE
+13,Excessive Wear/Tear,13.4,Improper loading/rate of use,BASIC_CAUSE
+13,Excessive Wear/Tear,13.5,Used for wrong purpose/task/activity,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.1,Inadequate assessment of needs and risks,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.2,Inadequate consideration of human factors/ergonomics,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.3,Inadequate (supplier) standard/specification,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.4,Incorrect measurement/detection/(process) control,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.5,Inadequate availability of tool / equipment / machinery / device,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.6,Inadequate inspection/repair/maintenance,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.7,Inadequate adjustment/calibration,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.8,Inadequate salvage and reclamation,BASIC_CAUSE
+14,Inadequate Tool/Equipment/Machinery/Device,14.9,Inadequate removal and replacement of unsuitable items,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.1,Inadequate assessment of needs and risks,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.2,Inadequate product/service standard/specification/concession system,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.3,Inadequate product/service design/development,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.4,Inadequate product/service standard,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.5,Inadequate product/service design validation,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.6,Inadequate product/service design verification,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.7,Inadequate product/service planning,BASIC_CAUSE
+15,Inadequate Product/Service Design,15.8,Inadequate product/service quality verification,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.1,Inadequate identification of requirements (regulatory/industry code/permit-to-operate),BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.2,Inadequate risk identification/evaluation in development of standard,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.3,Inadequate standard from supplier/contractor,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.4,Inadequate coordination with process design when developing standard,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.5,Inadequate employee involvement in developing standard,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.6,Conflicting standards/improper prioritization of standards,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.7,Inadequate publication of standard,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.8,Inadequate distribution of standard,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.9,Inadequate translation of appropriate language,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.10,Improper use of language,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.11,Inadequate training of standard,BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.12,"Inadequate reinforcing of standard with signs, colour codes and job aids",BASIC_CAUSE
+16,Inadequate Work/Production Standards,16.13,Inadequate monitoring of standard compliance,BASIC_CAUSE
+17,Inadequate Communication/Information,17.1,Inadequate information handling,BASIC_CAUSE
+17,Inadequate Communication/Information,17.2,Unclear information,BASIC_CAUSE
+17,Inadequate Communication/Information,17.3,Inadequate transfer of information between internal parties,BASIC_CAUSE
+17,Inadequate Communication/Information,17.4,Inadequate transfer of information with client/stakeholder,BASIC_CAUSE
+17,Inadequate Communication/Information,17.5,Inadequate transfer of information with authorities,BASIC_CAUSE
+17,Inadequate Communication/Information,17.6,Inadequate transfer of information with other external parties,BASIC_CAUSE
+17,Inadequate Communication/Information,17.7,Inadequate communication structure,BASIC_CAUSE
+17,Inadequate Communication/Information,17.8,Inadequate databases/information system,BASIC_CAUSE
+17,Inadequate Communication/Information,17.9,Inadequate communication method/technique used,BASIC_CAUSE

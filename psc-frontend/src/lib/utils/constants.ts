@@ -168,4 +168,5 @@ export const ROUTES = {
   SYNC: '/sync',
   CIRCULAR: '/circular',
   ORB: '/orb',
+  SAFETY_SCM_SIGNOFF: '/safety/scm/:id/signoff',
 } as const;

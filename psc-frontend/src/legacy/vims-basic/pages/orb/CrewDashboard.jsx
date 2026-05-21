@@ -3457,7 +3457,7 @@ function ORBEntryForm(
                   <input
                     type="number"
                     step="0.01"
-                    value={details.sludge_before || ""}
+                    value={details.sludge_before ?? ""}
                     onChange={(e) => handleChange('sludge_before', parseFloat(e.target.value))}
                     placeholder="Enter Retained Quantity"
                     style={{ width: '100%', borderColor: errors.sludge_before ? 'red' : '#ccc' }}
@@ -3529,7 +3529,7 @@ function ORBEntryForm(
                   <input
                     type="number"
                     step="0.01"
-                    value={details.sludge_before || ""}
+                    value={details.sludge_before ?? ""}
                     onChange={(e) => handleChange('sludge_before', parseFloat(e.target.value))}
                     placeholder="Enter Retained Quantity"
                     style={{ width: '100%', borderColor: errors.sludge_before ? 'red' : '#ccc' }}

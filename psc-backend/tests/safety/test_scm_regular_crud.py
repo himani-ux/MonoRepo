@@ -1,0 +1,529 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+import unittest
+
+from tests.safety.support import bootstrap_django, recreate_scm_tables
+
+
+bootstrap_django()
+
+from rest_framework.test import APIRequestFactory, force_authenticate
+
+from apps.safety.models import SCMAttendance, SCMLegacyField, SCMMeeting, SCMSignature
+from apps.safety.views.scm import SCMDetailView, SCMListCreateView, SCMSubmitView
+from apps.safety.views.scm_attendance import SCMAttendanceListCreateView
+from apps.safety.views.scm_signature import SCMSignatureView
+
+
+def build_user(
+    *,
+    role_name: str,
+    process_ids: list[str] | None = None,
+    user_id: str = "co-7",
+):
+    return SimpleNamespace(
+        id=user_id,
+        is_authenticated=True,
+        username=user_id,
+        role_name=role_name,
+        safety_role_name=role_name,
+        form_ids=["SAF_F_003"],
+        process_ids=["SAF_P_001"] if process_ids is None else process_ids,
+        vessel_ids=["7"],
+        is_global=False,
+    )
+
+
+def build_sections() -> list[dict[str, object]]:
+    return [
+        {
+            "agenda_item_number": index,
+            "content": (
+                f"Section {index} discussion notes captured for the handover workspace "
+                "with enough detail to satisfy the SCM form expectations."
+            ),
+            "decision": f"Decision outcome recorded for section {index}.",
+        }
+        for index in range(1, 11)
+    ]
+
+
+def build_payload() -> dict[str, object]:
+    return {
+        "attendance_rows": [
+            {
+                "crew_id": "co-7",
+                "display_name": "Chief Officer Seven",
+                "present": True,
+                "rank_name": "CO",
+            },
+            {
+                "absence_reason": "Engine watch handover overlap",
+                "crew_id": "ce-7",
+                "display_name": "Chief Engineer Seven",
+                "present": False,
+                "rank_name": "CE",
+                "remarks": "Joining after watch change.",
+            },
+        ],
+        "vessel_id": "7",
+        "vessel_code": "ABC",
+        "meeting_date": "2026-04-28",
+        "meeting_time_local": "10:00:00",
+        "location": "Singapore Anchorage",
+        "voyage_no": "V2026-03",
+        "chair_crew_id": "master-7",
+        "sections": build_sections(),
+    }
+
+
+def build_legacy_sections() -> list[dict[str, object]]:
+    sections = build_sections()
+    legacy_fields: dict[int, dict[str, object]] = {
+        1: {
+            "previous_minutes_reviewed": True,
+            "absent_from_previous_meeting": False,
+            "company_topics_discussed": True,
+            "deficiencies_discussed": True,
+            "near_misses_discussed": True,
+            "immediate_actions_discussed": True,
+            "major_incidents_discussed": False,
+            "emergency_drills_discussed": True,
+        },
+        2: {
+            "outstandingitems": "Outstanding items reviewed from the previous SCM.",
+            "pendingitems": "Two pending items remain under follow-up.",
+            "closeditems": "One prior item closed since the last meeting.",
+        },
+        3: {
+            "permit_to_work_compliance": True,
+            "checklist_system_compliance": True,
+            "five_minute_safety_meeting_compliance": True,
+            "risk_assessment_management": True,
+            "alcohol_policy": True,
+            "rest_hours": True,
+            "best_practices": "Deck team shared enclosed-space preparation practice.",
+            "quality_safety_topic_1": "Mooring safety",
+            "quality_safety_topic_2": "Lifting gear",
+            "quality_safety_topic_3": "Hot work watch",
+        },
+        4: {
+            "immediate_security_concerns": "No immediate security concerns were raised.",
+            "security_best_practices": "Gangway watch handover reinforced.",
+            "cyber_security_notes": "USB media control discussed.",
+            "latest_circular_safety_alert": "Latest safety alert reviewed.",
+            "seq_message": "SEQ reminder discussed.",
+        },
+        5: {
+            "kpi_review": "Environmental KPI trend reviewed.",
+            "environment_best_practices": "Garbage segregation practice reinforced.",
+        },
+        6: {
+            "health_review": "Crew health status reviewed.",
+            "rest_hours_compliance": True,
+            "medical_certificates_healthy": True,
+            "weekly_master_inspection": True,
+            "mess_committee_meeting": True,
+            "health_best_practices": "Hydration checks reinforced.",
+        },
+        7: {
+            "crew_complaint_received": False,
+            "matter_status_resolved": True,
+            "complaint_form_submitted": True,
+            "crew_best_practices": "Crew welfare feedback captured.",
+        },
+        8: {
+            **{f"findings{index}": f"Finding {index} observation." for index in range(1, 11)},
+            **{f"correctivemeasure{index}": f"Corrective measure {index}." for index in range(1, 11)},
+        },
+        9: {
+            "miscellaneous_comments": "Miscellaneous safety comments captured.",
+        },
+    }
+    for section in sections:
+        section["content"] = ""
+        if section["agenda_item_number"] == 10:
+            section["decision"] = ""
+        section["legacy_fields"] = legacy_fields.get(section["agenda_item_number"], {})
+    return sections
+
+
+class SCMRegularCrudTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        bootstrap_django()
+
+    def setUp(self) -> None:
+        recreate_scm_tables()
+        self.factory = APIRequestFactory()
+        self.list_create_view = SCMListCreateView.as_view()
+        self.detail_view = SCMDetailView.as_view()
+        self.submit_view = SCMSubmitView.as_view()
+        self.attendance_view = SCMAttendanceListCreateView.as_view()
+        self.signature_view = SCMSignatureView.as_view()
+
+    def test_co_can_create_regular_scm_and_read_it_back(self) -> None:
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+
+        create_response = self.list_create_view(create_request)
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["meeting_type"], "REGULAR")
+        self.assertEqual(create_response.data["state"], "DRAFT")
+        self.assertEqual(len(create_response.data["sections"]), 10)
+        self.assertEqual(create_response.data["prepared_by_crew_id"], "co-7")
+
+        detail_request = self.factory.get(f"/api/safety/scm/{create_response.data['id']}/")
+        force_authenticate(detail_request, user=build_user(role_name="MASTER", process_ids=[], user_id="master-7"))
+
+        detail_response = self.detail_view(detail_request, id=create_response.data["id"])
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.data["id"], create_response.data["id"])
+        self.assertEqual(detail_response.data["scm_number"], "ABC-28-Apr-2026")
+        self.assertEqual(detail_response.data["sections"][0]["agenda_item_number"], 1)
+
+    def test_master_can_create_regular_scm_with_create_process_id(self) -> None:
+        request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(request, user=build_user(role_name="MASTER", user_id="master-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["meeting_type"], "REGULAR")
+        self.assertEqual(response.data["prepared_by_crew_id"], "master-7")
+
+    def test_master_created_regular_targets_actual_co_for_co_signature(self) -> None:
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="MASTER", user_id="master-7"))
+        create_response = self.list_create_view(create_request)
+        self.assertEqual(create_response.status_code, 201)
+
+        attendance_request = self.factory.get(f"/api/safety/scm/{create_response.data['id']}/attendance/")
+        force_authenticate(
+            attendance_request,
+            user=build_user(role_name="MASTER", process_ids=["SAF_P_002"], user_id="master-7"),
+        )
+        attendance_response = self.attendance_view(attendance_request, id=create_response.data["id"])
+
+        self.assertEqual(attendance_response.status_code, 200)
+        self.assertEqual(attendance_response.data["co_signature"]["signer_crew_id"], "co-7")
+
+        signature_request = self.factory.post(
+            f"/api/safety/scm/{create_response.data['id']}/signatures/",
+            {
+                "signer_role": "CO",
+                "signer_crew_id": "co-7",
+                "typed_name": "Chief Officer Seven",
+                "device_fingerprint": "device-co-7",
+            },
+            format="json",
+        )
+        force_authenticate(
+            signature_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        signature_response = self.signature_view(signature_request, id=create_response.data["id"])
+
+        self.assertEqual(signature_response.status_code, 200)
+        signature = SCMSignature.objects.get(
+            meeting_id=create_response.data["id"],
+            signer_role=SCMSignature.SignerRole.CO,
+        )
+        self.assertEqual(signature.signer_crew_id, "co-7")
+
+    def test_regular_create_persists_attendance_rows_in_same_request(self) -> None:
+        request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        attendance_rows = list(
+            SCMAttendance.objects.filter(meeting_id=response.data["id"]).order_by("crew_id")
+        )
+        self.assertEqual(len(attendance_rows), 2)
+        self.assertEqual(attendance_rows[0].crew_id, "ce-7")
+        self.assertFalse(attendance_rows[0].present)
+        self.assertEqual(attendance_rows[0].absence_reason, "Engine watch handover overlap")
+        self.assertEqual(attendance_rows[1].crew_id, "co-7")
+        self.assertTrue(attendance_rows[1].present)
+
+    def test_regular_create_derives_chair_and_preparer_from_authenticated_scope(self) -> None:
+        payload = build_payload()
+        payload["prepared_by_crew_id"] = "spoofed-co"
+        payload["chair_crew_id"] = "spoofed-master"
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["prepared_by_crew_id"], "co-7")
+        self.assertEqual(response.data["chair_crew_id"], "master-7")
+
+    def test_regular_create_requires_location_or_coordinates(self) -> None:
+        payload = build_payload()
+        payload["location"] = ""
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("location", response.data)
+
+    def test_regular_create_accepts_at_sea_coordinates_without_location(self) -> None:
+        payload = build_payload()
+        payload["meeting_date"] = "2026-04-29"
+        payload["location"] = ""
+        payload["latitude"] = "1.290270"
+        payload["longitude"] = "103.851959"
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(response.data["location"])
+        self.assertEqual(str(response.data["latitude"]), "1.290270")
+        self.assertEqual(str(response.data["longitude"]), "103.851959")
+
+    def test_create_accepts_structured_legacy_payload_and_renders_section_one(self) -> None:
+        payload = build_payload()
+        payload.update(
+            {
+                "occasion": "M",
+                "ship_position": "P",
+                "ship_pos_from": "Singapore",
+                "ship_pos_to": "Fujairah",
+                "comm_time": "10:00:00",
+                "comp_time": "11:00:00",
+                "sections": build_legacy_sections(),
+            }
+        )
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["occasion"], "M")
+        self.assertEqual(response.data["ship_position"], "P")
+        section_one = response.data["sections"][0]
+        self.assertTrue(section_one["legacy_fields"]["previous_minutes_reviewed"])
+        self.assertFalse(section_one["legacy_fields"]["absent_from_previous_meeting"])
+        self.assertEqual(
+            SCMLegacyField.objects.get(
+                meeting_id=response.data["id"],
+                agenda_item_number=1,
+                field_key="previous_minutes_reviewed",
+            ).field_value,
+            "true",
+        )
+
+    def test_section_eight_persists_ten_findings_and_corrective_measure_pairs(self) -> None:
+        payload = build_payload()
+        payload["meeting_date"] = "2026-05-02"
+        payload["sections"] = build_legacy_sections()
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        section_eight_fields = SCMLegacyField.objects.filter(
+            meeting_id=response.data["id"],
+            agenda_item_number=8,
+        )
+        self.assertEqual(section_eight_fields.count(), 20)
+        self.assertEqual(
+            section_eight_fields.get(field_key="findings10").field_value,
+            "Finding 10 observation.",
+        )
+        self.assertEqual(
+            response.data["sections"][7]["legacy_fields"]["correctivemeasure10"],
+            "Corrective measure 10.",
+        )
+
+    def test_office_review_is_not_required_for_vessel_create(self) -> None:
+        payload = build_payload()
+        payload["meeting_date"] = "2026-05-03"
+        sections = build_legacy_sections()
+        sections[9]["legacy_fields"] = {}
+        sections[9]["content"] = ""
+        sections[9]["decision"] = ""
+        payload["sections"] = sections
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(response.data["office_comment"])
+        self.assertFalse(response.data["is_reviewed"])
+
+    def test_scm_create_rate_limit_blocks_fourth_creation_for_vessel_day(self) -> None:
+        statuses = []
+        for index, meeting_date in enumerate(
+            ["2026-04-28", "2026-04-29", "2026-04-30", "2026-05-01"], start=1
+        ):
+            payload = build_payload()
+            payload["meeting_date"] = meeting_date
+            payload["voyage_no"] = f"V2026-{index:02d}"
+            request = self.factory.post("/api/safety/scm/", payload, format="json")
+            force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+            response = self.list_create_view(request)
+            statuses.append(response.status_code)
+            if response.status_code == 201:
+                SCMMeeting.objects.filter(pk=response.data["id"]).update(state=SCMMeeting.State.SUBMITTED)
+
+        self.assertEqual(statuses[:3], [201, 201, 201])
+        self.assertEqual(statuses[3], 429)
+
+    def test_co_can_finalize_regular_scm_and_capture_co_signature(self) -> None:
+        payload = build_payload()
+        payload["sections"] = build_legacy_sections()
+        create_request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        self.assertEqual(create_response.status_code, 201)
+
+        submit_request = self.factory.post(
+            f"/api/safety/scm/{create_response.data['id']}/submit/",
+            {"typed_name": "Chief Officer Seven", "device_fingerprint": "device-co-7"},
+            format="json",
+        )
+        force_authenticate(
+            submit_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        submit_response = self.submit_view(submit_request, id=create_response.data["id"])
+
+        self.assertEqual(submit_response.status_code, 200)
+        self.assertEqual(submit_response.data["state"], SCMMeeting.State.SUBMITTED)
+        signature = SCMSignature.objects.get(meeting_id=create_response.data["id"], signer_role="CO")
+        self.assertEqual(signature.signer_crew_id, "co-7")
+        self.assertEqual(signature.typed_name, "Chief Officer Seven")
+
+    def test_finalize_accepts_section_eight_legacy_findings_without_extra_decision(self) -> None:
+        payload = build_payload()
+        sections = build_legacy_sections()
+        sections[7]["decision"] = ""
+        payload["sections"] = sections
+        create_request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        self.assertEqual(create_response.status_code, 201)
+
+        submit_request = self.factory.post(
+            f"/api/safety/scm/{create_response.data['id']}/submit/",
+            {"typed_name": "Chief Officer Seven", "device_fingerprint": "device-co-7"},
+            format="json",
+        )
+        force_authenticate(
+            submit_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        submit_response = self.submit_view(submit_request, id=create_response.data["id"])
+
+        self.assertEqual(submit_response.status_code, 200)
+        self.assertEqual(submit_response.data["state"], SCMMeeting.State.SUBMITTED)
+
+    def test_finalize_blocks_when_attendance_is_missing(self) -> None:
+        payload = build_payload()
+        payload["attendance_rows"] = []
+        payload["sections"] = build_legacy_sections()
+        create_request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        self.assertEqual(create_response.status_code, 201)
+
+        submit_request = self.factory.post(
+            f"/api/safety/scm/{create_response.data['id']}/submit/",
+            {"typed_name": "Chief Officer Seven", "device_fingerprint": "device-co-7"},
+            format="json",
+        )
+        force_authenticate(
+            submit_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        submit_response = self.submit_view(submit_request, id=create_response.data["id"])
+
+        self.assertEqual(submit_response.status_code, 422)
+        self.assertIn("attendance", submit_response.data["errors"])
+
+    def test_co_can_capture_present_attendee_signature(self) -> None:
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        request = self.factory.post(
+            f"/api/safety/scm/{create_response.data['id']}/signatures/",
+            {
+                "signer_role": "ATTENDEE",
+                "signer_crew_id": "co-7",
+                "typed_name": "Chief Officer Seven",
+                "device_fingerprint": "device-attendee-co",
+            },
+            format="json",
+        )
+        force_authenticate(
+            request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        response = self.signature_view(request, id=create_response.data["id"])
+
+        self.assertEqual(response.status_code, 200)
+        signature = SCMSignature.objects.get(
+            meeting_id=create_response.data["id"],
+            signer_role=SCMSignature.SignerRole.ATTENDEE,
+            signer_crew_id="co-7",
+        )
+        self.assertEqual(signature.display_name, "Chief Officer Seven")
+
+        attendance_request = self.factory.get(f"/api/safety/scm/{create_response.data['id']}/attendance/")
+        force_authenticate(
+            attendance_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+        attendance_response = self.attendance_view(attendance_request, id=create_response.data["id"])
+
+        self.assertEqual(attendance_response.status_code, 200)
+        signed_row = next(row for row in attendance_response.data["rows"] if row["crew_id"] == "co-7")
+        self.assertEqual(signed_row["signature"]["status"], "SIGNED")
+        self.assertEqual(signed_row["signature"]["typed_name"], "Chief Officer Seven")
+
+    def test_master_can_finalize_regular_scm(self) -> None:
+        payload = build_payload()
+        payload["sections"] = build_legacy_sections()
+        create_request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        request = self.factory.post(
+            f"/api/safety/scm/{create_response.data['id']}/submit/",
+            {"typed_name": "Master Seven", "device_fingerprint": "device-master-7"},
+            format="json",
+        )
+        force_authenticate(
+            request,
+            user=build_user(role_name="MASTER", process_ids=["SAF_P_002"], user_id="master-7"),
+        )
+
+        response = self.submit_view(request, id=create_response.data["id"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["state"], SCMMeeting.State.SUBMITTED)
+        self.assertFalse(
+            SCMSignature.objects.filter(
+                meeting_id=create_response.data["id"],
+                signer_role=SCMSignature.SignerRole.CO,
+            ).exists()
+        )

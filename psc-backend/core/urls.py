@@ -122,6 +122,9 @@ urlpatterns = [
     # POST /api/psc/notifications/mark-read/
     # POST /api/psc/notifications/mark-all-read/
     path('api/psc/notifications/', include('apps.notifications.urls', namespace='notifications')),
+
+    # Safety module endpoints
+    path('api/safety/', include('apps.safety.urls', namespace='safety')),
 ]
 
 # Serve media files in development

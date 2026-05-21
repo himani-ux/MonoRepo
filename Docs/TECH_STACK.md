@@ -172,7 +172,8 @@ All versions are **pinned** to ensure reproducibility.
 |-----------|---------|-------|
 | SQL Server | 2019 | Production database |
 | Database Name | `ksm_marine_live` | Shared with CMS |
-| ODBC Driver | 17 or 18 | Microsoft ODBC Driver for SQL Server |
+| ODBC Driver | 18 | Microsoft ODBC Driver for SQL Server |
+| Authentication | Windows integrated auth by default | Leave `DB_USER` / `DB_PASSWORD` blank and set `DB_TRUSTED_CONNECTION=yes` |
 
 ### 3.1 Database Conventions
 
@@ -188,11 +189,12 @@ All versions are **pinned** to ensure reproducibility.
 
 ### 3.2 Connection String Pattern
 ```
-Driver={ODBC Driver 17 for SQL Server};
-Server=<server>;
+Driver={ODBC Driver 18 for SQL Server};
+Server=localhost,1433;
 Database=ksm_marine_live;
-UID=<username>;
-PWD=<password>;
+Encrypt=no;
+TrustServerCertificate=yes;
+Trusted_Connection=yes;
 ```
 
 ---
@@ -343,9 +345,13 @@ ALLOWED_HOSTS=localhost,127.0.0.1
 # Database (SQL Server)
 DB_HOST=localhost
 DB_NAME=ksm_marine_live
-DB_USER=sa
-DB_PASSWORD=your-password-here
 DB_PORT=1433
+DB_DRIVER=ODBC Driver 18 for SQL Server
+DB_ENCRYPT=no
+DB_TRUST_SERVER_CERTIFICATE=yes
+DB_TRUSTED_CONNECTION=yes
+DB_USER=
+DB_PASSWORD=
 
 # JWT Authentication (units: MINUTES)
 JWT_ACCESS_TOKEN_LIFETIME=60          # 60 minutes = 1 hour

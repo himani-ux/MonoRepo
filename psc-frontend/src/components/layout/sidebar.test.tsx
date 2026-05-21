@@ -165,6 +165,24 @@ describe('Sidebar', () => {
     expect(screen.getByText('Inspections')).toBeInTheDocument();
   });
 
+  it('shows_safety_link_when_user_has_any_safety_form_access', () => {
+    sidebarMocks.useLocation.mockReturnValue({ pathname: '/safety/scm' });
+    sidebarMocks.useAuth.mockReturnValue({
+      user: {
+        user_type: 'office',
+      },
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      canAccessReports: false,
+      hasForm: vi.fn((formId: string) => formId === 'SAF_F_003'),
+    });
+
+    render(<Sidebar isOpen />);
+
+    expect(screen.getByRole('link', { name: /safety/i })).toHaveAttribute('href', '/safety/scm');
+  });
+
   it('marks_help_entry_as_active_on_help_route', () => {
     sidebarMocks.useLocation.mockReturnValue({ pathname: '/help' });
 

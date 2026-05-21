@@ -18,3 +18,7 @@ PSC_UPLOAD_PATH = UPLOAD_BASE_PATH
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
+
+SILENCED_SYSTEM_CHECKS = [
+    "models.E034",
+]

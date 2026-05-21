@@ -295,7 +295,7 @@ export function buildItemRows(code, items, dateISO, officer, availableTanks = []
       }
 
       // 11.3 Sludge Before Collection
-      if (i.sludge_before) {
+      if (i.sludge_before !== undefined && i.sludge_before !== null && i.sludge_before !== "") {
         add("11.3", `${i.sludge_before} M³`);
       }
       // 11.4 Manual Collection

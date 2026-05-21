@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCM PDF Format Sample - VIMS Safety</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5f6975;
+      --line: #cfd8e3;
+      --soft: #f4f7fb;
+      --panel: #ffffff;
+      --navy: #183b56;
+      --teal: #0f766e;
+      --amber: #b45309;
+      --red: #b42318;
+      --green: #166534;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #e8edf3;
+      color: var(--ink);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      line-height: 1.35;
+    }
+
+    .screen-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 18px;
+      background: #111827;
+      color: #ffffff;
+      font-size: 13px;
+    }
+
+    .screen-toolbar button {
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #ffffff;
+      color: #111827;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 18px auto;
+      padding: 20mm;
+      background: var(--panel);
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
+      position: relative;
+    }
+
+    .pdf-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .brand {
+      font-size: 9pt;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 4px 0 0;
+      color: var(--navy);
+      font-size: 19pt;
+      line-height: 1.1;
+    }
+
+    h2 {
+      margin: 18px 0 8px;
+      color: var(--navy);
+      font-size: 13pt;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin: 12px 0 6px;
+      color: #243447;
+      font-size: 11pt;
+      line-height: 1.2;
+    }
+
+    .doc-tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid #91d5cf;
+      padding: 5px 10px;
+      color: #0f514b;
+      background: #e7f7f5;
+      font-size: 9pt;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--line);
+      margin: 12px 0;
+    }
+
+    .meta-cell {
+      min-height: 42px;
+      padding: 7px 8px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .meta-cell:nth-child(4n) {
+      border-right: 0;
+    }
+
+    .label {
+      display: block;
+      color: var(--muted);
+      font-size: 7.8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .value {
+      display: block;
+      margin-top: 3px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 6px 7px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+
+    th {
+      background: #edf2f7;
+      color: #243447;
+      font-size: 8.5pt;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tight td {
+      padding: 5px 6px;
+    }
+
+    .status {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 8pt;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status.green {
+      color: var(--green);
+      background: #dcfce7;
+      border: 1px solid #86efac;
+    }
+
+    .status.amber {
+      color: var(--amber);
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+    }
+
+    .status.red {
+      color: var(--red);
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+    }
+
+    .section-box {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      margin: 10px 0;
+      break-inside: avoid;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--soft);
+      border-bottom: 1px solid var(--line);
+      color: var(--navy);
+      font-weight: 800;
+    }
+
+    .section-body {
+      padding: 9px 10px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .note {
+      margin: 8px 0;
+      padding: 8px 10px;
+      border-left: 4px solid var(--teal);
+      background: #eefcf9;
+      color: #134e4a;
+      font-size: 9pt;
+    }
+
+    .warning {
+      border-left-color: var(--amber);
+      background: #fff7ed;
+      color: #78350f;
+    }
+
+    .signatures {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .signature-card {
+      min-height: 76px;
+      border: 1px solid var(--line);
+      padding: 8px;
+      background: #ffffff;
+    }
+
+    .signature-line {
+      height: 28px;
+      border-bottom: 1px solid #9aa7b5;
+      margin-bottom: 5px;
+    }
+
+    .footer {
+      position: absolute;
+      left: 20mm;
+      right: 20mm;
+      bottom: 12mm;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 5px;
+      color: var(--muted);
+      font-size: 8pt;
+    }
+
+    .page-content {
+      padding-bottom: 18mm;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 8.5pt;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: 1fr 52px 52px;
+      gap: 0;
+      border: 1px solid var(--line);
+    }
+
+    .checkbox-grid div {
+      padding: 5px 7px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .checkbox-grid div:nth-child(3n) {
+      border-right: 0;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .checkbox-grid .head {
+      background: #edf2f7;
+      color: #243447;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 800;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      .screen-toolbar {
+        display: none;
+      }
+
+      .page {
+        margin: 0;
+        box-shadow: none;
+        page-break-after: always;
+      }
+    }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="screen-toolbar">
+    <div>SCM PDF format sample aligned to VIMS Safety SSOT. Use browser print to save as PDF.</div>
+    <button type="button" onclick="window.print()">Print PDF</button>
+  </div>
+
+  <main>
+    <section class="page">
+      <div class="page-content">
+        <header class="pdf-header">
+          <div>
+            <div class="brand">KSM VIMS Safety Module</div>
+            <h1>Safety Committee Meeting Minutes</h1>
+            <div class="small">Legacy SCM PDF structure preserved for D-PDF-03b and SSOT `vw_GetSCM_Master` alignment.</div>
+          </div>
+          <div class="doc-tag">Meeting Type: REGULAR</div>
+        </header>
+
+        <div class="meta-grid">
+          <div class="meta-cell">
+            <span class="label">SCM No</span>
+            <span class="value">EBK-31-Mar-2026</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Vessel</span>
+            <span class="value">MV Example Bridge</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Meeting Date</span>
+            <span class="value">31-Mar-2026</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Occasion</span>
+            <span class="value">M - Monthly</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Ship Position</span>
+            <span class="value">S - Sea</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Position From</span>
+            <span class="value">Singapore</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Position To</span>
+            <span class="value">Fujairah</span>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Time</span>
+            <span class="value">14:00 - 15:10 LT</span>
+          </div>
+        </div>
+
+        <div class="note">
+          This sample uses the same template for Regular and Ad-Hoc SCM. For Ad-Hoc, print `Meeting Type: AD_HOC`; it does not replace the monthly Regular SCM and cadence still anchors on the last SCM closure timestamp.
+        </div>
+
+        <h2>Attendance and WRH Snapshot</h2>
+        <table class="tight">
+          <thead>
+            <tr>
+              <th style="width: 16%;">Rank</th>
+              <th style="width: 23%;">Name</th>
+              <th style="width: 15%;">Attendance</th>
+              <th style="width: 20%;">WRH Status</th>
+              <th>Digital Signature Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Master</td>
+              <td>Capt. A. Kumar</td>
+              <td><span class="status green">Present</span></td>
+              <td><span class="status green">Compliant</span></td>
+              <td>Chair and final sign-off captured at closure.</td>
+            </tr>
+            <tr>
+              <td>Chief Officer</td>
+              <td>S. Menon</td>
+              <td><span class="status green">Present</span></td>
+              <td><span class="status green">Compliant</span></td>
+              <td>Prepared minutes and co-signed.</td>
+            </tr>
+            <tr>
+              <td>Chief Engineer</td>
+              <td>R. Das</td>
+              <td><span class="status green">Present</span></td>
+              <td><span class="status amber">Unavailable</span></td>
+              <td>Signed after Master acknowledged WRH warning.</td>
+            </tr>
+            <tr>
+              <td>AB</td>
+              <td>M. Ali</td>
+              <td><span class="status green">Present</span></td>
+              <td><span class="status amber">Non-Compliant</span></td>
+              <td>Signed. Warning is for record and does not block meeting.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="note warning">
+          WRH gaps are amber warnings only. They must be acknowledged by the Master, but they do not block creation, conduct, or closure of SCM minutes.
+        </div>
+
+        <h2>Closed Items Since Last SCM</h2>
+        <div class="small">Inserted in the PDF before the Section 8 SOI block. Cutoff uses previous SCM closure timestamp, not meeting creation date.</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 17%;">Finding ID</th>
+              <th>Description</th>
+              <th style="width: 16%;">Closed Date</th>
+              <th style="width: 22%;">Master Sign-Off Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SOI-EBK-2026-018</td>
+              <td>Fire locker inventory mismatch corrected and verified by Safety Officer.</td>
+              <td>24-Mar-2026</td>
+              <td>24-Mar-2026 18:35 LT</td>
+            </tr>
+            <tr>
+              <td>SOI-EBK-2026-021</td>
+              <td>Engine room escape route marking renewed and photographed in inspection record.</td>
+              <td>29-Mar-2026</td>
+              <td>29-Mar-2026 16:20 LT</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Document Control and SSOT Alignment</h2>
+        <table class="tight">
+          <tbody>
+            <tr>
+              <th style="width: 28%;">Source Form</th>
+              <td>Legacy SCM master format, preserving `SCMNo`, `VesselName`, `SDate`, `Ocassion`, `ShipPosition`, `CommTime`, `CompTime`, and section records.</td>
+            </tr>
+            <tr>
+              <th>RBAC Path</th>
+              <td>SCM module behind `SAF_F_003`. CO prepares Regular SCM; Master can create Ad-Hoc and must perform final sign-off.</td>
+            </tr>
+            <tr>
+              <th>SOI Gate</th>
+              <td>Overdue SOI hard-block applies only at Master sign-off. Creation and running the meeting remain available.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer class="footer">
+        <span>SCM PDF Sample - Page 1 of 3</span>
+        <span>Generated from VIMS Safety HTML template</span>
+      </footer>
+    </section>
+
+    <section class="page">
+      <div class="page-content">
+        <header class="pdf-header">
+          <div>
+            <div class="brand">Safety Committee Meeting Minutes</div>
+            <h1>Legacy 10-Section SCM Record</h1>
+          </div>
+          <div class="doc-tag">SCM No: EBK-31-Mar-2026</div>
+        </header>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>1. Structured Review</span>
+            <span>Yes / No</span>
+          </div>
+          <div class="section-body">
+            <div class="checkbox-grid">
+              <div class="head">Question</div>
+              <div class="head">Yes</div>
+              <div class="head">No</div>
+              <div>Minutes of previous safety committee meeting reviewed?</div>
+              <div>Yes</div>
+              <div></div>
+              <div>Topics recommended by company discussed?</div>
+              <div>Yes</div>
+              <div></div>
+              <div>Deficiencies discussed?</div>
+              <div>Yes</div>
+              <div></div>
+              <div>All near misses discussed without exposing restricted reporter identity?</div>
+              <div>Yes</div>
+              <div></div>
+              <div>Immediate actions, major incidents, and emergency drills discussed?</div>
+              <div>Yes</div>
+              <div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>2. Outstanding Items</span>
+            <span>Carry Forward Control</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr>
+                  <th style="width: 28%;">Outstanding Items</th>
+                  <td>Two items carried from prior SCM. One action requires office procurement confirmation.</td>
+                </tr>
+                <tr>
+                  <th>Pending Items</th>
+                  <td>1. Replacement non-slip tape for mooring station. 2. Additional toolbox talk for enclosed space entry.</td>
+                </tr>
+                <tr>
+                  <th>Closed Items</th>
+                  <td>Fire locker mismatch and escape route marking closed since last SCM, listed in the dedicated block above.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>3. Safety Practice</span>
+            <span>Compliance Review</span>
+          </div>
+          <div class="section-body two-col">
+            <table class="tight">
+              <tbody>
+                <tr><th>Permit to Work</th><td><span class="status green">Compliant</span></td></tr>
+                <tr><th>Checklist System</th><td><span class="status green">Compliant</span></td></tr>
+                <tr><th>5-Minute Safety Meeting</th><td><span class="status green">Compliant</span></td></tr>
+                <tr><th>Risk Assessment</th><td><span class="status amber">Follow-up</span></td></tr>
+                <tr><th>Alcohol Policy</th><td><span class="status green">Compliant</span></td></tr>
+                <tr><th>Rest Hours</th><td><span class="status amber">WRH warning</span></td></tr>
+              </tbody>
+            </table>
+            <table class="tight">
+              <tbody>
+                <tr><th>Best Practice</th><td>Use color-coded isolation tags for deck maintenance jobs.</td></tr>
+                <tr><th>Quality Topic 1</th><td>PTW revalidation after weather interruption.</td></tr>
+                <tr><th>Quality Topic 2</th><td>Toolbox talk record completeness.</td></tr>
+                <tr><th>Quality Topic 3</th><td>Housekeeping around emergency exits.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>4. Security</span>
+            <span>Shipboard Review</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr><th style="width: 28%;">Immediate Security Review</th><td>No immediate security concern reported during the period.</td></tr>
+                <tr><th>Security Best Practice</th><td>Gangway watch checklist reinforced for port calls.</td></tr>
+                <tr><th>Cyber Security</th><td>USB control and shared terminal password practices reviewed.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>5. Environment</span>
+            <span>KPI and Practices</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr><th style="width: 28%;">KPI Review</th><td>No spill event. Garbage log and MARPOL placards verified.</td></tr>
+                <tr><th>Environmental Best Practice</th><td>Deck scupper plug readiness checked before bunkering.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>6. Health</span>
+            <span>Crew Welfare</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr><th style="width: 28%;">Health Review</th><td>No reportable illness. First-aid inventory checked.</td></tr>
+                <tr><th>Rest Hours</th><td>Two amber WRH entries noted and acknowledged by Master.</td></tr>
+                <tr><th>Medical Certificates</th><td>All checked crew certificates valid.</td></tr>
+                <tr><th>Master Weekly Inspection</th><td>Completed and recorded.</td></tr>
+                <tr><th>Mess Committee</th><td>No open complaint.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>7. Crew Complaints</span>
+            <span>Resolution Status</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr><th style="width: 28%;">Complaints Received</th><td>One verbal request on recreational equipment condition.</td></tr>
+                <tr><th>Matter Resolved</th><td>Yes. Replacement request added to procurement list.</td></tr>
+                <tr><th>Complaint Form Submitted</th><td>No formal complaint form required.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span>SCM PDF Sample - Page 2 of 3</span>
+        <span>Sections 1-7 preserve legacy SCM record fields</span>
+      </footer>
+    </section>
+
+    <section class="page">
+      <div class="page-content">
+        <header class="pdf-header">
+          <div>
+            <div class="brand">Safety Committee Meeting Minutes</div>
+            <h1>SOI Feed, Actions, Comments, Signatures</h1>
+          </div>
+          <div class="doc-tag">Closure Anchor: Master Sign-Off</div>
+        </header>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>8. Safety Observations for the Month</span>
+            <span>SOI Auto-Feed</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr>
+                  <th style="width: 30%;">SOI Event Occurred This Period</th>
+                  <td><span class="status green">Yes</span></td>
+                </tr>
+                <tr>
+                  <th>Inspection Count and Coverage</th>
+                  <td>4 SOI events recorded. Coverage: 92 percent of planned inspection areas.</td>
+                </tr>
+                <tr>
+                  <th>Open SOI Findings</th>
+                  <td>SOI-EBK-2026-026: Mooring station snap-back zone marking faded. SOI-EBK-2026-027: Galley wet deck mat replacement required.</td>
+                </tr>
+                <tr>
+                  <th>Minimum Narrative</th>
+                  <td>Open observations were reviewed by the committee and action owners were assigned with target dates. Narrative length must be at least 20 characters before sign-off.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>9. Findings and Corrective Measures</span>
+            <span>Action Register</span>
+          </div>
+          <div class="section-body">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 7%;">No</th>
+                  <th>Finding</th>
+                  <th>Corrective Measure</th>
+                  <th style="width: 18%;">Owner</th>
+                  <th style="width: 15%;">Due Date</th>
+                  <th style="width: 14%;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>Snap-back zone marking faded at aft mooring station.</td>
+                  <td>Repaint marking and brief mooring team.</td>
+                  <td>Chief Officer</td>
+                  <td>05-Apr-2026</td>
+                  <td><span class="status amber">Open</span></td>
+                </tr>
+                <tr>
+                  <td>2</td>
+                  <td>Galley wet deck mat worn.</td>
+                  <td>Replace mat and verify housekeeping checklist.</td>
+                  <td>Chief Cook</td>
+                  <td>03-Apr-2026</td>
+                  <td><span class="status amber">Open</span></td>
+                </tr>
+                <tr>
+                  <td>3</td>
+                  <td>Toolbox talk signatures incomplete for one hot work job.</td>
+                  <td>Refresh PTW closeout verification with duty officers.</td>
+                  <td>2/O</td>
+                  <td>02-Apr-2026</td>
+                  <td><span class="status green">Closed</span></td>
+                </tr>
+                <tr>
+                  <td>4</td>
+                  <td>Emergency exit housekeeping observation repeated.</td>
+                  <td>Add area to weekly Master inspection focus list.</td>
+                  <td>Master</td>
+                  <td>07-Apr-2026</td>
+                  <td><span class="status amber">Carry Forward</span></td>
+                </tr>
+                <tr><td>5</td><td>Sample slot reserved for legacy finding 5.</td><td>Corrective measure to be recorded.</td><td>TBD</td><td>TBD</td><td></td></tr>
+                <tr><td>6</td><td>Sample slot reserved for legacy finding 6.</td><td>Corrective measure to be recorded.</td><td>TBD</td><td>TBD</td><td></td></tr>
+                <tr><td>7</td><td>Sample slot reserved for legacy finding 7.</td><td>Corrective measure to be recorded.</td><td>TBD</td><td>TBD</td><td></td></tr>
+                <tr><td>8</td><td>Sample slot reserved for legacy finding 8.</td><td>Corrective measure to be recorded.</td><td>TBD</td><td>TBD</td><td></td></tr>
+                <tr><td>9</td><td>Sample slot reserved for legacy finding 9.</td><td>Corrective measure to be recorded.</td><td>TBD</td><td>TBD</td><td></td></tr>
+                <tr><td>10</td><td>Sample slot reserved for legacy finding 10.</td><td>Corrective measure to be recorded.</td><td>TBD</td><td>TBD</td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <div class="section-title">
+            <span>10. Office Comments and Review</span>
+            <span>For Record</span>
+          </div>
+          <div class="section-body">
+            <table class="tight">
+              <tbody>
+                <tr>
+                  <th style="width: 26%;">Office Comments</th>
+                  <td>Office to confirm procurement status for non-slip tape and galley deck mat. No DPA signature required for SCM closure.</td>
+                </tr>
+                <tr>
+                  <th>SOI Sign-Off Gate</th>
+                  <td><span class="status green">Clear</span> No overdue SOI area exists at the time of Master sign-off.</td>
+                </tr>
+                <tr>
+                  <th>Closure Timestamp</th>
+                  <td>31-Mar-2026 15:18 LT. This timestamp becomes the next Closed-Since-Last cutoff anchor.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h2>Digital Signatures</h2>
+        <div class="signatures">
+          <div class="signature-card">
+            <div class="signature-line"></div>
+            <strong>Master</strong><br />
+            Capt. A. Kumar<br />
+            <span class="small">Signed: 31-Mar-2026 15:18 LT</span>
+          </div>
+          <div class="signature-card">
+            <div class="signature-line"></div>
+            <strong>Chief Officer</strong><br />
+            S. Menon<br />
+            <span class="small">Prepared and co-signed</span>
+          </div>
+          <div class="signature-card">
+            <div class="signature-line"></div>
+            <strong>Attendee Signatures</strong><br />
+            4 of 4 captured<br />
+            <span class="small">Per attendance list</span>
+          </div>
+        </div>
+
+        <div class="note">
+          Near-miss discussion is printed without exposing restricted reporter identity. SOI remains paper-first; this PDF references records and does not introduce scan upload flow.
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span>SCM PDF Sample - Page 3 of 3</span>
+        <span>Aligned to D-SOI-14, D-GAP-M20, D-GAP-M22, D-GAP-M-ADHOC, D-PDF-03b</span>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

@@ -18,9 +18,10 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.accounts.backends import AuthenticatedUser
+from apps.accounts.backends import AuthenticatedUser, PSCJWTAuthentication
 from apps.accounts.models import RoleCodes
 from apps.accounts.serializers import generate_tokens_for_user
+from apps.accounts.utils import resolve_current_office_permission_snapshot
 from apps.accounts.views import CurrentUserView, LoginView, LogoutView, TokenRefreshView
 from apps.inspection.models import Inspection, InspectionStatus
 from apps.inspection.views import InspectionCreateView, InspectionDetailView, InspectionPICReviewView
@@ -197,6 +198,168 @@ class TestFEAT_AUTH_001_UserAuthentication(BaseAuthAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["data"]["id"], self.vessel_master.id)
         self.assertEqual(response.data["data"]["role"], RoleCodes.VESSEL_MASTER)
+
+    def test_feat_auth_001_current_user_refreshes_vessel_permissions_from_profile_mapping(self):
+        """`me` should prefer current vessel profile permissions over stale token claims."""
+        view = CurrentUserView.as_view()
+        token_claims = {
+            "user_id": self.vessel_master.id,
+            "user_type": self.vessel_master.user_type,
+            "full_name": self.vessel_master.full_name,
+            "role": self.vessel_master.role,
+            "rank": "MASTER",
+            "form_ids": [],
+            "process_ids": [],
+        }
+        request = self.factory.get("/api/psc/auth/me/")
+        force_authenticate(request, user=self.vessel_master, token=token_claims)
+
+        with patch(
+            "apps.accounts.views._get_current_vessel_permission_snapshot",
+            return_value={
+                "rank": "MASTER",
+                "role_name": "MASTER",
+                "safety_role_name": "MASTER",
+                "form_ids": ["SAF_F_003"],
+                "process_ids": ["SAF_P_004"],
+                "department": None,
+                "full_name": self.vessel_master.full_name,
+            },
+        ):
+            response = view(request)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["role_name"], "MASTER")
+        self.assertEqual(response.data["data"]["safety_role_name"], "MASTER")
+        self.assertEqual(response.data["data"]["form_ids"], ["SAF_F_003"])
+        self.assertEqual(response.data["data"]["process_ids"], ["SAF_P_004"])
+
+    def test_feat_auth_001_current_user_refreshes_office_permissions_from_mapping(self):
+        """`me` should surface fresh office permissions even when token claims are stale."""
+        view = CurrentUserView.as_view()
+        token_claims = {
+            "user_id": self.office_pic.id,
+            "login_id": "pic001",
+            "user_type": self.office_pic.user_type,
+            "full_name": self.office_pic.full_name,
+            "role": self.office_pic.role,
+            "employee_id": self.office_pic.employee_id,
+            "form_ids": [],
+            "process_ids": [],
+        }
+        request = self.factory.get("/api/psc/auth/me/")
+        force_authenticate(request, user=self.office_pic, token=token_claims)
+
+        with patch(
+            "apps.accounts.views._get_current_office_permission_snapshot",
+            return_value={
+                "role": RoleCodes.OFFICE_PIC,
+                "role_name": "SEQ MANAGER",
+                "safety_role_name": "DPA",
+                "form_ids": ["SAF_F_015"],
+                "process_ids": ["SAF_P_023"],
+                "has_global_vessel_access": False,
+                "employee_id": self.office_pic.employee_id,
+                "email": None,
+                "department": None,
+                "full_name": self.office_pic.full_name,
+            },
+        ):
+            response = view(request)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["role_name"], "SEQ MANAGER")
+        self.assertEqual(response.data["data"]["safety_role_name"], "DPA")
+        self.assertEqual(response.data["data"]["form_ids"], ["SAF_F_015"])
+        self.assertEqual(response.data["data"]["process_ids"], ["SAF_P_023"])
+
+    def test_feat_auth_001_fleet_manager_office_snapshot_is_global(self):
+        """Fleet Manager Safety role needs fleet-wide Safety tabs even without assigned vessel rows."""
+        with (
+            patch(
+                "apps.accounts.utils.get_office_profile_bundle_by_mapping",
+                return_value=("FLEET MANAGER", ["SAF_F_001", "SAF_F_002"], ["SAF_P_005"]),
+            ),
+            patch("apps.accounts.utils.get_office_global_reviewer_role", return_value=None),
+        ):
+            snapshot = resolve_current_office_permission_snapshot(
+                user_type="OFFICE",
+                login_id="fm001",
+                employee_id="FM001",
+                role=RoleCodes.OFFICE_PIC,
+                has_global_vessel_access=None,
+                full_name="Fleet Manager",
+            )
+
+        self.assertEqual(snapshot["safety_role_name"], "FM")
+        self.assertTrue(snapshot["has_global_vessel_access"])
+
+    def test_feat_auth_001_psc_jwt_authentication_refreshes_vessel_permissions_from_profile_mapping(self):
+        """Authenticated Safety requests should not rely on stale vessel permission claims."""
+        validated_token = {
+            "user_id": self.vessel_master.id,
+            "user_type": self.vessel_master.user_type,
+            "full_name": self.vessel_master.full_name,
+            "role": self.vessel_master.role,
+            "rank": "MASTER",
+            "department": "DECK",
+            "form_ids": [],
+            "process_ids": [],
+        }
+
+        with patch(
+            "apps.accounts.backends.resolve_current_vessel_permission_snapshot",
+            return_value={
+                "rank": "MASTER",
+                "role_name": "MASTER",
+                "safety_role_name": "MASTER",
+                "form_ids": ["SAF_F_015"],
+                "process_ids": ["SAF_P_023"],
+                "department": "DECK",
+                "full_name": self.vessel_master.full_name,
+            },
+        ):
+            user = PSCJWTAuthentication().get_user(validated_token)
+
+        self.assertEqual(user.role_name, "MASTER")
+        self.assertEqual(user.safety_role_name, "MASTER")
+        self.assertEqual(user.form_ids, ["SAF_F_015"])
+        self.assertEqual(user.process_ids, ["SAF_P_023"])
+
+    def test_feat_auth_001_psc_jwt_authentication_refreshes_office_permissions_from_mapping(self):
+        """Authenticated Safety requests should use refreshed office permissions."""
+        validated_token = {
+            "user_id": self.office_pic.id,
+            "login_id": "pic001",
+            "user_type": self.office_pic.user_type,
+            "full_name": self.office_pic.full_name,
+            "role": self.office_pic.role,
+            "employee_id": self.office_pic.employee_id,
+            "form_ids": [],
+            "process_ids": [],
+        }
+
+        with patch(
+            "apps.accounts.backends.resolve_current_office_permission_snapshot",
+            return_value={
+                "role": RoleCodes.OFFICE_PIC,
+                "role_name": "SEQ MANAGER",
+                "safety_role_name": "DPA",
+                "form_ids": ["SAF_F_015"],
+                "process_ids": ["SAF_P_023"],
+                "has_global_vessel_access": False,
+                "employee_id": self.office_pic.employee_id,
+                "email": None,
+                "department": None,
+                "full_name": self.office_pic.full_name,
+            },
+        ):
+            user = PSCJWTAuthentication().get_user(validated_token)
+
+        self.assertEqual(user.role_name, "SEQ MANAGER")
+        self.assertEqual(user.safety_role_name, "DPA")
+        self.assertEqual(user.form_ids, ["SAF_F_015"])
+        self.assertEqual(user.process_ids, ["SAF_P_023"])
 
     def test_feat_auth_001_happy_path_logout_blacklists_refresh_token(self):
         """PRD FEAT-AUTH-001: logout should invalidate refresh token via blacklist flow."""

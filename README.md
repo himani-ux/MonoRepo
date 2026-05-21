@@ -85,9 +85,13 @@ Frontend runs at `http://localhost:5173`.
 | `ALLOWED_HOSTS` | Comma-separated hosts | `localhost,127.0.0.1` |
 | `DB_HOST` | SQL Server hostname | `localhost` |
 | `DB_NAME` | Database name | `ksm_marine_live` |
-| `DB_USER` | Database user | `sa` |
-| `DB_PASSWORD` | Database password | (your password) |
 | `DB_PORT` | Database port | `1433` |
+| `DB_DRIVER` | SQL Server ODBC driver | `ODBC Driver 18 for SQL Server` |
+| `DB_ENCRYPT` | SQL Server encryption flag | `no` |
+| `DB_TRUST_SERVER_CERTIFICATE` | Trust local SQL Server certificate | `yes` |
+| `DB_TRUSTED_CONNECTION` | Use Windows integrated auth when user/password are blank | `yes` |
+| `DB_USER` | Database user; leave blank for Windows integrated auth | `` |
+| `DB_PASSWORD` | Database password; leave blank for Windows integrated auth | `` |
 | `JWT_ACCESS_TOKEN_LIFETIME` | Access token lifetime (minutes) | `60` |
 | `JWT_REFRESH_TOKEN_LIFETIME` | Refresh token lifetime (minutes) | `43200` |
 | `UPLOAD_BASE_PATH` | File upload directory | `/var/www/ksm_uploads` |

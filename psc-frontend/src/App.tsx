@@ -9,9 +9,11 @@
  */
 
 import { lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useRoutes } from 'react-router-dom';
 import { LoginPage } from '@/routes/login';
 import { useAuthInitializer, useAuth } from '@/hooks/use-auth';
+import { SafetyAuthProvider, type SafetyAuthUser } from '@/hooks/safety/use-auth';
+import { safetyRoutes } from '@/routes/safety';
 import { ROUTES } from '@/lib/utils/constants';
 import { PROCESS_IDS } from '@/lib/utils/permission-ids';
 import { Toaster } from '@/components/ui/toaster';
@@ -73,13 +75,15 @@ function PageLoadingFallback() {
  */
 function PermissionGuard({
   children,
+  requiredForm,
   requiredProcess,
 }: {
   children: ReactNode;
+  requiredForm?: string;
   requiredProcess: string;
 }) {
-  const { hasProcess } = useAuth();
-  if (!hasProcess(requiredProcess)) {
+  const { hasForm, hasProcess } = useAuth();
+  if ((requiredForm && !hasForm(requiredForm)) || !hasProcess(requiredProcess)) {
     return <Navigate to={ROUTES.CARS} replace />;
   }
   return <>{children}</>;
@@ -96,6 +100,51 @@ function DefaultRedirect() {
       replace
     />
   );
+}
+
+function SafetyModuleRouter() {
+  const { user, formIds, processIds, role, vesselId } = useAuth();
+  const element = useRoutes(safetyRoutes);
+  const safetyRole = user?.safety_role_name ?? user?.rank ?? user?.role_name ?? role ?? null;
+  const normalizedSafetyRole = String(safetyRole ?? "").trim().toUpperCase();
+  const hasFleetWideSafetyScope =
+    Boolean(user?.has_global_vessel_access) ||
+    normalizedSafetyRole === "DPA" ||
+    normalizedSafetyRole === "FM" ||
+    normalizedSafetyRole === "FLEET MANAGER";
+  const scopedVesselIds = hasFleetWideSafetyScope
+    ? ['ALL']
+    : user?.vessel_ids?.length
+      ? user.vessel_ids
+      : vesselId
+        ? [vesselId]
+        : [];
+  const scopedVesselNames = hasFleetWideSafetyScope
+    ? []
+    : user?.vessel_names?.length
+      ? user.vessel_names
+      : user?.vessel_name
+        ? [user.vessel_name]
+        : [];
+  const safetyAuthUser: SafetyAuthUser = {
+    crewId: user?.crew_id,
+    displayName: user?.display_name,
+    employeeId: user?.employee_id,
+    firstName: user?.first_name,
+    formIds: [...new Set(formIds.map((id) => String(id).trim().toUpperCase()).filter((id) => id.startsWith('SAF_F_')))],
+    fullName: user?.full_name,
+    id: user?.id,
+    isGlobal: hasFleetWideSafetyScope,
+    login_id: user?.login_id,
+    processIds: [...new Set(processIds.map((id) => String(id).trim().toUpperCase()).filter((id) => id.startsWith('SAF_P_')))],
+    role: safetyRole,
+    surname: user?.surname,
+    userName: user?.username ?? user?.UserName,
+    vesselIds: scopedVesselIds,
+    vesselNames: scopedVesselNames,
+  };
+
+  return <SafetyAuthProvider value={safetyAuthUser}>{element}</SafetyAuthProvider>;
 }
 
 /**
@@ -277,6 +326,14 @@ function AppShell() {
           element={
             <AuthGuard>
               <ORBModulePage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/safety/*"
+          element={
+            <AuthGuard>
+              <SafetyModuleRouter />
             </AuthGuard>
           }
         />

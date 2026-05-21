@@ -1,0 +1,66 @@
+[
+  {
+    "guard_code": "RECENCY",
+    "guard_name": "Recency",
+    "family": "DNV",
+    "description": "All five evidence categories must have at least one entry or an explicit justified n/a before Phase 4 to 5.",
+    "bit_position": 0,
+    "active": 1
+  },
+  {
+    "guard_code": "ASSUMPTION",
+    "guard_name": "Assumption",
+    "family": "DNV",
+    "description": "Every fact requires a linked evidence reference before it can be saved.",
+    "bit_position": 1,
+    "active": 1
+  },
+  {
+    "guard_code": "HINDSIGHT",
+    "guard_name": "Hindsight",
+    "family": "DNV",
+    "description": "Decision and finding records cannot rely on post-event information without justification.",
+    "bit_position": 2,
+    "active": 1
+  },
+  {
+    "guard_code": "CONFIRMATION",
+    "guard_name": "Confirmation",
+    "family": "DNV",
+    "description": "Each major finding requires at least one contradicting evidence row before Phase 5 to 6.",
+    "bit_position": 3,
+    "active": 1
+  },
+  {
+    "guard_code": "BLAME_FIXATION",
+    "guard_name": "Blame Fixation",
+    "family": "DNV",
+    "description": "Phase 6 to 7 hard-block if all roots are personal factors and no Lack-of-Control entry exists.",
+    "bit_position": 4,
+    "active": 1
+  },
+  {
+    "guard_code": "PLANT_TRAP",
+    "guard_name": "Plant-Problem Trap",
+    "family": "ORG_TRAP",
+    "description": "Warn when causes cluster in hardware-only categories and system factors may be under-coded.",
+    "bit_position": 5,
+    "active": 1
+  },
+  {
+    "guard_code": "PERSONNEL_TRAP",
+    "guard_name": "Personnel-Problem Trap",
+    "family": "ORG_TRAP",
+    "description": "Warn when causes cluster in person-only categories and process or organisational factors may be under-coded.",
+    "bit_position": 6,
+    "active": 1
+  },
+  {
+    "guard_code": "EXTERNAL_EVENT_TRAP",
+    "guard_name": "External-Event Trap",
+    "family": "ORG_TRAP",
+    "description": "Warn when causes cluster in external-event categories and internal controls may be under-coded.",
+    "bit_position": 7,
+    "active": 1
+  }
+]

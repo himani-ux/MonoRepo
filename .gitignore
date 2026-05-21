@@ -1,0 +1,27 @@
+# Local environments and dependency caches
+backend.env/
+psc-backend/backend.env/
+psc-backend/.deps/
+node_modules/
+psc-frontend/node_modules/
+
+# Runtime caches and generated local artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.vite/
+node_modules/.vite/
+
+# Local automation/debug output
+.codex-run/
+.playwright-mcp/
+Error_Images/
+tmp_voiceover/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+!psc-backend/.env.example

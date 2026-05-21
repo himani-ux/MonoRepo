@@ -262,4 +262,36 @@ describe('auth-store — initialize', () => {
     expect(state.isLoading).toBe(false);
     expect(state.isInitialized).toBe(true);
   });
+
+  it('refreshes_persisted_user_from_me_even_when_user_is_already_present', async () => {
+    const payload = { exp: Math.floor(Date.now() / 1000) + 3600 };
+    const fakeAccess = `header.${btoa(JSON.stringify(payload))}.sig`;
+    const fakeRefresh = `header.${btoa(JSON.stringify(payload))}.sig`;
+
+    useAuthStore.setState({
+      tokens: { access: fakeAccess, refresh: fakeRefresh },
+      user: {
+        ...mockUser(),
+        form_ids: [],
+        process_ids: [],
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      isInitialized: false,
+    });
+
+    authApiMock.me.mockResolvedValue({
+      ...mockUser(),
+      form_ids: ['SAF_F_003'],
+      process_ids: ['SAF_P_004'],
+    });
+
+    await useAuthStore.getState().initialize();
+
+    const state = useAuthStore.getState();
+    expect(authApiMock.me).toHaveBeenCalledWith(fakeAccess);
+    expect(state.user?.form_ids).toEqual(['SAF_F_003']);
+    expect(state.user?.process_ids).toEqual(['SAF_P_004']);
+    expect(state.isInitialized).toBe(true);
+  });
 });

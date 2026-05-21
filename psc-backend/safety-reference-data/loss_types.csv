@@ -1,0 +1,8 @@
+loss_type_id,loss_type_name,description
+1,People,Safety / Health
+2,Asset,Damage
+3,Environmental,Environmental
+4,Financial,"Fines, Claims, Insurance"
+5,Non-Conformity,Product / Service
+6,Reputation,Reputation / Complaint
+7,Process,Process / Business

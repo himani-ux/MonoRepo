@@ -43,6 +43,8 @@ export function isVesselRole(role: string | undefined): boolean {
  */
 export function isOfficeRole(role: string | undefined): boolean {
   return (
+    role === 'PIC' ||
+    role === 'VESSEL SUPERINTENDENT' ||
     role === USER_ROLES.OFFICE_PIC ||
     role === USER_ROLES.OFFICE_SSQE ||
     role === USER_ROLES.OFFICE_SUPT ||
@@ -56,6 +58,8 @@ export function isOfficeRole(role: string | undefined): boolean {
  */
 export function canPerformPICActions(role: string | undefined): boolean {
   return (
+    role === 'PIC' ||
+    role === 'VESSEL SUPERINTENDENT' ||
     role === USER_ROLES.OFFICE_PIC ||
     role === USER_ROLES.OFFICE_SSQE ||
     role === USER_ROLES.OFFICE_SUPT ||

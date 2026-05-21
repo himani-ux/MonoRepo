@@ -1,1742 +1,367 @@
-# LESSONS.md — Learning & Pattern Library
-## Inspection Module — PSC/RS/Audit Close-out System
-**Version:** 1.0 | **Date:** 2026-02-03
-
----
-
-## Purpose
-
-This file captures mistakes made, patterns discovered, and rules that prevent errors from recurring. Review at the start of every session.
-
----
-
-## How to Use This File
-
-**After ANY correction from the user:**
-1. Document what went wrong
-2. Explain why it happened
-3. Write a rule that prevents it
-4. Categorize appropriately
-
-**Format:**
-```
-### [Category] Brief Description
-**Date:** YYYY-MM-DD
-**What went wrong:** Description of the error
-**Why it happened:** Root cause analysis
-**Rule to prevent:** Concrete rule to follow
-**Related docs:** Links to relevant documentation
-```
-
----
-
-## Categories
-
-- **DESIGN** — Visual/styling mistakes
-- **COMPONENT** — Component architecture errors
-- **API** — Backend/API mistakes
-- **DATA** — Database/state management issues
-- **VALIDATION** — Form/input validation errors
-- **SYNC** — Offline/sync related issues
-- **WORKFLOW** — Process/workflow mistakes
-- **GENERAL** — Other lessons
-
----
-
-## Lessons
-
-### [WORKFLOW] Mandatory Post-Close Work Should Be Surfaced as Operational Queue State
-**Date:** 2026-02-11
-**What went wrong:** Even after PV auto-create on close, users could still miss completion because CAR list/dashboard did not expose a first-class "due now" operational view.
-**Why it happened:** Verification state existed in detail context, but there was no list-level computed signal to drive queue-based behavior.
-**Rule to prevent:** For any mandatory follow-up task, expose a list-level computed due field (`*_due`) and a dedicated filter so operations can run from queue view, not only detail pages.
-**Related docs:** apps/car/serializers.py `CARListSerializer`, apps/car/views.py `CARListView` filter/annotation, Docs/PRD.md FEAT-PV-001/002
-
----
-
-### [API] Prefer Reusing Existing List Metadata for Dashboard Counts
-**Date:** 2026-02-11
-**What went wrong:** The first instinct for dashboard tiles is to add a new count endpoint, which increases API surface and maintenance burden.
-**Why it happened:** Count metrics were treated as a separate feature instead of a filtered-list projection.
-**Rule to prevent:** If paginated list responses already return `total_count`, derive dashboard counts by querying the list with a narrow filter (for example `pv_due=true`) before adding a new endpoint.
-**Related docs:** apps/car/views.py list pagination contract, psc-frontend/src/routes/dashboard/index.tsx
-
----
-
-### [WORKFLOW] Close Transition Side Effects Must Create PV Idempotently and Reuse Existing Notification Path
-**Date:** 2026-02-11
-**What went wrong:** Closing a CAR could leave no PV record unless someone manually created it, making post-close verification effectively skippable in the data model.
-**Why it happened:** CLOSE_CAR transition logic set `verification_pending` but did not enforce creation of the dependent PV entity or reuse the existing PV-created notification flow.
-**Rule to prevent:** For mandatory post-transition artifacts, add side effects directly in the transition handler with an idempotency guard (`exists` check) and call the already-approved notification helper rather than creating parallel notification logic.
-**Related docs:** Docs/PRD.md FEAT-PV-001/FEAT-PV-002 intent, apps/car/views.py `CARWorkflowView`, apps/notifications/signals.py `notify_physical_verification_created`
-
----
-
-### [API] Report Sections Must Be Gated by Business Status, Not Record Existence
-**Date:** 2026-02-11
-**What went wrong:** PDF logic was keyed to whether PV data existed, which allowed OPEN (incomplete) PV context to appear in external-facing reports.
-**Why it happened:** Section rendering checks were presence-based (`if pv`) instead of state-based (`if pv.status == CLOSED`).
-**Rule to prevent:** For compliance-facing exports, gate optional sections on completion status and add explicit ordering tests when section placement is a requirement (for example, below DPA comments).
-**Related docs:** Docs/PRD.md report/PV acceptance criteria, apps/car/reports.py `_build_physical_verification`, Docs/DESIGN_SYSTEM.md PDF section guidance
-
----
-
-### [API] Inspection Create RBAC Must Enforce Role + Inspection Type Together
-**Date:** 2026-02-10
-**What went wrong:** Inspection create permissions allowed office roles to create all inspection types, including `PSC` and `RS`, even though those types are intended to be master-only.
-**Why it happened:** RBAC checks only validated role membership and did not evaluate `inspection_type` on create requests.
-**Rule to prevent:** For create endpoints with type-specific ownership rules, enforce permission on both actor role and submitted entity type in backend permission classes, then mirror restrictions in frontend type selection/submit guards.
-**Related docs:** Docs/VALIDATION_RULES.md Section 2.1, Docs/BACKEND_STRUCTURE.md Section 11.1, Docs/DEBUG_AGENT.md Step 4
-
----
-
-### [API] Report Feature Closure Must Validate Rendered Acceptance Criteria, Not Only Endpoint Contracts
-**Date:** 2026-02-08
-**What went wrong:** FEAT-RPT-001 was marked complete while the PDF header still showed `"[Company Logo]"`, and tests focused on payload/RBAC/format checks without explicit section-completeness assertions.
-**Why it happened:** Verification emphasized API behavior and binary/PDF signature checks, but did not include acceptance-criteria-level rendering checks for report content/sections.
-**Rule to prevent:** For report/export features, add explicit criterion tests before marking complete: (1) required visual/header element is rendered (no placeholders), (2) all required sections are built/asserted, and (3) traceability includes a linked feature report file in `test_progress.txt`.
-**Related docs:** Docs/PRD.md FEAT-RPT-001, Docs/DESIGN_SYSTEM.md Section 12 (PDF Report Styling), Docs/test_progress.txt
-
----
-
-### [API] Inspection Status Transitions Must Always Emit Required Activity + Notification Side Effects
-**Date:** 2026-02-08
-**What went wrong:** `InspectionPICReviewView` and `InspectionDPACloseView` changed inspection status but did not create required `ActivityHistory` events; DPA close also did not create the required vessel-facing notification.
-**Why it happened:** Transition handlers implemented state mutation but skipped FEAT-INS-005/006 side-effect requirements (audit timeline + notification trigger), so workflow completion was not traceable in activity/notification tables.
-**Rule to prevent:** For every status transition endpoint, implement a parity checklist before merge: (1) status mutation, (2) sync_version increment, (3) required activity event, and (4) required notification pipeline trigger per PRD/BACKEND contracts.
-**Related docs:** Docs/PRD.md FEAT-INS-005 and FEAT-INS-006, Docs/BACKEND_STRUCTURE.md activity history + notification sections, Docs/VALIDATION_RULES.md Sections 2.3 and 2.4
-
----
-
-### [VALIDATION] Physical Verification Must Enforce OPEN Uniqueness and Non-Future Close Dates
-**Date:** 2026-02-07
-**What went wrong:** Physical verification creation allowed multiple `OPEN` records for the same CAR, and close accepted a `visit_date` in the future.
-**Why it happened:** PV create view only checked CAR status precondition and skipped the "existing OPEN PV" precondition; close serializer required `visit_date` but did not validate date range against today.
-**Rule to prevent:** For stateful child records, enforce documented preconditions explicitly in the write endpoint (or DB constraint) and validate both requiredness and temporal bounds for date fields.
-**Related docs:** Docs/VALIDATION_RULES.md Section 7.1 and 7.2, Docs/PRD.md FEAT-PV-001 and FEAT-PV-002, Docs/BACKEND_STRUCTURE.md Section 10.8
-
----
-
-### [API] CAR Detail Timeline Must Aggregate Related Activity Entity Types
-**Date:** 2026-02-07
-**What went wrong:** CAR detail activity history only queried `ActivityHistory` rows where `entity_type='CAR'` and `entity_id=<car_id>`. This excluded FEAT-HIST-001 timeline events written as `entity_type='EVIDENCE'` (`EVIDENCE_UPLOADED`) and `entity_type='ACTION'` (`ACTION_COMPLETED`).
-**Why it happened:** Read-path logic assumed all CAR timeline entries are stored under CAR entity keys, but the activity schema is polymorphic and stores child-entity events under their own entity IDs.
-**Rule to prevent:** For parent detail timelines, always aggregate activity rows across all documented related entity types (parent + child entities) using related IDs; do not hard-filter to only the parent entity type.
-**Related docs:** Docs/PRD.md FEAT-HIST-001, Docs/BACKEND_STRUCTURE.md Sections 5.1 and 10.5
-
----
-
-### [GENERAL] Cross-Reference Audit Is Mandatory Before Declaring Docs Complete
-**Date:** 2026-02-05
-**What went wrong:** Session 2 claimed "Updated all cross-references between documents" in progress.txt, but 5 categories of contradiction survived: CLAUDE.md tech stack versions disagreed with TECH_STACK.md; IMPLEMENTATION_PLAN.md used namespaced API paths while BACKEND_STRUCTURE.md and APP_FLOW.md used flat paths; master data endpoint names differed across 3 docs; inspection report file format rules conflicted across PRD.md, VALIDATION_RULES.md, and APP_FLOW.md; progress.txt listed EXISTING_SCHEMA.md as completed but the file didn't exist.
-**Why it happened:** No systematic cross-reference verification was performed. Each doc was reviewed in isolation. "Cross-references updated" was written optimistically without proof.
-**Rule to prevent:**
-- After any documentation session, run an explicit cross-reference audit:
-  1. Grep all `/api/psc/` endpoint paths across BACKEND_STRUCTURE, IMPLEMENTATION_PLAN, and APP_FLOW — they must match exactly
-  2. Compare version numbers in CLAUDE.md tech stack summary against TECH_STACK.md — they must match exactly
-  3. Compare validation rules across PRD.md acceptance criteria, VALIDATION_RULES.md rules, and APP_FLOW.md screen specs — they must match exactly
-  4. Verify every file listed in CLAUDE.md canonical docs table actually exists
-  5. Verify every file listed in progress.txt completed section actually exists
-- Never write "cross-references updated" in progress.txt without running this audit and documenting results
-- progress.txt claims must be verifiable. If you can't prove it, don't write it.
-**Related docs:** All canonical docs, progress.txt
-
----
-
-### [GENERAL] Documentation-First Approach Works
-**Date:** 2026-02-03
-**What went wrong:** N/A (Proactive lesson)
-**Why it happened:** Industry best practice
-**Rule to prevent:** Always read canonical docs before implementing. Never start coding without checking PRD.md, APP_FLOW.md, and relevant specs.
-**Related docs:** CLAUDE.md Session Startup Sequence
-
----
-
-### [DESIGN] DefCode Must Always Be Visible
-**Date:** 2026-02-03
-**What went wrong:** N/A (Critical business requirement documented proactively)
-**Why it happened:** Regulatory/operational requirement for maritime inspections
-**Rule to prevent:** On ANY screen showing deficiencies, the DefCode MUST be prominently displayed. Check every deficiency-related component for DefCode visibility.
-**Related docs:** PRD.md FEAT-INS-003, CLAUDE.md Business Rules
-
----
-
-### [DATA] 1:1 Deficiency-to-CAR Relationship
-**Date:** 2026-02-03
-**What went wrong:** N/A (Critical business rule documented proactively)
-**Why it happened:** Business requirement — every deficiency must have a tracking mechanism
-**Rule to prevent:** 
-- CAR creation is AUTOMATIC via database trigger when deficiency is created
-- Never implement manual CAR creation
-- Never allow deficiency without CAR
-**Related docs:** BACKEND_STRUCTURE.md auto-CAR trigger, PRD.md FEAT-CAR-001
-
----
-
-### [VALIDATION] Evidence Requirements Are Strict
-**Date:** 2026-02-03
-**What went wrong:** N/A (Critical validation rule documented proactively)
-**Why it happened:** Regulatory compliance requires photographic evidence
-**Rule to prevent:**
-- CAR submission requires ≥1 BEFORE evidence AND ≥1 AFTER evidence
-- Both frontend and backend must validate
-- File limits: 3MB max, PDF/JPG/JPEG only
-**Related docs:** PRD.md FEAT-CAR-003, FEAT-CAR-004
-
----
-
-### [WORKFLOW] State Machines Are Enforced
-**Date:** 2026-02-03
-**What went wrong:** N/A (Architecture decision documented proactively)
-**Why it happened:** Business process requires specific approval workflow
-**Rule to prevent:**
-- Inspection: DRAFT → SUBMITTED → PIC_REVIEWED → DPA_CLOSED
-- CAR: DRAFT → SUBMITTED → PIC_ACCEPTED → DPA_CLOSED (with REWORK branch)
-- Never allow invalid transitions
-- Validate on both frontend (disable invalid actions) and backend (reject invalid requests)
-**Related docs:** BACKEND_STRUCTURE.md Part 11 State Machines
-
----
-
-### [COMPONENT] Always Implement All Three States
-**Date:** 2026-02-03
-**What went wrong:** N/A (Pattern documented proactively)
-**Why it happened:** Best practice for robust UX
-**Rule to prevent:**
-- Every data-fetching component needs: Loading, Empty, Error states
-- Use LoadingSkeleton, EmptyState, ErrorState from shared components
-- Never show blank screens
-**Related docs:** FRONTEND_GUIDELINES.md Section 3.3, APP_FLOW.md Empty States
-
----
-
-### [DESIGN] Mobile-First Is Mandatory
-**Date:** 2026-02-03
-**What went wrong:** N/A (Architecture decision)
-**Why it happened:** >50% of users are on vessels with mobile devices
-**Rule to prevent:**
-- Start every component with mobile layout
-- Use Tailwind responsive prefixes (md:, lg:) for desktop enhancements
-- Test at 375px width first
-**Related docs:** DESIGN_SYSTEM.md Section 7 Breakpoints, FRONTEND_GUIDELINES.md Section 8
-
----
-
-### [API] Match Contracts Exactly
-**Date:** 2026-02-03
-**What went wrong:** N/A (Rule documented proactively)
-**Why it happened:** API contracts are pre-defined and documented
-**Rule to prevent:**
-- Every endpoint must match BACKEND_STRUCTURE.md request/response shapes
-- Use exact field names (snake_case for backend)
-- Include all required fields
-- Return correct HTTP status codes
-**Related docs:** BACKEND_STRUCTURE.md Part 3 API Contracts
-
----
-
-### [SYNC] Offline Requires Careful Planning
-**Date:** 2026-02-03
-**What went wrong:** N/A (Architecture note)
-**Why it happened:** Vessels often have no internet connectivity
-**Rule to prevent:**
-- Every mutation must work offline (queue in IndexedDB)
-- Implement retry logic: 3 attempts, exponential backoff (1s, 2s, 4s)
-- Storage limit: 150MB, warn at <10MB
-- Conflicts resolved by Office only
-**Related docs:** PRD.md FEAT-SYNC-*, BACKEND_STRUCTURE.md Part 9
-
----
-
-### [DATA] Never Use user.crew_id for UUID Matching — Always Use user.id
-**Date:** 2026-02-10
-**What went wrong:** Crew members were never recognized as 'owner' or 'reviewer' in the CAR workflow. `_get_user_workflow_roles()` used `user.crew_id` (CRW string like 'CRW0002') for UUID matching against `assigned_crew_id`/`reviewer_crew_id` (HRM501 UUIDs). Same bug in `validate_transition()` and `deficiency-workflow-actions.tsx`.
-**Why it happened:** `AuthenticatedUser.crew_id` is the human-readable CrewID code (e.g., 'CRW0002'), NOT the HRM501 UUID. The code used `getattr(user, 'crew_id', None) or getattr(user, 'id', None)` which always resolved to the CRW string since it's truthy.
-**Rule to prevent:**
-- `user.crew_id` = CrewID string code (CRW0002) — for display only
-- `user.id` = HRM501 UUID — for ALL permission/matching comparisons
-- NEVER use `user.crew_id or user.id` pattern — always use `user.id` directly
-- Always use `_uuid_match()` for UUID comparisons (handles char(32) vs hyphenated format)
-**Related docs:** BACKEND_STRUCTURE.md accounts section, apps/accounts/backends.py AuthenticatedUser
-
----
-
-### [DATA] Raw str() UUID Comparison Fails on mssql-django Managed Tables
-**Date:** 2026-02-10
-**What went wrong:** `CARDetailView` VESSEL_CREW access check used `str(deficiency.assigned_crew_id) != str(request.user.id)` — raw string comparison. mssql-django stores UUIDs as char(32) without hyphens in managed tables, while JWT-reconstructed `user.id` has hyphens. Comparison always failed → 403 for crew.
-**Why it happened:** The char(32) vs uniqueidentifier format difference was known for ORM lookups but not consistently applied to in-Python comparisons.
-**Rule to prevent:**
-- NEVER use `str(uuid_a) == str(uuid_b)` for UUID comparisons
-- ALWAYS use `_uuid_match()` from `apps/inspection/workflow.py` which normalizes both values
-- Grep for `str(.*_id)` patterns in permission checks after adding any UUID comparison
-**Related docs:** MEMORY.md SQL Server + mssql-django UUID Gotchas
-
----
-
-### [WORKFLOW] Edit Page Submit Must Use Unified Workflow API, Not Legacy Endpoints
-**Date:** 2026-02-10
-**What went wrong:** CAR edit page's "Submit" button called the old `POST /cars/{id}/submit/` endpoint (CARSubmitView with CanSubmitCAR = VESSEL_MASTER only). Crew members got 403 because this endpoint is for "Submit to PIC" (a Master-only action). The correct action for crew is "Mark Completed" via `POST /cars/{id}/workflow/`.
-**Why it happened:** The edit page was built before the unified workflow system. It hardcoded the old submit endpoint instead of using the available-actions API to determine the correct action.
-**Rule to prevent:**
-- All workflow transitions MUST go through the unified `/workflow/` endpoint with named actions
-- Use `useCARAvailableActions()` to determine what the current user can do
-- Never hardcode a specific workflow endpoint — the available-actions API is the source of truth
-- Edit pages should dynamically show/hide the submit button based on available actions
-**Related docs:** Docs/BACKEND_STRUCTURE.md workflow section, apps/inspection/workflow.py
-
----
-
-### [WORKFLOW] determine_reviewer Must Handle All Rank Categories
-**Date:** 2026-02-10
-**What went wrong:** `determine_reviewer()` only routed 2E→CE and CE/CO→Master. "Other" ranks (Able Seaman, Bosun, etc.) returned (None, None), leaving `reviewer_crew_id=None`. This meant after MARK_COMPLETED, the CAR went to PENDING_CE_REVIEW with no reviewer assigned.
-**Why it happened:** The routing table only covered officer ranks explicitly. Non-officer crew members were not considered.
-**Rule to prevent:**
-- `determine_reviewer()` must have explicit routing for ALL rank categories including RANK_OTHER
-- When adding new rank classifications, verify the reviewer chain is complete
-- Test with non-officer rank crew members (Able Seaman, Bosun, etc.)
-**Related docs:** apps/inspection/workflow.py determine_reviewer
-
----
-
-## Patterns to Reuse
-
-### Pattern: Form with Validation
-```typescript
-// Use react-hook-form + zod for all forms
-const form = useForm<FormData>({
-  resolver: zodResolver(schema),
-  defaultValues: { ... }
-});
-```
-**When to use:** Every form in the application
-**Reference:** FRONTEND_GUIDELINES.md Section 3.2
-
-### Pattern: Data Fetching with TanStack Query
-```typescript
-// Use query keys consistently
-export const resourceKeys = {
-  all: ['resources'] as const,
-  lists: () => [...resourceKeys.all, 'list'] as const,
-  list: (filters: Filters) => [...resourceKeys.lists(), filters] as const,
-  details: () => [...resourceKeys.all, 'detail'] as const,
-  detail: (id: number) => [...resourceKeys.details(), id] as const,
-};
-```
-**When to use:** All server state management
-**Reference:** FRONTEND_GUIDELINES.md Section 4.1
-
-### Pattern: API Error Handling
-```typescript
-// Centralized error handling
-if (error instanceof AxiosError) {
-  const apiError = error.response?.data;
-  if (apiError?.details) {
-    // Field-level errors
-  } else if (apiError?.message) {
-    toast.error(apiError.message);
-  }
-}
-```
-**When to use:** Every API call
-**Reference:** FRONTEND_GUIDELINES.md Section 9.2
-
----
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern: Hardcoded Colors
-❌ `className="bg-blue-500"` (unless matches DESIGN_SYSTEM.md)
-✅ `className="bg-primary-500"` (maps to design token)
-
-### Anti-Pattern: Missing Loading States
-❌ Return null while loading
-✅ Return <LoadingSkeleton /> while loading
-
-### Anti-Pattern: Inline Styles
-❌ `style={{ marginTop: 16 }}`
-✅ `className="mt-4"` (uses spacing scale)
-
-### Anti-Pattern: Assuming Online
-❌ Direct API call without offline check
-✅ Queue mutation if offline, sync when online
-
----
-
-## Quick Reference Checklist
-
-Before submitting any code:
-- [ ] DefCode visible on deficiency screens?
-- [ ] All three states (loading/empty/error) implemented?
-- [ ] Mobile layout works at 375px?
-- [ ] Using design tokens from DESIGN_SYSTEM.md?
-- [ ] API matches BACKEND_STRUCTURE.md contract?
-- [ ] Form validation matches PRD requirements?
-- [ ] State transitions follow state machine?
-- [ ] Offline scenario handled?
-
----
-
-### [API] Django URL Namespace Requires app_name
-**Date:** 2026-02-05
-**What went wrong:** When adding masters app URL routes with `include('apps.masters.urls', namespace='masters')`, Django raised `ImproperlyConfigured: Specifying a namespace in include() without providing an app_name`.
-**Why it happened:** Django requires the included urls.py module to define `app_name` when the parent URL configuration specifies a `namespace` parameter. This is a Django convention to ensure proper URL reversing.
-**Rule to prevent:**
-- When creating a new Django app with URL routes, ALWAYS include `app_name = 'appname'` at the top of urls.py
-- Template:
-  ```python
-  from django.urls import path
-
-  app_name = 'appname'  # Required for namespace in include()
-
-  urlpatterns = [...]
-  ```
-**Related docs:** BACKEND_STRUCTURE.md, Django URL dispatcher documentation
-
----
-
-### [API] Verify Dependencies Are Actually Installed
-**Date:** 2026-02-05
-**What went wrong:** `ModuleNotFoundError: No module named 'rest_framework_simplejwt'` when starting Django server, even though the package was listed in settings.py INSTALLED_APPS.
-**Why it happened:** The package was specified in settings.py but was never actually installed in the virtual environment. The requirements.txt or pip install step was missed or incomplete.
-**Rule to prevent:**
-- After adding any package to INSTALLED_APPS, verify it's installed: `pip show <package-name>`
-- When inheriting a codebase, run `pip list` to verify all expected packages are present
-- Keep requirements.txt synchronized with INSTALLED_APPS
-- If a ModuleNotFoundError occurs for a third-party package, first check if it's installed before debugging further
-**Related docs:** TECH_STACK.md, psc-backend/requirements.txt
-
----
-
-### [WORKFLOW] Always Get User Approval Before Implementation
-**Date:** 2026-02-05
-**What went wrong:** After completing the startup sequence (reading CLAUDE.md, progress.txt, IMPLEMENTATION_PLAN.md, LESSONS.md, and writing tasks/todo.md), jumped directly to implementation without presenting the plan to the user for approval.
-**Why it happened:** Eagerness to start coding after understanding the task. Skipped step 6 of the startup sequence: "Verify plan with user — Before executing."
-**Rule to prevent:**
-- The startup sequence has 6 steps, not 5. Step 6 is MANDATORY.
-- After writing tasks/todo.md, STOP and present the plan to the user.
-- Wait for explicit approval ("yes", "proceed", etc.) before writing any code.
-- The plan presentation should include: files to create, files to modify, and a brief description of what will be implemented.
-- Never assume the user approves just because the plan seems straightforward.
-**Related docs:** CLAUDE.md Session Startup Sequence
-
----
-
-### [COMPONENT] Avoid Duplicate Keys When Mapping Shared Enum Values
-**Date:** 2026-02-05
-**What went wrong:** Created a status variant map using computed property names from both `INSPECTION_STATUS` and `CAR_STATUS` constants. TypeScript error: "An object literal cannot have multiple properties with the same name" because both enums share `DRAFT`, `SUBMITTED`, and `DPA_CLOSED` values.
-**Why it happened:** Didn't consider that inspection and CAR status enums have overlapping string values. Using `[INSPECTION_STATUS.DRAFT]: 'draft'` and `[CAR_STATUS.DRAFT]: 'draft'` creates duplicate `'DRAFT'` keys.
-**Rule to prevent:**
-- When creating maps for status types, use string literals directly instead of computed property names from multiple enums
-- Or use a single unified map with string keys: `{ DRAFT: 'draft', SUBMITTED: 'submitted', ... }`
-- Before creating enum-keyed objects, check if different enums share values
-**Related docs:** src/components/shared/status-badge.tsx
-
----
-
-### [GENERAL] Verify Constant Names Before Using Them
-**Date:** 2026-02-05
-**What went wrong:** Used `FILE_LIMITS.MAX_FILE_SIZE` in file-upload.tsx, but the actual constant in constants.ts is `MAX_FILE_SIZE_BYTES` (not an object).
-**Why it happened:** Assumed a constant structure without reading the actual file first. Made up a name that seemed reasonable.
-**Rule to prevent:**
-- Always read constants.ts (or relevant config file) before referencing constants
-- Use IDE autocomplete or grep to find exact constant names
-- Don't assume constant naming patterns - verify them
-**Related docs:** src/lib/utils/constants.ts, src/components/shared/file-upload.tsx
-
----
-
-### [API] Prefer Django Signals Over Database Triggers
-**Date:** 2026-02-05
-**What went wrong:** N/A (Architecture decision documented proactively)
-**Why it happened:** BACKEND_STRUCTURE.md specifies database triggers for auto-CAR creation, but Django signals are more appropriate in a Django project.
-**Rule to prevent:**
-- Use Django signals (post_save, pre_save) instead of raw SQL triggers when possible
-- Benefits of signals over DB triggers:
-  - Better testability (can mock/disable in tests)
-  - Django-native pattern (consistent with framework)
-  - Easier debugging (Python stack traces)
-  - No raw SQL execution required
-  - Works with Django's ORM transaction handling
-- Register signals in `apps.py` `ready()` method
-- Template:
-  ```python
-  # apps.py
-  def ready(self):
-      from . import signals  # noqa: F401
-  ```
-**Related docs:** BACKEND_STRUCTURE.md Section 8, apps/inspection/signals.py
-
----
-
-### [DATA] Use Denormalized Fields for Display Performance
-**Date:** 2026-02-05
-**What went wrong:** N/A (Pattern documented from BACKEND_STRUCTURE.md design)
-**Why it happened:** Schema design pattern for avoiding JOINs in list views while maintaining FK integrity.
-**Rule to prevent:**
-- When a field is frequently displayed but referenced via FK, store both:
-  - `{field}_id` - The actual FK/reference for integrity
-  - `{field}` - Denormalized string value for display
-- Example from Deficiency model:
-  ```python
-  def_code_id = models.CharField(max_length=5)  # FK to PSC_Def_Code
-  def_code = models.CharField(max_length=10)     # Denormalized for display
-  ```
-- Populate denormalized field in serializer's `create()` method
-- This pattern is explicitly defined in BACKEND_STRUCTURE.md schema
-- Trade-off: Slight data redundancy for significant query performance gain in list views
-**Related docs:** BACKEND_STRUCTURE.md Part 4.3, apps/inspection/deficiency_models.py
-
----
-
-### [API] Separate URL Files for Different Resource Paths
-**Date:** 2026-02-05
-**What went wrong:** N/A (Pattern documented proactively)
-**Why it happened:** Some resources have endpoints at multiple URL paths (e.g., deficiencies are created under inspections but updated at their own path).
-**Rule to prevent:**
-- When a resource has endpoints at different URL prefixes, create separate URL files:
-  - `urls.py` - Main app URLs (e.g., `/api/psc/inspections/...`)
-  - `urls_{resource}.py` - Separate resource URLs (e.g., `/api/psc/deficiencies/...`)
-- Each URL file needs its own `app_name` for namespacing
-- Include both in `core/urls.py`:
-  ```python
-  path('api/psc/inspections/', include('apps.inspection.urls', namespace='inspection')),
-  path('api/psc/deficiencies/', include('apps.inspection.urls_deficiency', namespace='deficiency')),
-  ```
-- This keeps URL organization clean and follows REST conventions where resources can be accessed via multiple paths
-**Related docs:** apps/inspection/urls.py, apps/inspection/urls_deficiency.py, core/urls.py
-
----
-
-### [API] Verify Permission Classes Exist Before Importing
-**Date:** 2026-02-05
-**What went wrong:** In `followup_views.py`, imported `IsVesselMaster` from `permissions.py` without first checking if it existed. Got `ImportError: cannot import name 'IsVesselMaster'`.
-**Why it happened:** Assumed a permission class with a logical name would exist based on other permission classes in the file. Didn't read permissions.py first to verify available classes.
-**Rule to prevent:**
-- Before importing any permission class, grep or read the permissions file to confirm it exists
-- If a needed permission class doesn't exist, create it in the permissions file first
-- Pattern for checking: `grep "class IsVesselMaster" apps/inspection/permissions.py`
-- Common mistake: assuming symmetric names (e.g., if `IsOfficeUser` exists, `IsVesselMaster` must too)
-- When creating new views, check what permission classes are available and reuse or extend them
-**Related docs:** apps/inspection/permissions.py, apps/inspection/followup_views.py
-
----
-
-### [COMPONENT] Read Component Props Before Using Them
-**Date:** 2026-02-05
-**What went wrong:** Used `onBack` prop on PageHeader component, but PageHeader only has `showBack` and `backTo` props - no `onBack` handler.
-**Why it happened:** Assumed a common pattern (onBack callback) without reading the actual component implementation first.
-**Rule to prevent:**
-- Before using any component prop, read the component's interface/props type
-- Don't assume props exist based on common patterns - verify them
-- For custom back behavior (e.g., confirmation dialog), either:
-  1. Use `backTo` with a route that handles the state
-  2. Add an `onBack` prop to PageHeader if needed across multiple pages
-  3. Handle navigation differently (don't rely on header back button)
-**Related docs:** src/components/layout/page-header.tsx
-
----
-
-### [GENERAL] Imports Go at the Top of the File
-**Date:** 2026-02-05
-**What went wrong:** Added `import { useState } from 'react';` at the bottom of inspection-form.tsx instead of with other imports at the top.
-**Why it happened:** Initially forgot to import useState, then added it at the end of the file as an afterthought instead of properly placing it with other imports.
-**Rule to prevent:**
-- All imports must be at the top of the file, before any other code
-- When adding a missing import, scroll to the top and add it with related imports
-- Group imports: React first, then third-party, then local (already a standard pattern)
-- If you realize you need an import while writing code, immediately add it at the top - don't defer
-**Related docs:** ESLint import rules, TypeScript conventions
-
----
-
-### [COMPONENT] Verify Barrel Exports Before Using Components
-**Date:** 2026-02-05
-**What went wrong:** Used DropdownMenu components in inspection detail page, but they weren't exported from `@/components/ui` barrel file, causing build error: `Module '"@/components/ui"' has no exported member 'DropdownMenu'`.
-**Why it happened:** Assumed that all UI components in the `ui/` folder were automatically exported from the barrel file. The dropdown-menu.tsx existed but wasn't added to index.ts.
-**Rule to prevent:**
-- Before importing from a barrel file (@/components/ui, @/components/shared), verify the export exists
-- When adding a new component file to a folder with a barrel export, immediately add the export to index.ts
-- If a component exists but isn't exported, add it to the barrel file before using it
-- Pattern: `grep "DropdownMenu" src/components/ui/index.ts` to verify export exists
-**Related docs:** src/components/ui/index.ts, FRONTEND_GUIDELINES.md
-
----
-
-### [COMPONENT] Use Full Import Paths for Layout Components
-**Date:** 2026-02-05
-**What went wrong:** Used `import { PageHeader } from '@/components/layout'` but no barrel file exists at that path, causing error: `Cannot find module '@/components/layout'`.
-**Why it happened:** Assumed a barrel file existed for layout components like it does for UI components. Layout components require full path imports.
-**Rule to prevent:**
-- Layout components use full paths: `@/components/layout/page-header`
-- UI components use barrel: `@/components/ui`
-- Shared components use barrel: `@/components/shared`
-- Check if a folder has an index.ts before using short imports
-- When uncertain, use the full path - it always works
-**Related docs:** src/components/layout/, FRONTEND_GUIDELINES.md
-
----
-
-### [GENERAL] Remove Unused Destructured Variables
-**Date:** 2026-02-05
-**What went wrong:** Destructured `action_code_description` from deficiency object but never used it, causing TypeScript error during build: `'action_code_description' is declared but its value is never read`.
-**Why it happened:** Destructured all fields from the type definition without considering which were actually needed in the component.
-**Rule to prevent:**
-- Only destructure variables you actually use
-- If planning ahead for a variable, add a comment: `// TODO: will use for tooltip`
-- Run `npm run type-check` after creating components to catch unused variables early
-- TypeScript strict mode catches these - don't ignore the warnings
-**Related docs:** tsconfig.json (noUnusedLocals), ESLint rules
-
----
-
-### [COMPONENT] Verify Hook Import Paths Before Using
-**Date:** 2026-02-06
-**What went wrong:** Used `import { useToast } from '@/components/ui/use-toast'` but the actual path is `@/hooks/use-toast`. Build failed with "Cannot find module" error.
-**Why it happened:** Assumed the toast hook would be in the UI components folder since toaster.tsx is there. Didn't check where existing files import it from.
-**Rule to prevent:**
-- Before importing any hook, grep the codebase to see how other files import it
-- Pattern: `grep "useToast" src/routes --include="*.tsx"` to find existing usage
-- UI components (`@/components/ui`) are for React components, not hooks
-- Hooks live in `@/hooks/` directory
-**Related docs:** FRONTEND_GUIDELINES.md, src/hooks/
-
----
-
-### [COMPONENT] Check Interface Properties Before Using Them
-**Date:** 2026-02-06
-**What went wrong:** Used `inspection.reports[0].file_url` but InspectionReport interface has `file_path`, not `file_url`. Used `ErrorState` with `action` prop but the interface has `onRetry` and `retryLabel` instead.
-**Why it happened:** Assumed property names without reading the actual interface definitions. Made educated guesses that were wrong.
-**Rule to prevent:**
-- Before accessing any property, use Serena's `find_symbol` to check the interface definition
-- Common mistakes: `file_url` vs `file_path`, `action` vs `onRetry`, `onClick` vs `onPress`
-- Read the component's props interface before using any prop
-- Pattern: `mcp__serena__find_symbol` with `include_body=true` for the type/interface
-**Related docs:** src/types/index.ts, src/components/shared/error-state.tsx
-
----
-
-### [API] Verify Type Definitions Before Passing Data to Mutations
-**Date:** 2026-02-06
-**What went wrong:** Tried to pass `authority` and `report_reference` to `useUpdateInspection` mutation, but `UpdateInspectionInput` (which extends `Partial<CreateInspectionInput>`) doesn't include these fields. TypeScript error: "property does not exist in type".
-**Why it happened:** The form collected more fields than the API type supports. Assumed the type would match the form data.
-**Rule to prevent:**
-- Before calling a mutation, check what fields the input type actually supports
-- Use Serena's `find_symbol` to read the exact type definition
-- Form data types and API input types may differ - map only supported fields
-- If the backend accepts fields not in the type, update the type definition first
-**Related docs:** src/types/index.ts (CreateInspectionInput, UpdateInspectionInput)
-
----
-
-### [WORKFLOW] Always Update progress.txt at End of Session
-**Date:** 2026-02-06
-**What went wrong:** Steps 4.7 and 4.8 were fully implemented in Session 8, but progress.txt was never updated. It still said "CURRENT STEP: 4.7" and "Next action: Begin Step 4.7". Session 9 had to spend time verifying the true state by reading all source files and running builds before it could determine that Phase 4 was actually complete.
-**Why it happened:** The previous session completed the work but ended without updating progress.txt. The "COMPLETED THIS SESSION" section still showed Step 4.6 items from the session before that.
-**Rule to prevent:**
-- At the END of every session (before signing off), update progress.txt with:
-  1. Move completed steps from "IN PROGRESS" / "NEXT UP" to "COMPLETED" section
-  2. Update "CURRENT STEP" to the actual next step
-  3. Update "COMPLETED THIS SESSION" with what was done
-  4. Update "SESSION HISTORY" with a session entry
-  5. Update "Overall Progress" percentage
-- Never end a session with stale progress.txt — it wastes the next session's time on state verification
-- If you completed work, progress.txt MUST reflect it before the session ends
-**Related docs:** Docs/progress.txt, CLAUDE.md Session Startup Sequence
-
----
-
-### [API] Use Standard Imports in URL Files — Never Use __import__
-**Date:** 2026-02-06
-**What went wrong:** First version of `apps/car/urls.py` used `__import__('apps.car.views', fromlist=['CARListView'])` pattern instead of standard `from .views import CARListView`. This is ugly, non-standard, and harder to maintain.
-**Why it happened:** Tried to get clever with dynamic imports instead of following the established pattern from `apps/inspection/urls.py`.
-**Rule to prevent:**
-- Always use standard relative imports in Django URL files: `from .views import ViewClass1, ViewClass2`
-- Before writing any new URL file, read an existing one in the project to follow the same pattern
-- Pattern:
-  ```python
-  from django.urls import path
-  from .views import View1, View2
-
-  app_name = 'appname'
-  urlpatterns = [...]
-  ```
-- Never use `__import__()`, `importlib`, or any dynamic import mechanism in URL configuration
-**Related docs:** apps/inspection/urls.py, apps/car/urls.py, Django URL dispatcher documentation
-
----
-
-### [API] CAR Model Cross-App FK Pattern
-**Date:** 2026-02-06
-**What went wrong:** N/A (Pattern documented proactively from architectural decision)
-**Why it happened:** CAR model lives in `apps/inspection/deficiency_models.py` (FK to Deficiency, already migrated), but related models (CorrectiveAction, Evidence, etc.) live in `apps/car/models.py`.
-**Rule to prevent:**
-- When referencing a model from another app, use string reference: `ForeignKey('inspection.CAR', ...)`
-- Or import directly: `from apps.inspection.deficiency_models import CAR`
-- The `apps/car/models.py` uses direct import since both apps are always installed together
-- When a model is already migrated in one app, DON'T move it — create new related models in the new app with FK references
-- This avoids complex migration surgery (renaming tables, updating FKs across apps)
-**Related docs:** apps/inspection/deficiency_models.py, apps/car/models.py, Docs/progress.txt (Decisions Log)
-
----
-
-### [API] Backend Uses Custom Pagination Format — Not DRF Standard
-**Date:** 2026-02-06
-**What went wrong:** N/A (Pattern documented proactively to prevent future issues)
-**Why it happened:** Both InspectionListView and CARListView return `{data: [...], pagination: {page, page_size, total_count, total_pages}}`, but the frontend `PaginatedResponse<T>` type in `types/index.ts` defines `{count, next, previous, results}` (DRF standard format). The inspection list component accesses `data.results` and `data.next` which would be undefined when connected to the actual backend.
-**Rule to prevent:**
-- The backend uses a **custom pagination format**: `{data, pagination}` — NOT DRF's `{count, next, previous, results}`
-- When creating new API response types, match the **actual backend format**, not the `PaginatedResponse<T>` type
-- The CAR API layer (`lib/api/cars.ts`) uses the correct `CARPaginatedResponse` type
-- The inspection API layer still uses the mismatched `PaginatedResponse` — this needs fixing during integration testing
-- Always check the backend view's `list()` method to see the actual response shape before creating frontend types
-**Related docs:** psc-backend/apps/car/views.py (CARListView.list), psc-backend/apps/inspection/views.py (InspectionListView.list), psc-frontend/src/types/index.ts (PaginatedResponse)
-
----
-
-### [GENERAL] Serena find_symbol Uses name_path_pattern, Not name_path
-**Date:** 2026-02-06
-**What went wrong:** Called `mcp__serena__find_symbol` with parameter `name_path` instead of `name_path_pattern`. All 4 parallel calls failed with a Pydantic validation error: `name_path_pattern Field required`. Wasted an entire round-trip (4 calls).
-**Why it happened:** The tool's description says "name_path" everywhere when explaining the concept, but the actual parameter is `name_path_pattern`. Easy to confuse.
-**Rule to prevent:**
-- Serena's `find_symbol` parameter is `name_path_pattern` (NOT `name_path`)
-- Serena's `find_referencing_symbols` parameter is `name_path` (different from find_symbol!)
-- Serena's `replace_symbol_body` parameter is `name_path` (different from find_symbol!)
-- Double-check parameter names before calling Serena tools
-- If a Serena call fails with a validation error, check the parameter name first
-**Related docs:** Serena MCP tool definitions
-
----
-
-### [GENERAL] Always Audit Imports Before Building New Components
-**Date:** 2026-02-06
-**What went wrong:** Two new component files had unused imports that caused the TypeScript build to fail. `evidence-section.tsx` imported `cn` from `@/lib/utils` but never used it. `activity-history.tsx` imported `Clock` from lucide-react but never used it.
-**Why it happened:** Initially planned to use those imports (cn for conditional classes, Clock for timeline icons) but ended up using different approaches. Didn't clean up before committing.
-**Rule to prevent:**
-- After writing a new component, scan ALL imports and verify each one is actually used in the file
-- If you import something "just in case," remove it if you end up not using it
-- Run `npx tsc --noEmit` after creating each batch of files, not just at the end
-- Common culprits: utility imports (cn, clsx), icon imports (often import more than needed)
-**Related docs:** tsconfig.json (noUnusedLocals), ESLint rules
-
----
-
-### [DATA] Grep All Usages Before Renaming Type Fields
-**Date:** 2026-02-06
-**What went wrong:** Renamed `ActivityEvent.description` to `event_description` to match the backend `ActivityHistorySerializer`. This was correct, but `inspection-detail.tsx` was already using `event.description` — if I hadn't caught it, the build would have failed (or worse, silently shown undefined at runtime).
-**Why it happened:** Changed the type definition without immediately checking all consumers of that type. The rename was necessary (backend field is `event_description`), but the ripple needed to be traced.
-**Rule to prevent:**
-- Before renaming ANY field on a shared type, grep the codebase for all usages: `grep "event\.description" src/ --include="*.tsx" --include="*.ts"`
-- Make the field rename AND all consumer fixes in the same batch of edits
-- Types that are already in use (e.g., `ActivityEvent`, `Evidence`) are more dangerous to rename than new types
-- Consider: will this field rename break existing code? If yes, fix all consumers FIRST
-**Related docs:** src/types/index.ts, src/components/inspection/inspection-detail.tsx
-
----
-
-### [COMPONENT] DatePicker Requires Controlled Approach, Not register()
-**Date:** 2026-02-06
-**What went wrong:** Used `{...register('due_date')}` with DatePicker component, but DatePicker's `onChange` expects `(value: string) => void` while react-hook-form's `ChangeHandler` expects `(event: { target: any }) => void`. Type mismatch caused build failure.
-**Why it happened:** Assumed DatePicker would work like native input elements that are compatible with react-hook-form's `register()`. DatePicker has a custom onChange signature.
-**Rule to prevent:**
-- DatePicker must use controlled approach: `value={watch('field')}` + `onChange={(val) => setValue('field', val)}`
-- Never use `{...register('field')}` with DatePicker
-- Custom components with non-standard onChange signatures always need controlled approach
-- Before using register() on any custom component, check the component's onChange type
-**Related docs:** src/components/shared/date-picker.tsx
-
----
-
-### [COMPONENT] ConfirmDialog Has No loading Prop
-**Date:** 2026-02-06
-**What went wrong:** Passed `loading={isPending}` to ConfirmDialog but it doesn't have a `loading` prop. Build failed with type error.
-**Why it happened:** Assumed a common prop name existed without checking the component interface first.
-**Rule to prevent:**
-- ConfirmDialog props: `open`, `onOpenChange`, `title`, `description`, `children`, `confirmLabel`, `cancelLabel`, `onConfirm`, `onCancel`, `variant`, `showIcon`, `confirmDisabled`
-- To disable confirm during async operations, use `confirmDisabled={isPending}` (NOT `loading`)
-- Always check ConfirmDialogProps interface before using — lesson from LESSONS.md "Check Interface Properties"
-**Related docs:** src/components/shared/confirm-dialog.tsx
-
----
-
-### [GENERAL] Serena replace_symbol_body Adds Extra Semicolons
-**Date:** 2026-02-06
-**What went wrong:** Used `mcp__serena__replace_symbol_body` to add `EVIDENCE` to the `EVIDENCE_TYPES` constant. The tool replaced the body correctly but produced `} as const;;` (double semicolon). ESLint caught it as `no-extra-semi` error.
-**Why it happened:** Serena's `replace_symbol_body` appends a semicolon after the replacement body, but the existing code already had a trailing semicolon as part of the `const` declaration syntax.
-**Rule to prevent:**
-- After ANY `replace_symbol_body` call, always run `npm run lint` to catch extra semicolons
-- If the original symbol body ends with `;`, the replacement body should NOT include the trailing `;` — or vice versa
-- Better yet, use `Edit` tool for single-line changes like adding a property to an object
-- Save `replace_symbol_body` for larger rewrites where the full symbol body is being replaced
-**Related docs:** src/lib/utils/constants.ts
-
----
-
-### [COMPONENT] PV Status Is NOT In StatusType — Use Badge Directly
-**Date:** 2026-02-06
-**What went wrong:** `PhysicalVerificationSection` used `<StatusBadge status={physicalVerification.status} />` but PV status values ('OPEN', 'CLOSED') are not in `StatusType` (which is `InspectionStatus | CARStatus | 'OVERDUE' | 'DETENTION'`). Build failed with `Type 'string' is not assignable to type 'StatusType'`.
-**Why it happened:** Assumed all status fields in the system use the same StatusType enum. PV has its own status values that are separate from inspection/CAR statuses.
-**Rule to prevent:**
-- `StatusBadge` only works with `StatusType` values (InspectionStatus, CARStatus, 'OVERDUE', 'DETENTION')
-- For PV status (OPEN/CLOSED), use `<Badge>` directly with appropriate variant
-- Before using StatusBadge, verify the status value is a valid StatusType
-- Other non-standard statuses (e.g., sync status, notification status) will also need Badge, not StatusBadge
-**Related docs:** src/components/shared/status-badge.tsx, src/components/car/physical-verification-section.tsx
-
----
-
-### [GENERAL] Verify Prior Session Work Before Planning New Implementation
-**Date:** 2026-02-06
-**What went wrong:** N/A (Pattern documented proactively)
-**Why it happened:** Steps 6.1-6.3 and most of 6.4 were already implemented in prior sessions but progress.txt still said "Next action: Begin Phase 6, Step 6.1." Thorough verification at session start revealed only integration work remained.
-**Rule to prevent:**
-- At session start, don't just read progress.txt — verify by checking if the files listed in IMPLEMENTATION_PLAN.md already exist
-- Grep for key symbols/functions before writing a plan that assumes they need to be created
-- Prior sessions may have implemented code without updating progress.txt (a known pattern — see LESSONS.md "Always Update progress.txt")
-- Quick verification saves an entire session of redundant work
-**Related docs:** Docs/progress.txt, Docs/IMPLEMENTATION_PLAN.md
-
----
-
-### [GENERAL] Unused Type Imports Fail Production Build
-**Date:** 2026-02-06
-**What went wrong:** `use-offline-cars.ts` imported `CARListItem` type but never used it. `tsc --noEmit` passed, but `npm run build` (which runs `tsc -b`) failed with `TS6196: 'CARListItem' is declared but never used`.
-**Why it happened:** Initially imported the type thinking it would be needed for return type annotations, but the hook functions inferred their types from IndexedDB queries instead.
-**Rule to prevent:**
-- `import type { ... }` imports are still checked by the compiler — unused types cause build failures
-- After creating any file with type imports, verify each imported type is actually used
-- Run `npm run build` (not just `tsc --noEmit`) as final verification — `tsc -b` is stricter
-- This is a repeat of the "Always Audit Imports" lesson — applies to type imports too
-**Related docs:** src/hooks/use-offline-cars.ts, tsconfig.json
-
----
-
-### [WORKFLOW] Read CLAUDE.md Explicitly — Not Just CLAUDE_VIMS.md
-**Date:** 2026-02-06
-**What went wrong:** At session startup, read `CLAUDE_VIMS.md` but skipped explicitly reading `CLAUDE.md`. User had to ask "have you read CLAUDE.md?" to catch the oversight.
-**Why it happened:** CLAUDE_VIMS.md is the extended rules file with project-specific instructions. Assumed reading it was sufficient since CLAUDE.md was already loaded in system context. But the startup sequence in CLAUDE.md itself says "Read CLAUDE.md" as step 1.
-**Rule to prevent:**
-- Session startup step 1 is "Read CLAUDE.md" — do it EXPLICITLY, not implicitly via system context
-- CLAUDE.md and CLAUDE_VIMS.md are BOTH required reads, not either/or
-- The startup sequence is: CLAUDE.md → progress.txt → IMPLEMENTATION_PLAN.md → LESSONS.md → tasks/todo.md → user approval
-- Follow the sequence literally, reading each file with the Read tool
-**Related docs:** Docs/CLAUDE.md (Session Startup Sequence), Docs/CLAUDE_VIMS.md
-
----
-
-### [COMPONENT] loading-skeleton.tsx Has No Generic LoadingSkeleton Export
-**Date:** 2026-02-06
-**What went wrong:** Used `import { LoadingSkeleton } from '@/components/shared/loading-skeleton'` in notification-list.tsx, but the file only exports named skeletons (CardSkeleton, ListSkeleton, TextSkeleton, etc.) and the `LoadingSkeletonProps` interface — there is no `LoadingSkeleton` component.
-**Why it happened:** Assumed a generic "LoadingSkeleton" wrapper existed because the file is named `loading-skeleton.tsx`. Didn't check actual exports before importing.
-**Rule to prevent:**
-- `loading-skeleton.tsx` exports: TextSkeleton, CardSkeleton, ListSkeleton, FormFieldSkeleton, FormSkeleton, DetailHeaderSkeleton, SectionSkeleton, InspectionCardSkeleton, CARCardSkeleton, DeficiencyItemSkeleton
-- For generic skeleton shapes, use `Skeleton` from `@/components/ui/skeleton` instead
-- Always grep or read the file's exports before importing: `grep "export" src/components/shared/loading-skeleton.tsx`
-**Related docs:** src/components/shared/loading-skeleton.tsx, src/components/ui/skeleton.tsx
-
----
-
-### [COMPONENT] ErrorState Prop Is message, Not description
-**Date:** 2026-02-06
-**What went wrong:** Passed `description` prop to ErrorState component, but the correct prop name is `message`. TypeScript would have caught this, but it's better to know upfront.
-**Why it happened:** Confused with toast API which uses `description`, or with EmptyState which uses `description`. ErrorState uses `message`.
-**Rule to prevent:**
-- ErrorState props: `title?`, `message?`, `onRetry?`, `retryLabel?`, `className?`
-- EmptyState props: `title`, `description?`, `actionLabel?`, `onAction?`
-- Toast props: `title?`, `description?`, `variant?`
-- These three similar components use DIFFERENT prop names for the secondary text
-**Related docs:** src/components/shared/error-state.tsx, src/components/shared/empty-state.tsx
-
----
-
-### [COMPONENT] React.memo() With Named Functions, Not Arrow Functions
-**Date:** 2026-02-06
-**What went wrong:** N/A (Pattern documented proactively from Step 8.4 memoization work)
-**Why it happened:** When wrapping existing arrow function components with `memo()`, the component loses its display name in React DevTools (shows as "Anonymous" or "memo()").
-**Rule to prevent:**
-- When wrapping with `memo()`, convert arrow function to named function:
-  ```typescript
-  // BEFORE (arrow):
-  export const MyCard: FC<Props> = ({ ... }) => { ... };
-
-  // AFTER (memo + named function):
-  export const MyCard: FC<Props> = memo(function MyCard({ ... }) { ... });
-  ```
-- Key changes: `= ({` → `= memo(function ComponentName({`, `}) => {` → `}) {`, `};` → `});`
-- Import: `import { memo, type FC } from 'react'` (not `import type { FC }`)
-- The named function inside `memo()` preserves the component name in React DevTools
-**Related docs:** src/components/inspection/inspection-card.tsx, src/components/car/car-card.tsx
-
----
-
-### [WORKFLOW] Read ALL 11 Startup Files — No Exceptions
-**Date:** 2026-02-06
-**What went wrong:** Only read 4 of 11 required startup files (CLAUDE_VIMS.md, progress.txt, IMPLEMENTATION_PLAN.md, LESSONS.md). User called it out: "did you read startup files?"
-**Why it happened:** Prioritized speed over thoroughness. Read the most critical files and skipped docs that seemed less relevant for a performance optimization task (PRD.md, APP_FLOW.md, TECH_STACK.md, etc.).
-**Rule to prevent:**
-- CLAUDE_VIMS.md lists 11 mandatory startup files — read ALL of them, every session
-- The full list: CLAUDE.md, CLAUDE_VIMS.md, progress.txt, IMPLEMENTATION_PLAN.md, LESSONS.md, PRD.md, APP_FLOW.md, TECH_STACK.md, BACKEND_STRUCTURE.md (header), FRONTEND_GUIDELINES.md, DESIGN_SYSTEM.md, VALIDATION_RULES.md
-- Even if a doc seems irrelevant to the current task, read it anyway — context prevents mistakes
-- "No exceptions" means no exceptions
-**Related docs:** Docs/CLAUDE_VIMS.md (Session Startup Sequence)
-
----
-
-### [DATA] Never Duplicate Type Definitions Across Files
-**Date:** 2026-02-07
-**What went wrong:** `SyncConflict` was defined in TWO places: `types/index.ts` (used by components, with wrong field names `vessel_version`/`server_version`/`conflict_fields`) and `lib/api/sync.ts` (matching backend response with `vessel_data`/`server_data`/`conflicting_fields`). Components imported from `@/types` and silently had the wrong type — no runtime error because the data was never populated (mock placeholder).
-**Why it happened:** The type in `types/index.ts` was created early during Phase 7 planning with assumed field names. When the backend serializer was built later, `lib/api/sync.ts` got the correct type, but `types/index.ts` was never updated. The duplicate was invisible because the mock data path never tested with real API responses.
-**Rule to prevent:**
-- Every shared type should exist in ONE place only — `types/index.ts` for domain types
-- API-layer files (`lib/api/*.ts`) should import types from `@/types`, not redefine them
-- When creating a backend endpoint, grep frontend for any type with the same name and verify alignment
-- Before wiring real data to a component that used mock data, verify all field names match the API response
-- Pattern: `grep "interface SyncConflict" src/ --include="*.ts" --include="*.tsx"` to check for duplicates
-**Related docs:** src/types/index.ts, src/lib/api/sync.ts
-
----
-
-### [API] Token Blacklist --fake Migration for Shared Databases
-**Date:** 2026-02-07
-**What went wrong:** N/A (Solution documented proactively for future reference)
-**Why it happened:** Shared dev database already had `token_blacklist` tables from another Django project, causing migration conflicts when trying to enable the app.
-**Rule to prevent:**
-- When a shared database has tables that match a Django app's migrations, use `migrate <app> --fake` to mark migrations as applied without running SQL
-- Always verify with `python manage.py check` after faking migrations
-- This is safe when the existing tables match the expected schema exactly
-- If tables have different schemas, manual SQL ALTER may be needed before faking
-- Document the fake migration in progress.txt so future developers know
-**Related docs:** psc-backend/core/settings.py, Django migration documentation
-
----
-
-### [API] Backend May Return Different Case Than Frontend Expects
-**Date:** 2026-02-07
-**What went wrong:** Backend JWT token claims and login response include `user_type: 'VESSEL'` (uppercase), but frontend edit pages compare with `user_type === 'vessel'` (lowercase). This caused ALL vessel master permission checks to silently fail — no error thrown, just false comparisons. Edit buttons hidden, users redirected to "Access Denied".
-**Why it happened:** Backend `AuthenticatedUser` stores `user_type = 'VESSEL'` (matching database convention). Frontend `AuthUser` type declares `user_type: 'vessel' | 'office'` (lowercase). No normalization layer existed between API response and frontend state. The `useAuth()` hook's `isVessel` computed property uses role-based check (works), but direct `user_type` comparisons in edit pages used lowercase (fails).
-**Rule to prevent:**
-- Always normalize API response data at the API boundary (in the API layer functions)
-- For enums/discriminators from backend, add a normalization function: `normalizeUser()` in `auth.ts`
-- Pattern: `user_type: user.user_type?.toLowerCase() as AuthUser['user_type']`
-- When adding string comparisons for API-returned values, check the ACTUAL backend response (not just the TypeScript type)
-- Test with real backend data, not just TypeScript compilation
-**Related docs:** psc-frontend/src/lib/api/auth.ts, psc-backend/apps/accounts/backends.py
-
----
-
-### [VALIDATION] FEAT-CAR-004 Submit Must Enforce Cause + Qualified Actions
-**Date:** 2026-02-07
-**What went wrong:** CAR submission accepted records with no CLC/custom cause mapping and accepted IMMEDIATE actions missing owner/due date.
-**Why it happened:** `CARSubmitSerializer` only checked action/evidence type counts and root cause length; it did not validate FEAT-CAR-004 cause and owner/due preconditions.
-**Rule to prevent:**
-- FEAT-CAR-004 submit validation must enforce:
-  - At least one cause mapping (`CLC` or custom cause path in current schema)
-  - At least one IMMEDIATE action with both owner and due date
-  - At least one LONG_TERM action with both owner and due date
-- Keep "submission ready" test setup aligned with submit preconditions, and explicitly disable specific prerequisites in gap tests that validate missing-precondition behavior.
-**Related docs:** Docs/PRD.md FEAT-CAR-004, Docs/VALIDATION_RULES.md Section 4.2, psc-backend/apps/car/serializers.py, psc-backend/apps/car/tests.py
-
----
-
-### [DATA] Never parseInt() on UUID Strings
-**Date:** 2026-02-07
-**What went wrong:** `routes/inspections/new.tsx` did `parseInt(user.vessel_id, 10)` where `vessel_id` is a UUID string like `"e2e7ff0d-ab6d-4485-afb8-aa45aa537d73"`. `parseInt` returns `NaN` (not an error!), which then fails the `!vesselId` check and shows "Unable to determine vessel" error toast.
-**Why it happened:** The `CreateInspectionInput` type had `vessel_id: number`, so the code assumed it needed numeric conversion. But vessel_id is actually a UUID (string) in the database and API.
-**Rule to prevent:**
-- UUIDs are ALWAYS strings — never convert them with parseInt(), Number(), or any numeric function
-- vessel_id, inspection_id, car_id, deficiency_id — ALL are UUID strings in this project
-- If a TypeScript type says `number` for an ID field, verify against the actual API response before trusting it
-- `parseInt()` on a UUID silently returns `NaN` — no error thrown, just broken logic
-- Check the backend model: if the field is `UUIDField`, the frontend type MUST be `string`
-**Related docs:** psc-frontend/src/types/index.ts, psc-frontend/src/routes/inspections/new.tsx
-
----
-
-### [API] Backend URL Routing May Not Follow RESTful Convention
-**Date:** 2026-02-07
-**What went wrong:** Frontend assumed RESTful URL patterns (POST `/inspections/` to create, PUT `/inspections/{id}/` to update, DELETE `/inspections/{id}/` to delete), but backend uses explicit sub-paths: POST `/inspections/create/`, PUT `/inspections/{id}/update/`, DELETE `/inspections/{id}/delete/`. The mismatch caused 405 Method Not Allowed errors.
-**Why it happened:** The backend `urls.py` docstring (lines 6-9) said the standard RESTful paths, but the actual urlpatterns (lines 43-49) use separate views with explicit sub-paths. The frontend was built based on the docstring, not the actual URL configuration.
-**Rule to prevent:**
-- Always check the actual `urlpatterns` in `urls.py`, not just the docstring
-- `path('')` handles GET (list), `path('create/')` handles POST (create) — they're separate views
-- Similarly, `path('<uuid:id>/')` handles GET (detail), `path('<uuid:id>/update/')` handles PUT
-- When debugging 405 errors, the URL is reaching a view that doesn't support that HTTP method
-- Compare frontend API calls against backend urlpatterns line-by-line
-**Related docs:** psc-backend/apps/inspection/urls.py, psc-frontend/src/lib/api/inspections.ts
-
----
-
-### [API] Duplicate Permission Classes Across Apps — Check Which One Views Import
-**Date:** 2026-02-07
-**What went wrong:** `CanEditCAR` exists in TWO files: `accounts/permissions.py` (correct, allows DRAFT + REWORK_REQUESTED for vessel master) and `car/permissions.py` (buggy, only allows DRAFT). The CAR views import from `car/permissions.py`, so vessel masters couldn't edit CARs in REWORK_REQUESTED status.
-**Why it happened:** The permission class was originally created in `accounts/permissions.py` during Phase 2. When `apps/car/` was created in Phase 5, a new `CanEditCAR` was written in `car/permissions.py` with slightly different logic. The views were wired to the local copy.
-**Rule to prevent:**
-- Before creating a permission class, grep for existing ones with the same name: `grep "class CanEditCAR" psc-backend/ -r`
-- If a permission class already exists in another app, either import it or keep them in sync
-- When fixing a permission bug, check ALL files that define that permission class
-- Prefer a single source of truth for permission logic — don't duplicate across apps
-**Related docs:** psc-backend/apps/car/permissions.py, psc-backend/apps/accounts/permissions.py
-
----
-
-### [VALIDATION] FEAT-CAR-002 Rules Must Be Enforced in Serializers
-**Date:** 2026-02-07
-**What went wrong:** CAR update accepted past `target_date`, accepted arbitrary `clc_item_ids`, and corrective actions could be created without owner/due date.
-**Why it happened:** `CARUpdateSerializer` and `CorrectiveActionCreateSerializer` declared fields but had no rule-level validators for these FEAT-CAR-002 constraints.
-**Rule to prevent:**
-- Add serializer-level validation for all non-trivial business fields, not just type parsing
-- `target_date` and `due_date` must reject past dates
-- Corrective action create must require both owner (`owner_crew_id` or `owner_user_id`) and `due_date`
-- `clc_item_ids` must be validated against master CLC IDs before mapping rows are written
-- For unmanaged/external master dependencies in tests, patch lookup helpers so happy-path and invalid-path checks are deterministic
-**Related docs:** Docs/PRD.md FEAT-CAR-002, Docs/VALIDATION_RULES.md Sections 4.1 and 5.1, psc-backend/apps/car/serializers.py
-
----
-
-### [API] Auto-Create CAR Signal Must Mirror FEAT-CAR-001 Defaults and Activity Logging
-**Date:** 2026-02-07
-**What went wrong:** Deficiency creation auto-created a CAR in DRAFT, but left `CAR.target_date` as `NULL` and did not write a `CAR_CREATED` activity event.
-**Why it happened:** The Django signal implementation in `apps/inspection/signals.py` only handled CAR row creation + linking, and omitted two FEAT-CAR-001 behaviors that were defined in docs/tests (target-date defaulting and activity timeline entry).
-**Rule to prevent:**
-- Any replacement of documented DB-trigger behavior with Django signals must include all documented side effects, not just primary row creation.
-- For FEAT-CAR-001 auto-create flow, signal must do all of:
-  1. create CAR in `DRAFT`
-  2. default `CAR.target_date` to `Deficiency.target_date` or `today + 7 days`
-  3. create `ActivityHistory` event `CAR_CREATED` for vessel timeline
-- Keep FEAT_CAR_001 tests (`TestFEAT_CAR_001_AutoCreateCAR`) green as regression guard before closing related work.
-**Related docs:** Docs/PRD.md FEAT-CAR-001, Docs/BACKEND_STRUCTURE.md Section 8.1 and Part 5.1, psc-backend/apps/inspection/signals.py, psc-backend/apps/car/tests.py
-
----
-
-### [VALIDATION] FEAT-CAR-005 PIC Accept Must Enforce Comment Min Length
-**Date:** 2026-02-07
-**What went wrong:** PIC accept endpoint returned success for short comments (for example `"short"`), but `VALIDATION_RULES.md` Section 4.3 requires at least 10 characters.
-**Why it happened:** `CARPICAcceptSerializer` declared `comment` with `min_length=1`, so request validation did not enforce the documented rule.
-**Rule to prevent:**
-- FEAT-CAR-005 must enforce `comment` minimum length at serializer level (`min_length=10`) before any status transition writes.
-- Keep a regression test that sends a short comment and expects HTTP 400 (`test_feat_car_005_gap_validation_comment_min_10_required`).
-- For comment-based state transitions, compare serializer field constraints against `VALIDATION_RULES.md` before closing the task.
-**Related docs:** Docs/VALIDATION_RULES.md Section 4.3, Docs/PRD.md FEAT-CAR-005, psc-backend/apps/car/serializers.py, psc-backend/apps/car/tests.py
-
----
-
-### [WORKFLOW] Always Close Debug Fixes with Progress + Lessons Updates
-**Date:** 2026-02-07
-**What went wrong:** A debug fix can be completed in code/tests, but if `progress.txt` and `LESSONS.md` are not updated in the same session, project state drifts and context is lost for the next session.
-**Why it happened:** Documentation close-out was treated as optional after technical verification.
-**Rule to prevent:**
-- After every debug fix, update both `Docs/progress.txt` and `Docs/LESSONS.md` before closing the session.
-- `progress.txt` must record reproduction, root cause, fix, and verification command results.
-- `LESSONS.md` must capture the root mistake pattern and an actionable prevention rule.
-**Related docs:** Docs/DEBUG_AGENT.md Step 7, Docs/progress.txt, Docs/LESSONS.md
-
----
-
-### [CAR API CONTRACT] FEAT-CAR-007/009/010 Gaps Came from Serializer/View Drift
-**Date:** 2026-02-07
-**What went wrong:** CAR endpoints passed older happy-path tests but failed gap tests for FEAT-CAR-007/009/010:
-- DPA close accepted short comments.
-- CAR list did not support `source`, `date_from/date_to`, and `overdue` filters.
-- CAR list payload lacked `is_overdue`.
-- CAR detail allowed cross-vessel access for vessel users.
-- CAR detail evidence payload lacked preview metadata.
-**Why it happened:** Serializer and view logic drifted from documented FEAT acceptance criteria and validation rules, and payload/filter contracts were not re-verified after earlier implementation sessions.
-**Rule to prevent:**
-- For state-transition comments, match serializer `min_length` exactly to `VALIDATION_RULES.md` before merge.
-- Treat list query params and response keys as explicit API contract; add regression tests for each documented filter/indicator.
-- Enforce vessel own-vessel visibility checks in detail endpoints even when list filtering already exists.
-- Include UI-required evidence preview metadata (`preview_url`) in detail payload contracts.
-**Related docs:** Docs/PRD.md FEAT-CAR-007/009/010, Docs/VALIDATION_RULES.md Section 4.5, Docs/BACKEND_STRUCTURE.md Sections 10.5 and 11.2, psc-backend/apps/car/serializers.py, psc-backend/apps/car/views.py
-
----
-
-### [VALIDATION] FEAT-CAR-011 Add Action Must Enforce Status + Owner Normalization
-**Date:** 2026-02-07
-**What broke:** Corrective action create accepted requests in invalid CAR states and treated whitespace-only `owner_user_id` as a valid owner.
-**Why it broke:** `CorrectiveActionCreateView` lacked CAR status precondition checks, and `CorrectiveActionCreateSerializer` validated owner presence without normalizing blank-only strings.
-**Rule to prevent:**
-- Enforce FEAT-CAR-011 status precondition in the view before serializer writes: CAR must be `DRAFT` or `REWORK_REQUESTED`.
-- Normalize string owner fields (`strip`) before owner-presence checks; blank-only input must never satisfy required-owner rules.
-- Keep regression coverage in `TestFEAT_CAR_011_AddCorrectiveAction` for both status precondition and whitespace-owner edge case.
-**Related docs:** Docs/PRD.md FEAT-CAR-011, Docs/VALIDATION_RULES.md Section 5.1, psc-backend/apps/car/serializers.py, psc-backend/apps/car/views.py, psc-backend/apps/car/tests.py
-
----
-
-### [VALIDATION] FEAT-CAR-012 Completion Endpoint Must Be Idempotency-Safe
-**Date:** 2026-02-07
-**What broke:** Completion endpoint required `completion_remarks` even though spec marks it optional, and allowed re-completing an already completed action.
-**Why it broke:** Serializer constraints drifted from `VALIDATION_RULES.md` Section 5.2, and the view lacked an explicit already-completed precondition guard.
-**Rule to prevent:**
-- Treat documented optional fields as optional in serializer definitions; enforce only documented limits (here: max 4000 chars).
-- Add explicit already-completed guard in state-transition endpoints to prevent duplicate transitions and timeline noise.
-- Keep regression coverage in `TestFEAT_CAR_012_CompleteCorrectiveAction` for optional remarks and already-completed rejection.
-**Related docs:** Docs/PRD.md FEAT-CAR-012, Docs/VALIDATION_RULES.md Section 5.2, psc-backend/apps/car/serializers.py, psc-backend/apps/car/views.py, psc-backend/apps/car/tests.py
-
----
-
-### [SYNC CONTRACT] FEAT-SYNC-002/003 Must Enforce Push Guards and Include Masters Bucket
-**Date:** 2026-02-07
-**What broke:** Sync gap tests exposed missing contract checks:
-- Pull response omitted `data.masters`.
-- Push accepted invalid `client_version`, future `timestamp`, duplicate `event_id`, and >100 events.
-- Push checksum accepted `000...000` integrity placeholder.
-**Why it broke:** Sync serializers only validated field presence/type, not Section 9.1 business rules, and pull response shape drifted from `BACKEND_STRUCTURE.md` Section 10.9.
-**Rule to prevent:**
-- Keep FEAT-SYNC request guards in serializer validation (not only service logic): `client_version >= 1`, timestamp not future, event count <= 100, unique `event_id`.
-- Enforce checksum integrity guard in request validation; reject known invalid sentinel payload checksums.
-- Keep `data.masters` present in pull response to preserve FEAT-SYNC-002 response contract.
-- Add/retain regression tests for each rule in `apps/sync/tests.py`.
-**Related docs:** Docs/VALIDATION_RULES.md Section 9.1, Docs/BACKEND_STRUCTURE.md Section 10.9, psc-backend/apps/sync/serializers.py, psc-backend/apps/sync/sync_service.py, psc-backend/apps/sync/tests.py
-
----
-
-### [SYNC RELIABILITY] FEAT-SYNC-006 Upload Failures Must Round-Trip into Queue State
-**Date:** 2026-02-07
-**What broke:** Attachment uploads could fail, but queue state/UI never reflected those failures, and backend upload URLs pointed to a non-existent route.
-**Why it broke:** Frontend push marked items completed before upload outcomes and treated uploads as fire-and-forget; failed rows were not included in retry selection; backend emitted `/api/psc/sync/upload/{token}` URLs without implementing the endpoint/token validation path.
-**Rule to prevent:**
-- Never clear sync queue items tied to attachment uploads before upload results are persisted.
-- Persist FEAT-SYNC-006 terminal states directly to `syncQueue` (`FAILED` with `error_message`), then render retry UI from that source of truth.
-- Push retry selection must include both `PENDING` and `FAILED` rows.
-- If backend returns tokenized upload URLs, route/view/token validation must be delivered in the same change set as URL generation.
-**Related docs:** Docs/PRD.md FEAT-SYNC-003/006, Docs/VALIDATION_RULES.md Section 11.4, Docs/BACKEND_STRUCTURE.md Section 10.9, psc-frontend/src/lib/sync/sync-service.ts, psc-frontend/src/lib/db/sync-queue.ts, psc-backend/apps/sync/urls.py, psc-backend/apps/sync/views.py, psc-backend/apps/sync/sync_service.py
-
----
-
-### [WORKFLOW] Backend Tests Must Default to Isolated Test Settings
-**Date:** 2026-02-07
-**What broke:** Running `python manage.py test apps.sync.tests` used SQL Server settings, attempted to create `test_ksm_cms_dev`, and failed non-interactively (`EOFError`) when the DB already existed. Running `pytest` also failed to collect Django tests because settings/apps were not initialized.
-**Why it broke:** Test execution relied on implicit operator flags (`--settings=core.settings_test`) and had no project-level pytest bootstrap for Django DB lifecycle setup.
-**Rule to prevent:**
-- Default `manage.py test` runs must use `core.settings_test` unless settings are explicitly provided.
-- Keep a pytest bootstrap (`conftest.py`) that sets `DJANGO_SETTINGS_MODULE=core.settings_test`, calls `django.setup()`, and manages `setup_databases()/teardown_databases()`.
-- Keep sync conflict resolution input constraints aligned with docs (`notes` max 1000 chars per `VALIDATION_RULES.md` 9.2) so full suites pass once DB setup is stable.
-**Related docs:** Docs/DEBUG_AGENT.md (Step 1, Step 6), Docs/VALIDATION_RULES.md Section 9.2, psc-backend/manage.py, psc-backend/conftest.py, psc-backend/apps/sync/serializers.py, psc-backend/apps/sync/tests.py
-
----
-
-### [SYNC CONTRACT] FEAT-SYNC-001 Pull Must Persist Masters Bucket to IndexedDB
-**Date:** 2026-02-07
-**What broke:** `pullFromServer()` merged inspections/deficiencies/CARs but ignored `data.masters`, so the FEAT-SYNC-001 masters-persistence test failed and offline master cache could remain stale after sync.
-**Why it broke:** Frontend pull-path implementation drifted from the sync payload contract after backend added the `masters` bucket; no persistence call was wired in sync-service.
-**Rule to prevent:**
-- When sync pull contract contains `data.masters`, always persist it via `bulkPutMasterData()` in the same pull transaction path.
-- Keep `SyncPullData` type contract in `src/lib/api/sync.ts` aligned with backend response shape (including optional buckets).
-- Treat sync contract tests (`sync-service.test.ts`) as release gates for offline data integrity.
-**Related docs:** Docs/PRD.md FEAT-SYNC-001/002, Docs/BACKEND_STRUCTURE.md Section 10.9, psc-frontend/src/lib/sync/sync-service.ts, psc-frontend/src/lib/api/sync.ts, psc-frontend/src/lib/sync/sync-service.test.ts
-
----
-
-### [API] Inspection Edit/Delete Flows Must Apply Full Compliance Side Effects
-**Date:** 2026-02-07
-**What broke:** FEAT-INS gap tests failed because inspection update did not create audit entries, post-submit edits did not increment `revision_no`, and deleting a draft inspection did not soft-delete linked deficiency/CAR rows.
-**Why it broke:** `InspectionUpdateView` and `InspectionDeleteView` implemented primary CRUD writes but omitted documented side effects (audit trail, revision tracking, and cascading soft-delete semantics).
-**Rule to prevent:**
-- Treat inspection update/delete as workflow operations, not plain CRUD; verify side effects from docs/tests before closing.
-- On every successful inspection update, write one `AuditLog` `UPDATE` record; office users must set `is_office_edit_assist=True`.
-- When editing non-`DRAFT` inspections, increment `revision_no`.
-- When deleting `DRAFT` inspections, soft-delete related `Deficiency` and linked `CAR` records in the same transaction.
-**Related docs:** Docs/PRD.md FEAT-INS-007/008/009, Docs/VALIDATION_RULES.md Section 2.5, Docs/BACKEND_STRUCTURE.md Section 10.3, psc-backend/apps/inspection/views.py, psc-backend/apps/inspection/tests.py
-
----
-
-### [VALIDATION/RBAC] Inspection Create/Submit Must Enforce Contract Preconditions End-to-End
-**Date:** 2026-02-08
-**What broke:** Inspection gap tests exposed missing FEAT-INS-001/004 rules:
-- Create accepted future `inspection_date`.
-- Create did not enforce PSC `mou_id`.
-- Create accepted 1-character `port_place`.
-- Submit allowed vessel crew role.
-- Submit did not block orphan deficiencies without linked CAR.
-- Submit did not write `INSPECTION_SUBMITTED` activity history.
-- API contract path mismatch: root `POST /api/psc/inspections/` was not implemented.
-**Why it broke:** Validation and workflow guards drifted between serializers, permissions, and views; contract assumptions in docs were not locked by endpoint-level regression coverage.
-**Rule to prevent:**
-- Keep FEAT-INS create rules centralized in serializer validation (future date, PSC MOU required, port min length) for both create and update flows.
-- Enforce submit role gates in permission class, not only in view/serializer preconditions.
-- Treat submit as a workflow transition: validate linked entities (deficiency→CAR) and always create activity timeline events.
-- Keep root contract endpoints (`POST /api/psc/inspections/`) covered even when legacy aliases (`/create/`) remain.
-**Related docs:** Docs/PRD.md FEAT-INS-001/004, Docs/VALIDATION_RULES.md Sections 2.1/2.2, Docs/BACKEND_STRUCTURE.md Section 10.3, psc-backend/apps/inspection/serializers.py, psc-backend/apps/inspection/permissions.py, psc-backend/apps/inspection/views.py, psc-backend/apps/inspection/tests.py
-
----
-
-### [VALIDATION] INS-002 Upload Report Description Must Be Explicitly Required
-**Date:** 2026-02-08
-**What broke:** FEAT-INS-002 gap test `test_gap_validation_description_should_be_mandatory` failed because upload requests without `description` returned `201 Created` instead of `400 Bad Request`.
-**Why it broke:** `InspectionReportUploadSerializer` set `description` to `required=False` with `allow_blank=True`, drifting from FEAT-INS-002 acceptance criteria.
-**Rule to prevent:**
-- Treat report upload `description` as a required field in serializer validation; do not rely on database nullability to define API contract.
-- Keep `Docs/VALIDATION_RULES.md` aligned with PRD acceptance criteria when contract-level validation changes are made.
-- For every backfill gap labeled "mandatory mismatch", add a direct negative test (missing field) and run the full feature-class subset after the fix.
-**Related docs:** Docs/PRD.md FEAT-INS-002, Docs/VALIDATION_RULES.md Section 8.1, psc-backend/apps/inspection/serializers.py, psc-backend/apps/inspection/tests.py
-
----
-
-### [VALIDATION/WORKFLOW] INS-003 Deficiency Create Must Enforce Rule Set Across Serializer + View
-**Date:** 2026-02-08
-**What broke:** FEAT-INS-003 gap tests failed in five places: short descriptions and >4000 descriptions were accepted, past `target_date` was accepted, vessel users could add deficiencies on `SUBMITTED` inspections, and deficiency create wrote no `DEFICIENCY_ADDED` activity event.
-**Why it broke:** Contract rules were split between layers but partially implemented. `DeficiencyCreateSerializer` lacked explicit description/date validators, and `DeficiencyCreateView` enforced status membership (`DRAFT`/`SUBMITTED`) without the documented office-only branch for `SUBMITTED`, and without timeline side-effect creation.
-**Rule to prevent:**
-- For FEAT-INS-003, enforce `description` length (10-4000) and non-past `target_date` directly in `DeficiencyCreateSerializer`.
-- In `DeficiencyCreateView`, treat `SUBMITTED` as a conditional state: only `OFFICE` users may add deficiencies.
-- On every successful deficiency create, always write `ActivityHistory` with `entity_type='DEFICIENCY'` and `event_type='DEFICIENCY_ADDED'`.
-- Keep targeted class verification (`TestFEAT_INS_003_AddDeficiency`) as a regression gate after any create-flow change.
-**Related docs:** Docs/PRD.md FEAT-INS-003, Docs/VALIDATION_RULES.md Section 3.1, Docs/BACKEND_STRUCTURE.md Section 10.4, psc-backend/apps/inspection/deficiency_serializers.py, psc-backend/apps/inspection/deficiency_views.py, psc-backend/apps/inspection/tests.py
-
----
-
-### [COMPONENT/A11Y] Radix DialogContent Requires a Description Contract
-**Date:** 2026-02-08
-**What broke:** `DeficiencyModal` rendered `DialogContent` with title only, which emitted repeated Radix accessibility warnings during tests: missing dialog description / `aria-describedby`.
-**Why it broke:** The modal implementation omitted `DialogDescription`, so the dialog accessibility relationship was incomplete even though behavior tests still passed.
-**Rule to prevent:**
-- For every Radix dialog, include either `DialogDescription` or an explicit `aria-describedby` override.
-- Add a regression assertion that the rendered `role="dialog"` element has a non-empty `aria-describedby` that points to description content.
-- Treat accessibility warnings in test stderr as defects, not noise.
-**Related docs:** Docs/FRONTEND_GUIDELINES.md (component architecture), psc-frontend/src/components/inspection/deficiency-modal.tsx, psc-frontend/src/components/inspection/deficiency-modal.test.tsx
-
----
-
-### [SYNC/STATUS-FLOW] FEAT-SYNC-005 REOPEN_FOR_MERGE Must Set CAR to REWORK_REQUESTED (Not DRAFT)
-**Date:** 2026-02-08
-**What broke:** Sync conflict resolution (`REOPEN_FOR_MERGE`) moved CAR to `DRAFT`, and sync tests encoded the same expectation.
-**Why it broke:** Implementation and test assertions drifted from PRD acceptance criteria for FEAT-SYNC-005 (`REOPEN_FOR_MERGE: set CAR to REWORK_REQUESTED`).
-**Rule to prevent:**
-- For sync conflict resolution, treat `REOPEN_FOR_MERGE` as a CAR status transition to `REWORK_REQUESTED`; do not auto-transition to `DRAFT` inside the sync resolver.
-- Keep resolver logic and FEAT-SYNC tests aligned with PRD language for status transitions.
-- When status transitions are doc-driven, assert the exact terminal status in tests (not an inferred downstream status).
-**Related docs:** Docs/PRD.md FEAT-SYNC-005, psc-backend/apps/sync/conflict_resolver.py, psc-backend/apps/sync/tests.py
-
----
-
-### [QUALITY/TOOLING] Backend Static Checks Must Use Project Venv + Local Mypy Config
-**Date:** 2026-02-08
-**What broke:** Requested validation (`pytest -v`, `mypy .`, `ruff check .`) was initially non-actionable:
-- `pytest` auto-discovery returned 0 tests because this repo uses per-app `tests.py` modules.
-- `mypy`/`ruff` were missing from global Python, and mypy inherited strict/global defaults that produced framework-noise.
-**Why it broke:** Toolchain execution relied on ambient environment instead of project-local setup and repo-specific config.
-**Rule to prevent:**
-- Run backend static checks from `psc-backend/venv` and keep a project `mypy.ini` (Django + DRF plugins, repo-appropriate excludes).
-- Use explicit pytest module targets for this backend layout when global discovery is not configured.
-- Treat lint auto-fixes as safe only for mechanical issues (unused imports/vars, ordering), then re-run full regression tests.
-**Related docs:** docs/DEBUG_AGENT.md (verification step), psc-backend/mypy.ini, psc-backend/apps/*/tests.py
-
----
-
-### [COMPONENT/A11Y] CAR Action Modals Must Include DialogDescription
-**Date:** 2026-02-08
-**What broke:** CAR modal tests emitted repeated Radix warnings: missing dialog description / `aria-describedby` for `DialogContent` in PIC Accept, Rework, and DPA Close flows.
-**Why it broke:** `DialogContent` was rendered with `DialogTitle` only in multiple CAR action modals; the accessibility description contract was applied inconsistently after prior deficiency-modal fixes.
-**Rule to prevent:**
-- Every modal using Radix `DialogContent` must include `DialogDescription` (or explicit `aria-describedby={undefined}` when intentionally omitted).
-- When one modal in a feature family fails an a11y contract, audit sibling modals in that family, not just the surfaced test target.
-- Treat test stderr accessibility warnings as defects and close them at source-component level.
-**Related docs:** Docs/FRONTEND_GUIDELINES.md, Docs/DEBUG_AGENT.md, psc-frontend/src/components/car/pic-accept-modal.tsx, psc-frontend/src/components/car/rework-modal.tsx, psc-frontend/src/components/car/dpa-close-modal.tsx, psc-frontend/src/components/car/evidence-upload-modal.tsx
-
----
-
-### [WORKFLOW/VALIDATION] Mandatory Transition Comments Require Form Modals, Not Confirm Dialogs
-**Date:** 2026-02-08
-**What broke:** Inspection detail route allowed PIC review and DPA close with empty comments because transitions were triggered from generic confirm dialogs without input collection.
-**Why it broke:** FEAT-INS-005/006 contract requires mandatory comments (min 10 chars), but route-level UI flow used `ConfirmDialog` for state transition actions and passed empty payloads.
-**Rule to prevent:**
-- For any transition with required input fields, use dedicated form modals with schema validation (`react-hook-form` + `zod`), not confirmation-only dialogs.
-- Add route-level tests that assert mutation payload contains non-empty validated fields for the transition.
-- Keep acceptance criteria and UI interaction contract aligned: if backend requires a field, route UI must collect and validate it before mutation.
-**Related docs:** Docs/PRD.md FEAT-INS-005/006, Docs/VALIDATION_RULES.md Sections 2.3/2.4, psc-frontend/src/routes/inspections/[id].tsx, psc-frontend/src/components/inspection/inspection-pic-review-modal.tsx, psc-frontend/src/components/inspection/inspection-dpa-close-modal.tsx
-
----
-
-### [RBAC] Assigned-Verifier Checks Must Match Actual Caller Identity
-**Date:** 2026-02-08
-**What broke:** CAR detail route allowed office users to close physical verification whenever `verifier_user_id` existed, even if caller was not the assigned verifier.
-**Why it broke:** Permission gate checked verifier presence, not verifier identity match.
-**Rule to prevent:**
-- For assignment-based permissions, compare assignment field to current user identity, not just non-null assignment.
-- Normalize identifiers (trim + lowercase) before comparison when values may come from different sources (`employee_id`, `id`).
-- Keep DPA override explicit and isolated in permission expression.
-**Related docs:** Docs/PRD.md FEAT-PV-002, Docs/BACKEND_STRUCTURE.md RBAC matrix Section 11.1, psc-frontend/src/routes/cars/[id].tsx
-
----
-
-### [COMPONENT] useAuthStore Is Not Exported from use-auth.ts
-**Date:** 2026-02-09
-**What broke:** Vite production build failed because `deficiency-workflow-actions.tsx` imported `useAuthStore` from `@/hooks/use-auth`, but that file only exports `useAuth` (the hook wrapper). The actual store lives in `@/stores/auth-store`.
-**Why it broke:** During Session 66, `useAuthStore` was used directly instead of `useAuth()`. The dev server (with HMR) didn't catch the missing export, but production build (Rollup) does.
-**Rule to prevent:**
-- Never import `useAuthStore` from `@/hooks/use-auth.ts` — it only exports `useAuth()`.
-- The store (`useAuthStore`) lives in `@/stores/auth-store` but should rarely be used directly.
-- Always prefer `useAuth()` hook which wraps the store with computed values.
-- Production build (`vite build`) catches import errors that dev server misses — always run it.
-**Related docs:** psc-frontend/src/hooks/use-auth.ts, psc-frontend/src/stores/auth-store.ts
-
----
-
-### [RBAC] masterOnly Nav Flag Must Also Allow Office Users
-**Date:** 2026-02-09
-**What happened:** When implementing `masterOnly` filtering for nav items, the initial instinct was `if (item.masterOnly && !isMaster) return false` which would also hide items from office users.
-**Why it matters:** Office users need to see Settings and potentially other "admin" items. The `masterOnly` flag means "hidden from crew" not "hidden from everyone except master".
-**Rule to prevent:**
-- `masterOnly` filter logic: `if (item.masterOnly && !isMaster && !isOffice) return false`
-- Think about ALL user types (master, crew, office PIC/SSQE/DPA) when adding role-based visibility.
-- Name the flag after what it restricts FROM (crew), not who it restricts TO (master).
-
----
-
-### [API] Crew DEF Filtering Must Apply at Every Access Point
-**Date:** 2026-02-09
-**What happened:** VESSEL_CREW users should only see deficiencies assigned to them. This filter must be applied at three separate backend points: list view, detail serializer, and export view.
-**Rule to prevent:**
-- When adding role-based data filtering, audit ALL access paths: list endpoints, detail serializers, export/report views.
-- Defense-in-depth: even if the UI button is hidden, the backend must also enforce the filter.
-
----
-
-### [RBAC] Check Permission Matrix Before Exposing Nav Items to Roles
-**Date:** 2026-02-09
-**What happened:** Crew was shown Inspections and Deficiencies nav items even though the permission matrix shows ❌ on ALL actions for those sections. Crew only needs CARs (upload evidence, complete actions) and Notifications.
-**Rule to prevent:**
-- Before adding nav items, check BACKEND_STRUCTURE.md §11.1 permission matrix for what the role can actually DO on that page.
-- If a role has zero actionable permissions on a page, don't show it in nav — read-only views with no actions are dead weight.
-- Crew's useful pages: CARs + Notifications. Everything else is master/office territory.
-- Always guard both the nav visibility AND the route itself (MasterOnlyGuard pattern).
-- When redirecting crew away from restricted routes, send them to their landing page (/cars), not a page they also can't access.
-- Use `user.role == 'VESSEL_CREW'` (string comparison) in views — the `RoleCodes` enum is in `accounts/models.py` but views often use raw strings.
-
----
-
-### [RBAC] Office Vessel Filtering Must Use master_RoleByVessel — Not Open Access
-**Date:** 2026-02-09
-**What went wrong:** Office users (PIC, SSQE, Supt, PV) had `pass` / `return True` in all list views and the object-level permission check, giving them access to ALL vessels' data. Only DPA should see everything.
-**Why it happened:** During initial implementation, vessel filtering for office users was deferred with `# TODO: filter by master_RoleByVessel` comments. The TODOs survived through 70 sessions because E2E testing focused on vessel users and role-based actions, not office data scoping.
-**Rule to prevent:**
-- Never ship `pass` or `return True` as placeholders for security-critical filtering — use `queryset.none()` as a safe default until the real filter is implemented.
-- When adding vessel-scoped list views, apply the filter at EVERY access point: list views, detail permissions, export/report views.
-- DPA exemption should be explicit and isolated (check role first, then apply filter for everyone else).
-- Create a shared utility function (e.g., `apply_office_vessel_filter`) rather than duplicating filter logic across 4+ views.
-- UUID comparison across managed (char32) and unmanaged (uniqueidentifier) tables needs normalization — always convert to UUID objects before comparing.
-**Related docs:** psc-backend/core/vessel_access.py, psc-backend/apps/inspection/permissions.py, psc-backend/apps/accounts/models.py (MasterRoleByVessel)
-
----
-
-### [Validation] Removing UI Fields Requires Updating All Downstream Validators
-**Date:** 2026-02-09
-**What happened:** Session 72 removed `due_date` from the corrective action create/edit forms per user request, but the `CARSubmitSerializer` (submit precondition validator) still required actions to have both `owner` AND `due_date`. This caused CAR Submit to return 400 Bad Request with "At least 1 immediate corrective action with owner and due date is required."
-**Rule to prevent:**
-- When removing a field from create/edit forms, search the entire backend for ALL validators/serializers that reference that field — not just the create/update serializer.
-- Submit validators, state transition validators, and export generators may all reference the field independently.
-- Pattern: `grep -r "field_name" apps/` after removing any field to find all references.
-- Think of the data flow: create → validate → save → **submit** → review → close. Removing a field from step 1 must cascade through ALL subsequent steps.
-
----
-
-### [DATA] Deficiency Model Field Names Differ From Serializer Output
-- **Date:** 2026-02-09 (Session 74)
-- **Context:** Building dashboard query for monthly DEF trend and top deficiency codes
-- **Mistake:** Used `created_at` and `def_code_description` in ORM queries — neither exists on the Deficiency model
-- **Root Cause:** Deficiency model uses `created_date` (not `created_at`), and `def_code_description` is a SerializerMethodField that joins to PSCDefCode master table — not a model field
-- **Fix:** Use `created_date` for date-based queries. For top def codes, group by `def_code_id` and bulk-lookup descriptions from PSCDefCode separately
-- **Rule:** Always check actual model field names (not serializer output field names) before writing ORM queries. Serializers often rename or add computed fields.
-
-### [DATA] CAR Has No Direct vessel_id — Must Traverse FK Chain
-- **Date:** 2026-02-09 (Session 74)
-- **Context:** Scoping dashboard CAR/CorrectiveAction queries by vessel
-- **Issue:** CAR model has no `vessel_id` field — it connects to vessel through `deficiency.inspection.vessel_id`
-- **Fix:** Use ORM traversal: `CAR.filter(deficiency__inspection__vessel_id=vid)`, `CorrectiveAction.filter(car__deficiency__inspection__vessel_id=vid)`
-- **Rule:** Before writing vessel-scoped queries on any model, check whether it has a direct `vessel_id` or requires FK chain traversal.
-
-## Session Notes
-
-- 2026-02-07: Added Session 33 documentation sync note after FEAT-CAR-005 fix to keep `progress.txt` and `LESSONS.md` aligned.
-- 2026-02-07: Added FEAT-CAR-007/009/010 contract-drift lesson after closing all 7 documented CAR gap tests.
-- 2026-02-07: Added FEAT-CAR-011/012 validation lessons after closing status/owner and completion-idempotency gaps.
-- 2026-02-07: Added FEAT-SYNC-002/003 validation+response-contract lesson after closing six sync gap fixes.
-- 2026-02-07: Added FEAT-SYNC-006 reliability lesson after wiring attachment failure persistence and implementing `/api/psc/sync/upload/{token}/`.
-- 2026-02-07: Added FEAT-SYNC-001 masters-persistence lesson after wiring pull `data.masters` to IndexedDB bulk upsert.
-- 2026-02-07: Added FEAT-INS-007/008/009 edit/delete side-effects lesson after fixing audit, revision, and cascading soft-delete gaps.
-- 2026-02-08: Added FEAT-INS-001/004 validation+submit workflow lesson after closing create-rule, submit-RBAC, submit-CAR, activity-event, and root-path contract gaps.
-- 2026-02-08: Added FEAT-INS-002 upload report description-mandatory validation lesson and aligned documentation in `progress.txt` and `test_progress.txt`.
-- 2026-02-08: Session closed after INS-002 gap verification and documentation sync.
-- 2026-02-08: Added FEAT-INS-003 deficiency create validation/precondition/activity-event lesson after closing all 5 INS-003 gap tests.
-- 2026-02-08: Session closed after INS-003 closure and documentation sync.
-- 2026-02-08: Added FEAT-INS-005/006 transition side-effects lesson after closing missing PIC-review/DPA-close activity events and DPA-close vessel notification.
-- 2026-02-08: Session closed after INS-005/006 closure and documentation sync.
-- 2026-02-08: Added DeficiencyModal Radix dialog a11y lesson and regression rule (`DialogDescription`/`aria-describedby`) after frontend depth-audit updates.
-- 2026-02-08: Added CAR action modal Radix dialog a11y lesson and closed source-component warnings in PIC Accept, Rework, DPA Close, and Evidence Upload modals.
-- 2026-02-08: Added FEAT-SYNC-005 status-flow lesson after correcting `REOPEN_FOR_MERGE` CAR transition from `DRAFT` to `REWORK_REQUESTED`.
-- 2026-02-08: Added backend tooling lesson after aligning validation commands to project venv + local `mypy.ini` and restoring actionable static checks.
-- 2026-02-08: Session closed after documentation sync (`progress.txt`, `LESSONS.md`, `test_progress.txt`) and final verification capture.
-- 2026-02-08: Added FEAT-INS-005/006 route-level transition validation lesson after replacing confirm-only actions with validated comment modals.
-- 2026-02-08: Added FEAT-PV-002 assigned-verifier RBAC lesson after tightening office close permission to identity match.
-- 2026-02-09: Added field-name contract lesson — backend serializer field names (`comment`) don't always match frontend param names (`comments`). Always verify exact field name in serializer before wiring API calls.
-- 2026-02-09: Added TanStack Query cache invalidation lesson — never use `setQueryData` with partial response objects (action endpoints return basic `Inspection`, not full `InspectionDetail`). Use `invalidateQueries` to force refetch of complete data.
-- 2026-02-09: Added CAR reopen status transition lesson — `CARReopenView` was setting status to `REWORK_REQUESTED` but `CanSubmitCAR` only allows `DRAFT`. Both rework and reopen should set status to `DRAFT` for consistent vessel workflow (edit → resubmit).
-- 2026-02-09: Added action button discoverability lesson — critical actions like "Request Rework" and "Reopen CAR" must appear in the sticky bottom bar, not just the overflow dropdown menu. Users miss actions hidden in kebab menus.
-
-- 2026-02-09: Added bulk operations lesson — when implementing batch endpoints, always wrap in `transaction.atomic()` and validate ALL items before mutating ANY (fail-fast pattern). For file downloads, return the simpler format when possible (single PDF vs ZIP for 1 item) to avoid unnecessary overhead.
-- 2026-02-09: Added ZIP blob download lesson — when backend may return different content types (PDF for single, ZIP for multiple), check `blob.type` on the frontend to determine file extension. Pattern: `const ext = blob.type === 'application/pdf' ? 'pdf' : 'zip'`.
-- 2026-02-09: Session 67 closed after bulk DEF submission and bulk CAR PDF download features.
-- 2026-02-09: Session 68 — E2E verified bulk DEF submit (select all, confirm dialog, backend persistence, UI refresh) and bulk CAR download (ZIP with 20 PDFs, correct naming). Both features passed all tests.
-- 2026-02-09: Added Django shell field-name lesson — Deficiency model uses `def_status` (not `status`), `created_date` (not `created_at`). Always check model field choices from error output before retrying.
-- 2026-02-09: Added venv path lesson — on Windows, use forward slashes `venv/Scripts/python.exe` (not backslashes) when running from bash/shell tools.
-- 2026-02-09: Session 69 — Added crew role restriction lessons: useAuthStore import path, masterOnly nav flag must include office, and crew DEF filtering must cover all access points. Fixed pre-existing build error (useAuthStore import).
-- 2026-02-09: Session 70 — Added lesson: always check permission matrix before exposing nav items. Crew had Inspections/Deficiencies visible but zero actionable permissions. Scoped crew to CARs + Notifications only.
-- 2026-02-09: Session 71 — Added office vessel filtering lesson: never ship `pass`/`return True` as placeholder for security filtering. Fixed all 4 list views + object permission to use master_RoleByVessel. Created shared utility in core/vessel_access.py.
-- 2026-02-09: Session 73 — Added field-removal cascading validation lesson. Removing due_date from action forms broke CARSubmitSerializer which still required it. Fixed submit validator to count-based check. Full CAR lifecycle E2E verified (DRAFT→SUBMITTED→PIC_ACCEPTED→CLOSED).
-- 2026-02-09: Session 74 — Added Deficiency model field name lesson: Deficiency has `created_date` (not `created_at`), and `def_code_description` comes from serializer join to PSCDefCode master table (not a model field). Dashboard queries must use `def_code_id` for grouping and bulk-lookup descriptions separately.
-- 2026-02-09: Session 74 — Added CAR vessel scoping lesson: CAR model has no direct `vessel_id` field — must traverse `deficiency__inspection__vessel_id` for vessel filtering. Same pattern for CorrectiveAction → `car__deficiency__inspection__vessel_id`.
-- 2026-02-10: Session 75 — Added VesselData UUID filtering lesson: never use `VesselData.objects.filter(id__in=uuids)` — use `extra(where=[CAST(%s AS uniqueidentifier)])` with hyphenated strings instead. Added type/API field name verification lesson: always compare frontend type field names against actual API response before marking implementation complete.
-
-### [DATA] VesselData Queries Must Use CAST for UUID Filtering
-**Date:** 2026-02-10
-**What went wrong:** Dashboard API returned 500 ProgrammingError for office users (PIC/SSQE). `_get_vessels_for_office_user()` used `VesselData.objects.filter(id__in=vessel_ids)` which mssql-django converts to char(32) parameters against a native `uniqueidentifier` column.
-**Why it happened:** The known UUID gotcha (char(32) vs uniqueidentifier) was documented in MEMORY.md but wasn't applied when the dashboard view was written because the query looked simple and didn't trigger the usual warning signs.
-**Rule to prevent:** ANY query filtering VesselData (or other unmanaged tables) by UUID must use `extra(where=[CAST(%s AS uniqueidentifier)])` — never `filter(id=...)` or `filter(id__in=...)`. The pattern:
-```python
-hyphenated = [str(vid) for vid in vessel_ids]
-placeholders = ','.join(['CAST(%s AS uniqueidentifier)'] * len(hyphenated))
-qs = VesselData.objects.filter(...).extra(where=[f'id IN ({placeholders})'], params=hyphenated)
-```
-**Related docs:** MEMORY.md "SQL Server + mssql-django UUID Gotchas" section
-
-### [API] Always Verify Frontend Type Field Names Match Actual API Response
-**Date:** 2026-02-10
-**What went wrong:** Frontend `DeficiencyDetail` type used `def_text` for the description field, but the backend serializer returns `description`. The deficiency description never rendered on cards or in the detail dialog. The `CAR` type used `def_text` but the API returns `deficiency_description`.
-**Why it happened:** Frontend types were written based on spec document naming conventions (`def_text`) without verifying against the actual serializer field names. The mismatch was never caught because TypeScript only checks type structure at compile time — accessing a non-existent property returns `undefined` at runtime, which renders as empty in JSX without errors.
-**Rule to prevent:** After implementing any API-consuming component, verify field names by: (1) calling the actual API endpoint, (2) comparing the response keys against the TypeScript interface, (3) confirming the rendered output shows real data, not empty/undefined. When renaming type fields, search the entire codebase with `grep` to find all usages including test files.
-**Related docs:** BACKEND_STRUCTURE.md API contracts, types/index.ts
-
-### [WORKFLOW] Unified State Machine Replaces Dual-Status Systems
-**Date:** 2026-02-10
-**Context:** The deficiency workflow had a dual-status system — DefStatus on the Deficiency model (6 states) and CARStatus on the CAR model (5 states). This caused confusion about which status to display, filter by, and transition.
-**Solution:** Unified to a single CAR.status with 9 states, 12 named transitions, one endpoint (`POST /cars/{id}/workflow/`), and a backend `available-actions` endpoint. DEF.def_status is deprecated (kept in DB, not updated by new logic).
-**Key patterns:**
-- State machine as dict: `TRANSITIONS[(current_status, action)] → {target, allowed_roles, comment_required}`
-- `_get_user_workflow_roles(user, deficiency)` resolves owner/reviewer/master/pic/dpa from user attributes
-- Frontend: two workflow action components — `DeficiencyWorkflowActions` (client-side role logic) and `CARWorkflowActions` (uses backend `available-actions` endpoint)
-- Auto-start: ALLOTTED → IN_PROGRESS on any CAR content edit (via `auto_start_if_allotted()`)
-- Legacy endpoints kept as deprecated stubs for backward compat
-**Rule:** When replacing status enums, update ALL references: models, views, serializers, permissions, signals, dashboard, frontend types, constants, format-status, filters, cards, and route pages. Use `replace_all=true` for bulk string replacements (e.g., `DPA_CLOSED` → `CLOSED`).
-
-### [FRONTEND] Replace Legacy Action Modals with Unified Workflow Component
-**Date:** 2026-02-10
-**Context:** The CAR detail page had 5 separate modal components (SubmitConfirmDialog, PICAcceptModal, ReworkModal, DPACloseModal, ReopenModal), each with their own state, mutation hook, and dialog. This was fragile and hard to maintain as workflow evolved.
-**Solution:** Replaced with a single `CARWorkflowActions` component that fetches available actions from the backend and renders buttons dynamically. Actions requiring comments show a generic comment dialog. One transition hook (`useTransitionCAR`) handles all 12 workflow actions.
-**Rule:** When building workflow UIs, prefer a data-driven approach (fetch available actions from backend) over hardcoded permission checks. This ensures frontend stays in sync with backend state machine changes.
-
-- 2026-02-10: Session 76 — Implemented unified CAR workflow overhaul: 9 statuses, 12 named transitions, single workflow endpoint, backend available-actions endpoint, frontend components updated. DefStatus deprecated. Full TypeScript + Vite build verification passed.
-
-### [SECURITY] Unified Workflow Endpoints Must Inherit Legacy Validation
-**Date:** 2026-02-10
-**What went wrong:** The unified workflow endpoint `POST /cars/{id}/workflow/` with `action=SUBMIT_TO_PIC` had NO content/evidence validation — only role and status transition checks. The legacy endpoint (`POST /cars/{id}/submit/`) had proper validation via `CARSubmitSerializer`, but the workflow path completely bypassed it. This allowed Master to submit incomplete CARs to PIC.
-**Why it happened:** When building the unified workflow (Session 76), we focused on the state machine transitions and role-based access. The validation logic was left in the legacy serializer and never ported to the new code path. The two endpoints weren't connected — they were parallel paths to the same outcome.
-**Rule to prevent:** When creating a new "unified" endpoint that replaces multiple legacy endpoints, audit EVERY legacy endpoint for validation logic and ensure the new endpoint inherits it. Create a shared validator function (single source of truth) and call it from both paths. Checklist: (1) Extract validation to a standalone function, (2) Legacy endpoint delegates to it, (3) New endpoint calls it, (4) Available-actions endpoint gates actions based on it.
-**Related docs:** validators.py, serializers.py (CARSubmitSerializer), views.py (CARWorkflowView)
-
-### [VALIDATION] Always .trim() User Input Before Length Checks
-**Date:** 2026-02-10
-**What went wrong:** Frontend `validateCarSubmission()` checked `rootCauseSummary.length` without `.trim()`, allowing a user to bypass the 50-character minimum by padding with spaces. Backend had `.strip()` but frontend didn't match.
-**Why it happened:** Copy-paste oversight — the backend serializer used `.strip()` but the frontend validation function used raw `.length`.
-**Rule to prevent:** All minimum-length checks on user text input must use `.trim()` (frontend) / `.strip()` (backend) before measuring length. Keep backend and frontend validation logic in sync — when one trims, the other must too.
-
-### [PATTERN] Defense-in-Depth for Critical Workflow Actions
-**Date:** 2026-02-10
-**Pattern:** For actions with business-critical preconditions (like CAR submission), implement validation at multiple layers:
-1. **Hide the button** — available-actions endpoint omits the action if preconditions fail
-2. **Client-side check** — validate before sending request (fast feedback, uses cached data)
-3. **Server-side gate** — authoritative validation in the endpoint handler (returns structured error)
-4. **Error handling** — catch and display server validation errors in case client-side check is bypassed
-This prevents bypass via direct API calls, stale UI state, or race conditions.
-
-- 2026-02-10: Session 78 — Fixed CAR submission validation bypass via unified workflow. Created shared validator, gated SUBMIT_TO_PIC at 4 layers, added action description length check (50 chars), fixed .trim() on root cause. E2E testing deferred to Session 79.
-- 2026-02-10: Session 80 — Replaced stored 4-stage inspection workflow with computed OPEN/CLOSED status (action_code_id based). Rewrote follow-up as 5-step wizard on same inspection. Added report_type to InspectionReport. Removed Submit/PIC Review/DPA Close workflow buttons. 20 files modified.
-
----
-
-### [WORKFLOW] Prefer Computed Status Over Stored Status for Derived State
-**Date:** 2026-02-10
-**What changed:** Inspection had a stored `status` field with 4-stage workflow (DRAFT→SUBMITTED→PIC_REVIEWED→DPA_CLOSED). This was replaced with a computed `operational_status` (OPEN/CLOSED) derived from deficiency `action_code_id` annotations.
-**Why it's better:**
-- OPEN = any non-deleted deficiency has `action_code_id IS NULL OR action_code_id != 10`
-- CLOSED = all non-deleted deficiencies have `action_code_id = 10` (Rectified)
-- No manual status transitions needed — status updates automatically when deficiency action codes change
-- Uses RawSQL scalar subquery annotations (SQL Server compatible, no GROUP BY conflicts)
-- Both list and detail views share the same annotations (no N+1)
-**Rule to follow:**
-- When status can be derived from child record states, compute it (don't store it)
-- Use queryset annotations for computed fields to avoid per-row DB queries
-- For SQL Server, always use scalar RawSQL subqueries (not Django ORM aggregations with RawSQL)
-- Filter by annotation name (e.g., `_open_def_count__gt=0`), not by stored field
-**Related docs:** psc-backend/apps/inspection/views.py, psc-backend/apps/inspection/serializers.py
-
----
-
-### [API] ActionCode Is Independent of CAR Status
-**Date:** 2026-02-10
-**Business rule:** A deficiency's ActionCode (e.g., 10=Rectified) is independent of its CAR.status. A DEF can be ActionCode=10 while its CAR is still open (in progress). Follow-up wizard updates action codes but does NOT touch CAR.status.
-**Why it matters:** The follow-up process (vessel records PSC reinspection results) and the CAR process (corrective action lifecycle) are parallel workflows. They converge at inspection closure but progress independently.
-**Rule to prevent:**
-- Do NOT gate ActionCode=10 on CAR closure
-- Do NOT auto-sync DEF closure with CAR status
-- Follow-up endpoint updates `deficiency.action_code_id` and creates `DeficiencyActionHistory` but never touches `CAR.status`
-- 1 DEF = 1 CAR always holds, but their statuses are orthogonal
-**Related docs:** psc-backend/apps/inspection/followup_views.py, Docs/PRD.md
-
----
-
-### [API] Follow-Up Should Update Same Record, Not Create New One
-**Date:** 2026-02-10
-**What changed:** The original follow-up implementation created a NEW inspection record linked to the parent. This was architecturally wrong — a PSC follow-up records the reinspection results on the SAME inspection.
-**Why it matters:** Creating a new record splits the deficiency history, duplicates data, and makes reporting harder. The correct model: follow-up updates deficiency action codes on the existing inspection and optionally uploads a follow-up report (with `report_type='FOLLOW_UP'`).
-**Rule to follow:**
-- Follow-up = update existing deficiencies + optional report upload
-- Use `report_type` field to distinguish original vs follow-up reports on the same inspection
-- Store reinspection_date in ActivityHistory metadata, NOT on the inspection master record
-- Wrap all updates in `transaction.atomic()` to ensure consistency
-**Related docs:** psc-backend/apps/inspection/followup_views.py, psc-backend/apps/inspection/models.py
-
----
-
-### [Backend] Computed Fields Must Have Matching Annotations in ALL Querysets
-**Date:** 2026-02-10
-**What happened:** `compute_operational_status()` relied on `getattr(obj, 'deficiency_count', 0)` but the detail view queryset only annotated `open_deficiency_count` and `closed_deficiency_count` — missing `deficiency_count`. The fallback to 0 meant YES inspections with all defs closed would incorrectly show as OPEN (because `total_count=0` → "no defs yet" → OPEN).
-**Why it matters:** When a helper function uses `getattr(obj, 'field', default)`, the default silently hides the missing annotation. The code appears to work but produces wrong results for specific edge cases.
-**Rule to follow:**
-- When adding a computed helper that reads annotated fields, audit ALL querysets that feed into serializers using that helper
-- List view and detail view querysets often diverge — they must both annotate the same fields if they share serializer logic
-- Prefer failing loudly over silent defaults: consider raising if a required annotation is missing rather than defaulting to 0
-**Related docs:** psc-backend/apps/inspection/views.py, psc-backend/apps/inspection/serializers.py
-
----
-
-### [Backend] Safe State Transitions Need Server-Side Guards
-**Date:** 2026-02-10
-**Pattern:** When a field change can invalidate existing data (e.g., `def_reported` YES→NO when deficiencies exist), always validate on the server — not just the UI.
-**Implementation:**
-- `validate_def_reported()` on UpdateSerializer rejects NO if `deficiencies.filter(is_deleted=False).count() > 0`
-- `DeficiencyCreateView` rejects POST when `inspection.def_reported == 'NO'`
-- Both frontend (hide button) AND backend (reject request) enforce the constraint
-**Rule:** Never rely solely on UI gating for data integrity. Every constraint needs a backend guard.
-**Related docs:** psc-backend/apps/inspection/serializers.py, psc-backend/apps/inspection/deficiency_views.py
-
----
-
-### [COMPONENT] React Stale Closures with Hooks in Async Flows
-**Date:** 2026-02-10
-**What went wrong:** `useUploadInspectionReport(createdInspectionId ?? '')` captured the empty string value at render time. When `setCreatedInspectionId(inspection.id)` was called during `handleSubmit`, the hook's mutation still used the old empty value because React state updates don't re-render mid-async-function.
-**Why it happened:** React hooks capture values from the render in which they're invoked. State updates (useState setter) schedule a re-render but don't synchronously update the variable in the current closure. The upload mutation was called before the re-render occurred.
-**Rule to prevent:**
-- Never use a hook's mutation when the hook's input depends on state that changes in the same async function
-- For two-step flows (create → use created ID), call the API directly with the fresh value instead of through a hook
-- Pattern: `await api.doThing(freshId, data)` instead of `mutation.mutateAsync(data)` when the mutation captured a stale ID
-**Related docs:** psc-frontend/src/routes/inspections/new.tsx
-
----
-
-### [API] DRF Serializer Fields Default to required=True
-**Date:** 2026-02-10
-**What went wrong:** `InspectionReportUploadSerializer.description` was a CharField without `required=False`. The frontend's `uploadInspectionReport()` only sends `file` in FormData, never `description`. This caused a 400 error: `{"description":["This field is required."]}`.
-**Why it happened:** DRF CharField defaults to `required=True`. When adding fields to serializers, the optionality wasn't explicitly set to match what the frontend actually sends.
-**Rule to prevent:**
-- When adding fields to DRF serializers, always explicitly set `required=True/False` — don't rely on defaults
-- Cross-check serializer fields against the frontend API call to ensure all required fields are actually sent
-- For optional fields, always provide `default=''` or `default=None` alongside `required=False`
-**Related docs:** psc-backend/apps/inspection/serializers.py
-
----
-
-### [COMPONENT] Chrome Blocks Programmatic .click() on Hidden File Inputs
-**Date:** 2026-02-10
-**What went wrong:** The file upload component used `inputRef.current?.click()` on a hidden `<input type="file">`. This worked in Edge but not Chrome, which silently blocks programmatic clicks on display:none/visibility:hidden inputs as a security measure.
-**Why it happened:** Different browsers have different security policies for programmatic file input activation. Chrome is stricter than Edge.
-**Rule to prevent:**
-- Never hide file inputs with display:none or visibility:hidden and rely on .click()
-- Instead, overlay the native input over the clickable area using: `position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer`
-- The native input remains interactive, Chrome allows user-initiated clicks on it
-**Related docs:** psc-frontend/src/components/shared/file-upload.tsx
-
----
-
-### [DATA] Cleaning Test Data Requires Full FK Dependency Chain
-**Date:** 2026-02-10
-**What went wrong:** Attempted to DELETE FROM psc_car but hit FK constraint errors from psc_evidence, psc_car_clc_mapping, psc_corrective_action, and psc_physical_verification tables.
-**Why it happened:** Raw SQL DELETE doesn't cascade like Django ORM's .delete(). SQL Server enforces FK constraints strictly and the delete order must respect the full dependency chain.
-**Rule to prevent:**
-- For bulk data cleanup, delete in this order:
-  1. psc_deficiency_action_history
-  2. psc_car_clc_mapping
-  3. psc_corrective_action
-  4. psc_evidence
-  5. psc_physical_verification
-  6. psc_deficiency
-  7. psc_inspection_report
-  8. psc_car
-  9. psc_inspection
-- Prefer Django ORM .delete() for active records (handles cascades automatically)
-- Use raw SQL only for soft-deleted records that the ORM manager excludes
-- The API delete endpoint uses soft-delete and only allows DRAFT status inspections
-**Related docs:** psc-backend/apps/inspection/models.py, BACKEND_STRUCTURE.md
-
----
-
-## Lesson 83: Frontend-Backend Enum Sync
-**Date:** 2026-02-10 | **Session:** 83
-**What happened:** Frontend PSC_SUBTYPES had MORE_DETAILED and CONCENTRATED_IC but backend had INITIAL, EXPANDED, CIC, FOLLOW_UP. Caused 400 errors on create.
-**Why:** Frontend constants were created with assumed values, never validated against canonical docs (BACKEND_STRUCTURE.md).
-**Rule:** Always cross-check frontend enum/constant values against backend model choices AND canonical docs before shipping. When in doubt, backend model is source of truth.
-**Related docs:** BACKEND_STRUCTURE.md, psc-backend/apps/inspection/models.py, psc-frontend/src/lib/utils/constants.ts
-
----
-
-## Lesson 84: assigned_crew_id is UUID, NOT CrewID String
-**Date:** 2026-02-10 | **Session:** 83
-**What happened:** Permission check compared user.crew_id (string like "CRW0002") against deficiency.assigned_crew_id (UUID). They never matched.
-**Why:** HRM501 model has both `id` (UUID) and `CrewID` (string). The deficiency stores the UUID in assigned_crew_id, but the JWT token's crew_id claim is the CrewID string.
-**Rule:** For permission checks against assigned_crew_id (UUIDField), always use `request.user.id` (UUID), NOT `request.user.crew_id` (CrewID string).
-**Related docs:** psc-backend/apps/accounts/backends.py, psc-backend/apps/inspection/deficiency_models.py
-
----
-
-## Lesson 85: VESSEL_CREW Needs Explicit Permission Grants
-**Date:** 2026-02-10 | **Session:** 83
-**What happened:** Crew couldn't edit CAR or add corrective actions because CanEditCAR and CanManageAction only allowed VESSEL_MASTER/OFFICE roles.
-**Why:** Permissions were written for the initial Master-only workflow; crew assignment was added later but permissions weren't updated.
-**Rule:** When adding crew assignment features, audit ALL permission classes that gate the workflow: CanEditCAR, CanManageAction, CanUploadEvidence, CanCompleteAction. Crew must be allowed through each gate they need to pass.
-**Related docs:** psc-backend/apps/car/permissions.py
-
----
-
-## Lesson 86: Frontend Client-Side Permission Checks Must Match Backend
-**Date:** 2026-02-10 | **Session:** 83
-**What happened:** Backend CanEditCAR was fixed to allow crew, but frontend canEditCAR() in [id].edit.tsx still blocked crew (only checked VESSEL_MASTER).
-**Why:** Duplicate permission logic — frontend has its own canEditCAR() function that wasn't updated when backend was fixed.
-**Rule:** When fixing backend permissions, ALWAYS search frontend for matching client-side permission checks. They exist in both the detail page ([id].tsx canEdit) and edit page ([id].edit.tsx canEditCAR()).
-**Related docs:** psc-frontend/src/routes/cars/[id].edit.tsx, psc-frontend/src/routes/cars/[id].tsx
-
----
-
-**Remember:** Every mistake is a learning opportunity. Document it here so it never happens again.
-
----
-
-### [DATA] Office Notification Recipient Lookup Must Use SQL Server UUID-Safe Filtering
-**Date:** 2026-02-10
-**What went wrong:** CAR submission notifications (`CAR_SUBMITTED`) were not created for PIC/SSQE users even when CAR moved to `SUBMITTED_TO_PIC`. Recipient lookup returned an empty office list.
-**Why it happened:** `_get_office_users_for_vessel()` filtered unmanaged `master_RoleByVessel.VesselId` with direct UUID ORM filtering. SQL Server raised conversion errors on mixed/legacy values, so lookup failed and notification pipeline had no recipients.
-**Rule to prevent:**
-- For unmanaged SQL Server tables with UUID-like columns, never rely on direct UUID ORM filtering as the only path.
-- Implement SQL-safe fallback with `TRY_CAST(... AS uniqueidentifier) = CAST(%s AS uniqueidentifier)`.
-- Normalize recipient IDs (trim + dedupe) before notification fan-out.
-- Add regression tests that force direct filter failure and verify fallback behavior.
-**Related docs:** `psc-backend/apps/notifications/signals.py`, `psc-backend/apps/notifications/tests.py`, `Docs/BACKEND_STRUCTURE.md` notifications section
-
----
-
-### [REPORT] PDF Template Must Mirror Current UI Data Model, Not Legacy Fields
-**Date:** 2026-02-10
-**What went wrong:** CAR PDF still printed legacy corrective-action columns (`Due Date`, `Pending`, `Completed`) and CLC internal identifiers/prefixes (`CLC Item ...`, code-prefixed labels), while the current CAR screen expects narrative output (Immediate + Long-term/Preventive) and human-readable root-cause labels.
-**Why it happened:** Report template logic (`apps/car/reports.py`) drifted from current UI/serializer semantics and retained old table-oriented mapping.
-**Rule to prevent:**
-- Treat PDF/export as a first-class UI surface: when CAR screen model changes, update print mapping in the same change set.
-- Never print internal IDs/codes in end-user CAR reports unless explicitly required.
-- For CLC output, resolve label text from master data and strip code prefixes before rendering.
-- For corrective actions, print only fields that exist in current section semantics.
-**Related docs:** `psc-backend/apps/car/reports.py`, `psc-frontend/src/components/car/car-form.tsx`, `Docs/APP_FLOW.md` CAR edit/detail sections
-
----
-
-### [WORKFLOW] Duplicate runserver Processes Can Serve Stale Code and Fake “No Change”
-**Date:** 2026-02-10
-**What went wrong:** User reported “same no change” after backend patch because multiple `manage.py runserver` processes were listening on port `8000`, so requests could hit stale code paths.
-**Why it happened:** Dev server lifecycle was not normalized; old background runserver processes were left running.
-**Rule to prevent:**
-- Before verifying a critical fix, ensure only one backend process is bound to the target port.
-- If behavior appears unchanged after code changes, check listener PID(s) first, then restart cleanly.
-- Use no-cache headers and timestamped filenames for exported files to avoid stale-download confusion.
-**Related docs:** `psc-backend/apps/car/report_views.py`, `psc-backend/apps/inspection/report_views.py`, `Docs/DEBUG_AGENT.md`
-
----
-
-### [REPORT] Keep Approval Comments in Dedicated Body Sections, Not Timeline Text
-**Date:** 2026-02-10
-**What went wrong:** CAR PDF `Review / Approval History` printed raw `event_description`, which included appended PIC/DPA comment text. This duplicated approval comments in timeline rows and mixed audit metadata with narrative comments.
-**Why it happened:** Report history rendering was coupled to workflow activity message formatting instead of separating action metadata (who/when/what) from comment payloads intended for dedicated body fields.
-**Rule to prevent:**
-- In PDF/report timelines, render action metadata only; never rely on full event strings when comments can be appended.
-- Put approval comments (PIC/DPA) in explicit main-body sections with deterministic data-source fallback.
-- For DPA comment sourcing, prefer dedicated model field; otherwise derive from DPA-close history comment before using generic `last_action_comment`.
-- Add report tests that assert both presence in body and absence in history for approval comments.
-**Related docs:** `psc-backend/apps/car/reports.py`, `psc-backend/apps/car/tests.py`
-
----
-
-### [WORKFLOW] Every New Workflow Transition Must Be Wired to Notification Dispatch
-**Date:** 2026-02-10
-**What went wrong:** CARs successfully transitioned from `PIC_REVIEW` to `SUBMITTED_TO_DPA`, but DPA users received no notification.
-**Why it happened:** `CARWorkflowView._send_notifications()` was not updated when `SUBMIT_TO_DPA` transition was introduced, so the action had no notification branch.
-**Rule to prevent:**
-- For each workflow action in `apps/inspection/workflow.py`, verify parity in dispatch side effects: activity, audit, and notification.
-- Add an explicit dispatch test per critical action in `apps/car/tests.py` (mock notify function, assert branch called).
-- When adding role-specific recipient logic, add trigger-function coverage in `apps/notifications/tests.py`.
-**Related docs:** `psc-backend/apps/car/views.py`, `psc-backend/apps/notifications/signals.py`, `psc-backend/apps/car/tests.py`, `psc-backend/apps/notifications/tests.py`
-
----
-
-### [API] Notification Visibility Must Be Recipient-Scoped, Not Vessel-Wide
-**Date:** 2026-02-10
-**What went wrong:** Vessel users saw multiple notifications for one action because list/read filters matched `vessel_id` broadly, exposing notifications addressed to other crew and office users on the same vessel.
-**Why it happened:** Notification query/permission logic mixed recipient-specific and vessel-wide predicates (`... OR vessel_id = user.vessel_id`) without a true broadcast notification model.
-**Rule to prevent:**
-- For inbox/read endpoints, enforce recipient ownership first:
-  - Vessel: `recipient_type='CREW' AND recipient_id=user.crew_id`
-  - Office: `recipient_type='OFFICE' AND recipient_id=user.employee_id`
-- Do not use vessel_id-only filtering for recipient-specific records.
-- Add tests for same-vessel cross-recipient isolation on list, mark-read, and mark-all-read.
-**Related docs:** `psc-backend/apps/notifications/views.py`, `psc-backend/apps/notifications/permissions.py`, `psc-backend/apps/notifications/tests.py`, `Docs/PRD.md` FEAT-NOTIF-001
-
----
-
-### [COMPONENT] High-Impact Workflow Actions Need Explicit User Confirmation
-**Date:** 2026-02-10
-**What went wrong:** Master could trigger send/re-send to PIC actions with a single click, increasing accidental resubmission risk after rework.
-**Why it happened:** Workflow action rendering was generic and action execution was immediate; no role+action-specific confirmation gate existed for this high-impact transition.
-**Rule to prevent:**
-- Add a confirmation modal for critical transitions that re-enter review cycles (e.g., send/resubmit to PIC).
-- Detect confirmation targets by explicit action-key allowlist from backend available-actions, not by status heuristics.
-- Keep transition execution path unchanged (`executeTransition`) and preserve backend-driven comment rules (`comment_required`).
-**Related docs:** `psc-frontend/src/components/car/car-workflow-actions.tsx`, `Docs/PRD.md` FEAT-CAR-004
-
----
-
-### [SYNC] User-Scoped Query Keys Are Mandatory For Authenticated Notification Data
-**Date:** 2026-02-10
-**What went wrong:** Notification badge/list could appear empty right after login and only show data after a full refresh.
-**Why it happened:** Notification queries used global query keys and were not tied to auth/recipient identity, so cache from a previous auth context could be reused on first post-login render.
-**Rule to prevent:**
-- For authenticated user-specific data (notifications, inbox, tasks), include a stable user scope segment in TanStack Query keys (e.g., `office:{employee_id}` / `crew:{crew_id}`).
-- Gate query execution on auth readiness (`isInitialized && isAuthenticated`) plus required recipient identifiers.
-- For login-sensitive surfaces, force first-mount freshness with `refetchOnMount: 'always'` when appropriate.
-**Related docs:** `psc-frontend/src/hooks/use-notifications.ts`, `psc-frontend/src/hooks/use-auth.ts`, `Docs/FRONTEND_GUIDELINES.md`
-
----
-
-### [REPORT] External PDF Sanitization Must Be Transition-Scoped, Not Global
-**Date:** 2026-02-11
-**What went wrong:** External-mode sanitization removed internal tokens globally across payload text, which risks mutating legitimate business content outside history/transition fields.
-**Why it happened:** Sanitization was implemented as recursive payload string replacement instead of targeting transition-notation sources only.
-**Rule to prevent:**
-- Sanitize only transition-derived text (e.g., `(STATE_A -> STATE_B)` / `(STATE_A → STATE_B)`) in history/office transition paths.
-- Do not globally strip `_REVIEW` / `SUBMITTED_` from all report strings.
-- Keep tests scoped to transition-rendered output, not all paragraphs.
-**Related docs:** `psc-backend/apps/car/reports.py`, `psc-backend/apps/car/tests.py`
-
----
-
-### [DB] Model Changes Must Be Followed By Local Migration Apply Before UI Verification
-**Date:** 2026-02-11
-**What went wrong:** CAR list UI failed with HTTP 500 after code updates because backend schema lacked `inspection.0008_car_initial_action_code`.
-**Why it happened:** Code and migration state diverged in local runtime; endpoint query path hit unapplied schema.
-**Rule to prevent:**
-- After introducing model fields, run and verify app migrations before functional UI checks.
-- Use `showmigrations` to confirm target migration is applied.
-- If UI suddenly returns 500 after backend model changes, check migration state first.
-**Related docs:** `psc-backend/apps/inspection/migrations/0008_car_initial_action_code.py`, `psc-backend/apps/inspection/deficiency_models.py`
+# VIMS Safety Module - Lessons Learned
+
+> Corrections-driven learning file. Reviewed at every session start, updated after every user correction or confirmed non-obvious win.
+>
+> **Numbering:** `L-###` (zero-padded, append-only - never renumber).
+> **Format per entry:** What happened | Why | Rule that prevents recurrence.
+> **Trigger for new entry:** (a) any user correction, (b) any confirmed non-obvious win worth preserving, (c) any cross-module contract drift caught in review.
+>
+> Seed entries L-001 / L-002 / L-003 capture the most load-bearing lessons from Sessions 1-5 interrogation; preserve them verbatim.
+
+---
+
+## L-001 - External reference packs can reshape locked specs
+**What happened:** Round 21 reference pack (TapRoot, ABS RCA, IMO RCA guidance) surfaced 23 enhancements after Session 4 had already "closed" the V1 spec. Causal layering (Immediate/Intermediate/Root) was added on top of M-SCAT as a result.
+**Why:** "Interrogation complete" is a state-in-time, not permanence. External references introduce patterns the original interrogation didn't probe.
+**Rule:** Before docsuite generation, always run a final gap-analysis pass against any new reference material the user contributes. Do not treat spec close as immutable.
+
+## L-002 - Paper-first means no scan upload
+**What happened:** Initial SOI design assumed scanned-PDF upload after paper fieldwork.
+**Why:** User clarified (D-GAP-E4) that paper is filed in ship SMS filing system - scan upload is duplicative and creates a second source of truth.
+**Rule:** When a workflow is "paper-first," the system generates -> user downloads -> paper becomes authoritative -> findings registered digitally via unique ID only. No upload column, no scan endpoint.
+
+## L-003 - Role persists, person may change
+**What happened:** Early drafts had "Acting-DPA" and "Acting-CO" concepts.
+**Why:** D-GAP-A3/A4 locked that ranks are always staffed; the person in the role changes via normal crew rotation but the role itself is continuous.
+**Rule:** No "Acting-*" concepts anywhere. No deputy chains. No MD-escalation logic. Use the timeline-extension procedure (D-GAP-B2) as the universal escape valve.
+
+---
+
+<!-- Append new L-### entries below as corrections occur. Never edit entries above; never renumber. -->
+
+## L-004 - Do not edit the live monorepo when the handover workspace is the requested build target
+**What happened:** Initial execution started by inspecting and preparing to patch `C:\Users\himan\Desktop\Complete_VIMS` because the user called it the monorepo folder, then the user corrected the target and required all development to stay inside the handover package.
+**Why:** The session mixed "actual monorepo" discovery with "handover workspace" execution and did not lock the write target early enough.
+**Rule:** Before any file edit, confirm the write target root from the user's latest instruction. If the user directs work to the handover package, do all implementation and verification there and keep the live monorepo read-only unless the user explicitly re-authorizes direct changes.
+
+## L-005 - Treat DB-name drift against the locked docs as a contract issue, not a harmless default
+**What happened:** Step `0.1` artifacts still referenced `ksm_marine_live`, while `AGENTS.md`, `CLAUDE.md`, `TECH_STACK.md`, and `BACKEND_STRUCTURE.md` all lock the shared Safety database to `ksm_marine_live`.
+**Why:** Scaffold tests and progress notes can inherit stale environment assumptions from earlier workspace setup, and that drift silently contaminates later auth, migration, and repository work.
+**Rule:** When a DB name, alias, or host in code/tests disagrees with the locked docs, correct the artifact immediately and carry the docs value forward. Do not preserve the stale default just because it currently exists in the workspace.
+
+## L-006 - Use `progress.txt` as the execution handoff when `AGENTS.md` startup notes lag behind
+**What happened:** `AGENTS.md` still said to begin at Step `0.1`, but `docsuite/progress.txt` showed that Steps `0.1` and `0.2` were already complete and that the correct carry-forward target was Step `0.3`.
+**Why:** `AGENTS.md` is a stable entry-point document, while `progress.txt` is the cross-session state file and will change as implementation moves forward.
+**Rule:** At session start, treat `AGENTS.md` as orientation and `progress.txt` as the live handoff. If they differ on current step, continue from `progress.txt` and record the newer state there again at session close.
+
+## L-007 - When Step file paths and frontend naming guidance drift, preserve the step path but keep exported symbols aligned with the frontend rules
+**What happened:** `docsuite/IMPLEMENTATION_PLAN.md` Step `0.4` named files like `src/hooks/safety/use-auth.ts` and `src/stores/safety/incident-draft-store.ts`, while `docsuite/FRONTEND_GUIDELINES.md` preferred `use-safety-auth.ts` and `safety-incident-draft-store.ts`.
+**Why:** The implementation plan is the execution blueprint for which files to create in a phase, but the frontend guidelines carry the stronger naming convention for exported `Safety*` components and `useSafety*` hooks.
+**Rule:** If a phase step's required file paths differ from the frontend-guideline naming examples, create the step-mandated paths for execution continuity, keep the exported component and hook names aligned with `FRONTEND_GUIDELINES.md`, and record the discrepancy in `tasks/todo.md` and `progress.txt`.
+
+## L-008 - Seed artifacts outrank summary assumptions about natural keys and scalar types
+**What happened:** Step `0.5` uncovered that `seed-data/soi_checklist_v1.csv` uses decimal Section 12 item numbers like `12.1` and contains a duplicated `(area_id, subsection_id, item_number)` pair with different descriptions.
+**Why:** The docsuite summary for `master_soi_area_item` implied an integer `item_number` and uniqueness on `(area_id, subsection_id, item_number)`, but the real seed artifact is the load-bearing input and exposes the stronger truth the DDL must accommodate.
+**Rule:** Before locking DDL or upsert keys for a seeded master table, validate the actual seed artifacts first. If the artifact and the summary disagree, preserve the artifact, record the drift, and carry the reconciliation into the next schema step instead of coercing the data to fit the summary.
+
+## L-009 - Mid-phase migration stubs must not break the app migration graph or unrelated tests
+**What happened:** Adding `0002_seed_master_tables.py` before Step `0.6` initially broke Django migration loading because there was no `0001_initial.py`, and then the data migration tried to seed tables that did not yet exist in SQLite test runs.
+**Why:** Even placeholder migrations participate in the global migration graph, so a stub written for sequencing can still break unrelated tests if it assumes later schema work already exists.
+**Rule:** When a phase requires introducing a migration stub ahead of the real DDL, add the minimum valid parent migration and guard the data migration so it no-ops cleanly until the required tables exist.
+
+## L-010 - Raw SQL seeders need database defaults, not just Django field defaults
+**What happened:** Step `0.6` initially created the real `0001_initial.py` table shells with Django-side `default=` values only, and the Step `0.5` raw SQL seed migration then failed because omitted `master_*` columns such as `active` and `created_date` had no database-level defaults.
+**Why:** `default=` populates values through the ORM, but `seed_master_safety.py` inserts rows with explicit SQL and depends on the database schema itself to fill omitted columns.
+**Rule:** If a migration-created table will be seeded by raw SQL or a management command that omits some non-null columns, either give those columns a `db_default` in the migration or have the seeder write them explicitly. Do not assume ORM defaults will protect raw inserts.
+
+## L-011 - During development, do not change existing tables unless the task explicitly requires it
+**What happened:** Ongoing Safety implementation work is being built around an existing shared schema surface, and unnecessary edits to already-existing tables create avoidable cross-module risk and migration drift.
+**Why:** Existing tables may be consumed by other modules, seeded data, or live integrations, so changing them during routine feature development can break contracts outside the current task.
+**Rule:** While doing development, do not make changes to existing tables unless the current task explicitly requires that table change and the impacted contract has been reviewed first.
+
+## L-012 - Keep package `__init__` files import-light when tests bootstrap Django manually
+**What happened:** Full `tests.safety` discovery initially failed because `apps.safety.authentication.__init__` imported DRF/SimpleJWT-backed modules before Django settings were configured, and one auth test imported DRF test helpers before calling its local bootstrap.
+**Why:** In this handover workspace, many tests intentionally configure Django inside the test module. Heavy package-level imports can force Django/DRF settings access too early and turn harmless import order into false-red suite failures.
+**Rule:** Keep package `__init__` modules lightweight in the handover workspace, especially around auth and DRF integrations. When a test uses manual bootstrap, call it before importing DRF, SimpleJWT, or project modules that transitively depend on configured Django settings.
+
+## L-013 - When phase-gate rules conflict across docs, follow the arbitration order and record the chosen source
+**What happened:** Step `1.3` exposed a direct conflict: `VALIDATION_RULES.md` still put `imo_classifier`, `risk_band`, and `investigation_depth` in the Phase `1 -> 2` gate, while `IMPLEMENTATION_PLAN.md` Step `1.4` and `APP_FLOW.md` clearly place those fields in Phase `2`.
+**Why:** The docsuite contains phase-by-phase detail written from different angles, so gate rules can drift even when the underlying intent is stable.
+**Rule:** When a validation rule conflicts with the phase breakdown or route contract, resolve it using the published arbitration order, implement against the higher-priority phase source, and record the decision in `tasks/todo.md` and `progress.txt` so the next session does not reintroduce the drift.
+
+## L-014 - Treat the user's actual environment identifiers as higher-priority runtime truth than inherited handover defaults
+**What happened:** The handover docsuite had been normalized around `ksm_cms_live`, but the user later clarified that the actual target database in this environment is `ksm_marine_live`, and the document set had to be corrected after Step `1.4` work was already complete.
+**Why:** Handover packages can carry forward historical environment assumptions that are internally consistent but still wrong for the user's live setup.
+**Rule:** When the user provides a concrete runtime identifier such as the real database name, treat it as authoritative for environment-specific docs and carry it through the handoff files immediately. Do not keep the inherited default just because multiple documents already agree with each other.
+
+## L-015 - When the user gives exact environment config, mirror it verbatim in workspace settings before arguing for normalization
+**What happened:** The workspace still had a stale DB smoke test and SQLite placeholder settings while the user supplied an explicit `DATABASES['default']` snippet for `ksm_marine_live` using `HOST='localhost'`, `PORT='1433'`, blank `DB_USER` / `DB_PASSWORD`, ODBC Driver 18, and `Trusted_Connection=yes`.
+**Why:** It is easy to optimize for what looks more conventional (`HOST` / `PORT` fields, no `USER` on trusted auth) and postpone the literal user-provided config, but that leaves the checked-in workspace out of sync with the user's declared runtime truth.
+**Rule:** If the user provides an exact environment configuration snippet, update the workspace to match that snippet first, then document any remaining runtime handshake issue separately. Do not silently normalize the shape before mirroring the user's stated config.
+
+## L-016 - When a step description conflicts with higher-priority docs, preserve the higher-priority contract and record the drift
+**What happened:** Step `1.6` in `IMPLEMENTATION_PLAN.md` described multi-vessel linking via a `related_incident_ids` array, but the higher-priority SSOT / PRD / APP_FLOW / BACKEND docs all locked the handover workspace to the existing self-link fields `linked_incident_id` and `superseded_by_id`.
+**Why:** Step-level execution notes can carry shorthand or stale shape details that no longer match the canonical contract stack.
+**Rule:** If a step file names a data shape that conflicts with higher-priority docs, implement the higher-priority contract, note the drift explicitly in `tasks/todo.md` and `progress.txt`, and do not add a second parallel shape just to satisfy the lower-priority wording.
+
+## L-017 - A phase step is not complete until its transition gate matches the newly implemented contract
+**What happened:** Step `1.6` initially added the Phase 4 fact-base tables and APIs, but the `PhaseStateMachine` still had an older placeholder Phase `4 -> 5` gate that did not enforce the locked recency-bias evidence-tab rule.
+**Why:** It is easy to finish the visible CRUD surface and miss the phase-transition logic that actually determines whether the feature behaves according to the docsuite.
+**Rule:** When implementing any phase-scoped feature, inspect and update the corresponding phase gate in `PhaseStateMachine` during the same step, then add a focused transition test so the step closes with both the data surface and the gate behavior aligned.
+
+## L-018 - Seed-reference reality outranks implied typed subsets in the docs
+**What happened:** Step `1.7` surfaced that the handover `seed-data/mscat_taxonomy.csv` currently loads only `cause_type='BASIC_CAUSE'` rows, even though the docsuite wording around blame-fixation and Lack-of-Control implies a richer typed subset that the workspace data cannot actually prove yet.
+**Why:** Some docs summarize downstream semantic groupings as if they were already encoded in the seed data, but the real handover artifact may only provide a flatter source shape.
+**Rule:** Before implementing logic that depends on a supposed typed subset inside a seeded master table, inspect the actual seed artifact first. If the artifact does not encode that subset, fall back to the strongest provable heuristic, record the drift in `tasks/todo.md` and `progress.txt`, and do not silently invent reference-data structure that the seed does not contain.
+
+## L-019 - Distinguish sandboxed Windows-auth failures from a real SQL outage
+**What happened:** Direct `pyodbc` and `sqlcmd` runs against `ksm_marine_live` failed inside the Codex sandbox with `SSL Provider: No credentials are available in the security package` / `Encryption not supported on the client`, while SQL MCP and an unsandboxed `python -m unittest tests.safety.test_db_connection -v` run both succeeded against the same server, database, and Windows identity.
+**Why:** The failing path was the sandbox's integrated-auth token, not the SQL Server instance itself, so treating the symptom as "DB down" would create a false blocker and keep the workspace test surface red for the wrong reason.
+**Rule:** When a live SQL smoke test fails under `Trusted_Connection=yes`, verify the same target through SQL MCP or an unsandboxed run before reporting the database as unreachable. If the failure is the known sandbox-only SSPI handshake issue, make the test skip explicitly or use SQL-auth overrides rather than leaving a false-red DB failure in the handoff.
+
+## L-020 - Do not describe the SQLite unit harness as the user's actual database
+**What happened:** Phase `1.9` verification used the existing `tests/safety/support.py` in-memory SQLite bootstrap for fast unit coverage, and that could be misread as the runtime environment even though the user's real target is SQL Server `ksm_marine_live`.
+**Why:** The handover workspace mixes lightweight logic tests with SQL Server-specific integration checks, so it is easy to blur "test harness backend" with "deployment database".
+**Rule:** When reporting test results in this workspace, explicitly separate the unit-test harness database from the real runtime database. Always state that the production target is SQL Server `ksm_marine_live`, and never imply that SQLite is the user's actual environment.
+
+## L-021 - Treat sandboxed Vite or Vitest `spawn EPERM` as an execution-mode issue before treating it as a frontend misconfiguration
+**What happened:** After the missing root frontend toolchain was added, `npm test` and Vite-backed config loading still failed inside the sandbox with `spawn EPERM`, while the same commands passed immediately when rerun outside the sandbox.
+**Why:** Vite, Vitest, and esbuild spawn worker processes, and that can be blocked by the sandbox even when the project configuration is otherwise correct.
+**Rule:** If Vite or Vitest fails in this workspace with `spawn EPERM`, verify the TypeScript surface locally, then rerun the command outside the sandbox before declaring the frontend toolchain broken. Distinguish environment execution limits from real config or code errors.
+
+## L-022 - When a handover step depends on a missing sibling-module live join, ship a workspace-safe seam and record the exact production gap
+**What happened:** Step `1.10` required the Inspection-module `psc_physical_verification` pattern plus HR/CMS-driven leave-transfer behavior, but those real cross-module surfaces were not present in the handover workspace.
+**Why:** The handover package is intentionally narrower than the real monorepo, so some documented live joins cannot be proven end-to-end locally even when the step itself still needs a runnable implementation and test surface.
+**Rule:** If a phase step depends on a sibling-module live join that the handover workspace does not contain, implement a workspace-safe seam that preserves the local contract shape, then record the missing production integration explicitly in `progress.txt` and `tasks/todo.md` instead of pretending the live join is complete.
+
+## L-023 - When step prose and file inventory drift from the stronger schema contract, harden the existing surface instead of duplicating it
+**What happened:** Step `1.11` prose asked for a new `apps/safety/models/corrective_action.py` file and a shorter `OPEN -> IN_PROGRESS -> VERIFIED -> CLOSED` CA lifecycle, but the higher-priority `BACKEND_STRUCTURE.md` already locked the workspace CA contract to the existing `CorrectiveAction` model under `apps/safety/models/recommendation.py` with `PENDING_VERIFY` and `REOPENED` states.
+**Why:** Step-level execution notes can lag behind the canonical schema/API contract, and blindly following the file list would have created a second parallel CA implementation with the wrong lifecycle.
+**Rule:** If a step's file inventory or state-machine summary conflicts with the stronger backend contract already present in the workspace, extend the existing implementation surface and record the drift. Do not create duplicate model paths or downgrade the canonical lifecycle just to match lower-priority shorthand.
+
+## L-024 - If the user authorizes the real Safety target DB, prefer live SQL Server validation over the SQLite harness for schema/integration confidence
+**What happened:** The workspace kept using the in-memory SQLite harness for focused Step `1.x` verification even after the user clarified that `ksm_marine_live` may be used, provided existing shared tables are not modified.
+**Why:** The handover package already had fast SQLite bootstrap tests, and earlier sessions were conservative about live-schema churn, so the default testing path stayed local longer than the user's actual preference.
+**Rule:** When the user explicitly authorizes use of `ksm_marine_live`, use the real SQL Server for live validation and Safety-owned table work where feasible, while still avoiding changes to existing shared tables unless the task explicitly requires them. Use the SQLite harness only for isolated unit-style coverage or when live SQL would be unnecessarily destructive/noisy.
+
+## L-025 - Treat same-DB cross-module schema drift as a live-contract check, not a naming cleanup exercise
+**What happened:** Step `1.13` docs referenced shorthand Reporting surfaces like `vims_noon_report` / `vims_reporting_daily_report`, but the actual `ksm_marine_live` schema exposed the legacy tables `dbo.NoonReport`, `dbo.DepartureReport`, `dbo.ArrivalReport`, and `dbo.NoonReportPort` with inconsistent coordinate column names such as `Longitud2` / `Longitud3`.
+**Why:** Cross-module handover docs can normalize or summarize sibling schemas, while the live database remains the runtime integration contract that the code must actually survive.
+**Rule:** Before implementing any same-DB live join, inspect the real target tables and columns in `ksm_marine_live` first. Use the observed schema as integration truth, then record any docs drift explicitly in `tasks/todo.md` and `docsuite/progress.txt` instead of coding against the shorthand alone.
+
+## L-026 - Role-based visibility exceptions belong in the shared scope filter, not in ad hoc view branches
+**What happened:** Step `1.14` needed a non-default visibility rule: Masters may read closed incidents fleet-wide, while DPA and FM must be global by role even when `is_global` is not explicitly populated on the request user.
+**Why:** If these exceptions are patched separately into individual list or detail views, the workspace drifts quickly and the same RBAC rule gets enforced differently across routes.
+**Rule:** When a Safety visibility rule changes by role, implement it once in the shared vessel-scope layer and verify both list and detail behavior with focused tests. Do not scatter role-specific visibility branches across multiple views.
+
+## L-027 - When a dedicated module step starts on a shared table, add dedicated API and route surfaces before expanding schema
+**What happened:** Step `2.1` introduced the first dedicated Near Miss module surfaces, but the current handover workspace still models Near Miss on the shared `vims_safety_incident` shell rather than on a richer near-miss-specific schema.
+**Why:** The docsuite can describe a fuller eventual module shape than the current workspace schema can safely support, and jumping straight to new columns would create undocumented drift before the next phase steps justify it.
+**Rule:** When a new module phase starts on top of an existing shared record, first carve out dedicated serializers, views, routes, and tests around the shared model. Expand schema only when the later step explicitly requires it and the stronger backend contract supports it.
+
+## L-028 - When route-level action gates drift from the frozen step plan, implement the step-plan contract and record the docs drift
+**What happened:** Step `2.2` surfaced a direct mismatch: `APP_FLOW.md` still described Near Miss triage and fleet-alert action gates as `SAF_P_008` / `SAF_P_009`, while `IMPLEMENTATION_PLAN.md` explicitly assigned Step `2.2` triage to `SAF_P_002`.
+**Why:** Screen-flow docs can lag behind the frozen execution blueprint, especially when later-step action IDs are described before the intermediate workspace slice is built.
+**Rule:** If route-level process IDs in `APP_FLOW.md` conflict with the current frozen implementation step, implement the `IMPLEMENTATION_PLAN.md` contract, note the drift in `progress.txt` and `tasks/todo.md`, and avoid inventing a second parallel gate just to satisfy the lower-priority route prose.
+
+## L-029 - When a feature's route surface drifts across docs, follow the frozen implementation step and record the UI-contract mismatch
+**What happened:** Step `2.3` surfaced another near-miss docs mismatch: `IMPLEMENTATION_PLAN.md` explicitly required a dedicated `src/routes/safety/near-miss/[id]/analysis.tsx` route, while `APP_FLOW.md` still mapped `FEAT-SAF-NM-004` to the generic near-miss detail surface instead of a separate analysis route.
+**Why:** Screen-flow documentation and frozen execution steps can diverge when a feature is described both as a user-facing surface and as a file-by-file implementation slice.
+**Rule:** If a feature's route/file surface in `APP_FLOW.md` conflicts with the current frozen implementation step, build the `IMPLEMENTATION_PLAN.md` surface, log the drift in `progress.txt` and `tasks/todo.md`, and do not collapse the feature back into an older generic route just to satisfy lower-priority flow prose.
+
+## L-030 - When a step's anti-spam shorthand conflicts with the validation and screen contract, enforce the higher-priority create-path rules
+**What happened:** Step `2.4` in `IMPLEMENTATION_PLAN.md` described near-miss throttling as `5 per vessel per hour` with `>=50` characters, while the broader create-path docs locked the user-facing and validation contract to `>=100` characters and reset guidance at `00:00` vessel local time from `wrh_ship_time_config`.
+**Why:** Execution-plan prose can compress a feature so far that it drifts from the actual validation and route behavior defined elsewhere in the docsuite.
+**Rule:** If a step summary disagrees with the create-screen and validation contract, resolve it with the published arbitration order and implement the higher-priority input/UI rule on the real endpoint. Record the discarded shorthand in `progress.txt` and `tasks/todo.md` so later sessions do not revert it.
+
+## L-031 - When an action gate in APP_FLOW conflicts with the backend permission registry, use the backend registry and record the stale route prose
+**What happened:** Step `2.5` surfaced a near-miss fleet-alert gate mismatch: `APP_FLOW.md` still assigned the route to `SAF_P_009`, while `BACKEND_STRUCTURE.md` owns the `SAF_P_*` registry and locks fleet circular emit authority to `SAF_P_024`.
+**Why:** UI-flow prose can preserve older route/action IDs even after the backend permission registry has been refined and frozen more precisely.
+**Rule:** If a route-level action gate in `APP_FLOW.md` conflicts with `BACKEND_STRUCTURE.md`'s permission registry, implement the backend registry value, note the drift in `progress.txt` and `tasks/todo.md`, and do not reuse the stale APP_FLOW process ID just to keep the prose unchanged.
+
+## L-032 - Near-miss anonymity is not complete until audit and derived exits are filtered too
+**What happened:** Step `2.6` started with serializer-level masking already in place for the main near-miss list/detail responses, but the workspace still lacked a near-miss audit exit and would have leaked reporter-history rows if the incident audit pattern were copied over unchanged.
+**Why:** It is easy to treat `AnonymityMixin` as the whole solution because it protects the primary record serializers, while append-only field history, PDF/search payload builders, and other derived exits can bypass that path entirely.
+**Rule:** When a feature depends on near-miss anonymity, verify every exit that can expose reporter identity: list, detail, audit/history, and any PDF/search/export payload builders in scope. Do not assume serializer masking alone closes the boundary.
+
+## L-033 - When the handover workspace already ships the schema shell for a step, extend that shell instead of recreating the step from prose
+**What happened:** Step `3.1` prose described a fresh SCM model with dedicated ten-section meeting fields, but the workspace already had `vims_safety_scm_meeting` and `vims_safety_scm_agenda` table shells in `0001_initial.py`.
+**Why:** Frozen step prose can summarize the desired feature shape at a higher level than the current checked-in workspace, and blindly following it would have created a second parallel storage path or forced an unnecessary migration.
+**Rule:** Before implementing a new phase step in the handover workspace, inspect the existing migration and model surface first. If the required table shell already exists, extend that shell and map the feature onto the strongest existing schema path, then record any prose-vs-schema drift in `progress.txt` and `tasks/todo.md`.
+
+## L-034 - When a seeded permission catalog conflicts with the active step contract, follow the higher-priority workflow docs and keep the extra permission as recorded drift
+**What happened:** Step `3.2` exposed a new SCM gate mismatch: the workspace permission seed already contains `SAF_P_012 = SAFETY_SCM_AD_HOC_CREATE`, while the higher-priority startup docs and SCM user-flow docs still keep both Regular and Ad-Hoc SCM creation on shared `SAF_P_001` with role differentiation in the view layer.
+**Why:** Permission catalogs can be broader or older than the currently active workflow slice, and blindly splitting the gate to match the seed would have diverged from the stronger handover contract already used in `Step 3.1`.
+**Rule:** If a seeded `SAF_P_*` code suggests a narrower action gate than the active step contract in the higher-priority docs, keep the implemented workflow aligned with the higher-priority contract, enforce role differentiation in code where required, and record the seed-vs-workflow drift explicitly in `progress.txt` and `tasks/todo.md`.
+
+## L-035 - When a live same-DB module schema has moved to a newer table family, join the real tables instead of preserving older docs shorthand
+**What happened:** Step `3.3` SCM attendance initially pointed toward the docsuite shorthand `wrh_attendance` / `wrh_daily_rest_hours`, but the real `ksm_marine_live` WRH contract in this environment had already moved to `wrh_s520_day_entry` + `wrh_s520_month` + `wrh_ship_time_config`.
+**Why:** Cross-module docs can preserve an older abstraction even after the sibling module has consolidated its runtime schema onto newer transactional tables.
+**Rule:** Before implementing any same-DB live join, inspect the current production table family first. If the real module contract has moved to a newer schema path, join that path directly, record the shorthand drift in `progress.txt` and `tasks/todo.md`, and do not add compatibility code around obsolete intermediate tables unless the current step explicitly requires it.
+
+## L-036 - When a step summary drifts from the FEAT acceptance criteria, implement the higher-priority feature state and record the shorthand drift
+**What happened:** Step `3.4` summary prose in `IMPLEMENTATION_PLAN.md` described the Closed-Since-Last block as including "near-miss triaged" rows, while `PRD.md` `FEAT-SAF-SCM-006` and `APP_FLOW.md` both defined the block around records/items closed since the prior SCM sign-off timestamp.
+**Why:** Step-level summaries can compress workflow states and accidentally carry an older shorthand even when the feature acceptance criteria and route contract have already narrowed the real state boundary.
+**Rule:** If a step summary conflicts with the feature acceptance criteria and route contract, implement the higher-priority FEAT/UI state contract, then record the shorthand drift in `progress.txt` and `tasks/todo.md` so later sessions do not revert to the looser wording.
+
+## L-037 - When later step prose implies a freer agenda model than the locked table shell, keep the authoritative shell and attach lifecycle data through the existing related model
+**What happened:** Step `3.5` asked for agenda owner / due-date / status tracking plus an `[+ Add agenda item]` route behavior, but the locked workspace schema still preserves the fixed legacy 10-section `vims_safety_scm_agenda` shell with one row per `agenda_item_number` and no dedicated owner/due/status columns.
+**Why:** Execution-step prose and screen-flow text can describe a richer future workflow than the stronger backend contract that is already frozen into the current table shell.
+**Rule:** If a later step implies a freer agenda/action model than the authoritative table shell supports, keep the authoritative shell unchanged and attach the extra lifecycle data through the existing related model already named by the backend contract. Do not invent undocumented columns or a second parallel agenda store just to satisfy lower-priority prose.
+
+## L-038 - When the sign-off preflight contract is stronger than the current schema, enforce the real block at the active seam and derive the rest
+**What happened:** Step `3.6` surfaced two SCM sign-off drifts at once: higher-priority Step/PRD/validation docs kept the overdue SOI rule as a sign-off-only hard block, while `BACKEND_STRUCTURE.md` still carried stale submit wording and a different process-ID registry; the same preflight contract also asked for `attendance_acknowledged` even though the current workspace schema has no dedicated acknowledgement field.
+**Why:** Endpoint summaries and route prose can drift from the active workflow slice, and preflight UX can name a control state that the current table shell does not actually persist yet.
+**Rule:** If the sign-off preflight contract is ahead of the current schema, enforce the documented hard block at the active sign-off seam, record any stale submit/process-ID prose as drift, and derive unsupported preflight booleans from the strongest existing persisted signal instead of adding undocumented columns or moving the block earlier.
+
+## L-039 - When signature capture is required before the final document pipeline exists, store the hybrid payload in audit history and expose the downstream export as an explicit seam
+**What happened:** Step `3.7` required SCM Master signature capture plus a PDF-generation trigger, but the workspace schema still only had `master_signed_off_at` / `master_signed_off_by` on `vims_safety_scm_meeting` and the actual SCM PDF endpoint remains a Step `6.4` dependency.
+**Why:** The workflow can require a legally/audit-relevant signature event earlier than the document-export phase, and adding fake PDF behavior or new signature columns mid-phase would create unsupported drift.
+**Rule:** If a step requires hybrid digital signature capture before the final export pipeline exists, record the full payload (`typed_name`, `timestamp`, `device_fingerprint`) append-only in `vims_safety_field_history`, keep the canonical state stamp on the current table, and expose any not-yet-built export behavior as an explicit pending seam instead of inventing storage or pretending the export already exists.
+
+## L-040 - Keep time-based SCM tests relative to the live session date
+**What happened:** Step `3.8` verification surfaced false-red SCM tests on 2026-04-29 because `test_scm_cadence_warn.py` and `test_scm_overdue_soi_block.py` encoded absolute calendar dates while the production code correctly uses the live current date/time.
+**Why:** Handover tests run across sessions and calendar days, so fixed-date fixtures eventually drift even when the feature behavior is still correct.
+**Rule:** For time-sensitive Safety tests, anchor fixtures to `timezone.localdate()` / `timezone.now()` or inject a controlled `now_func` into the service under test. Do not hard-code "overdue by N days" calendar dates unless the behavior is explicitly tied to a fixed absolute date.
+
+## L-041 - ORM-backed test tables still need database defaults when older fixtures write raw SQL
+**What happened:** Step `4.1` switched the SOI test harness from hand-written SQL table creation to ORM-created `SOIInspection` / area-map / applicability-log tables, and the pre-existing Step `3.8` SOI raw SQL fixtures immediately failed because they omitted fields like `lost_paper_flag`, `section_12_included`, `schema_version`, `is_deleted`, and `created_date`.
+**Why:** Replacing a hand-written fixture table with a schema-editor-created model table changes which defaults are enforced at the database layer versus only through ORM inserts, and older raw SQL tests keep depending on the DB side of that contract.
+**Rule:** When upgrading a test harness from manual SQL DDL to ORM-created tables, audit every existing raw SQL fixture that inserts into those tables. Add `db_default` for any omitted non-null column or update the fixture explicitly before treating the harness migration as complete.
+
+## L-042 - Frontend route tests must satisfy the full gate stack, not just the form gate
+**What happened:** Step `4.2` frontend verification initially surfaced a failing older route test for `/safety/incidents/create/` even though the screen code was fine, because the test only provided `SAF_F_001` and omitted the existing `SAF_P_001` + role gate required by the route.
+**Why:** Safety routes frequently stack `PermissionGate`, `ProcessGate`, and `RoleGate`, so an under-specified auth fixture renders `null` and can look like a UI regression when the real mismatch is in the test harness.
+**Rule:** When writing or maintaining frontend route tests for gated Safety screens, provide the full auth contract required by the route: form IDs, process IDs, and role. Do not assume a form ID alone is enough unless the route is actually form-gated only.
+
+## L-043 - When step prose names a schema field that the authoritative backend contract does not define, follow the backend contract and carry the drift explicitly
+**What happened:** Step `4.3` in `IMPLEMENTATION_PLAN.md` referenced `checklist_version_id` on `vims_safety_soi_inspection`, but `BACKEND_STRUCTURE.md` and the current `0001_initial.py` shell do not define that column.
+**Why:** Step-level execution prose can preserve an intended persistence shape that never made it into the authoritative schema contract, and implementing the lower-priority field would create undocumented drift immediately.
+**Rule:** If a step file names a schema field that the backend authority does not define, implement the strongest schema-backed behavior available, record the docs drift in `progress.txt` and `tasks/todo.md`, and do not invent the missing column until the authoritative backend contract is revised.
+
+## L-044 - When the current phase needs a live route but the later dashboard contract names a different endpoint, ship the current-phase surface and record the drift
+**What happened:** Step `4.4` exposed a docsuite route mismatch: `APP_FLOW.md` put the SOI list compliance tile on `GET /api/safety/soi/compliance/?vessel_id=...`, while `BACKEND_STRUCTURE.md` only named the later dashboard endpoint `GET /api/safety/dashboard/soi-compliance/?vessel_id=...`.
+**Why:** The screen-flow document described the phase-local SOI list behavior before the broader dashboard API section caught up, so waiting for the later route would have left the active Step `4.4` surface undocumented in code.
+**Rule:** If the active phase needs a route now but a later dashboard section names a different endpoint for the eventual aggregate surface, implement the current-phase route required by the active screen contract, record the mismatch in `progress.txt` and `tasks/todo.md`, and defer endpoint unification until the higher-level dashboard step is reached.
+
+## L-045 - DRF file endpoints must neutralize the framework `?format=` override before using `format` as a business query parameter
+**What happened:** Step `4.5` initially shipped the SOI download view with the documented `?format=pdf|xlsx` contract, but DRF intercepted that query parameter during content negotiation and returned `404 Not Found` before the view logic ran.
+**Why:** DRF treats `?format=` as a renderer-selection override by default, which silently collides with business routes that also need a `format` query parameter in their API contract.
+**Rule:** If a Safety download/export endpoint must accept `?format=` as a business parameter, disable or bypass DRF's query-string format override on that view before wiring the serializer or tests. Do not assume the framework will leave `format` alone.
+
+## L-046 - Mandatory-reason recovery flows must not be implemented as GET actions
+**What happened:** Step `4.6` surfaced a docs drift: `BACKEND_STRUCTURE.md` still listed SOI lost-paper recovery as `GET /api/safety/soi/{id}/lost-paper/recover/`, while the step contract and validation rules required a mandatory reason plus an inspection-note mutation before re-download.
+**Why:** Endpoint inventory prose can lag behind the actual workflow contract, and a GET route is the wrong shape for a state-changing action that must carry a required reason.
+**Rule:** If a Safety workflow mutates audit state and requires a mandatory reason, implement it as a body-carrying write action and record any stale GET route prose as documentation drift. Do not weaken the workflow just to preserve an older endpoint-method summary.
+
+## L-047 - When SOI endpoint auth prose drifts outside the locked permission namespace, keep the shared module gates and treat the endpoint summary as stale
+**What happened:** Step `4.7` surfaced a direct SOI auth mismatch: `BACKEND_STRUCTURE.md` still described finding registration with `SAF_F_012` + `SAF_P_013`, while `CLAUDE.md`, the seeded workspace contract, and `APP_FLOW.md` all keep SOI inside the shared `SAF_F_004` form plus `SAF_P_002` register-findings action seam.
+**Why:** Endpoint inventory prose can preserve an older or shorthand permission registry even after the module's canonical form/process namespace has been frozen and implemented elsewhere in the workspace.
+**Rule:** If an SOI endpoint summary introduces form or process IDs outside the locked shared module namespace, keep the implemented route on the authoritative `SAF_F_*` / `SAF_P_*` contract already seeded in the workspace and record the endpoint auth drift explicitly. Do not mint a second permission namespace just to satisfy stale prose.
+
+## L-048 - When a later phase needs new workflow linkage but the authoritative table shell has no column for it, prefer append-only audit metadata over ad hoc schema widening
+**What happened:** Step `4.8` needed SOI findings to remember incident-worthy outcomes, life-threat escalation choices, and linked Incident / Near Miss references, but the current authoritative `vims_safety_soi_finding` shell still has no dedicated link or nudge-note column.
+**Why:** Frozen step prose can imply a richer persistence shape than the checked-in workspace schema actually supports, and adding undocumented columns mid-phase would create new drift immediately.
+**Rule:** If a phase step requires additional workflow metadata but the authoritative table shell does not define the needed columns, first look for an append-only audit surface already accepted in the workspace, such as `vims_safety_field_history`. Record the metadata there and expose it as derived state instead of widening the schema unless the authoritative backend contract explicitly changes.
+
+## L-049 - When SOI action summaries and the seeded permission registry diverge, follow the seeded/backend action codes for dedicated finding workflows
+**What happened:** Step `4.9` surfaced another SOI permission drift: `APP_FLOW.md` still summarized finding closure under the broader shared SOI actions `SAF_P_002` / `SAF_P_004`, while the seeded catalog and backend permission registry already define dedicated finding-closure gates `SAF_P_014` and `SAF_P_015`.
+**Why:** Screen-flow summaries can compress multiple SOI actions back into the shared module verbs even after the backend permission map has split them into dedicated action IDs for finer auditability.
+**Rule:** When a dedicated SOI finding workflow already has explicit `SAF_P_*` codes in the seeded registry and backend authority, use those dedicated action codes in routes and endpoints, then record any broader APP_FLOW summary as documentation drift instead of collapsing the implementation back to the shared verbs.
+
+## L-050 - When a step example conflicts with the repeated cycle contract, implement the repeated contract and carry the example as drift
+**What happened:** Step `4.10` included a sample sentence saying a Feb 1 Section 12 carry should block new carries until July 1, while the Step `4.10` description, `PRD.md`, `APP_FLOW.md`, `USER_GUIDE.md`, and the cited decision all consistently define Section 12 by the current calendar quarter.
+**Why:** Step-level sample prose can preserve an older timeline example even when the governing decision and the surrounding docsuite have already converged on a clearer rule.
+**Rule:** If a phase-step example conflicts with its governing decision and the repeated docsuite contract, implement the repeated contract, note the example as documentation drift in `progress.txt` / `tasks/todo.md`, and do not encode the stale sample timeline into the product.
+
+## L-051 - When a dedicated backend permission registry exists for a workflow, do not reuse the broader module gate from stale route prose
+**What happened:** Step `4.11` surfaced a direct applicability-workflow auth drift: `APP_FLOW.md` still assigned the Master/DPA flow to `SAF_F_004` with `SAF_P_011` / `SAF_P_010`, while `BACKEND_STRUCTURE.md` already split the workflow onto the dedicated applicability gate `SAF_F_013` with `SAF_P_016` / `SAF_P_017`.
+**Why:** Route-flow prose can preserve the broader module gate even after the backend permission registry has carved out a dedicated audited workflow surface.
+**Rule:** If a Safety workflow already has a dedicated `SAF_F_*` / `SAF_P_*` registry entry in the backend authority, implement that dedicated gate on both API and frontend routes, record the older route prose as drift, and do not collapse the workflow back onto the broader module permission just for consistency with stale docs.
+
+## L-052 - Rolling-window analytics should compare by business date when the persistence seam can normalize timestamps differently than the in-process clock
+**What happened:** Step `4.12` introduced the crew-rotation coverage service and then immediately exposed a false-zero metric in the close-flow test even though the same service passed its standalone fixture. The difference came from the close flow persisting `closed_at` through the ORM/DB seam, which normalized the timestamp differently than the fixed in-process clock used to define the rolling-window upper bound.
+**Why:** When a workflow persists timezone-aware timestamps and then queries them again inside the same session, the database storage/readback path can normalize the value differently from the Python object that originally generated it. A strict datetime upper-bound can then drop rows that are semantically on the same business day.
+**Rule:** For rolling-window analytics that are defined in business-day terms rather than exact wall-clock cutoffs, compare persisted timestamps by date at the query seam unless the spec explicitly requires sub-day precision. This avoids false misses caused by timezone normalization between save-time and query-time representations.
+
+## L-053 - Validate same-DB sibling table families against the live schema before hardening a cross-module join
+**What happened:** Step `5.1` still referenced `vims_noon_report` / `vims_departure_report` / `vims_arrival_report` in parts of the Safety docsuite, but the real shared Reporting contract in `ksm_marine_live` for this environment remained the legacy `NoonReport` / `DepartureReport` / `ArrivalReport` / `NoonReportPort` tables.
+**Why:** Cross-module handover docs can preserve shorthand or future-state names even when the live sibling module still runs on older table families, and hardening the join against the prose alone would target the wrong runtime surface.
+**Rule:** Before hardening any same-DB Safety join, verify the actual sibling table family and key columns in the live shared database first. Implement against the proven runtime contract, then record the docs shorthand drift explicitly in `progress.txt` and `tasks/todo.md`.
+
+## L-054 - Validate live join key types as well as live table names
+**What happened:** Step `5.2` confirmed that the live WRH runtime family in `ksm_marine_live` is `wrh_s520_day_entry` / `wrh_s520_month` / `wrh_ship_time_config`, and it also surfaced that the WRH-side `vessel_id` columns are `uniqueidentifier` in SQL Server even though the handover workspace test harness still models vessel IDs as strings.
+**Why:** Same-DB join hardening can appear complete once the right table family is identified, but column-type drift on the join keys can still break the runtime contract or produce misleading local assumptions.
+**Rule:** When validating a live same-DB integration, inspect the join-key column types in the live schema before closing the step. Record any workspace-vs-runtime type drift explicitly, and keep the implementation passing the live type in the shape the shared database actually expects.
+
+## L-055 - Live CMS roster joins need date-window filtering and GUID-reference resolution, not just "current crew" flags
+**What happened:** Step `5.3` surfaced that the real CMS runtime surface in `ksm_marine_live` does not match the simplified handover fixture: `Crew_Onboarding_History` uses `CrewID` / `Vessel` / `SignOnDate` / `SignOffDate`, `HRM501.rank_name` and `HRM501.department_name` store GUID references, and signed-off rows can still carry `is_active = 1`.
+**Why:** A naive repository that only checks an "is current" style flag or expects text rank/department columns will silently mis-resolve crew availability across rotation boundaries and will return unreadable GUIDs instead of business labels.
+**Rule:** Before closing a CMS live join, validate the real sign-on / sign-off window columns and resolve any GUID-backed rank or department references through the owning master tables. Do not treat `is_active` alone as the onboard truth when the live onboarding history already carries the date window.
+
+## L-056 - A same-DB FK step is only runtime-live if the sibling table family actually exists in the shared database
+**What happened:** Step `5.4` targeted the documented `pur_requisition` Purchase contract, but live SQL validation on `2026-04-30` confirmed that the rebuilt `pur_*` Purchase tables are not present in this `ksm_marine_live` environment yet.
+**Why:** The Safety docsuite can lock a future same-DB cross-module contract before the sibling module has been deployed into the shared runtime database.
+**Rule:** Before calling a same-DB FK or live-join step runtime-complete, verify that the target sibling table family exists in the live database. If it does not, implement the Safety-side seam against the documented contract, record the missing runtime surface explicitly in `progress.txt` and `tasks/todo.md`, and do not guess a legacy substitute table.
+
+## L-057 - When PDF export permissions drift across docs, follow the seeded/backend registry and carry the route prose as stale
+**What happened:** Step `6.1` surfaced a direct export-auth mismatch: `BACKEND_STRUCTURE.md` plus the seeded permission catalog used `SAF_P_023` for record-PDF export, while `APP_FLOW.md` and parts of the frontend guidance still summarized export actions under `SAF_P_007`.
+**Why:** Endpoint and route prose can preserve an older shared export action even after the backend permission registry has split record-PDF export into a dedicated audited process ID.
+**Rule:** If a Safety export workflow already has an explicit `SAF_P_*` code in the seeded registry and backend authority, implement that dedicated code on the API and route gate, then record the older export prose as documentation drift instead of collapsing back to the stale shared action.
+
+## L-058 - Validate the live vessel-particulars table family and lookup keys before hardening MSC-MEPC.3 exports
+**What happened:** Step `6.2` needed Appendix 2 ship-particulars auto-fill, and the docsuite named `vims_vessel_particulars`, but live SQL validation on `2026-04-30` showed that this environment exposes the vessel-particulars contract through `dbo.VesselData` instead, with `id` as a GUID and `vesselCode` as the reporting-friendly lookup key.
+**Why:** Cross-module handover docs can normalize future-state table names before the sibling runtime has actually been renamed or reshaped in the shared database.
+**Rule:** Before hardening any Safety vessel-particulars join or export mapping, verify the live table family and lookup keys in `ksm_marine_live` first. Implement against the proven runtime contract, support the real key shape (`id` and/or `vesselCode`) where needed, and record any docs drift explicitly in `progress.txt` and `tasks/todo.md`.
+
+## L-059 - When a PDF contract describes richer near-miss fields than the shared handover schema exposes, map from proven current fields and record the seam explicitly
+**What happened:** Step `6.3` required a near-miss lightweight PDF with `What Happened + Suggestion + Immediate Action`, but the current shared `vims_safety_incident` handover shell has no dedicated `suggestion` or `immediate_action` column for near misses.
+**Why:** The docsuite can lock a user-facing export shape that is richer than the currently modeled shared-table surface in the handover workspace, especially where Near Miss still rides on the generic incident shell.
+**Rule:** When an export contract references dedicated near-miss fields that do not exist in the proven workspace schema, do not invent new columns or silent defaults mid-step. Map from the strongest current source fields or helpers already present in the implementation, keep the behavior explicit in code, and record the schema-vs-export seam in `progress.txt` and `tasks/todo.md`.
+
+## L-060 - When a PDF contract expects richer signature persistence than the workspace stores, expose the status seam instead of inventing signature rows
+**What happened:** Step `6.4` required the SCM PDF to show Master + CO + attendee signatures, but the handover workspace currently persists only the Master hybrid digital signature explicitly while CO and attendee digital-signature rows remain unmodeled.
+**Why:** Export-facing docs can lock a richer signature presentation than the underlying handover schema actually stores, especially where attendance/preparer surfaces exist but dedicated signature records do not.
+**Rule:** When an export surface needs signature coverage beyond the persisted schema, render the strongest current status from proven stored fields, label the remaining gap explicitly in the export and tracker files, and do not invent new signature storage mid-step just to satisfy the document prose.
+
+## L-061 - Paper-first SOI exports must stay audit-summary only, even when the PDF surface is implemented later than the checklist workflow
+**What happened:** Step `6.5` introduced the SOI summary PDF after the earlier paper-first SOI checklist flow was already complete, and the export still needed to avoid reproducing per-item Yes/No checklist answers even though it now had access to the reported inspection context.
+**Why:** A later export step can create pressure to reconstruct richer digital detail from the reporting workflow, but D-GAP-E4 keeps the paper checklist as the authoritative record and the post-submission PDF is only an audit summary.
+**Rule:** When implementing a paper-first SOI export after the main workflow already exists, include only the post-submission audit summary surfaces that the docs lock: stamped areas, findings, trainees, signatures, audit metadata, and the checklist unique-ID footer. Do not rebuild or infer per-item checklist answers into the digital PDF just because the export layer can access the record.
+
+## L-062 - Attachment-mining export bundles must ignore generated export metadata or they will recurse their own PDFs back into the bundle
+**What happened:** Step `6.6` initially over-counted auditor ZIP attachments because the bundle builder scanned `SafetyFieldHistory` JSON for path-like values and picked up the freshly written `export_path` / `file_name` metadata from the record-PDF audit rows.
+**Why:** The export pipeline legitimately records generated PDF storage metadata in append-only field history, and a generic path scan cannot distinguish "supporting attachment" from "just-generated bundle member" unless export bookkeeping keys or rows are filtered out explicitly.
+**Rule:** When building attachment bundles from field-history JSON, exclude known export-history row types and export bookkeeping keys such as `download_path`, `export_path`, and `file_name`. Only real supporting evidence paths belong under the bundle's `attachments/` subtree.
+
+## L-063 - When the docs lock dashboard contributors but not the numeric score formula, keep the handover score transparent and record it as a seam
+**What happened:** Step `7.1` locked the composite rollup inputs for FEAT-SAF-DASH-001 (`open incidents`, `open near misses`, `open findings`, `overdue CAs`, and `SOI Compliance %`), but the docsuite still did not freeze the exact weighting formula that converts those contributors into one 0-100 Safety Health Score.
+**Why:** The product docs were specific enough to implement the rollup contract and API shape, but not specific enough to justify a hidden or arbitrary weighting model without carrying the assumption forward.
+**Rule:** If a dashboard step locks the contributing metrics but not the final numeric weighting formula, implement a transparent interim score calculation, expose the component scores directly in the payload/UI, and record the formula as an explicit handover seam in `progress.txt` and `tasks/todo.md` until product freezes the final rule.
+
+## L-064 - When dashboard route prose conflicts with the backend form registry, align the whole surface to the dedicated dashboard gate
+**What happened:** Step `7.2` exposed a dashboard permission drift: `BACKEND_STRUCTURE.md` locked the dashboard surface to `SAF_F_015`, while `APP_FLOW.md` and the older workspace route shell still referenced `SAF_F_005`.
+**Why:** Screen-flow prose and carry-forward frontend shells can preserve an earlier shared form gate even after the backend authority has split the dashboard into its own audited surface.
+**Rule:** If dashboard route prose conflicts with the backend form registry, align the backend view, frontend route shell, sidebar, tests, and demo auth surface to the dedicated backend dashboard gate, then record the stale route prose as drift in `progress.txt` and `tasks/todo.md`.
+
+## L-065 - When the backend permission registry is internally stale, do not mint a new search gate mid-step
+**What happened:** Step `7.3` surfaced a search permission drift: `APP_FLOW.md` and the existing route shell used `SAF_F_005`, while `BACKEND_STRUCTURE.md` listed `SAF_F_016` for Safety Search but also mislabeled nearby form IDs such as `SAF_F_005`.
+**Why:** The backend permission table around the search IDs is internally inconsistent in this handover package, so blindly switching to the newer-looking code would have created a second parallel gate without a coherent surrounding registry.
+**Rule:** If the permission-registry source is internally stale around the target IDs, keep the already-implemented route gate that matches the broader route shell and user flow, then record the drift explicitly instead of inventing a new permission surface mid-phase.
+
+## L-066 - When export throttling prose conflicts with higher-priority product acceptance, follow the product contract and carry the throttle table as drift
+**What happened:** Step `7.6` exposed a dashboard-export rule conflict: `VALIDATION_RULES.md` still lists `POST /api/safety/dashboard/export/` at `5/hour`, while the higher-priority `PRD.md` acceptance criteria for `FEAT-SAF-DASH-007` explicitly say "No DPA export rate-limiting in V1."
+**Why:** Validation tables can preserve an older operational guardrail even after the product contract has been relaxed for a specific privileged export surface.
+**Rule:** If an export throttle in `VALIDATION_RULES.md` conflicts with the higher-priority `PRD.md` acceptance criteria, implement the PRD contract, omit the stale throttle from the API, and record the mismatch in `progress.txt` and `tasks/todo.md` until the docs are reconciled.
+
+## L-067 - If parent-bound audit history must purge with the record, write retention summaries to a system-scoped audit parent instead
+**What happened:** Step `7.8` required an audit entry for the hard-delete retention job, but the same docsuite also locks `D-GAP-M33`, which deletes parent-bound `vims_safety_field_history` rows when the parent incident / near-miss / SCM / SOI is purged.
+**Why:** A purge workflow can ask for an audit trail and also require parent-tied audit cleanup; if both are implemented on the same parent-bound history surface, the summary audit row deletes itself in the same operation.
+**Rule:** When a workflow needs a durable purge summary but the normal append-only history is contractually tied to the deleted parent, store the purge summary under a separate system-scoped audit parent and record that seam explicitly in `progress.txt` and `tasks/todo.md` instead of violating the parent-retention rule.
+
+<!-- Session close review completed 2026-04-30 10:21. No new lesson added for Step 5.5. Latest standing addition remains L-056. Session closure confirmed after Step 5.5 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 10:37. No new lesson added for Step 5.6. Latest standing addition remains L-056. Session closure confirmed after Step 5.6 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 10:57. Added L-057 for the Step 6.1 PDF export permission-registry drift. Session closure confirmed after Step 6.1 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 11:39. Added L-059 for the Step 6.3 near-miss schema-vs-export mapping seam. Session closure confirmed after Step 6.3 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 11:53. Added L-060 for the Step 6.4 SCM signature-surface seam. Session closure confirmed after Step 6.4 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 12:05. No new lesson added for the Step 6.5 planning-only handoff session. Latest standing addition remains L-060. Session closure confirmed after docs review, plan preparation, and tracker sync in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 12:22. Added L-061 for the Step 6.5 paper-first SOI summary export boundary. Session closure confirmed after tracker sync and verification-backed Step 6.5 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 12:49. Added L-062 for the Step 6.6 export-history attachment recursion boundary. Session closure confirmed after tracker sync and verification-backed Step 6.6 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 13:21. Added L-063 for the Step 7.1 composite-score weighting seam. Session closure confirmed after tracker sync and verification-backed Step 7.1 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 13:49. Added L-064 for the Step 7.2 dashboard form-gate drift. Session closure confirmed after tracker sync and verification-backed Step 7.2 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 15:52. Added L-065 for the Step 7.3 search permission-registry drift. Session closure confirmed after tracker sync and verification-backed Step 7.3 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 16:02. No new lesson added for Step 7.4. Latest standing addition remains L-065. Session closure confirmed after tracker sync and verification-backed Step 7.4 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 16:27. No new lesson added for Step 7.5. Latest standing addition remains L-065. Session closure confirmed after tracker sync and verification-backed Step 7.5 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 16:46. Added L-066 for the Step 7.6 dashboard-export throttle drift. Session closure confirmed after tracker sync and verification-backed Step 7.6 completion in the handover workspace. -->
+<!-- Session close review completed 2026-04-30 17:15. No new lesson added for Step 7.7. Existing L-006, L-051, and L-064 already cover the progress-handoff and permission-registry drifts handled in this session. -->
+<!-- Session close review completed 2026-04-30 17:29. Added L-067 for the Step 7.8 retention-audit summary conflict with parent-bound field-history purge. Session closure confirmed after tracker sync and verification-backed Step 7.8 completion in the handover workspace. -->

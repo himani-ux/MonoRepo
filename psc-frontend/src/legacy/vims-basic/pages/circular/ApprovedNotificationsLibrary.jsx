@@ -26,6 +26,11 @@ import {
 } from '../../components/circular/ui/table';
 import { buildCircularAttachmentUrl } from '../../utils/circular/attachmentUrl';
 import { parseCircularStoredArray } from '../../utils/circular/supersede';
+import {
+    getCircularRankDisplayName,
+    getDisplayableCircularRanks,
+    splitCircularRanksByDepartment,
+} from '../../utils/circular/ranks';
 
 
 
@@ -166,28 +171,10 @@ const ApprovedNotificationsLibrary = () => {
         return parsed.toLocaleString();
     };
 
-    const seqRankNames = [
-        "Master",
-        "Chief Officer",
-        "Second Officer",
-        "Third Officer",
-        "Deck Fitter",
-        "Deck Cadet",
-        "Bosun",
-        "Able Bodied Seaman",
-        "Ordinary Seaman",
-        "Cook",
-        "Messman",
-        "Welder",
-    ].map((name) => name.toLowerCase());
-
-    const resendDeckRanks = resendRanks.filter((rank) =>
-        seqRankNames.includes((rank.rank_name || rank.name || "").toLowerCase())
-    );
-
-    const resendTechnicalRanks = resendRanks.filter(
-        (rank) => !seqRankNames.includes((rank.rank_name || rank.name || "").toLowerCase())
-    );
+    const {
+        deckRanks: resendDeckRanks,
+        technicalRanks: resendTechnicalRanks,
+    } = splitCircularRanksByDepartment(resendRanks);
 
 
     // --- NEW: Fetch Lookup Maps on Component Mount ---
@@ -451,7 +438,7 @@ const ApprovedNotificationsLibrary = () => {
             ]);
 
             setResendVessels(Array.isArray(vesselsData) ? vesselsData : []);
-            setResendRanks(Array.isArray(ranksData) ? ranksData : []);
+            setResendRanks(getDisplayableCircularRanks(ranksData));
         } catch (err) {
             console.error("handleOpenResendModal: Failed to load resend options:", err);
             alert(`Failed to load resend options: ${err.message}`);
@@ -1230,7 +1217,7 @@ const ApprovedNotificationsLibrary = () => {
                                                                         checked={resendSelectedRankIds.has(rank.id)}
                                                                         onChange={() => handleResendRankToggle(rank.id)}
                                                                     />
-                                                                    <span>{rank.rank_name || rank.name || rank.id}</span>
+                                                                    <span>{getCircularRankDisplayName(rank)}</span>
                                                                 </label>
                                                             ))}
                                                         </div>
@@ -1259,7 +1246,7 @@ const ApprovedNotificationsLibrary = () => {
                                                                         checked={resendSelectedRankIds.has(rank.id)}
                                                                         onChange={() => handleResendRankToggle(rank.id)}
                                                                     />
-                                                                    <span>{rank.rank_name || rank.name || rank.id}</span>
+                                                                    <span>{getCircularRankDisplayName(rank)}</span>
                                                                 </label>
                                                             ))}
                                                         </div>

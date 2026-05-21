@@ -42,9 +42,12 @@ export interface AuthUser {
   department?: string | null;
   form_ids: string[];
   process_ids: string[];
+  vessel_ids?: string[];
+  vessel_names?: string[];
   has_global_vessel_access?: boolean | null;
   display_name?: string;
   role_name?: string;
+  safety_role_name?: string | null;
   username?: string;
   UserName?: string;
   work_side?: number;
@@ -121,6 +124,8 @@ function normalizeUser(user: AuthUser): AuthUser {
     user_type: user.user_type?.toLowerCase() as AuthUser['user_type'],
     form_ids: normalizeIdList((user as AuthUser).form_ids),
     process_ids: normalizeIdList((user as AuthUser).process_ids),
+    vessel_ids: normalizeIdList((user as AuthUser).vessel_ids),
+    vessel_names: normalizeIdList((user as AuthUser).vessel_names),
   };
 }
 

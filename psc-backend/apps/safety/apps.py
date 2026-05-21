@@ -1,0 +1,12 @@
+from django.apps import AppConfig
+
+
+class SafetyConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.safety"
+    label = "safety"
+    verbose_name = "VIMS Safety"
+
+    def ready(self) -> None:
+        # Later phases wire signals and scheduled tasks here.
+        return None

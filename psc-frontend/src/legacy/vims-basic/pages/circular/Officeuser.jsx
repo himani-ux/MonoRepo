@@ -35,8 +35,14 @@ import {
 import {
   clearCircularDraftEditSession,
 } from "../../utils/circular/draftSession";
+import {
+  getCircularRankDisplayName,
+  getDisplayableCircularRanks,
+  splitCircularRanksByDepartment,
+} from "../../utils/circular/ranks";
 
 const clearCircularPrefillStorage = () => {
+  localStorage.removeItem("safetyCircularPrefill");
   localStorage.removeItem("supersedingNotificationId");
   localStorage.removeItem("oldNotificationType");
   localStorage.removeItem("oldNotificationDept");
@@ -49,6 +55,7 @@ const clearCircularPrefillStorage = () => {
 
 const MAX_CIRCULAR_ATTACHMENT_FILES = 3;
 const CIRCULAR_ATTACHMENT_ACCEPT = ".pdf";
+const SAFETY_CIRCULAR_PREFILL_KEY = "safetyCircularPrefill";
 
 const isCircularFormReload = () => {
   if (typeof window === "undefined") {
@@ -182,9 +189,47 @@ const Admin = ({ onNotificationSubmit }) => {
   // ================= FORM DATA =================
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [safetyPrefillNotice, setSafetyPrefillNotice] = useState("");
   const [files, setFiles] = useState([]);
   const [orientation, setOrientation] = useState("portrait");
   const [hashtags, setHashtags] = useState("");
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const shouldApplySafetyPrefill =
+      searchParams.get("safety_prefill") === "near_miss_fleet_alert";
+    const rawPrefill = localStorage.getItem(SAFETY_CIRCULAR_PREFILL_KEY);
+
+    if (!shouldApplySafetyPrefill || !rawPrefill || searchParams.get("draft_sr_no")) {
+      return;
+    }
+
+    try {
+      const prefill = JSON.parse(rawPrefill);
+      if (prefill?.source !== "near_miss_fleet_alert") {
+        return;
+      }
+
+      if (typeof prefill.title === "string") {
+        setTitle(prefill.title);
+      }
+      if (typeof prefill.body === "string") {
+        setBody(prefill.body);
+      }
+      setSafetyPrefillNotice(
+        "Near Miss fleet alert title and body were prefilled. Complete the remaining Circular fields manually.",
+      );
+    } catch (error) {
+      console.error("Failed to apply Safety circular prefill:", error);
+    } finally {
+      localStorage.removeItem(SAFETY_CIRCULAR_PREFILL_KEY);
+      searchParams.delete("safety_prefill");
+      const nextSearch = searchParams.toString();
+      navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, {
+        replace: true,
+      });
+    }
+  }, [location.pathname, location.search, navigate]);
 
   // ================= VESSEL =================
   const [showVesselPopup, setShowVesselPopup] = useState(false);
@@ -763,10 +808,11 @@ const Admin = ({ onNotificationSubmit }) => {
           }
           const data = await response.json();
           console.log("Rank Popup: Fetched ALL ranks:", data);
+          const displayableRanks = getDisplayableCircularRanks(data);
 
           // Group ranks by department for display
           const groupedRanks = {};
-          data.forEach((rank) => {
+          displayableRanks.forEach((rank) => {
             const dept = rank.department || "Unknown Department"; // Use 'Unknown' if department is missing
             if (!groupedRanks[dept]) {
               groupedRanks[dept] = [];
@@ -775,7 +821,7 @@ const Admin = ({ onNotificationSubmit }) => {
           });
           // console.log("Rank Popup: Grouped ranks by department:", groupedRanks);
 
-          setAllRanks(data);
+          setAllRanks(displayableRanks);
           setRanksGroupedByDepartment(groupedRanks);
         } catch (err) {
           console.error("Rank Popup: Error fetching all ranks:", err);
@@ -3266,35 +3312,19 @@ const Admin = ({ onNotificationSubmit }) => {
     }
   };
 
-  const seqRankNames = [
-    "Master",
-    "Acting Master",
-    "Chief Officer",
-    "Second Officer",
-    "Third Officer",
-    "Deck Fitter",
-    "Deck Cadet",
-    "Bosun",
-    "Able Bodied Seaman",
-    "Ordinary Seaman",
-    "Cook",
-    "Messman",
-    "Welder",
-  ].map((name) => name.toLowerCase()); // Normalize for comparison
-
-  // Group the ranks based on their names
-  // Use allRanks state here
-  const seqRanks = allRanks.filter((rank) =>
-    seqRankNames.includes((rank.rank_name || rank.name || "").toLowerCase()),
-  );
-  const technicalRanks = allRanks.filter(
-    (rank) =>
-      !seqRankNames.includes((rank.rank_name || rank.name || "").toLowerCase()),
-  );
+  const { deckRanks: seqRanks, technicalRanks } =
+    splitCircularRanksByDepartment(allRanks);
 
   return (
 
      <div className="max-w-7xl mx-auto p-4 space-y-6 bg-sky-50 text-sky-700 ">
+            {safetyPrefillNotice && (
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-sm text-emerald-800 font-medium">
+                        {safetyPrefillNotice}
+                    </p>
+                </div>
+            )}
             {supersedingNotificationSrNo && (
                 <div className="mb-4 p-3 bg-amber-100 border border-amber-200 rounded-lg">
                     <p className="text-sm text-amber-800 font-medium">
@@ -3729,7 +3759,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                             >
                                                 {isApprovalActionPending
                                                     ? 'Processing...'
-                                                    : `Confirm ${currentAction === 'approve' ? 'Approve' : 'Reject'}`}
+                                                    : `Confirm ${currentAction === 'approve' ? 'Approval' : 'Reject'}`}
                                             </button>
                                         </div>
                                     </div>
@@ -3821,7 +3851,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                                                                     />
                                                                     <label htmlFor={`deck-rank-${rank.id}`} className="text-sm text-gray-700 leading-tight">
-                                                                        {rank.rank_name || rank.name || rank.rank_id || 'Unknown Rank'} {/* Adjust field names based on your rank object structure */}
+                                                                        {getCircularRankDisplayName(rank)}
                                                                     </label>
                                                                 </div>
                                                             ))}
@@ -3867,7 +3897,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                                                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                                                                     />
                                                                     <label htmlFor={`engine-rank-${rank.id}`} className="ml-3 block text-sm text-gray-700">
-                                                                        {rank.rank_name || rank.name || rank.rank_id || 'Unknown Rank'} {/* Adjust field names based on your rank object structure */}
+                                                                        {getCircularRankDisplayName(rank)}
                                                                     </label>
                                                                 </div>
                                                             ))}

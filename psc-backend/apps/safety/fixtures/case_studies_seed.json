@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "navigator",
+    "title": "Navigator",
+    "event_type": "Type 14 Grounding",
+    "loss_summary": "Asset, reputation, and process loss after a Dover Strait grounding.",
+    "incident_date": "2013-09-18",
+    "immediate_cause_codes": "5, 10x2, 16, 17, 39",
+    "basic_cause_codes": "5, 8, 12",
+    "narrative": "Container vessel grounding at Verne Bank in the Dover Strait. The worked solution highlights route-monitoring failure, missed warnings, wrong ECDIS settings, and an unserviceable audible alarm, then traces the event back to weak supervision, poor bridge leadership, and defect-reporting failures.",
+    "recommendations": "Lessons learned: navigation is critical and familiarisation must be supervised. Immediate actions: issue a fleet bulletin, send type-specific ECDIS refresher support, and run extraordinary navigation-safety audits. System actions: strengthen competence management, formalise training-provider review, and add independent navigational safety assurance.",
+    "source_label": "DNV worked solution",
+    "active": true,
+    "display_order": 1,
+    "created_by": "seed_case_studies"
+  },
+  {
+    "slug": "sinkfast",
+    "title": "Sinkfast",
+    "event_type": "Type 16/17 Fire and Explosion",
+    "loss_summary": "People, asset, and environmental loss after a pump-room explosion.",
+    "incident_date": "2015-09-19",
+    "immediate_cause_codes": "2, 4, 8, 17, 25, 33",
+    "basic_cause_codes": "4.9, 5, 9, 12.7, 16",
+    "narrative": "Tanker pump-room explosion at Esso Fawley with one fatality. The worked solution shows permit-to-work weaknesses, poor gas-detection practice, unsafe task assignment for a new joiner, defective detection equipment, and ignition-source control failures, then ties those to competence, supervision, maintenance, and management-of-change gaps.",
+    "recommendations": "Lessons learned: the company did not identify the full Management of Change impact when it took a new vessel type into management. Immediate actions: issue a safety bulletin, revise the SMS with third-party support, overhaul pumps, repair ventilation, and calibrate gas detection before sailing. System actions: raise tanker competence requirements, revise the competence matrix, improve crew retention, and place experienced tanker management ashore.",
+    "source_label": "DNV worked solution",
+    "active": true,
+    "display_order": 2,
+    "created_by": "seed_case_studies"
+  }
+]

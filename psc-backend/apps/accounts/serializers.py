@@ -52,6 +52,16 @@ class UserSerializer(serializers.Serializer):
         read_only=True,
         default=list,
     )
+    vessel_ids = serializers.ListField(
+        child=serializers.CharField(),
+        read_only=True,
+        default=list,
+    )
+    vessel_names = serializers.ListField(
+        child=serializers.CharField(),
+        read_only=True,
+        default=list,
+    )
     has_global_vessel_access = serializers.BooleanField(
         read_only=True,
         allow_null=True,
@@ -143,7 +153,8 @@ class PSCRefreshToken(RefreshToken):
         if user.vessel_name:
             token['vessel_name'] = user.vessel_name
         token['display_name'] = user.display_name
-        token['role_name'] = user.role
+        token['role_name'] = user.role_name
+        token['safety_role_name'] = user.safety_role_name
         token['username'] = user.username
         token['UserName'] = user.username
         token['work_side'] = user.work_side
@@ -158,6 +169,10 @@ class PSCRefreshToken(RefreshToken):
             token['process_ids'] = user.process_ids
         if getattr(user, 'has_global_vessel_access', None) is not None:
             token['has_global_vessel_access'] = bool(user.has_global_vessel_access)
+        if getattr(user, 'vessel_ids', None):
+            token['vessel_ids'] = list(user.vessel_ids)
+        if getattr(user, 'vessel_names', None):
+            token['vessel_names'] = list(user.vessel_names)
 
         return token
 

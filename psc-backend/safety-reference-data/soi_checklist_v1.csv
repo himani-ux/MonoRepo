@@ -1,0 +1,356 @@
+area_id,area_name,subsection_id,subsection_name,item_number,description,tier
+1,External Deck Structure,1,External Deck Structure,1,"Decks clean, clear of oil, grease and non-slippery",BASELINE
+1,External Deck Structure,1,External Deck Structure,2,Lighting in full working order,BASELINE
+1,External Deck Structure,1,External Deck Structure,3,Stairwell properly lit,BASELINE
+1,External Deck Structure,1,External Deck Structure,4,Tripping hazards highlighted,BASELINE
+1,External Deck Structure,1,External Deck Structure,5,Obstructions at head height highlighted,BASELINE
+1,External Deck Structure,1,External Deck Structure,6,"Stairways, ladders and hand holds in good condition",BASELINE
+1,External Deck Structure,1,External Deck Structure,7,Steps in good order with non-skid material if required,BASELINE
+1,External Deck Structure,1,External Deck Structure,8,Continuous hand rails around all decks and these in good condition ,BASELINE
+1,External Deck Structure,1,External Deck Structure,9,"All entrances to Machinery spaces, CH, Motor Room, and enclosed spaces identified with the
+proper signage in place",BASELINE
+1,External Deck Structure,1,External Deck Structure,10,All doors fitted with adequate securing arrangements when opened and closed,BASELINE
+1,External Deck Structure,1,External Deck Structure,11,All entrances / exits clear of obstructions,BASELINE
+1,External Deck Structure,1,External Deck Structure,12,Procedures in place for restricting access to deck in heavy weather,BASELINE
+1,External Deck Structure,1,External Deck Structure,13,Access to all LSA/FFA equipment clear,BASELINE
+1,External Deck Structure,1,External Deck Structure,14,All gratings where used securely fitted,BASELINE
+1,External Deck Structure,1,External Deck Structure,15,All items adequately secured to safe locations,BASELINE
+1,External Deck Structure,1,External Deck Structure,16,Any stream / exhaust pipes lagged or guarded,BASELINE
+1,External Deck Structure,1,External Deck Structure,17,Fire flaps and vents marked and close easily,BASELINE
+1,External Deck Structure,1,External Deck Structure,18,Correct PPE for all work on deck freely available ,BASELINE
+1,External Deck Structure,1,External Deck Structure,19,Cold and heavy weather clothing available ,BASELINE
+1,External Deck Structure,1,External Deck Structure,20,Designated Restricted as clearly marked,BASELINE
+1,External Deck Structure,1,External Deck Structure,21,All openings through which a person could fall properly fenced,BASELINE
+1,External Deck Structure,1,External Deck Structure,22,"If portable ladders in use, they are properly secured and at a safe angle",BASELINE
+1,External Deck Structure,1,External Deck Structure,23,All hand tools for deck use in good condition,BASELINE
+1,External Deck Structure,1,External Deck Structure,24,"All pneumatic scaling tools and air hoses in good condition and being correctly maintained.
+Ensure that the tools are not modified. ",BASELINE
+1,External Deck Structure,1,External Deck Structure,25,"Oil spill equipment in place and correct, inventory maintained ",BASELINE
+1,External Deck Structure,1,External Deck Structure,26,Supervision of the deck work adequate,BASELINE
+2,Accommodation,1,Accommodation,1,Stairway and alleyway lighting in full working order,BASELINE
+2,Accommodation,1,Accommodation,2,Handrails in the stairwells secured,BASELINE
+2,Accommodation,1,Accommodation,3,"Housekeeping satisfactory, particularly in trunk ways and lockers",BASELINE
+2,Accommodation,1,Accommodation,4,Any from damaged flooring covering which may constitute a tripping hazard,BASELINE
+2,Accommodation,1,Accommodation,5,Fire doors with self-closing devices operate correctly,BASELINE
+2,Accommodation,1,Accommodation,6,Cabin and other non-fire doors have a safe mechanism for latching open in a seaway,BASELINE
+2,Accommodation,1,Accommodation,7,Ashtrays of the safety type only ,BASELINE
+2,Accommodation,1,Accommodation,8,Smoking notices posted correctly and smoking regulations followed,BASELINE
+2,Accommodation,1,Accommodation,9,All LSA/FFA equipment readily available and accessible ,BASELINE
+2,Accommodation,1,Accommodation,10,All exit routes clearly marked,BASELINE
+2,Accommodation,1,Accommodation,11,Muster Lists properly displayed ,BASELINE
+2,Accommodation,1,Accommodation,12,SOLAS Training Manual and Fire & Safety Booklet available and up to date,BASELINE
+2,Accommodation,1,Accommodation,13,Stowaway search carried out before departure,BASELINE
+2,Accommodation,1,Accommodation,14,Anti-piracy precautions in place,BASELINE
+2,Accommodation,1,Accommodation,15,Only one entrance used in port and all other doors kept shut,BASELINE
+2,Accommodation,1,Accommodation,16,Emergency cards prepared and given to each ship staff,BASELINE
+2,Accommodation,1,Accommodation,17,Every cabin has a life jacket and immersion suit,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,1,General housekeeping good with respect to night time movement,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,2,Any tripping hazards with reference to night time movement,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,3,All equipment can be safely stored in bad weather,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,4,"Pyrotechnics stored safely in a proper location,          
+Expiry date:",BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,5,Bridge security in port and at sea satisfactory,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,6,Safe working distances from aerials and Satellite domes clearly marked,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,7,"MOB markers properly rigged and float free arrangement satisfactory, 
+Expiry Date:",BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,8,"Magnetic Compass free of any bubble, spare bowl onboard,
+Last swing date:",BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,9,All Bridge Equipment working and manuals/instructions available,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,10,"Steering console Auto/manual change over procedure displayed
+Last tested:                                            
+HRU expiry:",BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,11,"EPIRB registration certificate available, ",BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,12,SART Battery Expiry Date:,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,13,GMDSS VHF handheld battery expiry date:,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,14,All Daylight signal / shapes available ,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,15,Life jackets and immersion suits available on the bridge,BASELINE
+3,Navigating Bridge & Monkey Island,1,Navigating Bridge & Monkey Island,16,"Notice placed on the radars in port, “DO NOT OPERATE”",BASELINE
+4,Electrical safety,1,Electrical safety,1,Electrical appliances firmly secured,BASELINE
+4,Electrical safety,1,Electrical safety,2,Electrical appliances served by permanent connections whenever possible,BASELINE
+4,Electrical safety,1,Electrical safety,3,All personal appliances being approved for shipboard use,BASELINE
+4,Electrical safety,1,Electrical safety,4,Heaters in drying rooms safe for use and clear of any obstructions,BASELINE
+4,Electrical safety,1,Electrical safety,5,Tumble drier vent free from fluff and other blockages,BASELINE
+4,Electrical safety,1,Electrical safety,6,Electrical cabinets free from combustible materials and moisture,BASELINE
+4,Electrical safety,1,Electrical safety,7,Any electrical sockets in cabins overloaded,BASELINE
+4,Electrical safety,1,Electrical safety,8,Multi sockets and extension leads of approved type,BASELINE
+4,Electrical safety,1,Electrical safety,9,Electrical safety posters positioned in suitable locations,BASELINE
+4,Electrical safety,1,Electrical safety,10,"Light fittings, shades and diffusers adequately secured",BASELINE
+4,Electrical safety,1,Electrical safety,11,‘Switch off after use’ signs used where appropriate,BASELINE
+4,Electrical safety,1,Electrical safety,12,Timer or other safety devices on electric toasters work satisfactory,BASELINE
+4,Electrical safety,1,Electrical safety,13,Light covers and shaver sockets in bathrooms in good order,BASELINE
+4,Electrical safety,1,Electrical safety,14,Torches used are of an approved type,BASELINE
+4,Electrical safety,1,Electrical safety,15,All switchboards have rubber mats in front of them,BASELINE
+4,Electrical safety,1,Electrical safety,16,Proper procedure followed for the safe disposal of batteries and light bulbs etc.,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,1,All save-alls / drip trays around machinery adequate and clean,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,2,Decks and walkways free clear from obstruction and free from oil,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,3,Emergency bilge valves and bilge injection valves clearly marked,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,4,"OWS overboard discharge valve kept locked, secured and the key is kept under the control of C/E or 2/E under the authority of C/E",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,5,"Spare filters available for the OWS, all signs, notices in place",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,6,Record of maintenance and testing of 15 PPM alarm available,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,7,General housekeeping good,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,8,Crew aware of different alarms in the ER,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,9,"All firefighting equipment in place, in good condition and as per the safety plan",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,10,Means of securing oil tank level gauges in the open positions removed,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,11,All double bottom sounding pipes closed with caps on,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,12,The quick closing fuel tank valves clearly marked,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,13,Fuel oil tanks have ‘Do not weld’ notices posted,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,14,All the lighting working and in full working order,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,15,Emergency escape routes highlighted with no obstructed access,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,16,Emergency escape trunk have adequate lighting and rescue equipment,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,17,"EEBD’s in good condition, with signs posted",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,18,Eye wash bottles/first aid kit not expired ,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,19,"PPE available at the chemical dosing locations, safety signs posted",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,20,Relevant data sheets available at the dosing tanks,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,21,"Flammable liquids, chemicals stored only in their designated containers",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,22,Tripping hazards / low beams highlighted,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,23,Designated welding area clean and clear of combustible material,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,24,Welding equipment and associated safety gear in good condition,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,25,"Oxy/Act equipment have flash back arrestors, valves closed when not in use",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,26,Entrances to the E/R have UMS machinery space signs on the doors,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,27,All workshop machinery emergency stops working and clearly marked,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,28,Adequate PPE provided in the workshop,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,29,Machinery guards in place ,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,30,Grinding wheels in good condition and a gap of <3mm between the rest and the stone,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,31,ER lagging generally in good order and free from oil,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,32,Garbage management instructions posted and designated bins in place.,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,33,UMS checklist completed and signed by D/Eng. and C/E before going UMS,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,34,Hand tools in good condition and checked on a regular basis,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,35,"Power tools, electric or pneumatic in good condition and these are checked on a regular basis.
+Ensure that the tools are not modified.",BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,36,Muster List in the ECR up to date,BASELINE
+5,Engine Room and Work Shop,1,Engine Room and Work Shop,37,Adequate number of lifejackets in the ECR.,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,1,General housekeeping good,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,2,Steering gear save–all clean,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,3,Lighting in full working order,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,4,Emergency escape routes highlighted,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,5,Emergency local control instructions clear,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,6,"Instructions for isolating cylinders, isolation valves etc clear ",BASELINE
+6,Other Machinery Spaces,1,Steering Gear,7,Gratings around the steering gear sound and in good condition,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,8,Steering gear LO storage tank properly filled and level gauge in good order,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,9,Communication from the steering flat to the Bridge,BASELINE
+6,Other Machinery Spaces,1,Steering Gear,10,Gyro repeater correctly aligned with the bridge repeater,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,1,General housekeeping and lighting levels good,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,2,Emergency generator save–all clean,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,3,Firefighting equipment in good order,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,4,Rubber mat in front of the emergency switchboard,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,5,Poster displayed detailing action to take in event of electric shock,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,6,Instructions on running up procedures clear and easy to follow,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,7,UMS machinery space notice on the entrance,BASELINE
+6,Other Machinery Spaces,2,Emergency Generator Room,8,Emergency stops clearly marked,BASELINE
+6,Other Machinery Spaces,3,Lift rooms / Fan Rooms,1,General housekeeping and lighting levels good,BASELINE
+6,Other Machinery Spaces,3,Lift rooms / Fan Rooms,2,Deck free from any oil,BASELINE
+6,Other Machinery Spaces,3,Lift rooms / Fan Rooms,3, UMS machinery space notice on the entrance,BASELINE
+6,Other Machinery Spaces,4,Battery Lockers,1,Battery lockers permanently ventilated,BASELINE
+6,Other Machinery Spaces,4,Battery Lockers,2,General housekeeping and lighting levels good,BASELINE
+6,Other Machinery Spaces,4,Battery Lockers,3,"Correct PPE available as required and used, and warning signs displayed",BASELINE
+6,Other Machinery Spaces,4,Battery Lockers,4,Eye wash bottle prominently displayed,BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,1,"Organization and segregation in good order, and adequate for heavy weather",BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,2,Required PPE including chemical suits stowed outside the locker and in good order,BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,3,"Correct, most up to date chemical data sheet provided in a suitable order",BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,4,Any unmarked chemical drums,BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,5,Fresh water shower operational and in good order,BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,6,Eyewash bottle within expiry date,BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,7,Adequate warning signs and is the chemical locker kept locked,BASELINE
+7,"All Stores as, including safe handling and stowage",1,Chemical Locker,8,Ventilation and lighting in full working order,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,1,Stowage adequate for heavy weather,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,2,Deck clean and free from oil / grease,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,3,General housekeeping good,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,4,Ventilation and lighting in full working order,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,5,Hand and pneumatic transfer pumps stored properly,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,6,Oil transfer hoses kept segregated from other hoses,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,7,Drum trolleys and trucks in good order,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,8,Oil and grease drums and containers adequately marked with contents,BASELINE
+7,"All Stores as, including safe handling and stowage",2,Oil and Greases,9,Bunker samples stored correctly and is housekeeping correct.,BASELINE
+7,"All Stores as, including safe handling and stowage",3,Deck Store,1,Stowage secure and housekeeping good,BASELINE
+7,"All Stores as, including safe handling and stowage",3,Deck Store,2,Ventilation and lighting in full working order,BASELINE
+7,"All Stores as, including safe handling and stowage",3,Deck Store,3,Hand tools in good condition,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,1,All areas of the galley clean and tidy,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,2,Decks clear of obstructions and non-slippery,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,3,Lighting adequate –  all light fittings in good order,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,4,Any fire hazards present such as loose packing,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,5,Are filters and hoods clean and free from grease,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,6,Waste disposal unit clean and hygienic,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,7,Location of the first aid kit clearly marked and is it fully stocked,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,8,Fire extinguishers and fire blanket available and accessible,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,9,Any clear instruction posted for action to take in the event of a deep fat fryer fire,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,10,"Galley fiddle bars in good condition and galley staff aware of
+correct use",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,11,Shelving secured and items arranged in a safe manner,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,12,Tin openers safe to use and clean,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,13,Machines have guards as required and danger notices posted,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,14,Procedures in place for cleaning galley machines,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,15,All doors and hatches have suitable securing arrangements,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,16,"Handles to ovens, drawers, cupboards secure",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,17,Main fridge & store room doors can be secured open in a seaway,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,18,"Fridges can be opened from inside and alarm activation available inside, Last Tested:",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,19,"Fridge decks free from ice and debris, door seals free from ice",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,20,Deck outside each fridge space have an anti-skid surface,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,21,Notice posted outside fridge space warning against O2 deficiency,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,22,Method available of advising galley staff of impending heavy weather and is galley staff aware of the procedure,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,23,"Duck boards, if used, are fitted correctly",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,24,Galley staff using the correct protective clothing and footwear. Sufficient stock onboard,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,25,Protective clothing clean,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,26,"Galley staff displaying correct personal hygiene practices e.g. Hand washing.
+Long hair tied back, Wearing cap, no open wounds",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,27,Separate sink in the galley available for hand washing with soap and clean paper towels available,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,28,"Protective gloves for cutting available, clean and cross contamination prevented in their use",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,29,Different colored chopping boards in use and is it being used correctly,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,30,"All work surfaces, equipment, knives etc cleaned after each task to prevent cross contamination",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,31,Frozen food being thawed correctly i.e. not being left in water,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,32, Food thermometer for checking the core temperature of food. Is it in working order? Is it used? ,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,33,Fridges operating at the correct temperature? Means for the galley staff to check temperature daily and is ,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,34,Food being stored in the galley fridge correctly i.e. cooked food separate from raw food etc.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,35,Food stored in the fridge correctly wrapped or covered.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,36,Evidence of food not being properly refrigerated after preparation and not left lying in the galley at ambient temperature. ,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,37,All pantry fridges checked daily with any ‘old’ items removed.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,38,"Catering staff included on the daily work plan and the cook/steward
+attend the daily work plan meeting.",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,39,Risk assessment(s) available to cover galley work.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,40,Shipboard anti-pollution procedures being followed and all catering staff can explain or describe these procedures. Procedures posted in the galley.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,41,"All correct notices displayed in the galley i.e. hand washing, fridge notice, etc.",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,42,Any evidence of infestation of any kind and if so what is being done to control or eradicate the problem?,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,43,"Stores and fridges being kept in a clean and tidy manner – securely stored to prevent
+‘movement’ in bad weather.",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,44,Deep fat fryer has a suitable lid and is in place when not in use,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,45,Knives and cutting equipment in good condition and stowed in a safe manner.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,46,Any chipped or cracked crockery in use? ,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,47,Different color coded cleaning cloths being used. No rags or torn towels. ,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,48,Galley equipment working satisfactory and safe. Checked on regular basis by the E/E.,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,49,"Cleaning chemicals stored separately, and are food safe ",BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,50,Cleaning schedule in place. All galley staff aware of this schedule and there is evidence that this is being followed,BASELINE
+8,Galley / Cold Rooms including work practices and hygiene control,1,Galley / Cold Rooms including work practices and hygiene control,51,Dishwasher working and operating correctly i.e. at the correct temperature.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",2,Crane operators have valid crane operator certificates.  ,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",3,Crane operating controls clearly marked.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",4,Any evidence of hydraulic oil leakage?,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",5,Crane safety cut outs tested regularly.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",6,Crane hooks including safety clips in good condition.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",7,"SWL and safe radius, angles of work clearly marked as appropriate.",BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",8,Risk assessment available for storing operation.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",9,All personnel involved in storing operations wearing correct PPE.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",10,Supervisor identified with high visibility waistcoat or similar.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",11,Correct signals being used.,BASELINE
+9,All Lifting Equipment,1,"Cranes and storing Operations (Observe at least one storing operation if
+possible)",12,Storing nets in good condition,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,1,All lifting equipment have a test certificate less than 5 years old.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,2,Competent person inspected all lifting equipment within the last 12 months.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,3,Records of annual checks updated in the PMS.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,4,All lifting wires been inspected within the last 12 months and records available,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,5,All lifting beams matched to the certification.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,6,All lifting fixed and portable davits marked with SWL.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,7,All pad eyes used for lifting marked with SWL.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,8,Fixed and portable lifting winches in good order with SWL marked.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,9,Removable lifting equipment be matched to its working position.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,10,All chain blocks certificated and identity marked.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,11,All chain blocks in good condition.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,12,All chain block lifting hooks have a spring safety clip or similar locking device.,BASELINE
+9,All Lifting Equipment,2,Lifting Plant and equipment,13,SWL of all chain blocks clearly marked.,BASELINE
+9,All Lifting Equipment,3,Lifting Plant and equipment,28,All strops and slings in good order with proper identification of SWL.,BASELINE
+9,All Lifting Equipment,3,Lifting Plant and equipment,29,All strops and slings easily matched to their certificate.,BASELINE
+9,All Lifting Equipment,3,Lifting Plant and equipment,30," Any ship made lifting strops, slings or hooks? (Not allowed to be disposed of)",BASELINE
+9,All Lifting Equipment,3,Lifting Plant and equipment,31,All small gear correctly certificated.,BASELINE
+9,All Lifting Equipment,3,Lifting Plant and equipment,32,All small lifting gear such as blocks and shackles have the SWL stamped on it.,BASELINE
+9,All Lifting Equipment,3,Lifting Plant and equipment,33,Color chart for SWL of strops available. Area tidy and storage adequate.,BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",35,All lifeboat & recovery boat lifting and recovery equipment in good condition and certificated.,BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",30,Lifeboat falls been inspected within the last 12 months.,BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",31,"Lift is properly certificated and safety trips tested.   Last test:   
+",BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",32,Lift wires been inspected within the last 12 months.          Last Inspected:,BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",33,Accommodation ladder (& pilot hoist) inspection records correct.,BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",34,"Stages, Bosun chairs and associated equipment in good condition.",BASELINE
+9,All Lifting Equipment,4,"Safety Equipment, Personnel Lifting Equipment",35,"Is all the rope work for the above of the correct type, tagged for work aloft only and kept separate from other general rope?",BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,1,All mooring areas have anti–skid surfaces.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,2,Tripping and other hazards suitably highlighted.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,3,Rollers and roller leads turn freely.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,4,Panama leads in good condition without deep wire scores,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,5,"Surfaces of fairleads, bitts, bollards and drum ends clean and in good condition.",BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,6,Heaving lines and chain stoppers in good condition and certification available.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,7,"Messengers of the correct construction, in good condition and certification available.",BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,8,‘Heave’ and ‘slack’ directions clearly marked for winch controls.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,9,Winch brake testing carried out annually.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,10,Winches free from leaks and in good condition. Plugs fitted for save-alls.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,11,Wires end for end each dry dock.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,12,SWL marked on mooring bitts,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,13,Rope tails of correct size and length (+25% of MBL & 11m).,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,14,Fire wires of correct size and length. ,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,15,Mooring wire inspection and greasing on schedule,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,16,Mooring equipment and machinery checked before arrival at port and log book entry made,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,17,Proper strong points for attaching chain stoppers on suitable place.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,18,Mooring operation discussed with all involved before arrival in port.,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,19,Pickup lines attached to pennants in good condition,BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,20,"Publications “Effective Mooring” and “Mooring Equipment Guidelines” available onboard
+(Applicable for Tankers and Gas Carriers)?",BASELINE
+10,Mooring and Access Equipment,1,Mooring Equipment,21,Risk assessment available for the mooring operation.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,1,"All personnel using the correct PPE, PIC also wearing high visibility vest",BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,2,Helmets being used with chin straps.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,3,Mooring party leaders briefed on the operation beforehand and a briefing of the crew by the OIC before operations commence.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,4,Pre-operation safety checks carried out and reported to the Bridge.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,5,Making fast of tugs carried out in a controlled manner.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,6,Personnel kept clear of snap back zones when tugs line are under tension.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,7,Personnel avoid standing in bights and use drum ends correctly.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,8,Winch brakes applied correctly.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,9,Inexperienced personnel supervised and guided as necessary.,BASELINE
+10,Mooring and Access Equipment,2,Mooring Operations: Observe 1 operation,10,Operation look unhurried and safely managed.,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,1,"All personnel using the correct PPE, including goggles for hydraulic winch operation.",BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,2,"Anchors are cleared for letting go during entering, maneuvering within and leaving harbours",BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,3,"Method of anchoring decided depending on weather, current, tide, depth of water and vessel
+displacement",BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,4,Winch operation correct and local instruction easily understood.,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,5,Pre-operation briefing taken place.,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,6,Anchor shackles clearly marked.,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,7,Bitter end release arrangement accessible and apparently free. Equipment to be used available in the vicinity,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,8,Hawse and spurling pipe covers available,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,9,Anchor securing arrangement & lashing is of sufficient strength,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,10,All personnel involved with anchoring operation thoroughly trained,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,11,All non-essential personnel kept clear of the area,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,12,Operations appear safely managed.,BASELINE
+10,Mooring and Access Equipment,3,Anchoring Operations,13,Risk assessment available for the anchoring operation.,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,1,Accommodation ladders in good condition,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,2,Accommodation ladder wires properly certificated with correct inspection records available,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,3,Correct PPE used when rigging the accommodation ladders,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,4,Overside lighting adequate for safe access,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,5,Means provided to secure the pilot ladder to the accommodation ladder,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,6,Walkways from the access point to accommodation painted with anti-skid paint,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,7,Pilot ladders in good condition,BASELINE
+10,Mooring and Access Equipment,4,Access Equipment,8,Pilot ladders rigged correctly when used in combination with accommodation ladders,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,1,Personnel nominated onboard for the activation of fixed smothering system,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,2,"Clear operating instructions posted, all valves marked",BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,3,CO2 room fan operational and position clearly marked,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,4,Last level check of the CO2 bottles      ,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,5,Last pressure test of the CO2 bottles     ,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,6,All bottles firmly secured,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,7,"All pipe work, cylinders and pulls in the system were inspected.   ",BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,8,All pipe work was blown through.                    ,BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,9,"Test of DP system, Date:                                 All pipe work and nozzles in good condition.",BASELINE
+11,CO2 Room & Fixed Smothering Systems,1,CO2 Room & Fixed Smothering Systems,10,Test of the foam system,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,1,General housekeeping and lighting levels good,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,2,Lagging on steam pipes and machinery in good condition and oil free,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,3,"All firefighting equipment in place, in good condition and as per the safety plan",BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,4,Gratings in good condition,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,5,Escape routes highlighted and clear from obstruction,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,6,Escape hatch easy to operate,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,7,A UMS machinery space notice on the entrance,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,8,Gas detectors and fire alarms tested regularly,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,9,Entry restriction sign posted,BASELINE
+12,Compressor House & Motor Room,1,Compressor House & Motor Room,10,Fans operational and run continuously,BASELINE
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.1,PPE Matrix compliance,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.2,LOTO in use,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.3,IMO signs,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.4,PTW observation,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.5,Enclosed-space entry,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.6,Hot-work arrangements,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.7,Work-at-height,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.8,Heat-stress,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.9,Supervision adequacy,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.10,Safety improvements prompt,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.11,Crew suggestions prompt,CROSS_CUTTING
+13,Cross-cutting Safety & Culture,1,Cross-cutting Safety & Culture,12.12,Previous findings rectification,CROSS_CUTTING

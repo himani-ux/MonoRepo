@@ -1,0 +1,79 @@
+[
+  {
+    "type_code": "IMO_COLLISION",
+    "type_name": "Collision",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_STRANDING_GROUNDING",
+    "type_name": "Stranding / Grounding",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_CONTACT",
+    "type_name": "Contact (with fixed/floating object)",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_FIRE_EXPLOSION",
+    "type_name": "Fire / Explosion",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_HULL_FAILURE",
+    "type_name": "Hull failure",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_MACHINERY_DAMAGE",
+    "type_name": "Machinery damage",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_DAMAGE_TO_SHIP_EQUIPMENT",
+    "type_name": "Damage to ship / equipment",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_CAPSIZING_LISTING",
+    "type_name": "Capsizing / listing",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_MISSING_VESSEL",
+    "type_name": "Missing vessel",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_LIFE_SAVING_APPLIANCE_ACCIDENT",
+    "type_name": "Accidents with life-saving appliances",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  },
+  {
+    "type_code": "IMO_OTHER",
+    "type_name": "Other",
+    "imo_reportable": 1,
+    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "active": 1
+  }
+]

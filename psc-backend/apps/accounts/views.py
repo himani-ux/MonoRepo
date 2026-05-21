@@ -19,14 +19,91 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from .backends import PSCAuthenticationBackend
-from .models import HRM501,CrewOnboardingHistory
+from .models import HRM501, CrewOnboardingHistory, OfficeUser, RoleCodes
 from .serializers import (
     LoginRequestSerializer,
     TokenRefreshRequestSerializer,
     generate_tokens_for_user,
 )
+from .utils import (
+    get_office_global_reviewer_role,
+    get_office_permissions_by_mapping,
+    get_profile_permissions,
+    resolve_current_office_permission_snapshot,
+    resolve_current_vessel_permission_snapshot,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _get_current_office_permission_snapshot(user, token):
+    return resolve_current_office_permission_snapshot(
+        user_type=getattr(user, 'user_type', None) or token.get('user_type'),
+        login_id=getattr(user, 'login_id', None) or token.get('login_id') or token.get('username'),
+        employee_id=getattr(user, 'employee_id', None) or token.get('employee_id') or token.get('user_id'),
+        role=getattr(user, 'role', None) or token.get('role'),
+        has_global_vessel_access=getattr(user, 'has_global_vessel_access', None),
+        full_name=getattr(user, 'full_name', None) or token.get('full_name'),
+        email=getattr(user, 'email', None) or token.get('email'),
+        department=getattr(user, 'department', None) or token.get('department'),
+    )
+
+
+def _get_current_vessel_permission_snapshot(user, token):
+    return resolve_current_vessel_permission_snapshot(
+        user_type=getattr(user, 'user_type', None) or token.get('user_type'),
+        role=getattr(user, 'role', None) or token.get('role'),
+        rank=getattr(user, 'rank', None) or token.get('rank'),
+        department=getattr(user, 'department', None) or token.get('department'),
+        full_name=getattr(user, 'full_name', None) or token.get('full_name'),
+    )
+
+
+def build_current_user_payload(user, token):
+    user_type = getattr(user, 'user_type', None) or token.get('user_type')
+    payload = {
+        'id': getattr(user, 'id', None) or token.get('user_id'),
+        'login_id': getattr(user, 'login_id', None) or token.get('login_id'),
+        'user_type': user_type,
+        'full_name': getattr(user, 'full_name', None) or token.get('full_name'),
+        'role': getattr(user, 'role', None) or token.get('role'),
+        'vessel_id': getattr(user, 'vessel_id', None) or token.get('vessel_id'),
+        'vessel_name': getattr(user, 'vessel_name', None) or token.get('vessel_name'),
+        'vessel_code': getattr(user, 'vessel_code', None) or token.get('vessel_code'),
+        'email': getattr(user, 'email', None) or token.get('email'),
+        'employee_id': getattr(user, 'employee_id', None) or token.get('employee_id'),
+        'crew_id': getattr(user, 'crew_id', None) or token.get('crew_id'),
+        'rank': getattr(user, 'rank', None) or token.get('rank'),
+        'department': getattr(user, 'department', None) or token.get('department'),
+        'form_ids': getattr(user, 'form_ids', None) or token.get('form_ids') or [],
+        'process_ids': getattr(user, 'process_ids', None) or token.get('process_ids') or [],
+        'has_global_vessel_access': getattr(user, 'has_global_vessel_access', None)
+        if getattr(user, 'has_global_vessel_access', None) is not None
+        else token.get('has_global_vessel_access'),
+        'vessel_ids': getattr(user, 'vessel_ids', None) or token.get('vessel_ids') or [],
+        'vessel_names': getattr(user, 'vessel_names', None) or token.get('vessel_names') or [],
+        'display_name': getattr(user, 'display_name', None) or token.get('display_name'),
+        'role_name': getattr(user, 'role_name', None) or token.get('role_name') or token.get('role'),
+        'safety_role_name': getattr(user, 'safety_role_name', None) or token.get('safety_role_name'),
+        'username': getattr(user, 'username', None) or token.get('username'),
+        'UserName': getattr(user, 'username', None) or token.get('UserName') or token.get('username'),
+        'work_side': getattr(user, 'work_side', None) if getattr(user, 'work_side', None) is not None else token.get('work_side'),
+        'first_name': getattr(user, 'first_name', None) or token.get('first_name'),
+        'surname': getattr(user, 'surname', None) or token.get('surname'),
+        'is_chief': getattr(user, 'is_chief', None) if getattr(user, 'is_chief', None) is not None else token.get('is_chief'),
+        'legacy_user_type': getattr(user, 'legacy_user_type', None) or token.get('legacy_user_type'),
+    }
+
+    normalized_user_type = str(user_type or '').upper()
+    try:
+        if normalized_user_type == 'OFFICE':
+            payload.update(_get_current_office_permission_snapshot(user, token))
+        elif normalized_user_type == 'VESSEL':
+            payload.update(_get_current_vessel_permission_snapshot(user, token))
+    except Exception as exc:
+        logger.warning("Current user permission refresh failed; falling back to token claims: %s", exc)
+
+    return payload
 
 
 class LoginView(APIView):
@@ -206,8 +283,8 @@ class CurrentUserView(APIView):
     def get(self, request):
         """
         Get current user information from JWT token.
-
-        Extracts user info from the JWT token claims.
+        Refreshes permissions from the database when possible so seeded form/process
+        mappings appear without requiring a fresh login.
         """
         # Get claims from the JWT token
         # The token is already validated by JWTAuthentication
@@ -222,34 +299,7 @@ class CurrentUserView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        # Extract user info from token claims
-        user_data = {
-            'id': token.get('user_id'),
-            'login_id': token.get('login_id'),
-            'user_type': token.get('user_type'),
-            'full_name': token.get('full_name'),
-            'role': token.get('role'),
-            'vessel_id': token.get('vessel_id'),
-            'vessel_name': token.get('vessel_name'),
-            'vessel_code': token.get('vessel_code'),
-            'email': token.get('email'),
-            'employee_id': token.get('employee_id'),
-            'crew_id': token.get('crew_id'),
-            'rank': token.get('rank'),
-            'department': token.get('department'),
-            'form_ids': token.get('form_ids') or [],
-            'process_ids': token.get('process_ids') or [],
-            'has_global_vessel_access': token.get('has_global_vessel_access'),
-            'display_name': token.get('display_name'),
-            'role_name': token.get('role_name'),
-            'username': token.get('username'),
-            'UserName': token.get('UserName'),
-            'work_side': token.get('work_side'),
-            'first_name': token.get('first_name'),
-            'surname': token.get('surname'),
-            'is_chief': token.get('is_chief'),
-            'legacy_user_type': token.get('legacy_user_type'),
-        }
+        user_data = build_current_user_payload(request.user, token)
 
         return Response(
             {

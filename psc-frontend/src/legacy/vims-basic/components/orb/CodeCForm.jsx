@@ -26,7 +26,7 @@ export default function CodeCForm({ details, handleChange, availableTanks, error
       </div>
       <div>
         <label>11.3 Total quantity of retention (m³) *</label>
-        <input type="number" step="0.01" value={details.sludge_before || ''} placeholder="Enter Retained Quantity"
+        <input type="number" step="0.01" value={details.sludge_before ?? ''} placeholder="Enter Retained Quantity"
           style={{ width:'100%', borderColor: errors.sludge_before ? 'red' : '#ccc' }}
           onChange={e => handleChange('sludge_before', parseFloat(e.target.value))} />
         {errors.sludge_before && <span style={{ color:'red', fontSize:'12px', display:'block' }}>{errors.sludge_before}</span>}

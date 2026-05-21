@@ -7,6 +7,7 @@ export const FORM_IDS = {
   SYNC: 'PSC_F_006',
   REPORTS: 'PSC_F_007',
   SETTINGS: 'PSC_F_008',
+  SAFETY_SCM: 'SAF_F_003',
 } as const;
 
 export const PROCESS_IDS = {
@@ -26,4 +27,5 @@ export const PROCESS_IDS = {
   VIEW_SYNC: 'PSC_P_014',
   VIEW_REPORTS: 'PSC_P_015',
   VIEW_SETTINGS: 'PSC_P_016',
+  SAFETY_SCM_SIGNOFF: 'SAF_P_004',
 } as const;

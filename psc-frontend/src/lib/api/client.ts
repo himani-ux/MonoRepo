@@ -162,9 +162,42 @@ apiClient.interceptors.response.use(
  * Standard API error format from the backend.
  */
 export interface ApiErrorResponse {
+  detail?: string | string[];
   error: string;
   message: string;
   details?: Record<string, string[]>;
+}
+
+function firstString(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const result = firstString(item);
+      if (result) {
+        return result;
+      }
+    }
+    return null;
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value as Record<string, unknown>)) {
+      const result = firstString(item);
+      if (result) {
+        return result;
+      }
+    }
+  }
+  return null;
+}
+
+function cleanErrorMessage(value: string): string {
+  const normalized = value.trim();
+  if (/^(<!doctype\s+html|<html[\s>])/i.test(normalized)) {
+    return 'Server error. Check the backend log for details.';
+  }
+  return normalized;
 }
 
 /**
@@ -172,23 +205,36 @@ export interface ApiErrorResponse {
  */
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as ApiErrorResponse | undefined;
-    if (data?.message) {
-      return data.message;
+    const data = error.response?.data as ApiErrorResponse | Record<string, unknown> | unknown[] | undefined;
+    if (data && !Array.isArray(data) && typeof data === 'object' && 'message' in data && typeof data.message === 'string') {
+      return cleanErrorMessage(data.message);
     }
-    if (data?.details) {
-      // Return first validation error
-      const firstKey = Object.keys(data.details)[0];
-      if (firstKey && data.details[firstKey]?.[0]) {
-        return data.details[firstKey][0];
+    if (data && !Array.isArray(data) && typeof data === 'object' && 'detail' in data && typeof data.detail === 'string') {
+      return cleanErrorMessage(data.detail);
+    }
+    if (data && !Array.isArray(data) && typeof data === 'object' && 'detail' in data) {
+      const detail = firstString(data.detail);
+      if (detail) {
+        return cleanErrorMessage(detail);
       }
     }
+    if (data && !Array.isArray(data) && typeof data === 'object' && 'details' in data && data.details) {
+      // Return first validation error
+      const detail = firstString(data.details);
+      if (detail) {
+        return cleanErrorMessage(detail);
+      }
+    }
+    const validationMessage = firstString(data);
+    if (validationMessage) {
+      return cleanErrorMessage(validationMessage);
+    }
     if (error.message) {
-      return error.message;
+      return cleanErrorMessage(error.message);
     }
   }
   if (error instanceof Error) {
-    return error.message;
+    return cleanErrorMessage(error.message);
   }
   return 'An unexpected error occurred';
 }

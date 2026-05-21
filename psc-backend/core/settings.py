@@ -10,6 +10,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from the backend .env file when present.
+load_dotenv(BASE_DIR / '.env')
+
 # Monkey-patch mssql-django to support SQL Server 2025 (version 17)
 # This is needed because mssql-django 1.6 doesn't recognize SQL Server 2025 yet
 try:
@@ -18,13 +24,6 @@ try:
         DatabaseWrapper._sql_server_versions[17] = 2025
 except ImportError:
     pass
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # =============================================================================
 # CORE SETTINGS
@@ -69,6 +68,7 @@ INSTALLED_APPS = [
     'apps.car',
     'apps.sync',
     'apps.notifications',
+    'apps.safety',
 ]
 
 MIDDLEWARE = [
@@ -106,16 +106,34 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # DATABASE (SQL Server)
 # Per TECH_STACK.md Section 3
 # =============================================================================
+_db_name = os.getenv("DB_NAME", "ksm_marine_live")
+_db_host = os.getenv("DB_HOST", "localhost")
+_db_port = os.getenv("DB_PORT", "1433")
+_db_user = os.getenv("DB_USER", "").strip()
+_db_password = os.getenv("DB_PASSWORD", "")
+_db_driver = os.getenv("DB_DRIVER", "ODBC Driver 18 for SQL Server")
+_db_encrypt = os.getenv("DB_ENCRYPT", "no")
+_db_trust_server_certificate = os.getenv("DB_TRUST_SERVER_CERTIFICATE", "yes")
+_db_trusted_connection = os.getenv("DB_TRUSTED_CONNECTION", "yes")
+
+_db_extra_params = (
+    f"Encrypt={_db_encrypt};"
+    f"TrustServerCertificate={_db_trust_server_certificate};"
+)
+if _db_trusted_connection.lower() in ("true", "1", "yes") and not _db_user and not _db_password:
+    _db_extra_params += "Trusted_Connection=yes;"
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'mssql',
-        'NAME': 'ksm_marine_live',
-        'USER': 'localhost',                 
-        # 'HOST': '.',
-        # 'PORT': '1433',
-        'OPTIONS': {
-            'driver': 'ODBC Driver 18 for SQL Server',
-            'extra_params': 'Encrypt=no;TrustServerCertificate=yes;Trusted_Connection=yes;'
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "mssql"),
+        "NAME": _db_name,
+        "HOST": _db_host,
+        "PORT": _db_port,
+        "USER": _db_user,
+        "PASSWORD": _db_password,
+        "OPTIONS": {
+            "driver": _db_driver,
+            "extra_params": _db_extra_params,
         },
     }
 }

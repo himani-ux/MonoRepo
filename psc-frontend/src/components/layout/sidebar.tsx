@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Ship,
+  Shield,
   ClipboardList,
   ListChecks,
   Bell,
@@ -48,6 +49,12 @@ interface NavItem {
   href: string;
   icon: typeof Ship;
   formId?: string;
+}
+
+interface SafetyNavItem {
+  formId: string;
+  href: string;
+  label: string;
 }
 
 const navItems: NavItem[] = [
@@ -110,6 +117,18 @@ const pscPriorityOrder = [
   '/settings',
 ] as const;
 
+const safetyNavItems: SafetyNavItem[] = [
+  { formId: 'SAF_F_015', href: '/safety/dashboard', label: 'Dashboard' },
+  { formId: 'SAF_F_001', href: '/safety/incidents', label: 'Incidents' },
+  { formId: 'SAF_F_002', href: '/safety/near-miss', label: 'Near Miss' },
+  { formId: 'SAF_F_003', href: '/safety/scm', label: 'Committee Meetings' },
+  { formId: 'SAF_F_004', href: '/safety/soi', label: 'Safety Officer Inspection' },
+  { formId: 'SAF_F_013', href: '/safety/soi', label: 'SOI Applicability' },
+  { formId: 'SAF_F_005', href: '/safety/search', label: 'Search' },
+  { formId: 'SAF_F_018', href: '/safety/admin', label: 'Admin' },
+  { formId: 'SAF_F_020', href: '/safety/admin/auditor-export', label: 'Auditor Export' },
+];
+
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
   const { hasForm, user, isVessel } = useAuth();
@@ -145,8 +164,12 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       .filter((item): item is NavItem => Boolean(item)),
     ...filteredNavItems.filter((item) => !pscPriorityOrder.includes(item.href as (typeof pscPriorityOrder)[number])),
   ];
+  const visibleSafetyItems = safetyNavItems.filter((item) => hasForm(item.formId));
 
   const hasActivePscItem = orderedNavItems.some((item) => isActive(item.href));
+  const hasSafetyAccess = visibleSafetyItems.length > 0;
+  const hasActiveSafetyItem = location.pathname.startsWith('/safety');
+  const hasActiveInspectionItem = hasActivePscItem || hasActiveSafetyItem;
   const legacyModuleItems = [
     {
       label: 'Circular',
@@ -161,13 +184,15 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       visible: isVessel,
     },
   ].filter((item) => item.visible);
-  const [inspectionOpen, setInspectionOpen] = useState(hasActivePscItem);
+  const [inspectionOpen, setInspectionOpen] = useState(hasActiveInspectionItem);
   const [pscOpen, setPscOpen] = useState(hasActivePscItem);
+  const [safetyOpen, setSafetyOpen] = useState(hasActiveSafetyItem);
 
   useEffect(() => {
-    setInspectionOpen(hasActivePscItem);
+    setInspectionOpen(hasActiveInspectionItem);
     setPscOpen(hasActivePscItem);
-  }, [hasActivePscItem]);
+    setSafetyOpen(hasActiveSafetyItem);
+  }, [hasActiveInspectionItem, hasActivePscItem, hasActiveSafetyItem]);
 
   const handleInspectionToggle = () => {
     setInspectionOpen((open) => {
@@ -304,6 +329,59 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                       </ul>
                     )}
                   </li>
+
+                  {hasSafetyAccess && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => setSafetyOpen((open) => !open)}
+                        aria-expanded={safetyOpen}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                          hasActiveSafetyItem || safetyOpen
+                            ? 'bg-primary-50/70 text-primary-700'
+                            : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+                        )}
+                      >
+                        <Shield
+                          className={cn(
+                            'h-5 w-5',
+                            hasActiveSafetyItem || safetyOpen ? 'text-primary-600' : 'text-neutral-500'
+                          )}
+                        />
+                        <span className="flex-1 text-left">Safety</span>
+                        {safetyOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      {safetyOpen ? (
+                        <ul className="mt-1 space-y-1 pl-3">
+                          {visibleSafetyItems.map((item) => {
+                            const active = location.pathname.startsWith(item.href);
+
+                            return (
+                              <li key={`${item.formId}-${item.label}`}>
+                                <NavLink
+                                  to={item.href}
+                                  onClick={onClose}
+                                  className={cn(
+                                    'flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                                    active
+                                      ? 'bg-primary-50 text-primary-700'
+                                      : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+                                  )}
+                                >
+                                  <span className="flex-1 text-left">{item.label}</span>
+                                </NavLink>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
+                    </li>
+                  )}
                 </ul>
               )}
             </li>

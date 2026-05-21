@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import logging
-from typing import Optional, Tuple, List
 import json
+import logging
+from typing import List, Optional, Tuple
 
 from django.db import connection
 
-from .models import MscProfile, RoleCodes
+from .models import MscProfile, OfficeUser, RoleCodes
 
 logger = logging.getLogger(__name__)
 
@@ -286,13 +286,24 @@ def get_office_permissions_by_mapping(
     username: Optional[str],
     employee_id: Optional[str],
 ) -> Tuple[List[str], List[str]]:
+    _role_name, form_ids, process_ids = get_office_profile_bundle_by_mapping(
+        username=username,
+        employee_id=employee_id,
+    )
+    return form_ids, process_ids
+
+
+def get_office_profile_bundle_by_mapping(
+    username: Optional[str],
+    employee_id: Optional[str],
+) -> Tuple[Optional[str], List[str], List[str]]:
     """
-    Resolve office permissions using mapping_role_user -> master_role -> msc_profiles.
+    Resolve office profile name and permissions using mapping_role_user -> master_role -> msc_profiles.
     Falls back to empty lists if no mapping exists.
     """
     identifiers = [v for v in (username, employee_id) if v]
     if not identifiers:
-        return [], []
+        return None, [], []
 
     # Raw SQL to avoid UUID conversion issues from ORM on some DBs
     sql = """
@@ -317,10 +328,145 @@ def get_office_permissions_by_mapping(
             cursor.execute(sql, [str(ident)])
             row = cursor.fetchone()
         if row:
-            _role_name, form_ids, process_ids = row
+            role_name, form_ids, process_ids = row
             return (
+                str(role_name).strip() if role_name not in (None, "") else None,
                 parse_id_list(form_ids),
                 parse_id_list(process_ids),
             )
 
-    return [], []
+    return None, [], []
+
+
+def resolve_safety_role_name(
+    *,
+    user_type: Optional[str],
+    role: Optional[str],
+    rank: Optional[str] = None,
+    profile_name: Optional[str] = None,
+) -> Optional[str]:
+    normalized_user_type = str(user_type or "").strip().upper()
+    normalized_role = str(role or "").strip().upper()
+    normalized_rank = str(rank or "").strip().upper()
+    normalized_profile = str(profile_name or "").strip().upper()
+
+    if normalized_user_type == "VESSEL":
+        if normalized_rank in {"MASTER", "CAPTAIN"}:
+            return "MASTER"
+        if normalized_rank in {"CHIEF OFFICER", "CHIEF MATE", "C/O", "CO"}:
+            return "CO"
+        if normalized_rank in {"CHIEF ENGINEER", "C/E", "CE"}:
+            return "CE"
+        if normalized_rank in {"SECOND ENGINEER", "2ND ENGINEER", "2/E", "2E"}:
+            return "2/E"
+        return normalized_rank or normalized_role or None
+
+    if normalized_profile == "SEQ MANAGER" or normalized_role == RoleCodes.DPA:
+        return "DPA"
+    if normalized_profile == "FLEET MANAGER":
+        return "FM"
+    if normalized_profile:
+        return normalized_profile
+    return normalized_role or None
+
+
+def resolve_current_office_permission_snapshot(
+    *,
+    user_type: Optional[str] = "OFFICE",
+    login_id: Optional[str],
+    employee_id: Optional[str],
+    role: Optional[str],
+    has_global_vessel_access: Optional[bool],
+    full_name: Optional[str] = None,
+    email: Optional[str] = None,
+    department: Optional[str] = None,
+) -> dict:
+    office_user = (
+        OfficeUser.objects.filter(is_active=True, is_deleted=False)
+        .filter(employee_id__iexact=employee_id)
+        .first()
+        if employee_id
+        else None
+    )
+
+    if office_user is None and login_id:
+        office_user = (
+            OfficeUser.objects.filter(is_active=True, is_deleted=False)
+            .filter(username__iexact=login_id)
+            .first()
+        )
+
+    mapped_profile_name, form_ids, process_ids = get_office_profile_bundle_by_mapping(
+        username=login_id,
+        employee_id=employee_id,
+    )
+    profile_name = mapped_profile_name or (office_user.employee_role if office_user and office_user.employee_role else None)
+
+    if not form_ids and not process_ids and office_user and office_user.employee_role:
+        form_ids, process_ids = get_profile_permissions(office_user.employee_role, work_side=False)
+
+    if not form_ids and not process_ids and role:
+        form_ids, process_ids = get_profile_permissions(role, work_side=False)
+
+    mapped_global_role = get_office_global_reviewer_role(
+        username=login_id,
+        employee_id=employee_id,
+    )
+    initial_safety_role_name = resolve_safety_role_name(
+        user_type=user_type,
+        role=role,
+        profile_name=profile_name,
+    )
+    if mapped_global_role == RoleCodes.DPA:
+        role = RoleCodes.DPA
+        has_global_vessel_access = True
+    elif mapped_global_role == RoleCodes.OFFICE_PIC:
+        role = RoleCodes.OFFICE_PIC
+        has_global_vessel_access = True
+    elif initial_safety_role_name == "FM":
+        has_global_vessel_access = True
+    elif has_global_vessel_access is None:
+        has_global_vessel_access = False
+
+    safety_role_name = resolve_safety_role_name(
+        user_type=user_type,
+        role=role,
+        profile_name=profile_name,
+    )
+
+    return {
+        'role': role,
+        'role_name': profile_name or role,
+        'safety_role_name': safety_role_name,
+        'form_ids': form_ids,
+        'process_ids': process_ids,
+        'has_global_vessel_access': has_global_vessel_access,
+        'employee_id': office_user.employee_id if office_user else employee_id,
+        'email': office_user.email_id if office_user and office_user.email_id else email,
+        'department': office_user.department if office_user and office_user.department else department,
+        'full_name': office_user.full_name if office_user else full_name,
+    }
+
+
+def resolve_current_vessel_permission_snapshot(
+    *,
+    user_type: Optional[str] = "VESSEL",
+    role: Optional[str] = None,
+    rank: Optional[str],
+    full_name: Optional[str] = None,
+    department: Optional[str] = None,
+) -> dict:
+    form_ids, process_ids = get_profile_permissions(rank, work_side=True)
+    return {
+        'rank': rank,
+        'role_name': rank or role,
+        'safety_role_name': resolve_safety_role_name(
+            user_type=user_type,
+            role=role,
+            rank=rank,
+        ),
+        'form_ids': form_ids,
+        'process_ids': process_ids,
+        'department': department,
+        'full_name': full_name,
+    }
