@@ -49,8 +49,8 @@ function toEditableRow(row: SafetyScmAgendaRow): EditableAgendaRow {
 function validateRows(rows: EditableAgendaRow[]): string[] {
   const errors: string[] = [];
   for (const row of rows) {
-    if (row.agenda_item_number !== 10 && !row.decision.trim()) {
-      errors.push(`Section ${row.agenda_item_number} requires a decision/outcome.`);
+    if (![7, 8, 9].includes(row.agenda_item_number) && !row.decision.trim()) {
+      errors.push(`Section ${row.agenda_item_number} requires recommendation / suggestions.`);
     }
     if (!row.action_enabled) {
       continue;
@@ -101,7 +101,7 @@ export default function SafetyScmAgendaEditor({
     onSuccess: async (updated) => {
       setRows(updated.rows.map(toEditableRow));
       setSaveAttempted(false);
-      setMessage("Agenda decisions and action items saved.");
+      setMessage("Agenda recommendations and action items saved.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: safetyKeys.scmAgenda(payload.meeting_id) }),
         queryClient.invalidateQueries({ queryKey: safetyKeys.scmMeeting(payload.meeting_id) }),
@@ -136,9 +136,9 @@ export default function SafetyScmAgendaEditor({
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Agenda decisions and action items</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Agenda recommendations and action items</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Edit the fixed 10-section SCM agenda, record each decision/outcome, and create or update section-linked corrective actions.
+              Edit the fixed SCM agenda, record recommendations/suggestions, and create or update section-linked corrective actions.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -166,8 +166,9 @@ export default function SafetyScmAgendaEditor({
                 <StatusPill value={payload.rows.find((item) => item.id === row.id)?.action_item?.display_status ?? "No action"} />
               </div>
 
+              {[7, 8, 9].includes(row.agenda_item_number) ? null : (
               <label className="mt-4 block">
-                <span className="text-sm font-semibold text-slate-900">Decision / outcome</span>
+                <span className="text-sm font-semibold text-slate-900">Recommendation / Suggestions</span>
                 <textarea
                   className="mt-2 min-h-[96px] w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 disabled:bg-slate-100"
                   disabled={isLocked}
@@ -175,6 +176,7 @@ export default function SafetyScmAgendaEditor({
                   value={row.decision}
                 />
               </label>
+              )}
 
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                 <label className="flex items-center gap-2 text-sm font-semibold text-slate-900">

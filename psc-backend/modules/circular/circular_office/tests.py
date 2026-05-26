@@ -24,6 +24,7 @@ from .views import (
     _generate_unique_circular_sr_no,
     _open_uploaded_pdf_reader,
     _resolve_circular_type_label,
+    _validate_circular_approval_scope,
     create_delivery_records,
     delete_draft_by_id,
     get_notification_details_by_sr_no,
@@ -246,6 +247,58 @@ class PendingDraftValidationTests(SimpleTestCase):
         self.assertEqual(_resolve_circular_type_label('Work Instruction'), 'Work Instruction')
         self.assertEqual(_resolve_circular_type_label('work_instruction_letter'), 'Work Instruction')
         self.assertIsNone(_resolve_circular_type_label('all'))
+
+
+class CircularApprovalScopeTests(SimpleTestCase):
+    @patch('modules.circular.circular_office.views._resolve_circular_actor_profile')
+    @patch('modules.circular.circular_office.views._get_department_master_name')
+    def test_technical_superintendent_cannot_approve_seq_notification(self, mock_dept, mock_profile):
+        mock_profile.return_value = SimpleNamespace(
+            profile_id='D604980F-0F1C-EF11-A9F1-F348983BAE6B',
+            profile_name='Technical Superintendent',
+        )
+        mock_dept.return_value = 'Deck'
+
+        response = _validate_circular_approval_scope(
+            SimpleNamespace(sr_no='KSM/Circular/SEQ/2026-0001', dept='dept-seq'),
+            {'published_by': 'EMP001'},
+        )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 403)
+
+    @patch('modules.circular.circular_office.views._resolve_circular_actor_profile')
+    @patch('modules.circular.circular_office.views._get_department_master_name')
+    def test_technical_superintendent_cannot_approve_technical_notification(self, mock_dept, mock_profile):
+        mock_profile.return_value = SimpleNamespace(
+            profile_id='D604980F-0F1C-EF11-A9F1-F348983BAE6B',
+            profile_name='Technical Superintendent',
+        )
+        mock_dept.return_value = 'Engine'
+
+        response = _validate_circular_approval_scope(
+            SimpleNamespace(sr_no='KSM/Alert/Technical/2026-0001', dept='dept-engine'),
+            {'published_by': 'EMP001'},
+        )
+
+        self.assertIsNotNone(response)
+        self.assertEqual(response.status_code, 403)
+
+    @patch('modules.circular.circular_office.views._resolve_circular_actor_profile')
+    @patch('modules.circular.circular_office.views._get_department_master_name')
+    def test_regular_approver_can_approve_seq_notification(self, mock_dept, mock_profile):
+        mock_profile.return_value = SimpleNamespace(
+            profile_id='809C3C1E-0F1C-EF11-A9F1-F348983BAE6B',
+            profile_name='SEQ Manager',
+        )
+        mock_dept.return_value = 'Deck'
+
+        response = _validate_circular_approval_scope(
+            SimpleNamespace(sr_no='KSM/Circular/SEQ/2026-0001', dept='dept-seq'),
+            {'published_by': 'EMP002'},
+        )
+
+        self.assertIsNone(response)
 
 
 class NotificationLookupTests(SimpleTestCase):

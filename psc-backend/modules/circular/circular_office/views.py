@@ -102,6 +102,11 @@ SR_NO_DEPARTMENT_DISPLAY_OVERRIDES = {
     '8a49308c-aa8a-ee11-987c-7413ea3d6a70': 'Technical',
 }
 
+TECHNICAL_SUPERINTENDENT_PROFILE_IDS = {
+    'd604980f-0f1c-ef11-a9f1-f348983bae6b',
+}
+TECHNICAL_CIRCULAR_DEPARTMENT_NAMES = {'engine', 'technical'}
+
 
 def _get_department_display_name_for_sr_no(dept_id_string):
     if not dept_id_string:
@@ -343,6 +348,143 @@ def _lookup_department_name_by_identifier(dept_id_string):
     return str(row[0]).strip() if row and row[0] else None
 
 
+def _resolve_circular_actor_profile(actor_identifier):
+    normalized_actor = str(actor_identifier or "").strip()
+    if not normalized_actor:
+        return None
+
+    identifiers = {normalized_actor}
+    employee_role = None
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP 1 employee_id, username, employee_role
+            FROM users
+            WHERE LOWER(LTRIM(RTRIM(employee_id))) = LOWER(%s)
+               OR LOWER(LTRIM(RTRIM(username))) = LOWER(%s)
+            """,
+            [normalized_actor, normalized_actor],
+        )
+        row = cursor.fetchone()
+
+    if row:
+        employee_id, username, employee_role = row
+        if employee_id:
+            identifiers.add(str(employee_id).strip())
+        if username:
+            identifiers.add(str(username).strip())
+
+    profile_sql = """
+        SELECT TOP 1
+            CONVERT(VARCHAR(36), mr.id) AS profile_id,
+            mr.role_name,
+            p.form_ids,
+            p.process_ids
+        FROM mapping_role_user mru
+        LEFT JOIN master_role mr
+            ON mr.id = mru.role_id
+           AND mr.is_active = 1
+           AND mr.is_deleted = 0
+        LEFT JOIN msc_profiles p
+            ON p.profile_id = mr.id
+           AND p.work_side = 0
+           AND p.is_active = 1
+           AND p.is_deleted = 0
+        WHERE mru.is_active = 1
+          AND mru.is_deleted = 0
+          AND LOWER(LTRIM(RTRIM(mru.userid))) = LOWER(%s)
+    """
+    for identifier in identifiers:
+        with connection.cursor() as cursor:
+            cursor.execute(profile_sql, [identifier])
+            row = cursor.fetchone()
+        if row:
+            return SimpleNamespace(
+                profile_id=str(row[0]).strip() if row[0] else None,
+                profile_name=str(row[1]).strip() if row[1] else None,
+                form_ids=row[2],
+                process_ids=row[3],
+            )
+
+    if employee_role:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 1
+                    CONVERT(VARCHAR(36), profile_id) AS profile_id,
+                    profile_name,
+                    form_ids,
+                    process_ids
+                FROM msc_profiles
+                WHERE work_side = 0
+                  AND is_active = 1
+                  AND is_deleted = 0
+                  AND LOWER(LTRIM(RTRIM(profile_name))) = LOWER(%s)
+                """,
+                [str(employee_role).strip()],
+            )
+            row = cursor.fetchone()
+        if row:
+            return SimpleNamespace(
+                profile_id=str(row[0]).strip() if row[0] else None,
+                profile_name=str(row[1]).strip() if row[1] else None,
+                form_ids=row[2],
+                process_ids=row[3],
+            )
+
+    return None
+
+
+def _is_technical_superintendent_profile(profile):
+    if not profile:
+        return False
+
+    profile_id = str(getattr(profile, 'profile_id', '') or '').strip().lower()
+    profile_name = str(getattr(profile, 'profile_name', '') or '').strip().lower()
+    return (
+        profile_id in TECHNICAL_SUPERINTENDENT_PROFILE_IDS
+        or profile_name == 'technical superintendent'
+    )
+
+
+def _is_technical_circular_notification(notification):
+    dept_name = _get_department_master_name(getattr(notification, 'dept', None))
+    normalized_dept_name = str(dept_name or '').strip().lower()
+    if normalized_dept_name in TECHNICAL_CIRCULAR_DEPARTMENT_NAMES:
+        return True
+
+    sr_no = str(getattr(notification, 'sr_no', '') or '').strip().lower()
+    return '/technical/' in sr_no
+
+
+def _validate_circular_approval_scope(notification, data):
+    actor_identifier = (
+        data.get('published_by')
+        or data.get('acted_by')
+        or data.get('actor_id')
+        or data.get('updated_by')
+    )
+    if not actor_identifier:
+        # Keep legacy callers working. Current UI sends published_by for approve
+        # and acted_by for reject so this is only a compatibility fallback.
+        return None
+
+    actor_profile = _resolve_circular_actor_profile(actor_identifier)
+    if _is_technical_superintendent_profile(actor_profile):
+        return JsonResponse(
+            {
+                'error': (
+                    'Technical Superintendent is not allowed to approve or '
+                    'reject circulars, alerts, or work instructions.'
+                )
+            },
+            status=403,
+        )
+
+    return None
+
+
 def _fetch_all_rows_from_cursor(cursor):
     rows = []
 
@@ -477,6 +619,53 @@ def _fetch_target_crew_ids_for_ranks(rank_ids):
     with connection.cursor() as cursor:
         cursor.execute(sql, normalized_rank_ids)
         target_crew_ids = _normalize_text_list([row[0] for row in cursor.fetchall()])
+
+    return _filter_crew_ids_by_allowed_status(target_crew_ids)
+
+
+def _fetch_target_crew_ids_for_vessels(vessel_ids):
+    normalized_vessel_ids = _normalize_uuid_list(vessel_ids)
+    if not normalized_vessel_ids:
+        return []
+
+    values_clause, sql_params = _build_uuid_values_clause(normalized_vessel_ids)
+    sql = f"""
+        SET NOCOUNT ON;
+
+        DECLARE @target_vessels TABLE (
+            vessel_id UNIQUEIDENTIFIER PRIMARY KEY
+        );
+
+        INSERT INTO @target_vessels (vessel_id)
+        VALUES {values_clause};
+
+        WITH latest_onboarding AS (
+            SELECT
+                LTRIM(RTRIM(coh.CrewID)) AS crew_id,
+                coh.Vessel,
+                ROW_NUMBER() OVER (
+                    PARTITION BY LTRIM(RTRIM(coh.CrewID))
+                    ORDER BY
+                        CASE WHEN ISNULL(coh.is_active, 0) = 1 THEN 0 ELSE 1 END,
+                        coh.updated_date DESC,
+                        coh.created_date DESC,
+                        coh.SignOnDate DESC,
+                        coh.id DESC
+                ) AS rn
+            FROM Crew_Onboarding_History coh
+            INNER JOIN @target_vessels target
+                ON target.vessel_id = TRY_CONVERT(UNIQUEIDENTIFIER, coh.Vessel)
+            WHERE ISNULL(coh.is_deleted, 0) = 0
+              AND LTRIM(RTRIM(ISNULL(coh.CrewID, ''))) <> ''
+        )
+        SELECT DISTINCT crew_id
+        FROM latest_onboarding
+        WHERE rn = 1;
+    """
+
+    with connection.cursor() as cursor:
+        cursor.execute(sql, sql_params)
+        target_crew_ids = _normalize_text_list([row[0] for row in _fetch_all_rows_from_cursor(cursor)])
 
     return _filter_crew_ids_by_allowed_status(target_crew_ids)
 
@@ -1947,6 +2136,10 @@ def update_notification_status(request, notification_sr_no):
         if not notification_for_dept:
             print(f"update_notification_status: Notification with SR No {notification_sr_no} not found.")
             return JsonResponse({'error': f'Notification with SR No {notification_sr_no} not found.'}, status=404)
+
+        scope_error = _validate_circular_approval_scope(notification_for_dept, data)
+        if scope_error is not None:
+            return scope_error
 
         is_repeat_approval = (
             allow_repeat_approval
@@ -4453,6 +4646,10 @@ def send_emails_to_vessels(request):
             notification_sr_no,
             vessel_ids_list,
         )
+        valid_vessel_ids = [
+            vessel_id for vessel_id in vessel_ids_list
+            if vessel_id in vessel_lookup
+        ]
         pending_vessel_ids = [
             vessel_id for vessel_id in vessel_ids_list
             if vessel_id in vessel_lookup and vessel_id not in existing_delivery_vessels
@@ -4463,8 +4660,23 @@ def send_emails_to_vessels(request):
             f"{len(pending_vessel_ids)} remaining for notification {notification_sr_no}."
         )
 
+        created_vessel_ids = _bulk_insert_ship_delivery_records(
+            notification_sr_no,
+            valid_vessel_ids,
+            django_timezone.now(),
+        )
+        delivery_records_created_count = len(created_vessel_ids)
+        vessel_crew_ids = _fetch_target_crew_ids_for_vessels(valid_vessel_ids)
+        created_vessel_crew_ids = _bulk_insert_crew_delivery_records(
+            notification_sr_no,
+            vessel_crew_ids,
+            django_timezone.now(),
+            reminder_count=1,
+        )
+
         emails_sent_count = 0
-        successful_vessel_ids = []
+        vessels_without_email_count = 0
+        email_failed_count = 0
         for vessel_id_str in pending_vessel_ids:
             vessel_details = vessel_lookup.get(vessel_id_str)
             if not vessel_details:
@@ -4474,6 +4686,7 @@ def send_emails_to_vessels(request):
             vessel_email = vessel_details.get('email')
             if not vessel_email:
                 print(f"send_emails_to_vessels[v2]: Vessel {vessel_name} has no email. Skipping.")
+                vessels_without_email_count += 1
                 continue
 
             subject = f"New {extracted_type_name} Notification: {notification_details.sr_no}"
@@ -4499,30 +4712,28 @@ Kaizen Ship Management
                 )
                 email_message.send()
                 emails_sent_count += 1
-                successful_vessel_ids.append(vessel_id_str)
                 print(f"send_emails_to_vessels[v2]: Email sent successfully to {vessel_email} for {vessel_name}.")
             except Exception as single_vessel_error:
+                email_failed_count += 1
                 print(
                     f"send_emails_to_vessels[v2]: Error sending to vessel {vessel_id_str}: "
                     f"{single_vessel_error}"
                 )
                 traceback.print_exc()
 
-        created_vessel_ids = _bulk_insert_ship_delivery_records(
-            notification_sr_no,
-            successful_vessel_ids,
-            django_timezone.now(),
-        )
-        delivery_records_created_count = len(created_vessel_ids)
-
         return JsonResponse({
             'success': True,
             'message': (
-                f'Emails sent successfully to {emails_sent_count} vessels and '
-                f'{delivery_records_created_count} delivery records created.'
+                f'KSM Library delivery created for {delivery_records_created_count} vessels. '
+                f'Crew delivery created for {len(created_vessel_crew_ids)} crew members. '
+                f'Emails sent successfully to {emails_sent_count} vessels.'
             ),
             'emails_sent': emails_sent_count,
+            'email_failed': email_failed_count,
+            'vessels_without_email': vessels_without_email_count,
             'delivery_records_created': delivery_records_created_count,
+            'crew_delivery_records_created': len(created_vessel_crew_ids),
+            'crew_delivery_records_eligible': len(vessel_crew_ids),
             'already_processed': len(existing_delivery_vessels),
             'total_requested': len(vessel_ids_list),
         })

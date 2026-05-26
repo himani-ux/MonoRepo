@@ -10,7 +10,7 @@ bootstrap_django()
 from apps.safety.serializers.scm import SCM_SECTION_TEMPLATE
 
 
-class SCMTenSectionTemplateTests(unittest.TestCase):
+class SCMSectionTemplateTests(unittest.TestCase):
     def test_legacy_template_keeps_expected_section_order(self) -> None:
         labels = [section["section_label"] for section in SCM_SECTION_TEMPLATE]
 
@@ -18,21 +18,20 @@ class SCMTenSectionTemplateTests(unittest.TestCase):
             labels,
             [
                 "Structured Review",
-                "Reserved",
-                "Safety Practice",
+                "Quality and Safety Practice",
                 "Security",
                 "Environment",
                 "Health",
                 "Crew Welfare",
-                "Findings & Corrective Measures",
+                "PSC Findings & Corrective Measures",
                 "Minutes of Meeting",
                 "Office Review",
             ],
         )
 
-    def test_legacy_template_contains_exactly_ten_sections(self) -> None:
-        self.assertEqual(len(SCM_SECTION_TEMPLATE), 10)
+    def test_legacy_template_contains_expected_sections(self) -> None:
+        self.assertEqual(len(SCM_SECTION_TEMPLATE), 9)
         self.assertEqual(
             [section["agenda_item_number"] for section in SCM_SECTION_TEMPLATE],
-            list(range(1, 11)),
+            list(range(1, 10)),
         )

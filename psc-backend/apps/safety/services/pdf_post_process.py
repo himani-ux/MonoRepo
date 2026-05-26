@@ -8,8 +8,6 @@ from reportlab.pdfgen import canvas
 
 
 class PdfPostProcessor:
-    confidentiality_label = "Confidential - Safety Investigation"
-
     def add_page_numbering_and_confidentiality(
         self,
         pdf_content: bytes,
@@ -49,10 +47,6 @@ class PdfPostProcessor:
     ) -> bytes:
         buffer = BytesIO()
         pdf = canvas.Canvas(buffer, pagesize=(width, height), invariant=1)
-        pdf.setFont("Helvetica-Bold", 8)
-        pdf.setFillColor(HexColor("#B91C1C"))
-        pdf.drawString(40, height - 18, self.confidentiality_label)
-
         pdf.setFont("Helvetica", 8)
         pdf.setFillColor(HexColor("#475569"))
         pdf.drawString(40, 18, f"{incident_number} | Generated {generated_at}")

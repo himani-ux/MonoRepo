@@ -12,7 +12,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.safety.models import EvidenceDeadlineTask, EvidenceItem, Incident, IncidentEvidence
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers.incident_phase3 import (
     ChainOfCustodyCreateSerializer,
     ChainOfCustodySerializer,
@@ -48,7 +48,7 @@ class IncidentPhase3ViewMixin(IncidentViewMixin):
 
     def get_incident(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
-        incident = get_by_public_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        incident = get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
         if incident.current_phase != 3:
             raise ValidationError("Phase 3 evidence can only be edited while current_phase = 3.")
         return incident
@@ -216,7 +216,7 @@ class IncidentPhase3AttachmentUploadView(IncidentPhase3ViewMixin, generics.Gener
 
         relative_path, absolute_path = self._build_storage_path(
             vessel_id=str(incident.vessel_id),
-            incident_id=int(incident.id),
+            incident_id=str(incident.id),
             tab_key=tab_key,
             original_name=str(uploaded_file.name or "photo"),
         )
@@ -434,7 +434,7 @@ class IncidentPhase3DeadlineTaskView(IncidentPhase3ViewMixin, generics.GenericAP
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        task = get_by_public_id_or_pk(incident.evidence_deadline_tasks.all(), self.kwargs["task_id"])
+        task = get_by_id_or_pk(incident.evidence_deadline_tasks.all(), self.kwargs["task_id"])
         next_status = serializer.validated_data["status"]
         task.status = next_status
         task.justification = serializer.validated_data.get("justification")

@@ -251,11 +251,10 @@ def recreate_soi_tables() -> None:
         cursor.execute(
             """
             CREATE TABLE vims_safety_soi_finding (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                public_id VARCHAR(36) NULL UNIQUE,
-                inspection_id BIGINT NOT NULL,
+                id VARCHAR(36) PRIMARY KEY,
+                inspection_id VARCHAR(36) NOT NULL,
                 area_id INTEGER NOT NULL,
-                item_id BIGINT NULL,
+                item_id VARCHAR(36) NULL,
                 title VARCHAR(256) NOT NULL,
                 description TEXT NOT NULL,
                 severity VARCHAR(8) NOT NULL,

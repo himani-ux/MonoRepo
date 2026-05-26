@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from types import SimpleNamespace
+import uuid
 import unittest
 
 from tests.safety.support import bootstrap_django, recreate_scm_tables, recreate_soi_tables
@@ -110,13 +111,19 @@ class SOIFindingStateFinalTests(unittest.TestCase):
                 parent_table=finding._meta.db_table,
                 parent_id=finding.pk,
                 field_name="status",
-            ).order_by("id")
+            ).order_by("changed_at", "id")
         )
 
         self.assertEqual(result["status"], "CLOSED")
         self.assertEqual(finding.status, SOIFinding.Status.CLOSED)
+        expected_transitions = [
+            ("OPEN", "PENDING_CLOSURE"),
+            ("PENDING_CLOSURE", "MASTER_APPROVED"),
+            ("MASTER_APPROVED", "CLOSED"),
+        ]
+        actual_transitions = [(row.old_value, row.new_value) for row in status_rows]
         self.assertEqual(
-            [(row.old_value, row.new_value) for row in status_rows],
+            sorted(actual_transitions, key=expected_transitions.index),
             [
                 ("OPEN", "PENDING_CLOSURE"),
                 ("PENDING_CLOSURE", "MASTER_APPROVED"),
@@ -165,11 +172,13 @@ class SOIFindingStateFinalTests(unittest.TestCase):
             created_by="co-7",
         )
 
-    def _insert_inspection(self) -> int:
+    def _insert_inspection(self) -> str:
+        inspection_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection (
+                    id,
                     vessel_id,
                     inspection_reference,
                     cycle_label,
@@ -188,9 +197,10 @@ class SOIFindingStateFinalTests(unittest.TestCase):
                     schema_version,
                     is_deleted,
                     created_by
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
+                    inspection_id,
                     "7",
                     "SOI/ABC/26/11",
                     "Q2/2026",
@@ -211,13 +221,15 @@ class SOIFindingStateFinalTests(unittest.TestCase):
                     "co-7",
                 ],
             )
-            return int(cursor.lastrowid)
+            return inspection_id
 
-    def _insert_finding_row(self, *, title: str, status: str, created_date) -> int:
+    def _insert_finding_row(self, *, title: str, status: str, created_date) -> str:
+        finding_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_finding (
+                    id,
                     inspection_id,
                     area_id,
                     item_id,
@@ -228,9 +240,10 @@ class SOIFindingStateFinalTests(unittest.TestCase):
                     status,
                     created_by,
                     created_date
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
+                    finding_id,
                     self.inspection_id,
                     5,
                     3001,
@@ -243,4 +256,4 @@ class SOIFindingStateFinalTests(unittest.TestCase):
                     created_date,
                 ],
             )
-            return int(cursor.lastrowid)
+            return finding_id

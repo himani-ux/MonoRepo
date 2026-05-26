@@ -121,7 +121,7 @@ class IncidentFactBaseTests(unittest.TestCase):
         reorder_response = self.reorder_view(reorder_request, id=self.incident.pk)
 
         self.assertEqual(reorder_response.status_code, 200)
-        self.assertEqual([row["id"] for row in reorder_response.data], [fact_ids[1], fact_ids[0]])
+        self.assertEqual([row["id"] for row in reorder_response.data], [str(fact_ids[1]), str(fact_ids[0])])
 
         contradiction_request = self.factory.post(
             f"/api/safety/incidents/{self.incident.pk}/facts/contradictions/",
@@ -161,7 +161,7 @@ class IncidentFactBaseTests(unittest.TestCase):
         response = self.detail_view(request, id=self.incident.pk, fact_id=fact.pk)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["id"], fact.pk)
+        self.assertEqual(response.data["id"], str(fact.pk))
         self.assertEqual(response.data["fact_text"], "Updated fact text.")
         self.assertEqual(response.data["confidence"], IncidentFact.Confidence.HIGH)
         fact.refresh_from_db()
@@ -220,7 +220,7 @@ class IncidentFactBaseTests(unittest.TestCase):
         create_response = self.list_create_view(create_request, id=tab_only_incident.pk)
 
         self.assertEqual(create_response.status_code, 201)
-        self.assertEqual(create_response.data["source_evidence_id"], tab.pk)
+        self.assertEqual(create_response.data["source_evidence_id"], str(tab.pk))
         self.assertIn("PEOPLE", create_response.data["evidence_summary"])
 
     def test_phase_four_gate_reports_missing_evidence_tabs_before_transition(self) -> None:

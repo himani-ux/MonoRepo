@@ -10,9 +10,9 @@ This document is the **screen contract** for every route the Safety Module expos
 
 **Glossary (first-use, per `<glossary>`):** **DPA** = Designated Person Ashore (ISM Code §4); **FM** = Fleet Manager; **TD** = Technical Director; **HOD** = Head of Department (onboard: CO or CE); **CO** = Chief Officer; **CE** = Chief Engineer; **SO** = Safety Officer (SOLAS Reg VI, COSWP 13.3.2); **SCM** = Safety Committee Meeting; **SOI** = Safety Officer Inspection; **MoC** = Management of Change; **RCA** = Root Cause Analysis; **CA / PA** = Corrective Action / Preventive Action; **ALARP** = As Low As Reasonably Practicable; **SMC / MC / MI** = Serious Marine Casualty / Marine Casualty / Marine Incident (IMO Casualty Investigation Code MSC.255(84)); **WRH** = Work & Rest Hours module; **CMS** = Crew Management System module; **PMS** = Planned Maintenance System module (**decoupled from VIMS — D-GAP-I1**); **SSQE** = Safety, Security, Quality & Environment (KSM Manual Rev 01 Feb 2026).
 
-**Identifier transition:** Route examples still use `:id` as the path variable name, but for Safety-owned transactional records that value should be the record's UUID `public_id` when available. Legacy integer IDs remain accepted during the transition so existing bookmarks, lists, PDFs, exports, and dashboards continue to work. This identifier rule does not change any workflow state, role gate, validation, signature sequence, or user-facing document number.
+**Safety UUID identifier rule:** Route examples use `:id` as the path variable name, and for Safety-owned managed records that value is the UUID `id` primary key. The transitional `public_id` field is not part of the final Safety design. This identifier rule does not change any workflow state, role gate, validation, signature sequence, dashboard, export, PDF, or user-facing document number.
 
-**Safety master/reference identifiers:** Safety-owned seeded master/reference endpoints now return UUID `id` as the actual database primary key plus `legacy_int_id` for transition compatibility. Stable business keys remain unchanged and continue to drive workflow selections where already developed: `type_code`, `loss_type_id`, `subcode_id`, `area_id`, `version_label`, `guard_code`, and SOI checklist item `legacy_int_id` compatibility. External/shared VIMS master data is not converted.
+**Safety master/reference identifiers:** Safety-owned seeded master/reference endpoints return UUID `id` as the actual database primary key. Stable business keys remain unchanged and continue to drive workflow selections where already developed: `type_code`, `loss_type_id`, `subcode_id`, `area_id`, `version_label`, `guard_code`, and checklist item reference codes. External/shared VIMS master data is not converted.
 
 ---
 
@@ -201,7 +201,7 @@ Reporter identity on Near Miss records is enforced at the **serializer layer** (
     :id/agenda/                              # Agenda + decisions
     :id/closed-since-last/                   # Closed-Since-Last-SCM block
     :id/signoff/                             # Master sign-off (closure)
-    :id/pdf/                                 # 10-section SCM PDF
+    :id/pdf/                                 # SCM PDF
   soi/                                       # SOI list + compliance tiles
     create/                                  # Step 1 — pick areas, SO + Assistant
     :id/                                     # SOI detail — landing = current state
@@ -654,12 +654,12 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. Regular monthly + Ad-Hoc me
 **FEAT refs:** FEAT-SAF-SCM-001, FEAT-SAF-SCM-003, FEAT-SAF-SCM-004.
 **Role gate:** `PermissionGate(SAF_F_003) + ActionGate(SAF_P_001) + role ∈ {Master, CO}` (D-RBAC-06).
 **Data loaded on mount:**
-- `GET /api/safety/scm/form-config/` — 10-section template derived from legacy `vw_GetSCM_Master`.
+- `GET /api/safety/scm/form-config/` — SCM section template derived from legacy `vw_GetSCM_Master`, with the old reserved Section 2 removed and later sections renumbered.
 - `GET /api/safety/scm/closed-since-last/?vessel_id={id}` — for auto-fill block (FEAT-SAF-SCM-006).
 - `GET /api/safety/soi/open-findings/?vessel_id={id}` — for Safety Observations auto-fill (FEAT-SAF-SOI-020).
 **Signature transition:** None yet — SCM host prepares; signatures at sign-off.
 **States:**
-- **Loaded:** 10-section form with Section 8 auto-answering Yes if SOI events in period + count + coverage %.
+- **Loaded:** SCM form with Section 7 auto-answering Yes if SOI events in period + count + coverage %.
 - **Loading:** Skeleton.
 - **Empty:** New draft — pre-filled vessel + date; free-text sections blank (≥20 chars each).
 - **Error — validation:** Section free-text < 20 chars → red block on Submit (VALIDATION_RULES §6).
@@ -683,7 +683,7 @@ Same form as Regular except `meeting_type='AD_HOC'` and mandatory trigger reason
 **Data loaded on mount:** `GET /api/safety/scm/:id/`, including agenda + decisions.
 **Signature transition:** None on read view.
 **States:**
-- **Loaded:** Meeting-type pill + date + chair + state; 10 sections as anchors; Closed-Since-Last block top.
+- **Loaded:** Meeting-type pill + date + chair + state; SCM sections as anchors; Closed-Since-Last block top.
 - **Loading:** Skeleton.
 - **Empty:** n/a.
 - **Error:** standard.
@@ -753,7 +753,7 @@ Same form as Regular except `meeting_type='AD_HOC'` and mandatory trigger reason
 
 **FEAT refs:** FEAT-SAF-PDF-004.
 **Role gate:** `PermissionGate(SAF_F_003) + ActionGate(SAF_P_007)`.
-**Data loaded on mount:** `GET /api/safety/scm/:id/pdf/` — 10-section layout with Closed-Since-Last summary block at top; attendance + WRH badges inline; signatures (Master + CO + attendees).
+**Data loaded on mount:** `GET /api/safety/scm/:id/pdf/` — SCM layout with Closed-Since-Last summary block at top; attendance + WRH badges inline; signatures (Master + CO + attendees).
 **States:** Loading → Loaded viewer → Error "Generation failed".
 **Decisions:** D-PDF-03b, D-GAP-M-ADHOC.
 
@@ -1122,7 +1122,7 @@ Every PRD V1 feature must map to ≥1 screen or route. `R` = referenced on scree
 | FEAT-SAF-SOI-017 | R: finding save nudge modal | — |
 | FEAT-SAF-SOI-018 | R: finding → Incident/Near Miss CTA | — |
 | FEAT-SAF-SOI-019 | R: finding badge + dashboard tile | — |
-| FEAT-SAF-SOI-020 | R: SCM `/closed-since-last/` + Section 8 auto-fill | — |
+| FEAT-SAF-SOI-020 | R: SCM `/closed-since-last/` + Section 7 auto-fill | — |
 | FEAT-SAF-SOI-021 | R: finding create `assigned_to` default | — |
 | FEAT-SAF-SOI-022 | R: dashboard + SCM analytics | — |
 | FEAT-SAF-SOI-023 | R: download paper signature lines | — |

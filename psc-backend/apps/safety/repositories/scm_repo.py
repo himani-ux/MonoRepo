@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta
+import json
 from typing import TYPE_CHECKING
+from uuid import UUID
 
+from django.core.exceptions import FieldError
 from django.db import connection, transaction
 from django.db import DatabaseError, OperationalError, ProgrammingError
 from django.utils import timezone
@@ -82,6 +85,67 @@ class SCMRepository(BaseRepository):
             self._replace_sections(meeting.id, sections)
             if isinstance(attendance_rows, list) and attendance_rows:
                 meeting = self.read(meeting.id)
+                self.save_attendance(meeting=meeting, rows=attendance_rows)
+
+        return self.read(meeting.id)
+
+    def update_meeting(
+        self,
+        *,
+        meeting: SCMMeeting,
+        payload: Mapping[str, object],
+        actor_id: str,
+    ) -> SCMMeeting:
+        from apps.safety.serializers.scm import normalize_scm_sections
+
+        data = dict(payload)
+        legacy_columns_available = self._scm_meeting_legacy_columns_available()
+        if not legacy_columns_available:
+            for field_name in self._legacy_header_field_names():
+                data.pop(field_name, None)
+
+        attendance_rows = data.pop("attendance_rows", None)
+        sections = normalize_scm_sections(data.pop("sections", None))
+        data.pop("vessel_code", None)
+        data.pop("vessel_id", None)
+        data.pop("scm_number", None)
+        data.pop("state", None)
+
+        allowed_fields = {
+            "meeting_type",
+            "meeting_date",
+            "meeting_time_local",
+            "location",
+            "latitude",
+            "longitude",
+            "voyage_no",
+            "occasion",
+            "ship_position",
+            "ship_pos_from",
+            "ship_pos_to",
+            "comm_time",
+            "comp_time",
+            "chair_crew_id",
+            "prepared_by_crew_id",
+            "ad_hoc_trigger_reason",
+            "schema_version",
+        }
+
+        with transaction.atomic():
+            update_fields: list[str] = []
+            for field_name in allowed_fields:
+                if field_name not in data:
+                    continue
+                setattr(meeting, field_name, data[field_name])
+                update_fields.append(field_name)
+            meeting.updated_by = actor_id
+            meeting.updated_date = timezone.now()
+            update_fields.extend(["updated_by", "updated_date"])
+            if update_fields:
+                meeting.save(update_fields=sorted(set(update_fields)))
+
+            self.update_agenda(meeting=meeting, rows=sections, actor_id=actor_id)
+            if isinstance(attendance_rows, list):
                 self.save_attendance(meeting=meeting, rows=attendance_rows)
 
         return self.read(meeting.id)
@@ -635,10 +699,10 @@ class SCMRepository(BaseRepository):
 
         carried_forward: list[dict[str, object]] = []
         for action in actions:
-            agenda_row = agenda_row_map.get(int(action.source_id))
+            agenda_row = agenda_row_map.get(action.source_id)
             if agenda_row is None:
                 continue
-            source_meeting = meeting_map.get(int(agenda_row.meeting_id))
+            source_meeting = meeting_map.get(agenda_row.meeting_id)
             if source_meeting is None:
                 continue
             carried_forward.append(
@@ -668,6 +732,7 @@ class SCMRepository(BaseRepository):
                     SELECT
                         id,
                         sr_no,
+                        NULL AS msc_type,
                         title,
                         category,
                         office_instructions,
@@ -700,6 +765,7 @@ class SCMRepository(BaseRepository):
                     SELECT TOP ({row_limit})
                         CAST(id AS NVARCHAR(64)) AS id,
                         sr_no,
+                        msc_type,
                         title,
                         category,
                         office_instructions,
@@ -730,12 +796,116 @@ class SCMRepository(BaseRepository):
 
         return [self._serialize_msc_circular(row) for row in rows]
 
+    def fetch_latest_near_misses(
+        self,
+        *,
+        vessel_id: str | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, object]]:
+        normalized_vessel_id = str(vessel_id or "").strip()
+        row_limit = max(1, min(int(limit or 5), 10))
+        if not normalized_vessel_id:
+            return []
+
+        try:
+            rows = (
+                Incident.objects.filter(
+                    is_deleted=False,
+                    vessel_id=normalized_vessel_id,
+                    record_type=Incident.RecordType.NEAR_MISS,
+                )
+                .order_by("-occurred_at", "-reported_at", "-created_date", "-id")[:row_limit]
+            )
+        except (DatabaseError, OperationalError, ProgrammingError):
+            return []
+
+        return [self._serialize_near_miss(row) for row in rows]
+
+    def fetch_latest_psc_cars(
+        self,
+        *,
+        vessel_id: str | None = None,
+        limit: int = 5,
+    ) -> list[dict[str, object]]:
+        normalized_vessel_id = str(vessel_id or "").strip()
+        row_limit = max(1, min(int(limit or 5), 10))
+        if not normalized_vessel_id:
+            return []
+
+        try:
+            vessel_uuid = UUID(normalized_vessel_id)
+        except (TypeError, ValueError):
+            return []
+
+        try:
+            from apps.inspection.deficiency_models import CAR
+
+            cutoff_meeting = (
+                self.meeting_model.objects.filter(
+                    vessel_id=normalized_vessel_id,
+                    master_signed_off_at__isnull=False,
+                )
+                .order_by("-master_signed_off_at", "-meeting_date", "-created_date")
+                .first()
+            )
+            queryset = CAR.objects.select_related("deficiency__inspection").filter(
+                is_deleted=False,
+                deficiency__is_deleted=False,
+                deficiency__inspection__is_deleted=False,
+                deficiency__inspection__vessel_id=vessel_uuid,
+                deficiency__inspection__inspection_type="PSC",
+            )
+            if cutoff_meeting and cutoff_meeting.master_signed_off_at:
+                queryset = queryset.filter(created_date__gt=cutoff_meeting.master_signed_off_at)
+            rows = queryset.order_by("-created_date", "-id")[:row_limit]
+        except (DatabaseError, OperationalError, ProgrammingError, ImportError, ValueError, FieldError):
+            return []
+
+        return [self._serialize_psc_car(row) for row in rows]
+
+    def _serialize_near_miss(self, row: Incident) -> dict[str, object]:
+        occurred_at = row.occurred_at
+        reported_at = row.reported_at
+        closed_at = row.closed_at
+        return {
+            "id": str(row.id),
+            "incident_number": row.incident_number,
+            "title": (row.narrative or "").strip() or row.incident_number,
+            "state": row.state,
+            "severity": row.near_miss_severity or "",
+            "priority": row.near_miss_priority or "",
+            "occurred_at": occurred_at.isoformat() if hasattr(occurred_at, "isoformat") else occurred_at,
+            "reported_at": reported_at.isoformat() if hasattr(reported_at, "isoformat") else reported_at,
+            "closed_at": closed_at.isoformat() if hasattr(closed_at, "isoformat") else closed_at,
+            "source_route": f"/safety/near-miss/{row.id}",
+        }
+
+    @staticmethod
+    def _serialize_psc_car(row) -> dict[str, object]:
+        deficiency = getattr(row, "deficiency", None)
+        inspection = getattr(deficiency, "inspection", None)
+        inspection_date = getattr(inspection, "inspection_date", None)
+        target_date = getattr(row, "target_date", None) or getattr(deficiency, "target_date", None)
+        return {
+            "action_code": str(getattr(deficiency, "action_code", None) or getattr(row, "initial_action_code", None) or "").strip(),
+            "car_number": str(getattr(row, "car_number", "") or "").strip(),
+            "def_code": str(getattr(deficiency, "def_code", "") or "").strip(),
+            "deficiency_description": str(getattr(deficiency, "description", "") or "").strip(),
+            "id": str(getattr(row, "id", "") or "").strip(),
+            "inspection_date": inspection_date.isoformat() if hasattr(inspection_date, "isoformat") else inspection_date,
+            "port_place": str(getattr(inspection, "port_place", "") or "").strip(),
+            "source_route": f"/cars/{getattr(row, 'id', '')}",
+            "status": str(getattr(row, "status", "") or "").strip(),
+            "target_date": target_date.isoformat() if hasattr(target_date, "isoformat") else target_date,
+        }
+
     def _serialize_msc_circular(self, row: Mapping[str, object]) -> dict[str, object]:
         published_on = row.get("published_on")
         created_at = row.get("created_at")
         return {
             "id": str(row.get("id") or "").strip(),
             "sr_no": str(row.get("sr_no") or "").strip(),
+            "msc_type": str(row.get("msc_type") or "").strip(),
             "title": str(row.get("title") or "").strip(),
             "category": str(row.get("category") or "").strip(),
             "office_instructions": str(row.get("office_instructions") or "").strip(),
@@ -802,6 +972,14 @@ class SCMRepository(BaseRepository):
             ),
             "generated_at": timezone.now().isoformat(),
             "latest_circulars": self.fetch_latest_msc_circulars(
+                vessel_id=normalized_vessel_id,
+                limit=5,
+            ),
+            "latest_near_misses": self.fetch_latest_near_misses(
+                vessel_id=normalized_vessel_id,
+                limit=5,
+            ),
+            "latest_psc_cars": self.fetch_latest_psc_cars(
                 vessel_id=normalized_vessel_id,
                 limit=5,
             ),
@@ -920,11 +1098,11 @@ class SCMRepository(BaseRepository):
             )
 
         errors: list[str] = []
-        if len(rows) != 10:
-            errors.append("SCM agenda must contain the locked 10-section structure.")
+        if len(rows) != 9:
+            errors.append("SCM agenda must contain the locked SCM section structure.")
         for row in rows:
             section_number = int(row.agenda_item_number)
-            if section_number == 10:
+            if section_number == 9:
                 continue
             if not SCM_LEGACY_FIELD_TEMPLATE.get(section_number, ()):
                 continue
@@ -938,13 +1116,25 @@ class SCMRepository(BaseRepository):
                 if value in (None, ""):
                     errors.append(f"Section {section_number} requires {field['field_label']}.")
 
+            if section_number == 1 and self._discussion_has_missing_reason(
+                section_fields.get("near_miss_discussion_status"),
+                section_fields.get("near_miss_not_discussed_reason"),
+            ):
+                errors.append("Section 1 requires a reason for each near miss marked not discussed.")
+
+            if section_number == 2 and self._discussion_has_missing_reason(
+                section_fields.get("circular_discussion_status"),
+                section_fields.get("circular_not_discussed_reason"),
+            ):
+                errors.append("Section 2 requires a reason for each circular / safety alert / work instruction marked not discussed.")
+
             if not has_legacy_values and not str(row.content or "").strip():
                 errors.append(f"Section {row.agenda_item_number} requires discussion content.")
             if not str(row.decision or "").strip() and not self._legacy_section_supplies_decision(
                 section_number,
                 section_fields,
             ):
-                errors.append(f"Section {row.agenda_item_number} requires a decision/outcome.")
+                errors.append(f"Section {row.agenda_item_number} requires recommendation / suggestions.")
         return not errors, errors
 
     @staticmethod
@@ -952,13 +1142,38 @@ class SCMRepository(BaseRepository):
         section_number: int,
         section_fields: Mapping[str, object],
     ) -> bool:
-        if section_number != 8:
+        if section_number == 8:
+            return section_fields.get("miscellaneous_comments") not in (None, "")
+
+        if section_number != 7:
             return False
 
         return any(
             section_fields.get(f"findings{index}") not in (None, "")
             and section_fields.get(f"correctivemeasure{index}") not in (None, "")
             for index in range(1, 11)
+        )
+
+    @staticmethod
+    def _discussion_has_missing_reason(status_value: object, reason_value: object) -> bool:
+        raw_status = str(status_value or "").strip()
+        if not raw_status:
+            return False
+        if raw_status.upper() == "NOT_DISCUSSED":
+            return not str(reason_value or "").strip()
+        if not raw_status.startswith("["):
+            return False
+        try:
+            rows = json.loads(raw_status)
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(rows, list):
+            return False
+        return any(
+            str(row.get("status") or "").strip().upper() == "NOT_DISCUSSED"
+            and not str(row.get("reason") or "").strip()
+            for row in rows
+            if isinstance(row, Mapping)
         )
 
     @staticmethod
@@ -1313,11 +1528,11 @@ class SCMRepository(BaseRepository):
             .order_by("source_id", "-id")
         )
 
-        action_map: dict[int, CorrectiveAction | None] = {row.id: None for row in rows}
+        action_map: dict[object, CorrectiveAction | None] = {row.id: None for row in rows}
         for action in actions:
-            action_map.setdefault(int(action.source_id), action)
-            if action_map[int(action.source_id)] is None:
-                action_map[int(action.source_id)] = action
+            action_map.setdefault(action.source_id, action)
+            if action_map[action.source_id] is None:
+                action_map[action.source_id] = action
         return action_map
 
     def _build_carried_forward_items(self, *, meeting: SCMMeeting) -> list[dict[str, object]]:
@@ -1353,18 +1568,15 @@ class SCMRepository(BaseRepository):
         }
 
     @staticmethod
-    def _split_id_list(value: object) -> list[int]:
+    def _split_id_list(value: object) -> list[str]:
         if value in (None, ""):
             return []
-        items: list[int] = []
+        items: list[str] = []
         for part in str(value).split(","):
             part = part.strip()
             if not part:
                 continue
-            try:
-                items.append(int(part))
-            except ValueError:
-                continue
+            items.append(part)
         return items
 
     @staticmethod
@@ -1375,20 +1587,19 @@ class SCMRepository(BaseRepository):
         return ",".join(str(item) for item in ids)
 
     @staticmethod
-    def _coerce_id_list(value: object) -> list[int]:
+    def _coerce_id_list(value: object) -> list[str]:
         if value in (None, ""):
             return []
         if not isinstance(value, (list, tuple, set)):
             value = [part.strip() for part in str(value).split(",") if part.strip()]
-        normalized = []
+        normalized: list[str] = []
         for item in value:
-            try:
-                normalized.append(int(item))
-            except (TypeError, ValueError):
-                continue
+            item_value = str(item or "").strip()
+            if item_value:
+                normalized.append(item_value)
         return normalized
 
-    def _validate_linked_incidents(self, incident_ids: list[int], *, vessel_id: str) -> None:
+    def _validate_linked_incidents(self, incident_ids: list[str], *, vessel_id: str) -> None:
         if not incident_ids:
             return
         found = set(
@@ -1398,11 +1609,12 @@ class SCMRepository(BaseRepository):
                 is_deleted=False,
             ).values_list("id", flat=True)
         )
-        missing = sorted(set(incident_ids) - found)
+        found_ids = {str(item) for item in found}
+        missing = sorted(set(incident_ids) - found_ids)
         if missing:
             raise ValidationError({"linked_incident_ids": [f"Invalid or out-of-scope incident ids: {missing}."]})
 
-    def _validate_linked_findings(self, finding_ids: list[int], *, vessel_id: str) -> None:
+    def _validate_linked_findings(self, finding_ids: list[str], *, vessel_id: str) -> None:
         if not finding_ids:
             return
         inspection_ids = SOIInspection.objects.filter(
@@ -1416,7 +1628,8 @@ class SCMRepository(BaseRepository):
                 is_deleted=False,
             ).values_list("id", flat=True)
         )
-        missing = sorted(set(finding_ids) - found)
+        found_ids = {str(item) for item in found}
+        missing = sorted(set(finding_ids) - found_ids)
         if missing:
             raise ValidationError({"linked_finding_ids": [f"Invalid or out-of-scope SOI finding ids: {missing}."]})
 

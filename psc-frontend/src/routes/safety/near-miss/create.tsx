@@ -18,7 +18,7 @@ export default function SafetyNearMissCreatePage() {
         description: "The near miss record has been refreshed and opened.",
         variant: "success",
       });
-      navigate(`/safety/near-miss/${nearMiss.public_id ?? nearMiss.id}`, {
+      navigate(`/safety/near-miss/${nearMiss.id}`, {
         state: { resultMessage: "Near miss created successfully." },
       });
     } catch (error) {

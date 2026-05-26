@@ -6,7 +6,3 @@ class SafetyConfig(AppConfig):
     name = "apps.safety"
     label = "safety"
     verbose_name = "VIMS Safety"
-
-    def ready(self) -> None:
-        # Later phases wire signals and scheduled tasks here.
-        return None

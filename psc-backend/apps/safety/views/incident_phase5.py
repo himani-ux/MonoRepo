@@ -12,7 +12,7 @@ from apps.safety.models import (
     IncidentPhase5Assessment,
     IncidentSafeguardFailure,
 )
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import (
     IncidentBiasGuardResponseSerializer,
     IncidentBlameOverrideSerializer,
@@ -45,7 +45,7 @@ class IncidentPhase5ViewMixin(IncidentViewMixin):
 
     def get_incident(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
-        incident = get_by_public_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
+        incident = get_by_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
         return incident
 
     def get_object(self):
@@ -139,7 +139,7 @@ class IncidentPhase5CauseDetailView(IncidentPhase5ViewMixin, generics.UpdateAPIV
         return self.get_incident().cause_tags.order_by("id")
 
     def get_object(self):
-        return get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -180,7 +180,7 @@ class IncidentPhase5SafeguardDetailView(IncidentPhase5ViewMixin, generics.Update
         return self.get_incident().safeguard_failures.order_by("id")
 
     def get_object(self):
-        return get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

@@ -28,8 +28,8 @@ export const safetyBiasGuardStateSchema = z.enum([
 ]);
 
 export const safetyIncidentCauseTagSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
-  source_fact_id: z.coerce.number().int().positive(),
+  id: z.string().min(1).optional(),
+  source_fact_id: z.string().min(1),
   mscat_subcode_id: z.string().min(1),
   mscat_category_id: z.coerce.number().int().positive().nullable().optional(),
   mscat_description: z.string().default(""),
@@ -71,7 +71,7 @@ export const safetyIncidentPhase5AssessmentSchema = z.object({
 });
 
 export const safetyIncidentPhase5WorkspaceSchema = z.object({
-  incident_id: z.coerce.number().int().positive(),
+  incident_id: z.string().min(1),
   investigation_depth: z.string().nullable().optional(),
   minimum_tools_required: z.coerce.number().int().positive(),
   analysis_tools_used: z.array(safetyIncidentAnalysisToolSchema).default([]),
@@ -89,7 +89,7 @@ export const safetyIncidentPhase5WorkspaceSchema = z.object({
   matrix_rows: z
     .array(
       z.object({
-        id: z.coerce.number().int().positive(),
+        id: z.string().min(1),
         finding: z.string().default(""),
         pro_evidence: z.string().default(""),
         con_evidence: z.string().default(""),

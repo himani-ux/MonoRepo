@@ -52,12 +52,12 @@ class SOIToSCMFeeder:
         if not outcomes:
             raise serializers.ValidationError({"outcomes": "At least one SOI finding outcome is required."})
 
-        updated_finding_ids: list[int] = []
+        updated_finding_ids: list[str] = []
         now_value = self.now_func()
 
         with transaction.atomic():
             for outcome in outcomes:
-                finding_id = self._coerce_int(outcome.get("finding_id"), field_name="finding_id")
+                finding_id = self._coerce_uuid(outcome.get("finding_id"), field_name="finding_id")
                 next_status = str(outcome.get("next_status") or "").strip().upper()
                 decision_note = str(outcome.get("decision_note") or "").strip()
 
@@ -193,7 +193,6 @@ class SOIToSCMFeeder:
                 finding.carried_forward_count AS carried_forward_count,
                 finding.created_date AS created_date,
                 inspection.id AS inspection_id,
-                inspection.public_id AS inspection_public_id,
                 inspection.inspection_reference AS inspection_reference,
                 inspection.checklist_unique_id AS checklist_unique_id
             FROM vims_safety_soi_finding AS finding
@@ -241,7 +240,6 @@ class SOIToSCMFeeder:
                 finding.carried_forward_count AS carried_forward_count,
                 finding.created_date AS created_date,
                 inspection.id AS inspection_id,
-                inspection.public_id AS inspection_public_id,
                 inspection.inspection_reference AS inspection_reference,
                 inspection.checklist_unique_id AS checklist_unique_id
             FROM vims_safety_soi_finding AS finding
@@ -361,7 +359,7 @@ class SOIToSCMFeeder:
         )
         return int(value or 0)
 
-    def _fetch_single_finding_row(self, finding_id: int) -> dict[str, object]:
+    def _fetch_single_finding_row(self, finding_id: str) -> dict[str, object]:
         rows = self.repository.execute_query(
             """
             SELECT
@@ -382,6 +380,12 @@ class SOIToSCMFeeder:
         if not rows:
             raise serializers.ValidationError({"finding_id": f"SOI finding {finding_id} does not exist."})
         return rows[0]
+
+    def _coerce_uuid(self, value, *, field_name: str) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            raise serializers.ValidationError({field_name: f"{field_name} must be a Safety UUID."})
+        return raw.replace("-", "")
 
     def _resolve_prior_cutoff_meeting(self, meeting: SCMMeeting) -> SCMMeeting | None:
         queryset = (
@@ -420,12 +424,11 @@ class SOIToSCMFeeder:
             return None
 
     def _serialize_finding_row(self, row: dict[str, object]) -> dict[str, object]:
-        inspection_id = int(row["inspection_id"])
-        finding_id = int(row["finding_id"])
+        inspection_id = row["inspection_id"]
+        finding_id = row["finding_id"]
         return {
             "finding_id": finding_id,
             "inspection_id": inspection_id,
-            "public_inspection_id": str(row["inspection_public_id"]),
             "inspection_reference": row["inspection_reference"],
             "checklist_unique_id": row["checklist_unique_id"],
             "title": row["title"],
@@ -438,7 +441,7 @@ class SOIToSCMFeeder:
             "proposed_action": row.get("proposed_action"),
             "carried_forward_count": int(row["carried_forward_count"] or 0),
             "created_date": self._serialize_datetime(row.get("created_date")),
-            "source_route": f"/safety/soi/{row['inspection_public_id']}/findings",
+            "source_route": f"/safety/soi/{row['inspection_id']}/findings",
         }
 
     def _serialize_cutoff(self, meeting: SCMMeeting | None) -> dict[str, object] | None:

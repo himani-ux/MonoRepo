@@ -34,6 +34,8 @@ import {
 
 
 
+const APPROVED_NOTIFICATIONS_PER_PAGE = 15;
+
 const ApprovedNotificationsLibrary = () => {
 
     const { user } = useAuth();
@@ -51,6 +53,7 @@ const ApprovedNotificationsLibrary = () => {
     const [sortCriteria, setSortCriteria] = useState("created_at");
     const [sortDirection, setSortDirection] = useState("desc");
     const [searchQuery, setSearchQuery] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
     const [crewSearchQuery, setCrewSearchQuery] = useState("");
     const [sendingIndividualReminder, setSendingIndividualReminder] = useState(null); // Store the crew_id being processed for individual reminder
     const [typeUuidToNameMap, setTypeUuidToNameMap] = useState({});
@@ -347,6 +350,28 @@ const ApprovedNotificationsLibrary = () => {
         sortDirection,
         searchQuery,
     ]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedType, selectedPriority, sortCriteria, sortDirection, searchQuery]);
+
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filteredNotifications.length / APPROVED_NOTIFICATIONS_PER_PAGE),
+    );
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const pageStartIndex = (safeCurrentPage - 1) * APPROVED_NOTIFICATIONS_PER_PAGE;
+    const paginatedNotifications = filteredNotifications.slice(
+        pageStartIndex,
+        pageStartIndex + APPROVED_NOTIFICATIONS_PER_PAGE,
+    );
+    const paginationPages = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
 
 
     const resetFilters = () => {
@@ -962,9 +987,15 @@ const ApprovedNotificationsLibrary = () => {
                 <p className="mb-4 text-sm text-neutral-600">
                     Showing{" "}
                     <span className="font-semibold text-neutral-800">
-                        {filteredNotifications.length}
+                        {filteredNotifications.length === 0 ? 0 : pageStartIndex + 1}
+                        -
+                        {Math.min(
+                            pageStartIndex + APPROVED_NOTIFICATIONS_PER_PAGE,
+                            filteredNotifications.length,
+                        )}
                     </span>{" "}
-                    of {notifications.length} approved notifications
+                    of {filteredNotifications.length} approved notifications
+                    {totalPages > 1 ? ` · Page ${safeCurrentPage} of ${totalPages}` : ""}
                 </p>
 
                 {filteredNotifications.length === 0 ? (
@@ -973,7 +1004,7 @@ const ApprovedNotificationsLibrary = () => {
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {filteredNotifications.map((n) => (
+                        {paginatedNotifications.map((n) => (
                             <Card
                                 key={n.id}
                                 className={`border-l-4 border-l-error-500 transition-shadow hover:shadow-md ${n.is_superseeded ? 'border-warning-100 bg-warning-50/40' : ''}`}
@@ -1099,6 +1130,43 @@ const ApprovedNotificationsLibrary = () => {
                                 </CardContent>
                             </Card>
                         ))}
+                        {totalPages > 1 && (
+                            <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                                    disabled={safeCurrentPage === 1}
+                                    className="inline-flex h-10 min-w-10 items-center justify-center rounded-full bg-neutral-100 px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label="Previous page"
+                                >
+                                    &lt;
+                                </button>
+                                {paginationPages.map((page) => (
+                                    <button
+                                        key={page}
+                                        type="button"
+                                        onClick={() => setCurrentPage(page)}
+                                        className={`inline-flex h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-semibold transition ${
+                                            page === safeCurrentPage
+                                                ? "bg-primary-600 text-white shadow-sm"
+                                                : "bg-white text-neutral-900 underline underline-offset-4 hover:bg-neutral-100"
+                                        }`}
+                                        aria-current={page === safeCurrentPage ? "page" : undefined}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                                    disabled={safeCurrentPage === totalPages}
+                                    className="inline-flex h-10 min-w-10 items-center justify-center rounded-full bg-neutral-100 px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40"
+                                    aria-label="Next page"
+                                >
+                                    &gt;
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1134,19 +1202,6 @@ const ApprovedNotificationsLibrary = () => {
                                     </div>
                                 ) : (
                                     <div className="space-y-6">
-                                        <div>
-                                            <label className="mb-2 block text-sm font-medium text-neutral-700">
-                                                Approval Comment
-                                            </label>
-                                            <textarea
-                                                value={resendComment}
-                                                onChange={(event) => setResendComment(event.target.value)}
-                                                rows={4}
-                                                placeholder="Update the approval comment if needed..."
-                                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-                                            />
-                                        </div>
-
                                         <div className="grid gap-6 lg:grid-cols-2">
                                             <div className="rounded-xl border border-neutral-200 p-4">
                                                 <div className="mb-3 flex items-center justify-between">
@@ -1253,6 +1308,19 @@ const ApprovedNotificationsLibrary = () => {
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-neutral-700">
+                                                Approval Comment
+                                            </label>
+                                            <textarea
+                                                value={resendComment}
+                                                onChange={(event) => setResendComment(event.target.value)}
+                                                rows={4}
+                                                placeholder="Update the approval comment if needed..."
+                                                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                                            />
                                         </div>
                                     </div>
                                 )}

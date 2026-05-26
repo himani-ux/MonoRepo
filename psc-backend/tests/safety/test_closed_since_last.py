@@ -155,12 +155,12 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
         )
         soi_item = next(item for item in response.data["items"] if item["item_type"] == "SOI_FINDING")
         self.assertEqual(soi_item["unique_id"], "SOI-UID-001")
-        inspection_public_id = SOIInspection.objects.get(pk=inspection_id).public_id
-        self.assertEqual(soi_item["source_route"], f"/safety/soi/{inspection_public_id}/findings")
+        inspection_id = SOIInspection.objects.get(pk=inspection_id).id.hex
+        self.assertEqual(soi_item["source_route"], f"/safety/soi/{inspection_id}/findings")
         ca_item = next(item for item in response.data["items"] if item["item_type"] == "CORRECTIVE_ACTION")
         self.assertEqual(
             ca_item["source_route"],
-            f"/safety/incidents/{closed_incident.public_id}/corrective-actions",
+            f"/safety/incidents/{closed_incident.id}/corrective-actions",
         )
         near_miss_item = next(item for item in response.data["items"] if item["item_type"] == "NEAR_MISS")
         self.assertEqual(near_miss_item["source_id"], closed_near_miss.id)
@@ -306,11 +306,12 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
         closed_at,
         vessel_id: str = "7",
     ) -> int:
+        inspection_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection (
-                    public_id,
+                    id,
                     vessel_id,
                     inspection_reference,
                     cycle_label,
@@ -330,7 +331,7 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    inspection_id,
                     vessel_id,
                     inspection_reference,
                     "Q2/2026",
@@ -349,7 +350,7 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
                     "so-7",
                 ],
             )
-            return int(cursor.lastrowid)
+            return inspection_id
 
     def _insert_soi_finding(
         self,
@@ -359,11 +360,12 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
         status: str,
         closed_at,
     ) -> int:
+        finding_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_finding (
-                    public_id,
+                    id,
                     inspection_id,
                     area_id,
                     title,
@@ -378,7 +380,7 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    finding_id,
                     inspection_id,
                     1,
                     title,
@@ -392,4 +394,4 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
                     "so-7",
                 ],
             )
-            return int(cursor.lastrowid)
+            return finding_id

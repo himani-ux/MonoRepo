@@ -81,7 +81,7 @@ class SCMSignoffTests(unittest.TestCase):
         self.assertEqual(response.data["signature"]["device_fingerprint"], "device-master-7")
         self.assertTrue(response.data["signature"]["signed_at"])
         self.assertEqual(response.data["pdf"]["status"], "generated")
-        self.assertEqual(response.data["pdf"]["download_path"], f"/api/safety/scm/{self.meeting.public_id}/pdf/")
+        self.assertEqual(response.data["pdf"]["download_path"], f"/api/safety/scm/{self.meeting.id}/pdf/")
         self.assertTrue(response.data["pdf"]["file_name"].endswith("-scm-legacy.pdf"))
 
         self.meeting.refresh_from_db()
@@ -104,7 +104,7 @@ class SCMSignoffTests(unittest.TestCase):
             field_name="scm_pdf_export",
         )
         export_payload = parse_history_value(export_row.new_value)
-        self.assertEqual(export_payload["download_path"], f"/api/safety/scm/{self.meeting.public_id}/pdf/")
+        self.assertEqual(export_payload["download_path"], f"/api/safety/scm/{self.meeting.id}/pdf/")
 
     def test_signature_payload_is_required_after_preflight_clears(self) -> None:
         request = self.factory.post(
@@ -295,7 +295,7 @@ class SCMSignoffTests(unittest.TestCase):
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_vessel_area_map (
-                    public_id,
+                    id,
                     vessel_id,
                     area_id,
                     applicable,
@@ -304,5 +304,5 @@ class SCMSignoffTests(unittest.TestCase):
                     schema_version
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                [str(uuid.uuid4()), vessel_id, area_id, applicable, last_inspected_at, due_at, 1],
+                [uuid.uuid4().hex, vessel_id, area_id, applicable, last_inspected_at, due_at, 1],
             )

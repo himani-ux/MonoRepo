@@ -141,6 +141,31 @@ class SOICreateTests(unittest.TestCase):
         self.assertEqual(len(detail_response.data["selected_areas"]), 2)
         self.assertEqual(detail_response.data["trainees"][0]["crew_id"], "cadet-7")
 
+    def test_create_rejects_more_than_four_selected_areas(self) -> None:
+        self._insert_area(area_id=4, area_name="Accommodation")
+        self._insert_area(area_id=5, area_name="Mooring Deck")
+        self._insert_area(area_id=6, area_name="Engine Room")
+        request = self.factory.post(
+            "/api/safety/soi/",
+            {
+                "vessel_id": "7",
+                "inspection_reference": "SOI/ABC/26/02",
+                "cycle_label": "Q2/2026",
+                "planned_date": "2026-05-01",
+                "safety_officer_crew_id": "co-7",
+                "assistant_crew_id": "2e-7",
+                "area_ids": [3, 4, 5, 6, 13],
+                "section_12_included": True,
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="CO"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["area_ids"][0], "Select a maximum of 4 areas for one SOI.")
+
     def test_generated_reference_uses_short_vessel_code_for_uuid_scope(self) -> None:
         vessel_id = "EF9029C2-A192-EF11-A9F2-933342524037"
         self._insert_vessel(vessel_id=vessel_id, vessel_code="KSM01")
@@ -429,7 +454,7 @@ class SOICreateTests(unittest.TestCase):
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection (
-                    public_id,
+                    id,
                     vessel_id,
                     inspection_reference,
                     cycle_label,
@@ -447,7 +472,7 @@ class SOICreateTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    uuid.uuid4().hex,
                     "7",
                     inspection_reference,
                     "Q2/2026",

@@ -123,7 +123,7 @@ class SOIFindingPhotoUploadView(SOIFindingViewMixin, generics.GenericAPIView):
 
         relative_path, absolute_path = self._build_storage_path(
             vessel_id=str(inspection.vessel_id),
-            inspection_id=int(inspection.id),
+            inspection_id=str(inspection.id),
             original_name=str(uploaded_file.name or "photo"),
         )
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -142,7 +142,7 @@ class SOIFindingPhotoUploadView(SOIFindingViewMixin, generics.GenericAPIView):
             status=201,
         )
 
-    def _build_storage_path(self, *, vessel_id: str, inspection_id: int, original_name: str) -> tuple[str, Path]:
+    def _build_storage_path(self, *, vessel_id: str, inspection_id: str, original_name: str) -> tuple[str, Path]:
         default_root = Path.cwd() / "var" / "www" / "ksm_uploads" / "safety"
         storage_root = Path(os.getenv("SAFETY_EXPORT_ROOT") or default_root).resolve(strict=False)
         suffix = Path(original_name).suffix.lower()

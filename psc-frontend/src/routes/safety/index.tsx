@@ -78,6 +78,7 @@ const SafetyScmAgendaRoute = lazy(() => import("./scm/[id]/agenda"));
 const SafetyScmAttendanceRoute = lazy(() => import("./scm/[id]/attendance"));
 const SafetyScmClosedSinceLastRoute = lazy(() => import("./scm/[id]/closed-since-last"));
 const SafetyScmDetailRoute = lazy(() => import("./scm/[id]/index"));
+const SafetyScmEditRoute = lazy(() => import("./scm/[id]/edit"));
 const SafetyScmIndexRoute = lazy(() => import("./scm"));
 const SafetyScmPdfRoute = lazy(() => import("./scm/[id]/pdf/index"));
 const SafetyScmSignoffRoute = lazy(() => import("./scm/[id]/signoff"));
@@ -401,6 +402,18 @@ export const safetyRoutes: RouteObject[] = [
           </PermissionGate>,
         ),
         path: "scm/:id/agenda",
+      },
+      {
+        element: renderWithSuspense(
+          <PermissionGate formId={safetyRoutePermissions.scm}>
+            <ProcessGate processId="SAF_P_002">
+              <RoleGate roles={["CO", "MASTER"]}>
+                <SafetyScmEditRoute />
+              </RoleGate>
+            </ProcessGate>
+          </PermissionGate>,
+        ),
+        path: "scm/:id/edit",
       },
       {
         element: renderWithSuspense(

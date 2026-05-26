@@ -7,7 +7,7 @@ from .base import PublicIdMixin
 
 
 class SOITrainee(PublicIdMixin):
-    inspection_id = models.BigIntegerField()
+    inspection_id = models.UUIDField()
     crew_id = models.CharField(max_length=64)
     trainee_slot = models.PositiveSmallIntegerField()
     schema_version = models.IntegerField(default=1, db_default=1)

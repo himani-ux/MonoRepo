@@ -10,7 +10,7 @@ from apps.safety.authentication.permissions import HasFormPermission, HasProcess
 from apps.safety.authentication.roles import normalized_authority_role
 from apps.safety.authentication.vessel_scope import filter_by_vessel_scope, get_scoped_vessel_ids, user_has_vessel_access
 from apps.safety.models import Incident
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import IncidentRepository
 from apps.safety.serializers import NearMissCreateSerializer, NearMissListSerializer, NearMissSerializer
 from apps.safety.services import NearMissRateLimiter, NotificationWriter, PhaseStateMachine
@@ -146,7 +146,7 @@ class NearMissViewMixin:
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
-        return get_by_public_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
 
 
 class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):

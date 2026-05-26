@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasProcessPermission
 from apps.safety.models import Incident, RecommendationVerification, SafetyFieldHistory
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers.incident_phase8 import (
     IncidentPhase8CloseSerializer,
     IncidentPhase8VerifySerializer,
@@ -39,7 +39,7 @@ class IncidentPhase8ViewMixin(IncidentViewMixin):
 
     def get_incident(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
+        return get_by_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
 
     def get_object(self):
         return self.get_incident()

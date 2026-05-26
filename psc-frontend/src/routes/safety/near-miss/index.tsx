@@ -135,7 +135,7 @@ export default function SafetyNearMissIndexRoute() {
                     <td className="px-4 py-4 text-slate-900">
                       <Link
                         className="font-medium hover:text-slate-600 hover:underline"
-                        to={`/safety/near-miss/${nearMiss.public_id ?? nearMiss.id}`}
+                        to={`/safety/near-miss/${nearMiss.id}`}
                       >
                         {nearMiss.incident_number || `Near Miss #${nearMiss.id}`}
                       </Link>

@@ -71,8 +71,8 @@ function buildDraft(fact: SafetyIncidentFact): FactDraft {
 }
 
 function buildPayload(draft: FactDraft) {
-  const sourceEvidenceId = Number(draft.source_evidence_id);
-  if (!Number.isFinite(sourceEvidenceId) || sourceEvidenceId <= 0) {
+  const sourceEvidenceId = draft.source_evidence_id.trim();
+  if (!sourceEvidenceId) {
     throw new Error("Select a source evidence record before adding a fact.");
   }
 
@@ -92,7 +92,7 @@ function buildPayload(draft: FactDraft) {
 }
 
 function emptyDraftForSources(sources: SafetyIncidentPhase4EvidenceSource[]): FactDraft {
-  const firstSource = sources.find((source) => Number(source.id) > 0);
+  const firstSource = sources.find((source) => String(source.id).trim().length > 0);
   return {
     ...emptyDraft,
     source_evidence_id: firstSource ? String(firstSource.id) : "",
@@ -247,7 +247,7 @@ export function SafetyIncidentPhase4() {
         safetyApi.getIncidentPhase4EvidenceSources(id),
       ]);
       const gatePayload = await safetyApi.getIncidentPhase4Gate(id);
-      const parsedSources = sourcePayload.filter((source) => Number.isFinite(Number(source.id)));
+      const parsedSources = sourcePayload.filter((source) => String(source.id).trim().length > 0);
       setFacts(parseFacts(factPayload));
       setEvidenceSources(parsedSources);
       setGate(gatePayload);

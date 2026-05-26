@@ -22,10 +22,10 @@ class UniqueIdAllocator:
         self.inspection_model = inspection_model
         self.token_factory = token_factory
 
-    def allocate(self, inspection_id: int) -> str:
+    def allocate(self, inspection_id) -> str:
         with transaction.atomic():
             inspection = self.inspection_model.objects.select_for_update().get(
-                pk=int(inspection_id),
+                pk=inspection_id,
                 is_deleted=False,
             )
             if inspection.checklist_unique_id:

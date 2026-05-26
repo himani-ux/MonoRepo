@@ -43,7 +43,7 @@
 
 **Platform context:** Safety lives as a child module in the VIMS monorepo at `apps/safety/` (Django) and `routes/safety/`, `components/safety/`, `hooks/safety/`, `stores/safety/`, `schemas/safety/` (React). Shared DB `ksm_marine_live`. Shared auth (SimpleJWT + `msc_profiles`). API under `/api/safety/`. Module tables use prefix `vims_safety_*`; reference/master data uses `master_*`.
 
-**Public identifier strategy:** Safety records expose a UUID `public_id` for public API links and frontend navigation. The legacy integer `id` remains an internal database primary key during the staged transition and continues to resolve existing routes. This does not change business reference numbers such as incident numbers, SCM numbers, SOI inspection references, checklist unique IDs, or report numbers.
+**Identifier strategy:** Safety-owned managed records use UUID `id` as the actual database primary key and as the public API/navigation identifier. The transitional `public_id` field is not part of the final design. This does not change business reference numbers such as incident numbers, SCM numbers, SOI inspection references, checklist unique IDs, or report numbers.
 
 **Priority tiers used in this PRD:**
 - **V1** — must-ship for first release
@@ -172,7 +172,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-SAF-PDF-001 | 10-Section Incident PDF (formal report) | PDF | V1 | D-PDF-01, D-GAP-R09 |
 | FEAT-SAF-PDF-002 | MSC-MEPC.3/Circ.4 Regulatory Export PDF | PDF | V1 | D-DNV-12, D-GAP-R08 |
 | FEAT-SAF-PDF-003 | Near Miss Lightweight PDF | PDF | V1 | D-PDF-03a |
-| FEAT-SAF-PDF-004 | SCM PDF (10-section legacy structure) | PDF | V1 | D-PDF-03b |
+| FEAT-SAF-PDF-004 | SCM PDF (legacy structure) | PDF | V1 | D-PDF-03b |
 | FEAT-SAF-PDF-005 | SOI Summary PDF (post-submission) | PDF | V1 | §2C.19, D-SOI-10 |
 | FEAT-SAF-PDF-006 | Auditor Leave-Behind ZIP Package | PDF | V1 | D-PDF-02, D-GAP-M37 |
 | FEAT-SAF-AUDIT-001 | Append-Only `vims_safety_incident_phase_log` | AUDIT | V1 | D-EDGE-10, §3.3 SSOT |
@@ -894,13 +894,13 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. V1 supports Regular monthly
 **Decisions:** D-GAP-M-ADHOC, D-GAP-M22.
 **SSOT refs:** see SSOT §6 D-GAP-M-ADHOC; D-GAP-M22.
 
-### FEAT-SAF-SCM-003 — 10-Section SCM Form (Legacy Structure)
+### FEAT-SAF-SCM-003 — SCM Form (Legacy Structure)
 
 **Priority:** V1
-**User story:** As CO preparing minutes, I need the SCM form to match the legacy `vw_GetSCM_Master` 10-section structure so historical-new consistency is preserved.
+**User story:** As CO preparing minutes, I need the SCM form to match the legacy `vw_GetSCM_Master` structure so historical-new consistency is preserved.
 **Acceptance criteria:**
-- 10 sections per legacy view structure (reproduce SSOT §5.3 field list verbatim on form).
-- Section 8 "Findings of Safety and environmental inspection" auto-answers "Yes" when any SOI event occurred in the period, with count + coverage-% figures surfaced (D-SOI-14).
+- Old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9.
+- Section 7 "Findings of Safety and environmental inspection" auto-answers "Yes" when any SOI event occurred in the period, with count + coverage-% figures surfaced (D-SOI-14).
 - "Safety Observations for the Month" table auto-populated from open SOI findings since last SCM (FEAT-SAF-SOI-020).
 - Free-text fields min 20 chars each.
 - Signature block: Master + CO + attendees (digital per D-GAP-D1).
@@ -1260,7 +1260,7 @@ Seed CSV at `safety-reference-data/soi_checklist_v1.csv` (329 rows — 317 basel
 - Open findings since last SCM → populate "Safety Observations for the Month" table.
 - Closed findings since last SCM closure timestamp → populate new "Closed Items" summary block at top of SCM (D-GAP-M22 cutoff).
 - Both blocks carry SOI inspection reference number (format `SOI/{VesselCode}/{YY}/{NN}`) and hyperlink to source record.
-- Section 8 SCM question auto-answers Yes if any inspection occurred in period, with count + coverage-% figures.
+- Section 7 SCM question auto-answers Yes if any inspection occurred in period, with count + coverage-% figures.
 **Dependencies:** FEAT-SAF-SCM-006, FEAT-SAF-SCM-003.
 **Decisions:** D-SOI-14, D-GAP-M22.
 **SSOT refs:** see SSOT §2C.14; §6 D-GAP-M22.
@@ -1455,12 +1455,12 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 **Decisions:** D-PDF-03a.
 **SSOT refs:** see SSOT §6 D-PDF-03a.
 
-### FEAT-SAF-PDF-004 — SCM PDF (10-Section Legacy Structure)
+### FEAT-SAF-PDF-004 — SCM PDF (Legacy Structure)
 
 **Priority:** V1
-**User story:** As CO/Master producing the SCM PDF, the layout matches the legacy `vw_GetSCM_Master` 10-section structure verbatim so historical-new consistency is preserved.
+**User story:** As CO/Master producing the SCM PDF, the layout matches the legacy `vw_GetSCM_Master` structure so historical-new consistency is preserved.
 **Acceptance criteria:**
-- 10 sections per legacy view.
+- Old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9.
 - Closed-since-last summary block appears at top (per FEAT-SAF-SCM-006).
 - Attendance block + WRH flags inline.
 - Signatures: Master + CO + attendees (digital per D-GAP-D1).
@@ -1885,7 +1885,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 ### SCM
 - Regular monthly cadence + Ad-Hoc meetings hosted by Master or CO.
 - Cadence counter + Closed-Since-Last snapshot anchor on last SCM closure timestamp **regardless of meeting type**.
-- 10-section form matches legacy `vw_GetSCM_Master` structure.
+- SCM form matches legacy `vw_GetSCM_Master` structure with the reserved section removed and later sections renumbered.
 - Sign-Off hard-blocks on overdue SOI areas (not meeting creation/running).
 - WRH attendance warn-don't-block.
 

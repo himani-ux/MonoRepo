@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const SAFETY_SOI_SCHEMA_VERSION = 1 as const;
+export const SAFETY_SOI_MAX_SELECTED_AREAS = 4 as const;
 
 export const safetySoiAreaOptionSchema = z.object({
   applicable: z.boolean(),
@@ -43,7 +44,7 @@ export const safetySoiSection12StatusSchema = z.object({
 });
 
 export const safetySoiCreateSchema = z.object({
-  area_ids: z.array(z.number().int().min(1)).min(1),
+  area_ids: z.array(z.number().int().min(1)).min(1).max(SAFETY_SOI_MAX_SELECTED_AREAS),
   assistant_crew_id: z.string().min(1),
   cycle_label: z.string().min(1),
   inspection_reference: z.string().min(1),

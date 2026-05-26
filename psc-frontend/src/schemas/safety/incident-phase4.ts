@@ -5,20 +5,20 @@ import { safetySchemaVersionSchema } from "./common";
 export const safetyIncidentFactConfidenceSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
 export const safetyIncidentFactSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().min(1).optional(),
   sequence_index: z.coerce.number().int().positive(),
   fact_text: z.string().min(1),
   fact_timestamp: z.string().nullable().optional(),
-  source_evidence_id: z.coerce.number().int().positive(),
+  source_evidence_id: z.string().min(1),
   evidence_summary: z.string().default("Evidence link"),
   confidence: safetyIncidentFactConfidenceSchema.default("MEDIUM"),
-  contradicts_fact: z.coerce.number().int().positive().nullable().optional(),
+  contradicts_fact: z.string().min(1).nullable().optional(),
   hindsight_guard_triggered: z.boolean().default(false),
   hindsight_override_reason: z.string().nullable().optional(),
 });
 
 export const safetyDuplicateCandidateSchema = z.object({
-  incident_id: z.coerce.number().int().positive(),
+  incident_id: z.string().min(1),
   vessel_code: z.string().nullable().optional(),
   vessel_display_name: z.string().nullable().optional(),
   vessel_id: z.string(),

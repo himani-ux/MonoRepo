@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from collections.abc import Iterable
 
@@ -41,6 +42,15 @@ from apps.safety.serializers import (
     SOIChecklistVersionAdminSerializer,
 )
 from apps.safety.services.field_history_recorder import capture_model_state, record_field_changes, resolve_actor_id
+
+
+_NUMBER_RE = re.compile(r"\d+")
+
+
+def _natural_item_number_key(value: object) -> tuple[tuple[int, ...], str]:
+    text = str(value or "").strip()
+    numbers = tuple(int(part) for part in _NUMBER_RE.findall(text))
+    return numbers, text.lower()
 
 
 def _normalize_permission_ids(value: object) -> set[str]:
@@ -302,11 +312,24 @@ class ReferenceSOIItemListView(ReferenceListView):
     serializer_class = MasterSOIAreaItemSerializer
 
     def get_queryset(self):
-        queryset = MasterSoiAreaItem.objects.order_by("area_id", "subsection_id", "item_number", "id")
+        queryset = MasterSoiAreaItem.objects.order_by("area_id", "subsection_id", "id")
         area_id = self.request.query_params.get("area_id")
         if area_id not in (None, ""):
             queryset = queryset.filter(area_id=area_id)
         return queryset
+
+    def get(self, request, *args, **kwargs):
+        rows = sorted(
+            list(self.get_queryset()),
+            key=lambda row: (
+                int(row.area_id),
+                int(row.subsection_id),
+                _natural_item_number_key(row.item_number),
+                str(row.id),
+            ),
+        )
+        serializer = self.get_serializer(rows, many=True)
+        return Response(serializer.data)
 
 
 class ReferenceSOIItemDetailView(ReferenceDetailView):

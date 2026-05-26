@@ -140,11 +140,11 @@ export default function SafetyScmIndexRoute() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {meetingsQuery.data.map((meeting) => (
-                    <tr key={meeting.public_id ?? meeting.id}>
+                    <tr key={meeting.id}>
                       <td className="px-4 py-4 text-slate-900">
                         <Link
                           className="font-medium hover:text-slate-600 hover:underline"
-                          to={`/safety/scm/${meeting.public_id ?? meeting.id}`}
+                          to={`/safety/scm/${meeting.id}`}
                         >
                           {meeting.scm_number || `SCM #${meeting.id}`}
                         </Link>

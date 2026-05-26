@@ -4,21 +4,27 @@ import { useNavigate } from "react-router-dom";
 
 import SafetyAssistantPicker from "../../../components/safety/soi/assistant-picker";
 import SafetyAreaPicker from "../../../components/safety/soi/area-picker";
+import { formatSoiCrewDisplay } from "../../../components/safety/soi/crew-display";
 import SafetyTraineeAssigner from "../../../components/safety/soi/trainee-assigner";
 import { useToast } from "../../../hooks/use-toast";
 import { useSafetyAuth } from "../../../hooks/safety/use-auth";
 import { safetyKeys, useSafetySoiCreateConfig } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
 import { safetyApi, type SafetySoiCreatePayload } from "../../../lib/api/safety";
+import { SAFETY_SOI_MAX_SELECTED_AREAS } from "../../../schemas/safety/soi";
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
 function toggleArea(selectedAreaIds: number[], areaId: number) {
-  return selectedAreaIds.includes(areaId)
-    ? selectedAreaIds.filter((value) => value !== areaId)
-    : [...selectedAreaIds, areaId];
+  if (selectedAreaIds.includes(areaId)) {
+    return selectedAreaIds.filter((value) => value !== areaId);
+  }
+  if (selectedAreaIds.length >= SAFETY_SOI_MAX_SELECTED_AREAS) {
+    return selectedAreaIds;
+  }
+  return [...selectedAreaIds, areaId];
 }
 
 function normalizeTrainees(crewIds: string[]) {
@@ -53,7 +59,8 @@ export default function SafetySoiCreateRoute() {
     const defaultAreaIds = config.areas
       .filter((area) => area.applicable)
       .filter((area) => !area.section_12_flag || config.section_12_status.prompt_required)
-      .map((area) => area.area_id);
+      .map((area) => area.area_id)
+      .slice(0, SAFETY_SOI_MAX_SELECTED_AREAS);
     const defaultAssistantId = config.assistant_candidates[0]?.crew_id ?? "";
 
     setSelectedAssistantId((current) =>
@@ -62,7 +69,9 @@ export default function SafetySoiCreateRoute() {
         : defaultAssistantId,
     );
     setSelectedAreaIds((current) => {
-      const sanitized = current.filter((areaId) => allowedAreaIds.has(areaId));
+      const sanitized = current
+        .filter((areaId) => allowedAreaIds.has(areaId))
+        .slice(0, SAFETY_SOI_MAX_SELECTED_AREAS);
       return sanitized.length > 0 ? sanitized : defaultAreaIds;
     });
     setTraineeCrewIds((current) =>
@@ -82,7 +91,7 @@ export default function SafetySoiCreateRoute() {
         description: "Paper checklist planning is ready. Download the checklist before fieldwork starts.",
         variant: "success",
       });
-      navigate(`/safety/soi/${inspection.public_id ?? inspection.id}/download`);
+      navigate(`/safety/soi/${inspection.id}/download`);
     },
     onError: (error) => {
       toast({
@@ -161,6 +170,7 @@ export default function SafetySoiCreateRoute() {
       safetyOfficer?.crew_id &&
       selectedAssistantId &&
       selectedAreaIds.length > 0 &&
+      selectedAreaIds.length <= SAFETY_SOI_MAX_SELECTED_AREAS &&
       !createMutation.isPending,
   );
 
@@ -231,7 +241,7 @@ export default function SafetySoiCreateRoute() {
               aria-label="Safety Officer"
               className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600"
               disabled
-              value={`${safetyOfficer.crew_id} - ${safetyOfficer.rank}`}
+              value={formatSoiCrewDisplay(safetyOfficer)}
             />
           </label>
         </div>
@@ -248,6 +258,7 @@ export default function SafetySoiCreateRoute() {
       <SafetyAreaPicker
         areas={config.areas}
         disabledAreaIds={disabledAreaIds}
+        maxSelectableAreas={SAFETY_SOI_MAX_SELECTED_AREAS}
         onToggleAreaId={(areaId) => setSelectedAreaIds((current) => toggleArea(current, areaId))}
         section12Status={config.section_12_status}
         selectedAreaIds={selectedAreaIds}

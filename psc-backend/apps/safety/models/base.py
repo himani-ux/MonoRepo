@@ -6,7 +6,7 @@ from django.db import models
 
 
 class PublicIdMixin(models.Model):
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     class Meta:
         abstract = True

@@ -7,9 +7,10 @@
 
 > **Naming law (per master prompt `<database_naming_convention>`):** every module-owned transactional table uses the `vims_safety_*` prefix; every shared reference / seed table uses the `master_*` prefix. **The bare `safety_*` prefix that appears in the SSOT is historical drift and MUST NOT appear in any DDL below.** Any legacy SSOT name is translated on output.
 
-> **Stage 1/2 public identity transition (2026-05-20):** Safety-owned managed transactional tables now carry a UUID `public_id` column. The existing integer `id` column remains the internal database primary key during this transition; it is not dropped, renamed, or promoted. API payloads expose `public_id` as the preferred public identifier while keeping legacy `id` for compatibility. Safety routes accept either `public_id` UUIDs or legacy integer IDs until the UUID route surface is proven in production. Human-readable numbers such as `incident_number`, `scm_number`, `inspection_reference`, and `checklist_unique_id` remain unchanged. Shared/external tables, managed=False reference wrappers, Purchase, Crew, Vessel, WRH, PMS, Circular, and auth tables are not part of this transition.
-> **Seed/bootstrap rule:** Safety seed and bootstrap paths must be idempotent. Reference/master seed commands match rows by natural keys and must not duplicate rows. Any Safety-owned transactional seed/demo/bootstrap path that bypasses the ORM must provide or backfill `public_id`; existing `public_id` values must be preserved on reseed.
-> **Safety master/reference UUID primary keys (2026-05-21):** Safety-owned seeded master/reference tables now use UUID `id` as the actual database primary key. The prior integer identity value is preserved as `legacy_int_id` for audit and compatibility during the transition. Stable business/natural keys remain unchanged (`type_code`, `loss_type_id`, `subcode_id`, `area_id`, `version_label`, `guard_code`, `slug`). Existing transactional tables continue to store their current compatibility references where already developed, for example SOI `area_id` business codes and legacy checklist `item_id`; APIs may expose UUID master `id` plus `legacy_int_id` until transactional references are fully migrated. External/shared VIMS master tables are not converted.
+> **Final Safety UUID identity design (2026-05-21):** Every Safety-owned managed table uses UUID `id` as the actual database primary key. The transitional `public_id` column is not part of the final schema. Safety-owned child references store UUID-compatible identifiers, while polymorphic references retain their type discriminator plus UUID record/source value. Human-readable numbers such as `incident_number`, `scm_number`, `inspection_reference`, and `checklist_unique_id` remain unchanged and are not database identifiers.
+> **Safety test-data reset:** Migration `safety.0032_uuid_id_final_cleanup` reset and recreated Safety-owned managed tables only during the test-phase UUID cleanup. External/shared VIMS tables were not touched. Transactional integer IDs were not retained because test data was reset; Safety-owned master/reference seed tables may retain `legacy_int_id` for seed compatibility and audit of prior seeded integer values.
+> **Seed/bootstrap rule:** Safety seed and bootstrap paths must be idempotent. Reference/master seed commands match rows by natural keys and must not duplicate rows. Raw SQL seed paths must insert UUID `id` values explicitly when bypassing model defaults.
+> **External/shared table rule:** Vessel, Crew, WRH, PMS, Circular, Purchase, auth/profile, and other shared non-Safety tables are not converted by the Safety UUID identity cleanup.
 
 ---
 
@@ -804,7 +805,7 @@ CREATE TABLE vims_safety_scm_meeting (
   state                   VARCHAR(24)   NOT NULL,            -- CHECK IN ('DRAFT','SUBMITTED','SIGNED_OFF','REOPENED')
   master_signed_off_at    DATETIME2     NULL,                -- D-GAP-M20 sign-off hard-block if SOI overdue
   master_signed_off_by    NVARCHAR(64)  NULL,
-  pdf_export_path         NVARCHAR(512) NULL,                -- D-PDF-03b legacy 10-section preserved
+  pdf_export_path         NVARCHAR(512) NULL,                -- D-PDF-03b legacy SCM PDF preserved
   schema_version          INT           NOT NULL DEFAULT 1,
   is_deleted              BIT           NOT NULL DEFAULT 0,
   archived_at             DATETIME2     NULL,
@@ -1494,7 +1495,7 @@ Master sign-off. State SUBMITTED → SIGNED_OFF. Writes `master_signed_off_at`, 
 
 #### 9.3.7 `GET /api/safety/scm/{id}/pdf/`
 
-Emit D-PDF-03b legacy 10-section layout (preserves `vw_GetSCM_Master` structure verbatim).
+Emit D-PDF-03b legacy SCM layout. The old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9.
 
 ### 9.4 SOI endpoints
 

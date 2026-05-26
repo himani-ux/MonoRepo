@@ -144,7 +144,7 @@ class ClosedSinceLastSCMService:
                 "title": row.narrative or row.incident_number,
                 "status": row.state,
                 "closed_at": self._serialize_datetime(row.closed_at),
-                "source_route": f"/safety/incidents/{row.public_id}",
+                "source_route": f"/safety/incidents/{row.id}",
                 "unique_id": None,
             }
             for row in rows
@@ -171,7 +171,7 @@ class ClosedSinceLastSCMService:
                 "title": row.narrative or row.incident_number,
                 "status": row.state,
                 "closed_at": self._serialize_datetime(row.closed_at),
-                "source_route": f"/safety/near-miss/{row.public_id}",
+                "source_route": f"/safety/near-miss/{row.id}",
                 "unique_id": None,
             }
             for row in rows
@@ -187,26 +187,22 @@ class ClosedSinceLastSCMService:
         incident_ids = list(
             self.incident_model.objects.filter(is_deleted=False, vessel_id=str(vessel_id)).values_list("id", flat=True)
         )
-        incident_public_ids = {
-            int(row["id"]): row["public_id"]
-            for row in self.incident_model.objects.filter(is_deleted=False, vessel_id=str(vessel_id)).values(
-                "id", "public_id"
-            )
+        incident_ids_by_id = {
+            str(row["id"]): row["id"]
+            for row in self.incident_model.objects.filter(is_deleted=False, vessel_id=str(vessel_id)).values("id")
         }
         meeting_ids = list(
             self.meeting_model.objects.filter(is_deleted=False, vessel_id=str(vessel_id)).values_list("id", flat=True)
         )
-        meeting_public_ids = {
-            int(row["id"]): row["public_id"]
-            for row in self.meeting_model.objects.filter(is_deleted=False, vessel_id=str(vessel_id)).values(
-                "id", "public_id"
-            )
+        meeting_ids_by_id = {
+            str(row["id"]): row["id"]
+            for row in self.meeting_model.objects.filter(is_deleted=False, vessel_id=str(vessel_id)).values("id")
         }
         agenda_rows = list(
             self.agenda_model.objects.filter(meeting_id__in=meeting_ids).values("id", "meeting_id")
         ) if meeting_ids else []
-        agenda_ids = [int(row["id"]) for row in agenda_rows]
-        agenda_to_meeting_id = {int(row["id"]): int(row["meeting_id"]) for row in agenda_rows}
+        agenda_ids = [row["id"] for row in agenda_rows]
+        agenda_to_meeting_id = {str(row["id"]): str(row["meeting_id"]) for row in agenda_rows}
 
         vessel_filter = Q(recommendation__incident__vessel_id=str(vessel_id))
         if incident_ids:
@@ -231,16 +227,16 @@ class ClosedSinceLastSCMService:
         for row in rows:
             source_route = None
             if getattr(row, "recommendation_id", None) and getattr(row.recommendation, "incident_id", None):
-                public_id = incident_public_ids.get(int(row.recommendation.incident_id))
-                source_route = f"/safety/incidents/{public_id}/corrective-actions" if public_id else None
+                incident_id = incident_ids_by_id.get(str(row.recommendation.incident_id))
+                source_route = f"/safety/incidents/{incident_id}/corrective-actions" if incident_id else None
             elif row.source_table == self.incident_model._meta.db_table:
-                public_id = incident_public_ids.get(int(row.source_id))
-                source_route = f"/safety/incidents/{public_id}/corrective-actions" if public_id else None
+                incident_id = incident_ids_by_id.get(str(row.source_id))
+                source_route = f"/safety/incidents/{incident_id}/corrective-actions" if incident_id else None
             elif row.source_table == self.agenda_model._meta.db_table:
-                meeting_id = agenda_to_meeting_id.get(int(row.source_id))
+                meeting_id = agenda_to_meeting_id.get(str(row.source_id))
                 if meeting_id is not None:
-                    public_id = meeting_public_ids.get(meeting_id)
-                    source_route = f"/safety/scm/{public_id}" if public_id else None
+                    meeting_id = meeting_ids_by_id.get(meeting_id)
+                    source_route = f"/safety/scm/{meeting_id}" if meeting_id else None
 
             items.append(
                 {
@@ -265,7 +261,6 @@ class ClosedSinceLastSCMService:
                 finding.status AS status,
                 finding.closed_at AS closed_at,
                 inspection.id AS inspection_id,
-                inspection.public_id AS inspection_public_id,
                 inspection.inspection_reference AS inspection_reference,
                 inspection.checklist_unique_id AS checklist_unique_id
             FROM vims_safety_soi_finding AS finding
@@ -293,12 +288,12 @@ class ClosedSinceLastSCMService:
         return [
             {
                 "item_type": "SOI_FINDING",
-                "source_id": int(row["source_id"]),
+                "source_id": row["source_id"],
                 "reference": row["inspection_reference"],
                 "title": row["title"],
                 "status": row["status"],
                 "closed_at": self._serialize_datetime(row["closed_at"]),
-                "source_route": f"/safety/soi/{row['inspection_public_id']}/findings",
+                "source_route": f"/safety/soi/{row['inspection_id']}/findings",
                 "unique_id": row["checklist_unique_id"],
             }
             for row in rows

@@ -12,8 +12,7 @@ type NearMissMode = "detail" | "review" | "rework" | "triage" | "analysis" | "fl
 const SAFETY_CIRCULAR_PREFILL_KEY = "safetyCircularPrefill";
 
 interface NearMissRecord {
-  id: number;
-  public_id?: string;
+  id: string;
   incident_number: string | null;
   vessel_id: string;
   state: string;
@@ -39,8 +38,7 @@ interface NearMissRecord {
 
 interface AnalysisFact {
   evidence_preview?: EvidencePreview | null;
-  id: number;
-  public_id?: string;
+  id: string;
   sequence_index: number;
   fact_text: string;
   fact_timestamp: string | null;
@@ -50,8 +48,7 @@ interface AnalysisFact {
 }
 
 interface EvidenceSourceOption {
-  id: number;
-  public_id?: string;
+  id: string;
   label: string;
   preview?: EvidencePreview | null;
   source_type: string;
@@ -107,7 +104,7 @@ interface FleetAlertPayload {
 
 interface AuditPayload {
   phase_log?: Array<{
-    id: number;
+    id: string;
     phase_from: number | null;
     phase_to: number;
     transition_type: string;
@@ -116,7 +113,7 @@ interface AuditPayload {
     occurred_at: string;
   }>;
   field_history?: Array<{
-    id: number;
+    id: string;
     field_name: string;
     actor_user_id: string;
     actor_role_code: string;
@@ -417,7 +414,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           ...current,
           sequence_index: current.sequence_index > nextSequence ? current.sequence_index : nextSequence,
         }));
-        const firstSourceId = analysisPayload.evidence_sources?.[0]?.public_id ?? analysisPayload.evidence_sources?.[0]?.id;
+        const firstSourceId = analysisPayload.evidence_sources?.[0]?.id;
         if (firstSourceId) {
           setFactDraft((current) => ({
             ...current,
@@ -918,7 +915,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
                   <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setFactDraft((current) => ({ ...current, source_evidence_id: event.target.value }))} value={factDraft.source_evidence_id}>
                     <option value="">Select evidence source</option>
                     {evidenceSources.map((source) => (
-                      <option key={`${source.source_type}-${source.public_id ?? source.id}`} value={source.public_id ?? source.id}>
+                      <option key={`${source.source_type}-${source.id}`} value={source.id}>
                         {source.label}
                       </option>
                     ))}

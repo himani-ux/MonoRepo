@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
 from apps.safety.models import SCMMeeting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import SCMMeetingSerializer, SCMSignOffSerializer
 from apps.safety.services.overdue_soi_blocker import OverdueSOIBlocker
 from apps.safety.services.pdf_renderer import SCMLegacyPdfRenderer
@@ -28,7 +28,7 @@ class SCMSignOffMixin(SCMViewMixin):
 
     def get_meeting(self) -> SCMMeeting:
         queryset = self._apply_filters(SCMMeeting.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, self.kwargs["id"])
+        return get_by_id_or_pk(queryset, self.kwargs["id"])
 
     def get_blocker(self) -> OverdueSOIBlocker:
         return self.blocker_class()

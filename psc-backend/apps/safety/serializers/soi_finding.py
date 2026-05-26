@@ -24,7 +24,6 @@ def _dedupe_area_ids(area_ids: list[int]) -> list[int]:
 
 
 class SOIFindingSerializer(serializers.ModelSerializer):
-    inspection_public_id = serializers.SerializerMethodField()
     incident_linked_id = serializers.SerializerMethodField()
     incident_linked_number = serializers.SerializerMethodField()
     incident_worthy_reason = serializers.SerializerMethodField()
@@ -40,9 +39,7 @@ class SOIFindingSerializer(serializers.ModelSerializer):
         model = SOIFinding
         fields = (
             "id",
-            "public_id",
             "inspection_id",
-            "inspection_public_id",
             "area_id",
             "item_id",
             "title",
@@ -78,13 +75,6 @@ class SOIFindingSerializer(serializers.ModelSerializer):
             "updated_by",
             "updated_date",
         )
-
-    def get_inspection_public_id(self, instance: SOIFinding) -> str | None:
-        inspection = getattr(instance, "inspection", None)
-        if inspection is not None:
-            return str(inspection.public_id)
-        row = SOIInspection.objects.filter(pk=instance.inspection_id, is_deleted=False).values("public_id").first()
-        return str(row["public_id"]) if row else None
 
     def _history_value(self, instance: SOIFinding, field_name: str) -> str | None:
         if SafetyFieldHistory._meta.db_table not in connection.introspection.table_names():

@@ -26,6 +26,7 @@ class SCMSignaturePayload:
 
 class SCMStateMachine:
     READ_ONLY_MESSAGE = "Signed-off SCM meetings are read-only in the handover workspace."
+    OFFICE_REVIEW_LOCK_MESSAGE = "SCM meetings cannot be edited after office review is recorded."
     SIGNOFF_STATE_MESSAGE = "Only submitted or reopened SCM meetings can be signed off in the handover workspace."
     DEVICE_FINGERPRINT_MAX_LENGTH = 128
 
@@ -58,6 +59,10 @@ class SCMStateMachine:
     def ensure_mutable(self, meeting: SCMMeeting) -> None:
         if meeting.state == SCMMeeting.State.SIGNED_OFF:
             raise serializers.ValidationError({"state": [self.READ_ONLY_MESSAGE]})
+
+    def ensure_editable_until_office_review(self, meeting: SCMMeeting) -> None:
+        if meeting.office_comment_at is not None:
+            raise serializers.ValidationError({"state": [self.OFFICE_REVIEW_LOCK_MESSAGE]})
 
     def ensure_signoff_ready(self, meeting: SCMMeeting) -> None:
         if meeting.state not in {SCMMeeting.State.SUBMITTED, SCMMeeting.State.REOPENED}:

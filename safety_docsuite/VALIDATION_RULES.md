@@ -8,9 +8,11 @@
 
 **Glossary** (first-use expansions per master prompt): DPA = Designated Person Ashore (ISM Code 2010 amendments §4); FM = Fleet Manager; TD = Technical Director; HOD = Head of Department; CO = Chief Officer; CE = Chief Engineer; SO = Safety Officer (SOLAS Reg VI); SCM = Safety Committee Meeting; SOI = Safety Officer Inspection; MoC = Management of Change; RCA = Root Cause Analysis; CA = Corrective Action; PA = Preventive Action; ALARP = As Low As Reasonably Practicable; SMC = Serious Marine Casualty (IMO Casualty Investigation Code); MC = Marine Casualty; MI = Marine Incident; WRH = Work & Rest Hours module; CMS = Crew Management System module; PMS = Planned Maintenance System module; SSQE = Safety, Security, Quality & Environment.
 
-**Identifier validation note:** For Stage 1/2 UUID transition, path identifiers on Safety-owned transactional endpoints may be either a UUID `public_id` or a legacy integer `id`. Validation must resolve the record first, then apply the same state, role, vessel-scope, signature, rate-limit, and phase-gate rules. User-facing reference numbers are not identifiers for route resolution unless a dedicated lookup endpoint explicitly says so.
+**Identifier validation note:** Path identifiers on Safety-owned managed endpoints are UUID `id` primary keys. Validation must resolve the record first, then apply the same state, role, vessel-scope, signature, rate-limit, and phase-gate rules. User-facing reference numbers are not identifiers for route resolution unless a dedicated lookup endpoint explicitly says so.
 
-**Master/reference validation note:** Safety-owned master/reference rows use UUID `id` as the actual database primary key. Validators may accept UUID master IDs or `legacy_int_id` compatibility values only where transactional tables still store legacy references during the staged transition. Stable natural keys remain authoritative for their domains, for example M-SCAT `subcode_id`, loss `loss_type_id`, SOI `area_id`, and bias guard `guard_code`.
+**Reference validation note:** Safety-owned child rows store UUID-compatible references to Safety-owned parent rows. Polymorphic references must include the record/source type discriminator plus UUID value. External/shared VIMS identifiers remain in their original format and are not converted by Safety validation.
+
+**Master/reference validation note:** Safety-owned master/reference rows use UUID `id` as the actual database primary key. Stable natural keys remain authoritative for their domains, for example M-SCAT `subcode_id`, loss `loss_type_id`, SOI `area_id`, and bias guard `guard_code`.
 
 ---
 

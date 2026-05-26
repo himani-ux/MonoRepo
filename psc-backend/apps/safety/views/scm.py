@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
 from apps.safety.authentication.vessel_scope import filter_by_vessel_scope, get_scoped_vessel_ids, user_has_vessel_access
 from apps.safety.models import SCMMeeting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import SCMRepository
 from apps.safety.serializers import SCMMeetingCreateSerializer, SCMMeetingSerializer, SCMSubmitSerializer
 from apps.safety.services.scm_state_machine import SCMStateMachine
@@ -98,7 +98,7 @@ class SCMViewMixin:
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
-        return get_by_public_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
 
 
 class SCMListCreateView(SCMViewMixin, generics.ListCreateAPIView):
@@ -174,6 +174,12 @@ class SCMDetailView(SCMViewMixin, generics.RetrieveAPIView):
     queryset = SCMMeeting.objects.filter(is_deleted=False)
     serializer_class = SCMMeetingSerializer
 
+    def get_permissions(self):
+        permissions = [self.form_permission_class()]
+        if self.request.method in {"PATCH", "PUT"}:
+            permissions.append(HasProcessPermission.requiring("SAF_P_002")())
+        return permissions
+
     def get_queryset(self):
         return self._apply_filters(super().get_queryset())
 
@@ -184,6 +190,20 @@ class SCMDetailView(SCMViewMixin, generics.RetrieveAPIView):
         meeting._legacy_fields = list(repository.list_legacy_fields(meeting.id))
         return meeting
 
+    def patch(self, request, *args, **kwargs):
+        self._ensure_agenda_editor_gate()
+        meeting = self.get_object()
+        self.get_state_machine().ensure_editable_until_office_review(meeting)
+        serializer = SCMMeetingCreateSerializer(
+            meeting,
+            data=request.data,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        response_serializer = SCMMeetingSerializer(updated, context=self.get_serializer_context())
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
 
 class SCMSubmitView(SCMViewMixin, generics.GenericAPIView):
     serializer_class = SCMSubmitSerializer
@@ -193,7 +213,7 @@ class SCMSubmitView(SCMViewMixin, generics.GenericAPIView):
 
     def get_meeting(self) -> SCMMeeting:
         queryset = self._apply_filters(SCMMeeting.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, self.kwargs["id"])
+        return get_by_id_or_pk(queryset, self.kwargs["id"])
 
     def post(self, request, *args, **kwargs):
         meeting = self.get_meeting()

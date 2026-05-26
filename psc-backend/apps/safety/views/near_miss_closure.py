@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from apps.safety.authentication.anonymity import MASKED_NULL_FIELDS, can_see_reporter
 from apps.safety.authentication.permissions import HasAnyProcessPermission, HasProcessPermission
 from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import FieldHistorySerializer, NearMissListSerializer, NearMissSerializer, PhaseLogSerializer
 from apps.safety.services import FleetAlertIssuer, capture_model_state, record_field_changes
 from apps.safety.services.field_history_recorder import resolve_actor_id
@@ -151,7 +151,7 @@ class NearMissClosureView(NearMissViewMixin, generics.GenericAPIView):
         return self._apply_filters(super().get_queryset())
 
     def get_near_miss(self) -> Incident:
-        near_miss = get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        near_miss = get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
         if near_miss.record_type != Incident.RecordType.NEAR_MISS:
             raise ValidationError("Near-miss closure is only available for near-miss records.")
         return near_miss
@@ -357,7 +357,7 @@ class NearMissAuditView(NearMissViewMixin, generics.GenericAPIView):
         return self._apply_filters(super().get_queryset())
 
     def get(self, request, *args, **kwargs):
-        near_miss = get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        near_miss = get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
         if near_miss.record_type != Incident.RecordType.NEAR_MISS:
             raise ValidationError("Near-miss audit is only available for near-miss records.")
 

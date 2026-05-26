@@ -132,7 +132,7 @@ class CrossRecordSearchService:
                 {
                 "archived": is_archived_record(incident),
                 "id": incident.pk,
-                "public_id": str(incident.public_id),
+                "id": str(incident.id),
                 "record_label": "Incident",
                 "record_type": "INCIDENT",
                 "reference": incident.incident_number,
@@ -184,13 +184,13 @@ class CrossRecordSearchService:
                 {
                     "archived": is_archived_record(near_miss),
                     "id": near_miss.pk,
-                    "public_id": str(near_miss.public_id),
+                    "id": str(near_miss.id),
                     "near_miss_priority": near_miss.near_miss_priority,
                     "record_label": "Near Miss",
                     "record_type": "NEAR_MISS",
                     "reference": near_miss.incident_number,
                     "reporter_name": base_payload.get("reporter_name"),
-                    "route": f"/safety/near-miss/{near_miss.public_id}",
+                    "route": f"/safety/near-miss/{near_miss.id}",
                     "snippet": self._build_snippet(
                         query,
                         near_miss.narrative,
@@ -230,11 +230,11 @@ class CrossRecordSearchService:
                 {
                 "archived": is_archived_record(meeting),
                 "id": meeting.pk,
-                "public_id": str(meeting.public_id),
+                "id": str(meeting.id),
                 "record_label": "SCM",
                 "record_type": "SCM",
                 "reference": meeting.scm_number,
-                "route": f"/safety/scm/{meeting.public_id}",
+                "route": f"/safety/scm/{meeting.id}",
                 "snippet": self._build_snippet(
                     query,
                     meeting.ad_hoc_trigger_reason,
@@ -292,13 +292,13 @@ class CrossRecordSearchService:
                     {
                     "archived": is_archived_record(inspection),
                     "id": finding.pk,
-                    "public_id": str(finding.public_id),
+                    "id": str(finding.id),
                     "inspection_id": inspection.pk,
-                    "inspection_public_id": str(inspection.public_id),
+                    "inspection_id": str(inspection.id),
                     "record_label": "SOI Finding",
                     "record_type": "SOI_FINDING",
                     "reference": inspection.inspection_reference,
-                    "route": f"/safety/soi/{inspection.public_id}/findings/{finding.public_id}",
+                    "route": f"/safety/soi/{inspection.id}/findings/{finding.id}",
                     "snippet": self._build_snippet(
                         query,
                         finding.description,
@@ -567,7 +567,7 @@ class CrossRecordSearchService:
     def _incident_route(incident: Incident) -> str:
         phase_number = int(incident.current_phase or 1)
         phase_number = min(max(phase_number, 1), 8)
-        return f"/safety/incidents/{incident.public_id}/phase-{phase_number}"
+        return f"/safety/incidents/{incident.id}/phase-{phase_number}"
 
     @staticmethod
     def _iso_datetime(value) -> str | None:

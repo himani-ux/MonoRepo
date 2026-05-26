@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasAnyProcessPermission
 from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import NearMissSerializer, PhaseLogSerializer
 from apps.safety.services import NotificationWriter, capture_model_state, record_field_changes
 from apps.safety.services.signature_chain import SignatureChainService
@@ -67,7 +67,7 @@ class NearMissReviewView(NearMissViewMixin, generics.GenericAPIView):
         return self.signature_service_class()
 
     def get_near_miss(self) -> Incident:
-        near_miss = get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        near_miss = get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
         if near_miss.record_type != Incident.RecordType.NEAR_MISS:
             raise ValidationError("Vessel review is only available for near-miss records.")
         if near_miss.state in {Incident.State.CLOSED, Incident.State.SUPERSEDED}:
@@ -195,7 +195,7 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
         return self._apply_filters(super().get_queryset())
 
     def post(self, request, *args, **kwargs):
-        near_miss = get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        near_miss = get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
         if near_miss.record_type != Incident.RecordType.NEAR_MISS:
             raise ValidationError("Rework is only available for near-miss records.")
         if near_miss.state != Incident.State.REWORK_REQUIRED:

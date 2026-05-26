@@ -248,8 +248,7 @@ export interface SafetyIncidentListItem {
   created_date: string;
   current_phase: number;
   draft_reference: string | null;
-  id: number;
-  public_id?: string;
+  id: string;
   imo_classifier: string | null;
   incident_number: string | null;
   occurred_at: string | null;
@@ -265,8 +264,7 @@ export interface SafetyIncidentListItem {
 }
 
 export interface SafetyNearMissListItem {
-  id: number;
-  public_id?: string;
+  id: string;
   incident_number: string | null;
   incident_type_id?: number | null;
   loss_type_primary_id?: number | null;
@@ -322,8 +320,7 @@ export interface SafetyScmMeeting {
   chair_crew_id: string | null;
   created_by: string | null;
   created_date: string;
-  id: number;
-  public_id?: string;
+  id: string;
   latitude: string | number | null;
   location: string | null;
   longitude: string | number | null;
@@ -364,8 +361,7 @@ export interface SafetyScmAgendaActionItem {
   description: string;
   display_status: string;
   due_date: string | null;
-  id: number;
-  public_id?: string;
+  id: string;
   source_route: string;
   status: string;
   title: string;
@@ -377,24 +373,23 @@ export interface SafetyScmAgendaRow {
   auto_populated: boolean;
   content: string;
   decision: string | null;
-  id: number;
-  public_id?: string;
-  linked_finding_ids: number[];
-  linked_incident_ids: number[];
+  id: string;
+  linked_finding_ids: string[];
+  linked_incident_ids: string[];
   section_label: string;
 }
 
 export interface SafetyScmCarriedForwardItem extends SafetyScmAgendaActionItem {
   agenda_item_number: number;
   section_label: string;
-  source_meeting_id: number;
+  source_meeting_id: string;
   source_scm_number: string;
 }
 
 export interface SafetyScmAgendaPayload {
   carried_forward_items: SafetyScmCarriedForwardItem[];
   meeting_date: string;
-  meeting_id: number;
+  meeting_id: string;
   meeting_state: string;
   meeting_type: string;
   rows: SafetyScmAgendaRow[];
@@ -418,14 +413,14 @@ export interface SafetyScmAgendaUpdatePayload {
     };
     content?: string;
     decision?: string | null;
-    linked_finding_ids?: number[];
-    linked_incident_ids?: number[];
+    linked_finding_ids?: string[];
+    linked_incident_ids?: string[];
   }>;
 }
 
 export interface SafetyScmClosedSinceLastCutoff {
   closed_at: string;
-  meeting_id: number;
+  meeting_id: string;
   meeting_type: string;
   scm_number: string;
 }
@@ -434,7 +429,7 @@ export interface SafetyScmClosedSinceLastItem {
   closed_at: string;
   item_type: 'INCIDENT' | 'NEAR_MISS' | 'SOI_FINDING' | 'CORRECTIVE_ACTION';
   reference: string;
-  source_id: number;
+  source_id: string;
   source_route: string | null;
   status: string;
   title: string;
@@ -464,9 +459,8 @@ export interface SafetyScmAutoFeedFinding {
   created_date: string | null;
   description: string;
   due_date: string | null;
-  finding_id: number;
-  inspection_id: number;
-  public_inspection_id?: string;
+  finding_id: string;
+  inspection_id: string;
   inspection_reference: string;
   priority: string;
   proposed_action: string | null;
@@ -506,12 +500,39 @@ export interface SafetyScmCircularFeedItem {
   created_at: string | null;
   hashtags: string;
   id: string;
+  msc_type?: string;
   office_instructions: string;
   publish_status: number | null;
   published_on: string | null;
   sr_no: string;
   title: string;
   vessel_id: string;
+}
+
+export interface SafetyScmNearMissFeedItem {
+  closed_at: string | null;
+  id: string;
+  incident_number: string;
+  occurred_at: string | null;
+  priority: string;
+  reported_at: string | null;
+  severity: string;
+  source_route: string;
+  state: string;
+  title: string;
+}
+
+export interface SafetyScmPscCarFeedItem {
+  action_code: string;
+  car_number: string;
+  def_code: string;
+  deficiency_description: string;
+  id: string;
+  inspection_date: string | null;
+  port_place: string;
+  source_route: string;
+  status: string;
+  target_date: string | null;
 }
 
 export interface SafetyScmAttendanceRow {
@@ -533,7 +554,7 @@ export interface SafetyScmAttendanceRow {
 export interface SafetyScmAttendancePayload {
   co_signature?: SafetyScmSignatureStatus;
   meeting_date: string;
-  meeting_id: number;
+  meeting_id: string;
   meeting_state: string;
   rows: SafetyScmAttendanceRow[];
   signature_summary?: {
@@ -580,7 +601,7 @@ export interface SafetyScmPreflightResponse {
   agenda_errors?: string[];
   attendance_acknowledged: boolean;
   attendance_warnings_present?: boolean;
-  meeting_id: number;
+  meeting_id: string;
   meeting_state: string;
   overdue_soi_areas: SafetyScmOverdueSoiArea[];
   signature_errors?: string[];
@@ -628,8 +649,8 @@ export interface SafetyScmSignaturePayload {
 
 export interface SafetyScmSignatureResponse {
   display_name: string;
-  id: number;
-  meeting_id: number;
+  id: string;
+  meeting_id: string;
   signed_at: string;
   signer_crew_id: string;
   signer_role: 'CO' | 'ATTENDEE' | 'MASTER';
@@ -669,6 +690,8 @@ export interface SafetyScmFormConfig {
   closed_since_last: SafetyScmClosedSinceLastPayload;
   generated_at: string;
   latest_circulars?: SafetyScmCircularFeedItem[];
+  latest_near_misses?: SafetyScmNearMissFeedItem[];
+  latest_psc_cars?: SafetyScmPscCarFeedItem[];
   meeting_date_default: string;
   meeting_type: 'REGULAR' | 'AD_HOC';
   overdue_soi_areas: SafetyScmOverdueSoiArea[];
@@ -728,7 +751,7 @@ export interface SafetySoiCrewSnapshot {
 }
 
 export interface SafetySoiSection12Status {
-  covered_by_inspection_id: number | null;
+  covered_by_inspection_id: string | null;
   covered_by_inspection_reference: string | null;
   covered_planned_date: string | null;
   covered_this_cycle: boolean;
@@ -745,6 +768,7 @@ export interface SafetySoiCreateConfigResponse {
   assistant_candidates: SafetySoiCrewSnapshot[];
   checklist_version: SafetySoiInspection['checklist_version'];
   max_trainees: number;
+  responsible_candidates: SafetySoiCrewSnapshot[];
   safety_officer: SafetySoiCrewSnapshot | null;
   section_12_status: SafetySoiSection12Status;
   trainee_candidates: SafetySoiCrewSnapshot[];
@@ -764,7 +788,7 @@ export interface SafetySoiCreatePayload {
 
 export interface SafetySoiPickAreasResponse {
   available_areas: SafetySoiAreaOption[];
-  inspection_id: number;
+  inspection_id: string;
   section_12_included: boolean;
   section_12_status: SafetySoiSection12Status;
   selected_areas: SafetySoiInspectionArea[];
@@ -796,7 +820,7 @@ export interface SafetySoiCloseSnapshot {
     pending_closure_count: number;
     total_count: number;
   };
-  inspection_id: number;
+  inspection_id: string;
   inspection_reference: string;
   planned_date: string;
   selected_areas: SafetySoiInspectionArea[];
@@ -825,13 +849,11 @@ export interface SafetySoiFinding {
   created_date: string;
   description: string;
   due_date: string | null;
-  id: number;
-  public_id?: string;
+  id: string;
   incident_linked_id: number | null;
   incident_linked_number: string | null;
   incident_worthy_reason: string | null;
-  inspection_id: number;
-  inspection_public_id?: string | null;
+  inspection_id: string;
   is_repeat: boolean;
   item_id: number | null;
   life_threat_escalation_target: string | null;
@@ -897,7 +919,7 @@ export interface SafetySoiPhotoUploadResponse {
 
 export interface SafetySoiFindingSubmitResponse {
   checklist_unique_id: string | null;
-  inspection_id: number;
+  inspection_id: string;
   pdf_export?: {
     download_path: string;
     export_path: string;
@@ -934,7 +956,7 @@ export interface SafetySoiFindingActionResponse extends SafetySoiFinding {
 
 export interface SafetySoiApplicabilityRequestScreen {
   areas: SafetySoiAreaOption[];
-  inspection_id: number;
+  inspection_id: string;
   inspection_reference: string;
   vessel_id: string;
 }
@@ -953,14 +975,14 @@ export interface SafetySoiApplicabilityRequestResult {
   master_requested_at: string | null;
   master_requested_by: string;
   reason: string;
-  request_id: number;
+  request_id: string;
   requested_applicable: boolean;
   status: string;
   vessel_id: string;
 }
 
 export interface SafetySoiApplicabilityApprovalScreen {
-  inspection_id: number;
+  inspection_id: string;
   inspection_reference: string;
   pending_requests: Array<{
     area_id: number;
@@ -971,7 +993,7 @@ export interface SafetySoiApplicabilityApprovalScreen {
     new_applicable: boolean;
     old_applicable: boolean;
     reason: string;
-    request_id: number;
+    request_id: string;
     section_12_flag: boolean;
     vessel_id: string;
   }>;
@@ -993,9 +1015,9 @@ export interface SafetySoiApplicabilityApprovalResult {
   decision: string;
   dpa_approved_at: string | null;
   dpa_approved_by: string;
-  map_id: number | null;
+  map_id: string | null;
   reason: string;
-  request_id: number;
+  request_id: string;
   requested_applicable: boolean;
   status: string;
   vessel_id: string;
@@ -1018,7 +1040,7 @@ export interface SafetySoiAreaOption {
   area_name: string;
   due_at: string | null;
   last_inspected_at: string | null;
-  map_id: number | null;
+  map_id: string | null;
   schema_version: number;
   section_12_flag: boolean;
 }
@@ -1042,17 +1064,17 @@ export interface SafetySoiInspectionArea {
   area_name: string;
   display_order: number;
   inspected: boolean;
-  inspection_id: number;
+  inspection_id: string;
   last_inspected_at: string | null;
   notes: string | null;
   schema_version: number;
   section_12_flag: boolean;
-  selection_id: number;
+  selection_id: string;
 }
 
 export interface SafetySoiTrainee {
   crew_id: string;
-  inspection_id: number;
+  inspection_id: string;
   schema_version: number;
   trainee_slot: number;
 }
@@ -1067,7 +1089,7 @@ export interface SafetySoiInspection {
     active: boolean;
     effective_from: string;
     effective_to: string | null;
-    id: number;
+    id: string;
     source_description: string;
     version_label: string;
   } | null;
@@ -1076,8 +1098,7 @@ export interface SafetySoiInspection {
   created_date: string;
   cycle_label: string;
   fieldwork_started_at: string | null;
-  id: number;
-  public_id?: string;
+  id: string;
   inspection_reference: string;
   lost_paper_flag: boolean;
   lost_paper_note: string | null;
@@ -1113,7 +1134,7 @@ export interface SafetySoiOfficerSetting {
   disabled_by: string | null;
   enabled_at: string | null;
   enabled_by: string | null;
-  id: number;
+  id: string;
   message?: string;
   migration_required?: boolean;
   reason: string | null;
@@ -1130,7 +1151,7 @@ export type SafetySearchGroupKey = 'INCIDENT' | 'NEAR_MISS' | 'SCM' | 'SOI_FINDI
 
 export interface SafetySearchResultItem {
   archived: boolean;
-  id: number;
+  id: string;
   inspection_id?: number;
   near_miss_priority?: string | null;
   record_label: string;
@@ -1174,8 +1195,7 @@ export type SafetyOfficeWorkflowResponse = Record<string, unknown>;
 
 export interface SafetyIncidentPhase4EvidenceSource {
   detail: string;
-  id: number;
-  public_id?: string;
+  id: string;
   label: string;
   source_type: string;
   tab_code?: string;
@@ -1263,7 +1283,7 @@ export interface SafetyIncidentPhase2Record extends SafetyIncidentPhase2Payload 
   created_date: string;
   current_phase: number;
   draft_reference: string | null;
-  id: number;
+  id: string;
   incident_number: string | null;
   notification_channel_count: number;
   resources_allocated: string | null;
@@ -2199,6 +2219,14 @@ export const safetyApi = {
   async createScmMeeting(payload: SafetyScmCreatePayload) {
     const response = await apiClient.post<SafetyScmMeeting>(
       buildSafetyApiUrl('/scm/'),
+      payload,
+    );
+    return response.data;
+  },
+
+  async updateScmMeeting(id: number | string, payload: SafetyScmCreatePayload) {
+    const response = await apiClient.patch<SafetyScmMeeting>(
+      buildSafetyApiUrl(`/scm/${id}/`),
       payload,
     );
     return response.data;

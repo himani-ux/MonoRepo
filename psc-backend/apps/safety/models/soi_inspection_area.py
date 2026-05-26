@@ -6,7 +6,7 @@ from .base import PublicIdMixin
 
 
 class SOIInspectionArea(PublicIdMixin):
-    inspection_id = models.BigIntegerField()
+    inspection_id = models.UUIDField()
     area_id = models.IntegerField()
     inspected = models.BooleanField(default=False, db_default=False)
     last_inspected_at = models.DateTimeField(null=True, blank=True)

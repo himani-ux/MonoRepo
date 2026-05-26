@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 from typing import Any
+import uuid
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
@@ -309,13 +310,27 @@ def _load_existing_keys(cursor, table_name: str, key_columns: tuple[str, ...]) -
 
 
 def _insert_row(cursor, table_name: str, columns: tuple[str, ...], row: dict[str, Any]) -> None:
-    column_sql = ", ".join(_validate_identifier(column) for column in columns)
-    placeholders = ", ".join(["%s"] * len(columns))
-    values = [row[column] for column in columns]
+    extra_values = _insert_defaults_for(table_name)
+    insert_columns = ("id", "legacy_int_id", *columns, *extra_values.keys())
+    column_sql = ", ".join(_validate_identifier(column) for column in insert_columns)
+    placeholders = ", ".join(["%s"] * len(insert_columns))
+    cursor.execute(f"SELECT COALESCE(MAX(legacy_int_id), 0) + 1 FROM {_validate_identifier(table_name)}")
+    next_legacy_id = cursor.fetchone()[0]
+    values = [uuid.uuid4().hex, next_legacy_id, *[row[column] for column in columns], *extra_values.values()]
     cursor.execute(
         f"INSERT INTO {_validate_identifier(table_name)} ({column_sql}) VALUES ({placeholders})",
         values,
     )
+
+
+def _insert_defaults_for(table_name: str) -> dict[str, Any]:
+    if table_name == "master_mscat_taxonomy":
+        return {"active": 1, "seeded_version": "v1.0-Round21", "schema_version": 1}
+    if table_name == "master_immediate_causes":
+        return {"active": 1, "seeded_version": "v1.0", "schema_version": 1}
+    if table_name == "master_loss_types":
+        return {"active": 1, "seeded_version": "v1.0"}
+    return {}
 
 
 def _update_row(

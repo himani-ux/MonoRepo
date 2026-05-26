@@ -24,6 +24,7 @@ from apps.safety.views.taxonomy_admin import (
     ReferenceMscatDetailView,
     ReferenceMscatListView,
     ReferenceSOIItemDetailView,
+    ReferenceSOIItemListView,
 )
 
 
@@ -294,6 +295,67 @@ class TaxonomyAdminDpaTests(unittest.TestCase):
                 change_reason="DPA updated SOI checklist item.",
             ).exists()
         )
+
+    def test_soi_item_reference_list_uses_numeric_item_order(self) -> None:
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO master_soi_area_item (
+                    id,
+                    legacy_int_id,
+                    area_id,
+                    area_name,
+                    subsection_id,
+                    subsection_name,
+                    item_number,
+                    description,
+                    tier,
+                    active,
+                    seeded_version,
+                    schema_version
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                [
+                    (
+                        "00000000000000000000000000000008",
+                        2,
+                        1,
+                        "External Deck Structure",
+                        1,
+                        "External Deck Structure",
+                        "10",
+                        "Tenth checklist item",
+                        "BASELINE",
+                        True,
+                        "v1.0",
+                        1,
+                    ),
+                    (
+                        "00000000000000000000000000000009",
+                        3,
+                        1,
+                        "External Deck Structure",
+                        1,
+                        "External Deck Structure",
+                        "2",
+                        "Second checklist item",
+                        "BASELINE",
+                        True,
+                        "v1.0",
+                        1,
+                    ),
+                ],
+            )
+        request = self.factory.get("/api/safety/reference/soi-items/?area_id=1")
+        force_authenticate(
+            request,
+            user=build_user(role_name="CO", form_ids=["SAF_F_004"], process_ids=[]),
+        )
+
+        response = ReferenceSOIItemListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row["item_number"] for row in response.data], ["1", "2", "10"])
 
     def test_incident_form_user_can_read_case_study_help_drawer_seed(self) -> None:
         request = self.factory.get("/api/safety/master/case-studies/")

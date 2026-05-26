@@ -1,4 +1,5 @@
 import type { SafetySoiCrewSnapshot } from "../../../schemas/safety/soi";
+import { formatSoiCrewDisplay } from "./crew-display";
 
 interface SafetyAssistantPickerProps {
   assistantCandidates: SafetySoiCrewSnapshot[];
@@ -30,9 +31,9 @@ export default function SafetyAssistantPicker({
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
             Safety Officer
           </div>
-          <div className="mt-2 font-medium text-slate-900">{safetyOfficer.crew_id}</div>
+          <div className="mt-2 font-medium text-slate-900">{formatSoiCrewDisplay(safetyOfficer)}</div>
           <div className="text-sm text-slate-600">
-            {safetyOfficer.rank} · {safetyOfficer.department}
+            {safetyOfficer.department}
           </div>
         </div>
       </div>
@@ -55,9 +56,9 @@ export default function SafetyAssistantPicker({
                   <div className="text-sm font-semibold tracking-[0.18em] uppercase opacity-80">
                     Assistant
                   </div>
-                  <h3 className="mt-2 text-lg font-semibold">{candidate.crew_id}</h3>
+                  <h3 className="mt-2 text-lg font-semibold">{formatSoiCrewDisplay(candidate)}</h3>
                   <p className={`mt-2 text-sm ${selected ? "text-sky-100" : "text-slate-600"}`}>
-                    {candidate.rank} from {candidate.department}
+                    {candidate.department}
                   </p>
                 </div>
                 <span

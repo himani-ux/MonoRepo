@@ -13,69 +13,61 @@ from apps.safety.serializers.vessel_display import VesselDisplayMixin
 
 SCM_SECTION_TEMPLATE: tuple[dict[str, object], ...] = (
     {"agenda_item_number": 1, "section_label": "Structured Review", "auto_populated": False},
-    {"agenda_item_number": 2, "section_label": "Reserved", "auto_populated": False},
-    {"agenda_item_number": 3, "section_label": "Safety Practice", "auto_populated": False},
-    {"agenda_item_number": 4, "section_label": "Security", "auto_populated": False},
-    {"agenda_item_number": 5, "section_label": "Environment", "auto_populated": False},
-    {"agenda_item_number": 6, "section_label": "Health", "auto_populated": False},
-    {"agenda_item_number": 7, "section_label": "Crew Welfare", "auto_populated": False},
-    {"agenda_item_number": 8, "section_label": "Findings & Corrective Measures", "auto_populated": False},
-    {"agenda_item_number": 9, "section_label": "Minutes of Meeting", "auto_populated": False},
-    {"agenda_item_number": 10, "section_label": "Office Review", "auto_populated": False},
+    {"agenda_item_number": 2, "section_label": "Quality and Safety Practice", "auto_populated": False},
+    {"agenda_item_number": 3, "section_label": "Security", "auto_populated": False},
+    {"agenda_item_number": 4, "section_label": "Environment", "auto_populated": False},
+    {"agenda_item_number": 5, "section_label": "Health", "auto_populated": False},
+    {"agenda_item_number": 6, "section_label": "Crew Welfare", "auto_populated": False},
+    {"agenda_item_number": 7, "section_label": "PSC Findings & Corrective Measures", "auto_populated": False},
+    {"agenda_item_number": 8, "section_label": "Minutes of Meeting", "auto_populated": False},
+    {"agenda_item_number": 9, "section_label": "Office Review", "auto_populated": False},
 )
 
 SCM_LEGACY_FIELD_TEMPLATE: dict[int, tuple[dict[str, object], ...]] = {
     1: (
         {"field_key": "previous_minutes_reviewed", "field_label": "Minutes of previous safety committee reviewed?", "field_type": "BOOLEAN", "required": True},
-        {"field_key": "absent_from_previous_meeting", "field_label": "Date absent from previous meeting", "field_type": "BOOLEAN", "required": True},
         {"field_key": "company_topics_discussed", "field_label": "Topics recommended by company discussed?", "field_type": "BOOLEAN", "required": True},
         {"field_key": "deficiencies_discussed", "field_label": "Safety/Deficiencies discussed?", "field_type": "BOOLEAN", "required": True},
         {"field_key": "near_misses_discussed", "field_label": "All near misses discussed?", "field_type": "BOOLEAN", "required": True},
+        {"field_key": "near_miss_discussion_status", "field_label": "Near miss discussion status", "field_type": "TEXT", "required": False},
+        {"field_key": "near_miss_not_discussed_reason", "field_label": "Reason if near miss not discussed", "field_type": "TEXT", "required": False},
         {"field_key": "immediate_actions_discussed", "field_label": "Immediate actions discussed?", "field_type": "BOOLEAN", "required": True},
         {"field_key": "major_incidents_discussed", "field_label": "Major incidents discussed?", "field_type": "BOOLEAN", "required": True},
         {"field_key": "emergency_drills_discussed", "field_label": "Emergency drills discussed?", "field_type": "BOOLEAN", "required": True},
     ),
-    2: (),
-    3: (
+    2: (
         {"field_key": "permit_to_work_compliance", "field_label": "Compliance with PTW (Permit To Work)", "field_type": "BOOLEAN", "required": True},
         {"field_key": "checklist_system_compliance", "field_label": "Compliance with Checklist system", "field_type": "BOOLEAN", "required": True},
-        {"field_key": "alcohol_policy", "field_label": "Compliance with Alcohol policy", "field_type": "BOOLEAN", "required": True},
+        {"field_key": "alcohol_policy", "field_label": "Compliance with Drug & Alcohol policy", "field_type": "BOOLEAN", "required": True},
         {"field_key": "risk_assessment_management", "field_label": "Compliance with Risk assessment", "field_type": "BOOLEAN", "required": True},
         {"field_key": "rest_hours", "field_label": "Compliance with Rest hours", "field_type": "BOOLEAN", "required": True},
         {"field_key": "marpol_procedure_compliance", "field_label": "Compliance with MARPOL procedure", "field_type": "BOOLEAN", "required": False},
-        {"field_key": "latest_circular_safety_alert_received", "field_label": "Received latest circular/safety alert?", "field_type": "BOOLEAN", "required": False},
-        {"field_key": "latest_circular_safety_alert", "field_label": "Circular/alert Sr. No.", "field_type": "TEXT", "required": False},
+        {"field_key": "circular_discussion_status", "field_label": "Circular / safety alert / work instruction discussion status", "field_type": "TEXT", "required": False},
+        {"field_key": "circular_not_discussed_reason", "field_label": "Reason if not discussed", "field_type": "TEXT", "required": False},
         {"field_key": "best_practices", "field_label": "Best practice recommendations", "field_type": "TEXT", "required": False},
-        *(
-            {"field_key": f"quality_safety_topic_{index}", "field_label": f"Quality & Safety topic {index}", "field_type": "TEXT", "required": False}
-            for index in range(1, 11)
-        ),
     ),
-    4: (
+    3: (
         {"field_key": "immediate_security_concerns", "field_label": "Review of immediate security concerns", "field_type": "TEXT", "required": True},
         {"field_key": "security_best_practices", "field_label": "Best practices", "field_type": "TEXT", "required": False},
         {"field_key": "cyber_security_notes", "field_label": "Cyber security notes", "field_type": "TEXT", "required": False},
-        {"field_key": "seq_message", "field_label": "Message from SEQ", "field_type": "TEXT", "required": False},
     ),
-    5: (
-        {"field_key": "kpi_review", "field_label": "KPI review", "field_type": "TEXT", "required": True, "separate_display": True},
+    4: (
         {"field_key": "environment_best_practices", "field_label": "Best practices", "field_type": "TEXT", "required": False},
     ),
-    6: (
+    5: (
         {"field_key": "health_review", "field_label": "Health review", "field_type": "TEXT", "required": True},
-        {"field_key": "rest_hours_compliance", "field_label": "Compliance with Rest hours", "field_type": "BOOLEAN", "required": True},
         {"field_key": "medical_certificates_healthy", "field_label": "Validity of Medical certificates", "field_type": "BOOLEAN", "required": True},
         {"field_key": "weekly_master_inspection", "field_label": "Weekly inspection by Master", "field_type": "BOOLEAN", "required": True},
         {"field_key": "mess_committee_meeting", "field_label": "Mess committee meeting for quality", "field_type": "BOOLEAN", "required": True},
         {"field_key": "health_best_practices", "field_label": "Best practices", "field_type": "TEXT", "required": False},
     ),
-    7: (
+    6: (
         {"field_key": "crew_complaint_received", "field_label": "Any complaints received from crew?", "field_type": "BOOLEAN", "required": True},
         {"field_key": "matter_status_resolved", "field_label": "Matter status resolved", "field_type": "BOOLEAN", "required": False},
         {"field_key": "complaint_form_submitted", "field_label": "Scan copy of complaint form submitted to office", "field_type": "BOOLEAN", "required": False},
         {"field_key": "crew_best_practices", "field_label": "Best practices", "field_type": "TEXT", "required": False},
     ),
-    8: tuple(
+    7: tuple(
         [
             {
                 "field_key": f"findings{index}",
@@ -95,10 +87,10 @@ SCM_LEGACY_FIELD_TEMPLATE: dict[int, tuple[dict[str, object], ...]] = {
             for index in range(1, 11)
         ]
     ),
-    9: (
+    8: (
         {"field_key": "miscellaneous_comments", "field_label": "Comments", "field_type": "TEXT", "required": True},
     ),
-    10: (
+    9: (
         {"field_key": "officecomments", "field_label": "OFFICECOMMENTS", "field_type": "TEXT", "required": False, "office_only": True},
         {"field_key": "isreviewed", "field_label": "IsReviewed", "field_type": "BOOLEAN", "required": False, "office_only": True},
     ),
@@ -113,12 +105,15 @@ def _legacy_field_meta(section_number: int) -> list[dict[str, object]]:
     return [dict(field) for field in SCM_LEGACY_FIELD_TEMPLATE.get(section_number, ())]
 
 
-def _coerce_bool(value: object) -> bool | None:
+def _coerce_bool(value: object) -> bool | str | None:
     if value in (None, ""):
         return None
     if isinstance(value, bool):
         return value
-    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+    normalized = str(value).strip().lower()
+    if normalized in {"na", "n/a", "not applicable", "not_applicable"}:
+        return "N/A"
+    return normalized in {"1", "true", "yes", "y"}
 
 
 def _coerce_legacy_value(value: object, field_type: str) -> object:
@@ -139,6 +134,8 @@ def legacy_value_for_storage(value: object, field_type: str) -> str | None:
     if normalized is None:
         return None
     if field_type == "BOOLEAN":
+        if normalized == "N/A":
+            return "N/A"
         return "true" if normalized else "false"
     return str(normalized)
 
@@ -168,7 +165,7 @@ def build_legacy_section_content(section_number: int, fields: Mapping[str, objec
         if value in (None, ""):
             continue
         if field["field_type"] == "BOOLEAN":
-            value = "Yes" if value is True else "No"
+            value = "N/A" if value == "N/A" else ("Yes" if value is True else "No")
         parts.append(f"{field['field_label']}: {value}")
     return "\n".join(parts)
 
@@ -180,7 +177,7 @@ def validate_required_legacy_fields(sections: Iterable[Mapping[str, object]]) ->
             section_number = int(section.get("agenda_item_number"))
         except (TypeError, ValueError):
             continue
-        if section_number == 10:
+        if section_number == 9:
             continue
         legacy_fields = section.get("legacy_fields")
         if not isinstance(legacy_fields, Mapping):
@@ -243,8 +240,28 @@ def normalize_scm_sections(value: object) -> list[dict[str, object]]:
     ]
 
 
+def _select_display_section_row(
+    agenda_map: Mapping[int, object],
+    *,
+    section_number: int,
+    legacy_source_number: int,
+) -> object | None:
+    current_row = agenda_map.get(section_number)
+    legacy_row = agenda_map.get(legacy_source_number)
+    if current_row is None:
+        return legacy_row
+    current_label = str(getattr(current_row, "section_label", "") or "").strip().lower()
+    if section_number == 2 and current_label == "reserved":
+        return legacy_row or current_row
+    return current_row
+
+
+def _has_nonblank_legacy_values(values: Mapping[str, object]) -> bool:
+    return any(value not in (None, "") and str(value).strip() for value in values.values())
+
+
 class SCMSectionSerializer(serializers.Serializer):
-    agenda_item_number = serializers.IntegerField(min_value=1, max_value=10)
+    agenda_item_number = serializers.IntegerField(min_value=1, max_value=9)
     section_label = serializers.CharField(required=False)
     auto_populated = serializers.BooleanField(required=False, default=False)
     content = serializers.CharField(allow_blank=True, required=False)
@@ -303,7 +320,7 @@ class SCMMeetingSerializer(VesselDisplayMixin, serializers.ModelSerializer):
         model = SCMMeeting
         fields = (
             "id",
-            "public_id",
+            "id",
             "vessel_id",
             "vessel_code",
             "vessel_name",
@@ -378,22 +395,37 @@ class SCMMeetingSerializer(VesselDisplayMixin, serializers.ModelSerializer):
                 field_type,
             )
 
+        agenda_map = {int(row.agenda_item_number): row for row in agenda_rows}
+        legacy_source_map = {1: 1, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10}
         rows = []
-        for row in agenda_rows:
-            section_number = int(row.agenda_item_number)
+        for template_row in build_default_scm_sections():
+            section_number = int(template_row["agenda_item_number"])
+            legacy_source_number = legacy_source_map.get(section_number, section_number)
+            row = _select_display_section_row(
+                agenda_map,
+                section_number=section_number,
+                legacy_source_number=legacy_source_number,
+            )
+            current_legacy_fields = legacy_map.get(section_number, {})
+            legacy_source_fields = legacy_map.get(legacy_source_number, {})
+            selected_legacy_fields = (
+                current_legacy_fields
+                if _has_nonblank_legacy_values(current_legacy_fields)
+                else legacy_source_fields
+            )
             rows.append(
                 {
                     "agenda_item_number": section_number,
-                    "section_label": row.section_label,
-                    "auto_populated": row.auto_populated,
-                    "content": row.content,
-                    "decision": row.decision,
+                    "section_label": str(template_row["section_label"]),
+                    "auto_populated": bool(getattr(row, "auto_populated", template_row.get("auto_populated", False))) if row is not None else bool(template_row.get("auto_populated", False)),
+                    "content": getattr(row, "content", None) if row is not None else "",
+                    "decision": getattr(row, "decision", None) if row is not None else None,
                     "legacy_field_meta": _legacy_field_meta(section_number),
                     "legacy_fields": {
                         **_blank_legacy_fields(section_number),
-                        **legacy_map.get(section_number, {}),
+                        **selected_legacy_fields,
                     },
-                    "schema_version": row.schema_version,
+                    "schema_version": getattr(row, "schema_version", 1) if row is not None else 1,
                 }
             )
         return rows
@@ -432,7 +464,7 @@ class SCMMeetingCreateSerializer(serializers.ModelSerializer):
         model = SCMMeeting
         fields = (
             "id",
-            "public_id",
+            "id",
             "vessel_id",
             "vessel_code",
             "meeting_type",
@@ -518,6 +550,23 @@ class SCMMeetingCreateSerializer(serializers.ModelSerializer):
         if sections is not None:
             payload["sections"] = sections
         return repository.create(payload)
+
+    def update(self, instance, validated_data):
+        repository = self.context["scm_repository"]
+        request = self.context.get("request")
+        actor_id = "system"
+        user = getattr(request, "user", None)
+        if user is not None:
+            for attr_name in ("username", "employee_id", "crew_id", "user_id", "id"):
+                value = getattr(user, attr_name, None)
+                if value not in (None, ""):
+                    actor_id = str(value)
+                    break
+        return repository.update_meeting(
+            meeting=instance,
+            payload=validated_data,
+            actor_id=actor_id,
+        )
 
 
 class SCMSignOffSerializer(serializers.Serializer):

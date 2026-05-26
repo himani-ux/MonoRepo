@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from django.http import FileResponse
 
 from apps.safety.models import EvidenceItem, Incident, IncidentEvidence, IncidentFact
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import NearMissAnalysisFactSerializer, build_near_miss_analysis_payload
 from apps.safety.serializers.near_miss_analysis import NearMissEvidenceSourceCreateSerializer
 from apps.safety.views.near_miss import NearMissViewMixin, _normalized_role, _resolve_actor_id
@@ -45,7 +45,7 @@ class NearMissAnalysisViewMixin(NearMissViewMixin):
 
     def get_near_miss(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
-        near_miss = get_by_public_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        near_miss = get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
         if near_miss.record_type != Incident.RecordType.NEAR_MISS:
             raise ValidationError("Lightweight analysis is only available for near-miss records.")
         if near_miss.near_miss_priority != "HIGH":
@@ -137,7 +137,7 @@ class NearMissAnalysisEvidenceSourceCreateView(NearMissAnalysisViewMixin, generi
 
         relative_path, absolute_path = self._build_storage_path(
             vessel_id=str(near_miss.vessel_id),
-            near_miss_id=int(near_miss.id),
+            near_miss_id=str(near_miss.id),
             original_name=str(uploaded_file.name or "photo"),
         )
         absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -213,7 +213,7 @@ class NearMissAnalysisEvidencePhotoView(NearMissAnalysisViewMixin, generics.Gene
 
     def get(self, request, *args, **kwargs):
         near_miss = self.get_near_miss()
-        evidence_item = get_by_public_id_or_pk(near_miss.evidence_items.all(), kwargs["evidence_id"])
+        evidence_item = get_by_id_or_pk(near_miss.evidence_items.all(), kwargs["evidence_id"])
         metadata = evidence_item.metadata_json or {}
         attachment_path = str(metadata.get("attachment_path") or "").strip()
         content_type = str(metadata.get("content_type") or "").strip()
@@ -259,7 +259,7 @@ class NearMissAnalysisFactDetailView(NearMissAnalysisViewMixin, generics.Retriev
         return self.get_near_miss().facts.order_by("sequence_index", "id")
 
     def get_object(self):
-        return get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

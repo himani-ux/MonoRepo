@@ -135,6 +135,39 @@ class SOICrudTests(unittest.TestCase):
         self.assertEqual(put_trainees_response.status_code, 200)
         self.assertEqual([row["crew_id"] for row in put_trainees_response.data["trainees"]], ["cadet-7"])
 
+    def test_pick_areas_rejects_more_than_four_selected_areas(self) -> None:
+        self._insert_area(area_id=4, area_name="Accommodation")
+        self._insert_area(area_id=5, area_name="Mooring Deck")
+        self._insert_area(area_id=6, area_name="Engine Room")
+        create_request = self.factory.post(
+            "/api/safety/soi/",
+            {
+                "vessel_id": "7",
+                "inspection_reference": "SOI/ABC/26/01",
+                "cycle_label": "Q2/2026",
+                "planned_date": "2026-05-01",
+                "safety_officer_crew_id": "co-7",
+                "assistant_crew_id": "2e-7",
+                "area_ids": [3],
+            },
+            format="json",
+        )
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        self.assertEqual(create_response.status_code, 201)
+
+        patch_request = self.factory.patch(
+            f"/api/safety/soi/{create_response.data['id']}/pick-areas/",
+            {"area_ids": [3, 4, 5, 6, 13], "section_12_included": True},
+            format="json",
+        )
+        force_authenticate(patch_request, user=build_user(role_name="CO", user_id="co-7"))
+
+        patch_response = self.pick_areas_view(patch_request, id=create_response.data["id"])
+
+        self.assertEqual(patch_response.status_code, 400)
+        self.assertEqual(patch_response.data["area_ids"][0], "Select a maximum of 4 areas for one SOI.")
+
     def test_trainee_update_reuses_live_cms_validation(self) -> None:
         create_request = self.factory.post(
             "/api/safety/soi/",
@@ -331,7 +364,7 @@ class SOICrudTests(unittest.TestCase):
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection (
-                    public_id,
+                    id,
                     vessel_id,
                     inspection_reference,
                     cycle_label,

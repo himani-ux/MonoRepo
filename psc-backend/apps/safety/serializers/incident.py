@@ -35,7 +35,7 @@ class IncidentSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
         model = Incident
         fields = (
             "id",
-            "public_id",
+            "id",
             "incident_number",
             "draft_reference",
             "vessel_id",
@@ -97,7 +97,7 @@ class IncidentSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
         )
         read_only_fields = (
             "id",
-            "public_id",
+            "id",
             "incident_number",
             "draft_reference",
             "vessel_code",
@@ -201,7 +201,7 @@ class PhaseLogSerializer(serializers.ModelSerializer):
         model = IncidentPhaseLog
         fields = (
             "id",
-            "public_id",
+            "id",
             "incident_id",
             "phase_from",
             "phase_to",
@@ -222,7 +222,7 @@ class FieldHistorySerializer(serializers.ModelSerializer):
         model = SafetyFieldHistory
         fields = (
             "id",
-            "public_id",
+            "id",
             "parent_table",
             "parent_id",
             "field_name",

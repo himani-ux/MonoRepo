@@ -15,7 +15,7 @@ from apps.safety.authentication.vessel_scope import (
     user_has_vessel_access,
 )
 from apps.safety.models import SOIInspection, SOIOfficerSetting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import CMSRepository, SOIRepository
 from apps.safety.services.checklist_version_resolver import ChecklistVersionResolver
 from apps.safety.services.section12_cycle_enforcer import Section12CycleEnforcer
@@ -183,11 +183,11 @@ class SOIViewMixin:
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
-        return get_by_public_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
 
     def get_inspection(self, inspection_id) -> SOIInspection:
         queryset = self._apply_filters(SOIInspection.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, inspection_id)
+        return get_by_id_or_pk(queryset, inspection_id)
 
 
 class SOIListCreateView(SOIViewMixin, generics.ListCreateAPIView):

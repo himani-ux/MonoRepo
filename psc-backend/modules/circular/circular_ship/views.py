@@ -48,7 +48,41 @@ def _normalize_circular_role(role_value):
 
 def _is_circular_master_role(role_value):
     normalized_role = _normalize_circular_role(role_value)
-    return normalized_role == 'MASTER' or normalized_role.endswith('_MASTER')
+    compact_role = re.sub(r'[^A-Z0-9]', '', normalized_role)
+    return (
+        normalized_role in {'MASTER', 'CAPTAIN'}
+        or compact_role in {'MASTER', 'CAPTAIN', 'MTR'}
+        or 'MASTER' in normalized_role
+        or normalized_role.endswith('_MASTER')
+    )
+
+
+def _resolve_crew_rank_display_for_circular(raw_rank_value):
+    raw_value = str(raw_rank_value or '').strip()
+    if not raw_value:
+        return ''
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 1 rank_name, rank_id
+                FROM master_applied_rank
+                WHERE id = TRY_CONVERT(uniqueidentifier, %s)
+                   OR LOWER(LTRIM(RTRIM(rank_name))) = LOWER(LTRIM(RTRIM(%s)))
+                   OR LOWER(LTRIM(RTRIM(rank_id))) = LOWER(LTRIM(RTRIM(%s)))
+                """,
+                [raw_value, raw_value, raw_value],
+            )
+            row = cursor.fetchone()
+    except Exception:
+        logger.exception("Failed to resolve circular rank display for %s", raw_value)
+        row = None
+
+    if not row:
+        return raw_value
+
+    return " ".join(str(value or '').strip() for value in row if str(value or '').strip())
 
 
 def _sortable_notification_dt(value):
@@ -98,6 +132,142 @@ def _get_current_crew_onboarding(crew_id):
     return _select_current_onboarding_record(onboarding_rows), len(onboarding_rows)
 
 
+def _unique_sr_no_list(*groups):
+    result = []
+    seen = set()
+    for group in groups:
+        for raw_value in group or []:
+            sr_no = str(raw_value or '').strip()
+            if not sr_no or sr_no in seen:
+                continue
+            seen.add(sr_no)
+            result.append(sr_no)
+    return result
+
+
+def _fetch_personal_delivery_sr_nos(crew_id):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT msc_sr_no
+            FROM msc_notification
+            WHERE crew_id = %s
+              AND LTRIM(RTRIM(ISNULL(msc_sr_no, ''))) <> ''
+            """,
+            [crew_id],
+        )
+        return _unique_sr_no_list([row[0] for row in cursor.fetchall()])
+
+
+def _fetch_rank_delivery_sr_nos(raw_rank_value):
+    raw_rank = str(raw_rank_value or '').strip()
+    if not raw_rank:
+        return []
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT msc_sr_no
+            FROM msc_rank_assigned
+            WHERE rank_id = TRY_CONVERT(uniqueidentifier, %s)
+              AND ISNULL(is_deleted, 0) = 0
+              AND ISNULL(is_active, 1) = 1
+              AND LTRIM(RTRIM(ISNULL(msc_sr_no, ''))) <> ''
+            """,
+            [raw_rank],
+        )
+        return _unique_sr_no_list([row[0] for row in cursor.fetchall()])
+
+
+def _fetch_vessel_delivery_sr_nos(vessel_id):
+    if not vessel_id:
+        return []
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT DISTINCT msc_sr_no_
+            FROM msc_ship_notification
+            WHERE vessel_id = %s
+              AND LTRIM(RTRIM(ISNULL(msc_sr_no_, ''))) <> ''
+            """,
+            [vessel_id],
+        )
+        return _unique_sr_no_list([row[0] for row in cursor.fetchall()])
+
+
+def _fetch_circular_rows_by_sr_nos(sr_nos):
+    sr_no_list = _unique_sr_no_list(sr_nos)
+    if not sr_no_list:
+        return []
+
+    placeholders = ','.join(['%s'] * len(sr_no_list))
+    with connection.cursor() as cursor:
+        cursor.execute(f"""
+            SELECT
+                md.id,
+                md.sr_no,
+                md.published_on,
+                md.title,
+                d.department_name AS dept,
+                md.hashtags,
+                md.attachment_path,
+                mt.name AS type,
+                mp.name AS priority
+            FROM msc_data md
+            LEFT JOIN msc_type mt ON md.msc_type = mt.id
+            LEFT JOIN msc_priority mp ON md.priority = mp.id
+            LEFT JOIN department d ON md.dept = d.id
+            WHERE md.sr_no IN ({placeholders})
+              AND md.is_deleted = 0
+        """, sr_no_list)
+        rows = cursor.fetchall()
+
+    columns = [
+        'id', 'sr_no', 'published_on', 'title', 'dept',
+        'hashtags', 'attachment_path', 'type', 'priority'
+    ]
+    return [dict(zip(columns, row)) for row in rows]
+
+
+def _ensure_crew_delivery_for_vessel_scoped_notification(crew_id, sr_no):
+    onboarding, _ = _get_current_crew_onboarding(crew_id)
+    if onboarding is None:
+        return False
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT TOP 1 1
+            FROM msc_ship_notification
+            WHERE msc_sr_no_ = %s
+              AND vessel_id = %s
+            """,
+            [sr_no, onboarding.Vessel],
+        )
+        has_vessel_delivery = cursor.fetchone() is not None
+
+    if not has_vessel_delivery:
+        return False
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO msc_notification (msc_sr_no, crew_id, delivered_at, reminder_count)
+            SELECT %s, %s, GETDATE(), 1
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM msc_notification
+                WHERE msc_sr_no = %s
+                  AND crew_id = %s
+            )
+            """,
+            [sr_no, crew_id, sr_no, crew_id],
+        )
+
+    return True
+
+
 # Regular font
 FONT_REG = os.path.join(settings.BASE_DIR, 'static', 'fonts', 'BOOKOS.TTF')
 
@@ -143,6 +313,82 @@ def get_master_notifications(request):
             )
 
         coh_vessel = onboarding.Vessel
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT TOP 1 rank_name
+                FROM HRM501
+                WHERE CrewID = %s
+                """,
+                [crew_id],
+            )
+            hr_row = cursor.fetchone()
+
+        rank_lookup_value = hr_row[0] if hr_row else None
+        rank_sr_no_list = _fetch_rank_delivery_sr_nos(rank_lookup_value)
+        msc_sr_no_list = _unique_sr_no_list(
+            _fetch_vessel_delivery_sr_nos(coh_vessel),
+            _fetch_personal_delivery_sr_nos(crew_id),
+            rank_sr_no_list,
+        )
+
+        if not msc_sr_no_list:
+            return JsonResponse([], safe=False)
+
+        msc_data = _fetch_circular_rows_by_sr_nos(msc_sr_no_list)
+        result = []
+
+        for obj in msc_data:
+            sr_no = obj.get('sr_no')
+            totalcrew, unreadCount = get_total_crew(crew_id, sr_no)
+            status = check_reminder_notification(sr_no, crew_id)
+            isReminder = 0 if status == 'Acknowledged' else 1
+            status_ack = check_notification_Acknowledge(sr_no, crew_id)
+            isAck = 1 if status_ack == 'Acknowledged' else 0
+            hashtags = [h.strip() for h in (obj.get('hashtags') or '').split(',') if h.strip()]
+
+            dept = obj.get('dept')
+            scope = "SEQ" if dept == 'Deck' else "Technical" if dept == 'Engine' else "Other"
+            publishedDate = obj['published_on'].isoformat() if obj.get('published_on') else None
+            attachment_url = f"/media/attachments/{os.path.basename(obj['attachment_path'])}" if obj.get('attachment_path') else None
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT delivered_at, seen_at, reminder_sent_at
+                    FROM msc_notification
+                    WHERE msc_sr_no = %s AND crew_id = %s
+                    """,
+                    [sr_no, crew_id],
+                )
+                temp = cursor.fetchall()
+            if temp:
+                delivered_at, seen_at, reminder_sent_at = temp[0]
+            else:
+                delivered_at = seen_at = reminder_sent_at = None
+
+            result.append({
+                'id': obj.get('id'),
+                'sr_no': obj.get('sr_no'),
+                'title': obj.get('title') or 'No Title',
+                'type': obj.get('type') or 'Alert',
+                'criticality': obj.get('priority') or 'Medium',
+                'scope': scope,
+                'publishedDate': publishedDate,
+                'hashtags': hashtags,
+                'attachment_url': attachment_url,
+                'isReminded': isReminder,
+                'isAck': isAck,
+                'unreadCount': unreadCount,
+                'totalCrew': totalcrew,
+                'delivered_at': delivered_at,
+                'seen_at': seen_at,
+                'reminder_sent_at': reminder_sent_at,
+                'is_rank_targeted': sr_no in set(rank_sr_no_list),
+            })
+
+        return JsonResponse(result, safe=False)
 
 
         # 2. Get all msc_sr_no for this vessel
@@ -291,7 +537,81 @@ def get_non_master_notifications(request):
             """, [crew_id])
             hr_row = cursor.fetchone()
 
+        if not hr_row:
+            return JsonResponse([], safe=False)
+
         logger.info(f"rank_id: {hr_row[3]}")
+        resolved_rank_display = _resolve_crew_rank_display_for_circular(hr_row[3])
+        if _is_circular_master_role(resolved_rank_display):
+            logger.info(
+                "Crew endpoint received master-rank user %s (%s); using vessel-library notifications.",
+                crew_id,
+                resolved_rank_display,
+            )
+            return get_master_notifications(request)
+
+        onboarding, _ = _get_current_crew_onboarding(crew_id)
+        rank_sr_no_list = _fetch_rank_delivery_sr_nos(hr_row[3])
+        vessel_sr_no_list = _fetch_vessel_delivery_sr_nos(onboarding.Vessel if onboarding else None)
+        msc_sr_no_list = _unique_sr_no_list(
+            vessel_sr_no_list,
+            _fetch_personal_delivery_sr_nos(crew_id),
+            rank_sr_no_list,
+        )
+
+        if not msc_sr_no_list:
+            return JsonResponse([], safe=False)
+
+        msc_data = _fetch_circular_rows_by_sr_nos(msc_sr_no_list)
+        result = []
+
+        for obj in msc_data:
+            var = obj.get('sr_no')
+            status = check_reminder_notification(var, crew_id)
+            isReminder = 0 if status == 'Acknowledged' else 1
+            status_ack = check_notification_Acknowledge(var, crew_id)
+            isAck = 1 if status_ack == 'Acknowledged' else 0
+            hashtags = [h.strip() for h in (obj.get('hashtags') or '').split(',') if h.strip()]
+
+            dept = obj.get('dept')
+            scope = "SEQ" if dept == 'Deck' else "Technical" if dept == 'Engine' else "Other"
+            publishedDate = obj['published_on'].isoformat() if obj.get('published_on') else None
+            attachment_url = f"/media/attachments/{os.path.basename(obj['attachment_path'])}" if obj.get('attachment_path') else None
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT delivered_at, seen_at, reminder_sent_at
+                    FROM msc_notification
+                    WHERE msc_sr_no = %s AND crew_id = %s
+                    """,
+                    [var, crew_id],
+                )
+                temp = cursor.fetchall()
+            if temp:
+                delivered_at, seen_at, reminder_sent_at = temp[0]
+            else:
+                delivered_at = seen_at = reminder_sent_at = None
+
+            result.append({
+                'id': obj.get('id'),
+                'sr_no': obj.get('sr_no'),
+                'title': obj.get('title') or 'No Title',
+                'type': obj.get('type') or 'Alert',
+                'criticality': obj.get('priority') or 'Medium',
+                'scope': scope,
+                'publishedDate': publishedDate,
+                'hashtags': hashtags,
+                'attachment_url': attachment_url,
+                'isReminded': isReminder,
+                'isAck': isAck,
+                'delivered_at': delivered_at,
+                'seen_at': seen_at,
+                'reminder_sent_at': reminder_sent_at,
+                'is_rank_targeted': var in set(rank_sr_no_list),
+            })
+
+        return JsonResponse(result, safe=False)
 
         # Fetch msc_sr_no list
         with connection.cursor() as cursor:
@@ -792,6 +1112,10 @@ def crew_acknowledge_notification(request):
         # fetch crew notification
         notification_rows = list(MscNotification.objects.filter(msc_sr_no=sr_no, crew_id=crew_id))
         obj1 = _select_ack_notification_record(notification_rows)
+        if obj1 is None:
+            _ensure_crew_delivery_for_vessel_scoped_notification(crew_id, sr_no)
+            notification_rows = list(MscNotification.objects.filter(msc_sr_no=sr_no, crew_id=crew_id))
+            obj1 = _select_ack_notification_record(notification_rows)
         if obj1 is None:
             return JsonResponse({'error': 'Record not found in msc_notification'}, status=404)
         if len(notification_rows) > 1:

@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.safety.models import SCMMeeting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import SCMMeetingSerializer, SCMOfficeCommentSerializer
 from apps.safety.services.field_history_recorder import capture_model_state, record_field_changes
 from apps.safety.views.scm import SCMViewMixin, _normalized_role, _resolve_actor_id
@@ -20,7 +20,7 @@ class SCMOfficeCommentView(SCMViewMixin, generics.GenericAPIView):
 
     def get_meeting(self) -> SCMMeeting:
         queryset = self._apply_filters(SCMMeeting.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, self.kwargs["id"])
+        return get_by_id_or_pk(queryset, self.kwargs["id"])
 
     def post(self, request, *args, **kwargs):
         if _normalized_role(getattr(request, "user", None)) not in {"DPA", "FM", "HOD SHORE", "SHORE HOD"}:
@@ -28,7 +28,7 @@ class SCMOfficeCommentView(SCMViewMixin, generics.GenericAPIView):
         meeting = self.get_meeting()
         if meeting.state != SCMMeeting.State.SIGNED_OFF or meeting.master_signed_off_at is None:
             raise ValidationError(
-                {"office_comment": "Section 10 office review is available after Master sign-off."}
+                {"office_comment": "Section 9 office review is available after Master sign-off."}
             )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -42,7 +42,7 @@ class SCMOfficeCommentView(SCMViewMixin, generics.GenericAPIView):
         meeting.save(update_fields=("office_comment", "office_comment_by", "office_comment_at"))
         self.get_scm_repository()._save_legacy_fields(
             meeting_id=meeting.id,
-            agenda_item_number=10,
+            agenda_item_number=9,
             values={
                 "officecomments": meeting.office_comment,
                 "isreviewed": bool(serializer.validated_data.get("is_reviewed", True)),

@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasProcessPermission
 from apps.safety.models import SCMMeeting, SCMSignature
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import SCMSignatureSerializer
 from apps.safety.views.scm import SCMViewMixin, _normalized_role
 
@@ -19,7 +19,7 @@ class SCMSignatureView(SCMViewMixin, generics.GenericAPIView):
 
     def get_meeting(self) -> SCMMeeting:
         queryset = self._apply_filters(SCMMeeting.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, self.kwargs["id"])
+        return get_by_id_or_pk(queryset, self.kwargs["id"])
 
     def post(self, request, *args, **kwargs):
         meeting = self.get_meeting()
@@ -69,7 +69,7 @@ class SCMSignatureView(SCMViewMixin, generics.GenericAPIView):
         return Response(
             {
                 "id": signature.id,
-                "public_id": str(signature.public_id),
+                "id": str(signature.id),
                 "meeting_id": signature.meeting_id,
                 "signer_role": signature.signer_role,
                 "signer_crew_id": signature.signer_crew_id,

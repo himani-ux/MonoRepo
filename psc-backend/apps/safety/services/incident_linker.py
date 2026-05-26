@@ -19,7 +19,7 @@ class IncidentLinkError(ValueError):
 
 @dataclass(frozen=True)
 class DuplicateCandidate:
-    incident_id: int
+    incident_id: str
     vessel_id: str
     distance_nm: float
     overlap_hours: float
@@ -30,8 +30,8 @@ class IncidentLinker:
     def __init__(self, *, model_class=Incident) -> None:
         self.model_class = model_class
 
-    def link_multi_vessel_incidents(self, incident_ids: Iterable[int]) -> tuple[Incident, Incident]:
-        unique_ids = list(dict.fromkeys(int(incident_id) for incident_id in incident_ids))
+    def link_multi_vessel_incidents(self, incident_ids: Iterable[object]) -> tuple[Incident, Incident]:
+        unique_ids = list(dict.fromkeys(str(incident_id) for incident_id in incident_ids))
         if len(unique_ids) != 2:
             raise IncidentLinkError("Multi-vessel linking requires exactly two distinct incidents.")
 

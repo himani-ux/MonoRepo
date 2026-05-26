@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
 from apps.safety.models import SCMMeeting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers.scm_agenda import SCMAgendaUpdateSerializer
 from apps.safety.views.scm import SCMViewMixin, _resolve_actor_id
 
@@ -25,7 +25,7 @@ class SCMAgendaView(SCMViewMixin, generics.GenericAPIView):
         return self._apply_filters(super().get_queryset())
 
     def get_meeting(self) -> SCMMeeting:
-        return get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
 
     def get(self, request, *args, **kwargs):
         meeting = self.get_meeting()

@@ -26,9 +26,9 @@ class SOIFinding(PublicIdMixin):
         CLOSED = "CLOSED", "Closed"
         CARRIED_FORWARD = "CARRIED_FORWARD", "Carried Forward"
 
-    inspection_id = models.BigIntegerField()
+    inspection_id = models.UUIDField()
     area_id = models.IntegerField()
-    item_id = models.BigIntegerField(null=True, blank=True)
+    item_id = models.UUIDField(null=True, blank=True)
     title = models.CharField(max_length=256)
     description = models.TextField()
     severity = models.CharField(max_length=8, choices=Severity.choices)

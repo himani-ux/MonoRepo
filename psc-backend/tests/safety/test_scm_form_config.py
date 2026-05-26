@@ -12,7 +12,7 @@ from tests.safety.support import bootstrap_django, recreate_incident_table, recr
 
 bootstrap_django()
 
-from apps.safety.models import CorrectiveAction, SCMAgendaItem, SCMMeeting
+from apps.safety.models import CorrectiveAction, Incident, SCMAgendaItem, SCMMeeting
 from apps.safety.repositories import SCMRepository
 
 
@@ -220,6 +220,7 @@ class SCMFormConfigTests(unittest.TestCase):
                     publish_status, published_on, created_at, vessel_id,
                     is_active, is_deleted, is_superseeded
                 ) VALUES
+                ('work-instruction', 'KSM/WorkInstruction/SEQ/2026-0016', 'Latest work instruction', 'internal', 'Discuss work instruction with crew.', '#workinstruction', 2, '2026-05-12 08:06:11', '2026-05-12 08:06:12', NULL, 1, 0, 0),
                 ('fleet-alert', 'KSM/Alert/SEQ/2026-0015', 'Latest fleet alert', 'internal', 'Discuss alert with crew.', '#alert', 2, '2026-05-11 08:06:11', '2026-05-11 08:06:12', NULL, 1, 0, 0),
                 ('vessel-circular', 'KSM/Circular/SEQ/2026-0002', 'Vessel circular', 'internal', 'Discuss circular on board.', '#circular', 2, '2026-04-23 06:01:40', '2026-04-23 05:44:59', '7', 1, 0, 0),
                 ('draft-alert', 'KSM/Alert/SEQ/2026-0001', 'Draft alert', 'internal', 'Should not show.', '#draft', 3, NULL, '2026-05-12 09:00:00', NULL, 1, 0, 0)
@@ -234,7 +235,36 @@ class SCMFormConfigTests(unittest.TestCase):
         )
 
         self.assertEqual([item["sr_no"] for item in payload["latest_circulars"]], [
+            "KSM/WorkInstruction/SEQ/2026-0016",
             "KSM/Alert/SEQ/2026-0015",
             "KSM/Circular/SEQ/2026-0002",
         ])
-        self.assertEqual(payload["latest_circulars"][0]["office_instructions"], "Discuss alert with crew.")
+        self.assertEqual(payload["latest_circulars"][0]["office_instructions"], "Discuss work instruction with crew.")
+
+    def test_build_form_config_includes_latest_near_misses_without_reporter_identity(self) -> None:
+        Incident.objects.create(
+            vessel_id="7",
+            incident_number="NM/ARYA/2026/001",
+            record_type=Incident.RecordType.NEAR_MISS,
+            state=Incident.State.CLOSED,
+            current_phase=1,
+            occurred_at=timezone.make_aware(datetime(2026, 5, 6, 9, 0, 0)),
+            reported_at=timezone.make_aware(datetime(2026, 5, 6, 9, 30, 0)),
+            closed_at=timezone.make_aware(datetime(2026, 5, 7, 11, 0, 0)),
+            narrative="Loose ladder pin observed near deck access.",
+            near_miss_severity="LOW",
+            near_miss_priority="LOW",
+            reporter_name="Masked Crew",
+            created_by="crew-7",
+        )
+
+        payload = self.repository.build_form_config(
+            vessel_id="7",
+            actor_id="co-7",
+            user=SimpleNamespace(vessel_id="7", vessel_code="ARYA", vessel_name="Araya"),
+            meeting_date="2026-05-08",
+        )
+
+        self.assertEqual(payload["latest_near_misses"][0]["incident_number"], "NM/ARYA/2026/001")
+        self.assertEqual(payload["latest_near_misses"][0]["title"], "Loose ladder pin observed near deck access.")
+        self.assertNotIn("reporter_name", payload["latest_near_misses"][0])

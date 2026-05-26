@@ -147,8 +147,8 @@ class Incident(BaseSafetyRecord):
     fm_approved_by = models.CharField(max_length=64, null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     closure_reason = models.TextField(null=True, blank=True)
-    linked_incident_id = models.BigIntegerField(null=True, blank=True)
-    superseded_by_id = models.BigIntegerField(null=True, blank=True)
+    linked_incident_id = models.UUIDField(null=True, blank=True)
+    superseded_by_id = models.UUIDField(null=True, blank=True)
     schema_version = models.PositiveIntegerField(
         default=INCIDENT_ENUM_TIGHTENED_SCHEMA_VERSION,
         db_default=INCIDENT_ENUM_TIGHTENED_SCHEMA_VERSION,

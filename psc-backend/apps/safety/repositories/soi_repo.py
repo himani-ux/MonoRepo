@@ -21,6 +21,13 @@ from .base import BaseRepository
 
 _VESSEL_CODE_SANITIZE_RE = re.compile(r"[^A-Z0-9]")
 _DIGIT_RE = re.compile(r"\D")
+_NUMBER_RE = re.compile(r"\d+")
+
+
+def _natural_item_number_key(value: object) -> tuple[tuple[int, ...], str]:
+    text = str(value or "").strip()
+    numbers = tuple(int(part) for part in _NUMBER_RE.findall(text))
+    return numbers, text.lower()
 
 
 class SOIRepository(BaseRepository):
@@ -56,7 +63,7 @@ class SOIRepository(BaseRepository):
         data.setdefault("lost_paper_note", None)
         data.setdefault("section_12_included", False)
         data.setdefault("schema_version", 1)
-        data.setdefault("public_id", uuid.uuid4().hex)
+        data.setdefault("id", uuid.uuid4().hex)
         data.setdefault("is_deleted", False)
         data.setdefault("is_archived", False)
         data.setdefault("archived_at", None)
@@ -138,7 +145,7 @@ class SOIRepository(BaseRepository):
 
     def _insert_without_returning(self, data: Mapping[str, object]) -> None:
         field_names = [
-            "public_id",
+            "id",
             "vessel_id",
             "inspection_reference",
             "cycle_label",
@@ -238,7 +245,7 @@ class SOIRepository(BaseRepository):
 
         with transaction.atomic():
             inspection = self.inspection_model.objects.select_for_update().get(
-                pk=int(inspection_id),
+                pk=inspection_id,
                 is_deleted=False,
             )
             update_fields: dict[str, object] = {}
@@ -253,7 +260,7 @@ class SOIRepository(BaseRepository):
             if update_fields:
                 self.inspection_model.objects.filter(pk=inspection.pk).update(**update_fields)
 
-        return self.read(int(inspection_id))
+        return self.read(inspection_id)
 
     def log_lost_paper_recovery(
         self,
@@ -268,7 +275,7 @@ class SOIRepository(BaseRepository):
 
         with transaction.atomic():
             inspection = self.inspection_model.objects.select_for_update().get(
-                pk=int(inspection_id),
+                pk=inspection_id,
                 is_deleted=False,
             )
             if not inspection.checklist_unique_id or inspection.checklist_generated_at is None:
@@ -292,7 +299,7 @@ class SOIRepository(BaseRepository):
                 updated_date=timestamp,
             )
 
-        return self.read(int(inspection_id))
+        return self.read(inspection_id)
 
     def list(self, *, filters: Mapping[str, object] | None = None):
         queryset = self.inspection_model.objects.filter(is_deleted=False)
@@ -338,7 +345,7 @@ class SOIRepository(BaseRepository):
         return [
             {
                 **row,
-                "map_id": None if row.get("map_id") in (None, "") else int(row["map_id"]),
+                "map_id": None if row.get("map_id") in (None, "") else str(row["map_id"]),
                 "area_id": int(row["area_id"]),
                 "section_12_flag": bool(row["section_12_flag"]),
                 "applicable": bool(row["applicable"]),
@@ -367,7 +374,7 @@ class SOIRepository(BaseRepository):
             WHERE selection.inspection_id = %s
             ORDER BY area.display_order ASC, selection.area_id ASC
             """,
-            [int(inspection_id)],
+            [inspection_id],
         )
         return [
             {
@@ -375,12 +382,12 @@ class SOIRepository(BaseRepository):
                 "area_name": row["area_name"],
                 "display_order": int(row["display_order"]),
                 "inspected": bool(row["inspected"]),
-                "inspection_id": int(row["inspection_id"]),
+                "inspection_id": str(row["inspection_id"]),
                 "last_inspected_at": row["last_inspected_at"],
                 "notes": row["notes"],
                 "schema_version": int(row["schema_version"] or 1),
                 "section_12_flag": bool(row["section_12_flag"]),
-                "selection_id": int(row["selection_id"]),
+                "selection_id": str(row["selection_id"]),
             }
             for row in rows
         ]
@@ -409,7 +416,7 @@ class SOIRepository(BaseRepository):
             """,
             [True, *normalized_area_ids],
         )
-        return [
+        payload = [
             {
                 "id": str(row["id"]),
                 "legacy_int_id": int(row["legacy_int_id"]),
@@ -423,6 +430,15 @@ class SOIRepository(BaseRepository):
             }
             for row in rows
         ]
+        return sorted(
+            payload,
+            key=lambda row: (
+                int(row["area_id"]),
+                int(row["subsection_id"]),
+                _natural_item_number_key(row["item_number"]),
+                str(row["id"]),
+            ),
+        )
 
     def resolve_checklist_item_legacy_id(self, *, item_id: object, area_id: int) -> int | None:
         raw_item_id = str(item_id or "").strip()
@@ -470,7 +486,7 @@ class SOIRepository(BaseRepository):
     ) -> dict[str, object]:
         with transaction.atomic():
             self._replace_selected_areas(inspection_id=inspection_id, area_ids=area_ids)
-            self.inspection_model.objects.filter(pk=int(inspection_id), is_deleted=False).update(
+            self.inspection_model.objects.filter(pk=inspection_id, is_deleted=False).update(
                 section_12_included=bool(section_12_included)
             )
         return self.build_pick_areas_payload(inspection_id=inspection_id)
@@ -511,7 +527,7 @@ class SOIRepository(BaseRepository):
         )
         return [
             {
-                "request_id": int(row["request_id"]),
+                "request_id": str(row["request_id"]),
                 "vessel_id": str(row["vessel_id"]),
                 "area_id": int(row["area_id"]),
                 "area_name": row["area_name"],
@@ -534,13 +550,13 @@ class SOIRepository(BaseRepository):
                 "schema_version": row.schema_version,
                 "trainee_slot": row.trainee_slot,
             }
-            for row in self.trainee_model.objects.filter(inspection_id=int(inspection_id)).order_by("trainee_slot", "id")
+            for row in self.trainee_model.objects.filter(inspection_id=inspection_id).order_by("trainee_slot", "id")
         ]
 
     def replace_trainees(self, *, inspection_id: int, trainee_crew_ids: list[str]) -> dict[str, object]:
         with transaction.atomic():
             self._replace_trainees(inspection_id=inspection_id, trainee_crew_ids=trainee_crew_ids)
-        return {"inspection_id": int(inspection_id), "trainees": self.list_trainees(int(inspection_id))}
+        return {"inspection_id": inspection_id, "trainees": self.list_trainees(inspection_id)}
 
     def create_applicability_request(
         self,
@@ -592,7 +608,7 @@ class SOIRepository(BaseRepository):
             [int(area_id)],
         )
         return {
-            "request_id": log_row.id,
+            "request_id": str(log_row.id),
             "status": "PENDING_APPROVAL",
             "vessel_id": str(vessel_id),
             "area_id": int(area_id),
@@ -687,7 +703,7 @@ class SOIRepository(BaseRepository):
             else current_applicable
         )
         return {
-            "request_id": pending_request.id,
+            "request_id": str(pending_request.id),
             "status": normalized_decision,
             "decision": normalized_decision,
             "vessel_id": str(vessel_id),
@@ -699,7 +715,7 @@ class SOIRepository(BaseRepository):
             "reason": pending_request.reason,
             "dpa_approved_by": actor_id,
             "dpa_approved_at": pending_request.dpa_approved_at,
-            "map_id": map_row.id if map_row is not None else None,
+            "map_id": str(map_row.id) if map_row is not None else None,
         }
 
     def update_applicability(
@@ -750,7 +766,7 @@ class SOIRepository(BaseRepository):
             [int(area_id)],
         )
         return {
-            "map_id": map_row.id,
+            "map_id": str(map_row.id),
             "vessel_id": str(vessel_id),
             "area_id": int(area_id),
             "area_name": area_name,
@@ -760,18 +776,18 @@ class SOIRepository(BaseRepository):
             "schema_version": map_row.schema_version,
         }
 
-    def _replace_selected_areas(self, *, inspection_id: int, area_ids: list[int]) -> None:
+    def _replace_selected_areas(self, *, inspection_id, area_ids: list[int]) -> None:
         selected_ids = [int(area_id) for area_id in area_ids]
-        self.inspection_area_model.objects.filter(inspection_id=int(inspection_id)).exclude(
+        self.inspection_area_model.objects.filter(inspection_id=inspection_id).exclude(
             area_id__in=selected_ids
         ).delete()
 
         existing_ids = set(
-            self.inspection_area_model.objects.filter(inspection_id=int(inspection_id)).values_list("area_id", flat=True)
+            self.inspection_area_model.objects.filter(inspection_id=inspection_id).values_list("area_id", flat=True)
         )
         create_rows = [
             self.inspection_area_model(
-                inspection_id=int(inspection_id),
+                inspection_id=inspection_id,
                 area_id=area_id,
                 schema_version=1,
             )
@@ -781,11 +797,11 @@ class SOIRepository(BaseRepository):
         if create_rows:
             self.inspection_area_model.objects.bulk_create(create_rows)
 
-    def _replace_trainees(self, *, inspection_id: int, trainee_crew_ids: list[str]) -> None:
-        self.trainee_model.objects.filter(inspection_id=int(inspection_id)).delete()
+    def _replace_trainees(self, *, inspection_id, trainee_crew_ids: list[str]) -> None:
+        self.trainee_model.objects.filter(inspection_id=inspection_id).delete()
         rows = [
             self.trainee_model(
-                inspection_id=int(inspection_id),
+                inspection_id=inspection_id,
                 crew_id=str(crew_id),
                 trainee_slot=index + 1,
                 schema_version=1,

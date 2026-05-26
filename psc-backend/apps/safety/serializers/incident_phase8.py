@@ -21,7 +21,7 @@ class RecommendationVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecommendationVerification
         fields = (
-            "public_id",
+            "id",
             "recommendation_id",
             "is_effective",
             "residual_risk",
@@ -32,7 +32,7 @@ class RecommendationVerificationSerializer(serializers.ModelSerializer):
 
 
 class IncidentPhase8VerifySerializer(serializers.Serializer):
-    recommendation_id = serializers.IntegerField(min_value=1)
+    recommendation_id = serializers.UUIDField()
     is_effective = serializers.BooleanField()
     residual_risk = serializers.CharField(max_length=32)
     notes = serializers.CharField(allow_blank=False)

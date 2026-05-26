@@ -70,7 +70,7 @@ export default function SafetyScmSignoffRoute() {
         typed_name: typedName,
       }),
     onSuccess: async (response) => {
-      setMessage(`SCM signed off. PDF generated as ${response.pdf.file_name}.`);
+      setMessage(`SCM is closed. PDF generated as ${response.pdf.file_name}.`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: safetyKeys.scmMeeting(meetingId) }),
         queryClient.invalidateQueries({ queryKey: safetyKeys.scmSignoffPreflight(meetingId) }),
@@ -308,7 +308,7 @@ export default function SafetyScmSignoffRoute() {
             </ul>
             <Link
               className="mt-3 inline-flex min-h-[40px] items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-              to={`/safety/scm/${meeting.public_id ?? meeting.id}/attendance`}
+              to={`/safety/scm/${meeting.id}/attendance`}
             >
               Open attendance signatures
             </Link>
@@ -361,7 +361,7 @@ export default function SafetyScmSignoffRoute() {
             onClick={() => signoffMutation.mutate()}
             type="button"
           >
-            {signoffMutation.isPending ? "Signing off..." : "Sign off meeting"}
+            {signoffMutation.isPending ? "Closing meeting..." : "Close Meeting"}
           </button>
           {!canSubmit && signoffBlockers.length > 0 ? (
             <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -374,7 +374,7 @@ export default function SafetyScmSignoffRoute() {
               {!signoffStateReady && !meeting.master_signed_off_at ? (
                 <Link
                   className="mt-3 inline-flex min-h-[40px] items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-                  to={`/safety/scm/${meeting.public_id ?? meeting.id}`}
+                  to={`/safety/scm/${meeting.id}`}
                 >
                   Open SCM detail to finalize
                 </Link>

@@ -15,6 +15,7 @@ from tests.safety.support import (
 bootstrap_django()
 
 from django.db import connection
+from django.urls import resolve
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -58,6 +59,11 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
         self.factory = APIRequestFactory()
         self.meeting_view = SCMSoIAutoFeedMeetingView.as_view()
         self.vessel_view = SOIOpenFindingsVesselView.as_view()
+
+    def test_open_findings_url_resolves_before_soi_detail_uuid_route(self) -> None:
+        match = resolve("/api/safety/soi/open-findings/")
+
+        self.assertIs(match.func.view_class, SOIOpenFindingsVesselView)
 
     def test_meeting_route_splits_new_and_carried_forward_findings(self) -> None:
         self._create_signed_off_meeting(
@@ -121,8 +127,8 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
 
         new_item = response.data["new_findings"][0]
         self.assertEqual(new_item["inspection_reference"], "SOI/ABC/26/01")
-        inspection_public_id = SOIInspection.objects.get(pk=inspection_id).public_id
-        self.assertEqual(new_item["source_route"], f"/safety/soi/{inspection_public_id}/findings")
+        inspection_id = SOIInspection.objects.get(pk=inspection_id).id.hex
+        self.assertEqual(new_item["source_route"], f"/safety/soi/{inspection_id}/findings")
         self.assertEqual(new_item["checklist_unique_id"], "SOI-UID-001")
 
     def test_vessel_route_supports_create_screen_feed_from_latest_signed_off_cutoff(self) -> None:
@@ -338,7 +344,7 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_vessel_area_map (
-                    public_id,
+                    id,
                     vessel_id,
                     area_id,
                     applicable,
@@ -348,7 +354,7 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    uuid.uuid4().hex,
                     "7",
                     area_id,
                     True,
@@ -366,11 +372,12 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
         reported_at,
         vessel_id: str = "7",
     ) -> int:
+        inspection_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection (
-                    public_id,
+                    id,
                     vessel_id,
                     inspection_reference,
                     cycle_label,
@@ -390,7 +397,7 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    inspection_id,
                     vessel_id,
                     inspection_reference,
                     "Q2/2026",
@@ -409,7 +416,7 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
                     "so-7",
                 ],
             )
-            return int(cursor.lastrowid)
+            return inspection_id
 
     def _insert_soi_finding(
         self,
@@ -420,11 +427,12 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
         created_date,
         carried_forward_count: int = 0,
     ) -> int:
+        finding_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_finding (
-                    public_id,
+                    id,
                     inspection_id,
                     area_id,
                     title,
@@ -440,7 +448,7 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    finding_id,
                     inspection_id,
                     1,
                     title,
@@ -455,7 +463,7 @@ class SCMSoIAutoFeedTests(unittest.TestCase):
                     created_date,
                 ],
             )
-            return int(cursor.lastrowid)
+            return finding_id
 
     def _fetch_finding_row(self, finding_id: int) -> dict[str, object]:
         with connection.cursor() as cursor:

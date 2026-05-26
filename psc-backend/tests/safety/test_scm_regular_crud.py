@@ -9,6 +9,7 @@ from tests.safety.support import bootstrap_django, recreate_scm_tables
 bootstrap_django()
 
 from rest_framework.test import APIRequestFactory, force_authenticate
+from django.utils import timezone
 
 from apps.safety.models import SCMAttendance, SCMLegacyField, SCMMeeting, SCMSignature
 from apps.safety.views.scm import SCMDetailView, SCMListCreateView, SCMSubmitView
@@ -45,7 +46,7 @@ def build_sections() -> list[dict[str, object]]:
             ),
             "decision": f"Decision outcome recorded for section {index}.",
         }
-        for index in range(1, 11)
+        for index in range(1, 10)
     ]
 
 
@@ -83,20 +84,14 @@ def build_legacy_sections() -> list[dict[str, object]]:
     legacy_fields: dict[int, dict[str, object]] = {
         1: {
             "previous_minutes_reviewed": True,
-            "absent_from_previous_meeting": False,
             "company_topics_discussed": True,
             "deficiencies_discussed": True,
             "near_misses_discussed": True,
             "immediate_actions_discussed": True,
-            "major_incidents_discussed": False,
+            "major_incidents_discussed": "N/A",
             "emergency_drills_discussed": True,
         },
         2: {
-            "outstandingitems": "Outstanding items reviewed from the previous SCM.",
-            "pendingitems": "Two pending items remain under follow-up.",
-            "closeditems": "One prior item closed since the last meeting.",
-        },
-        3: {
             "permit_to_work_compliance": True,
             "checklist_system_compliance": True,
             "five_minute_safety_meeting_compliance": True,
@@ -108,42 +103,42 @@ def build_legacy_sections() -> list[dict[str, object]]:
             "quality_safety_topic_2": "Lifting gear",
             "quality_safety_topic_3": "Hot work watch",
         },
-        4: {
+        3: {
             "immediate_security_concerns": "No immediate security concerns were raised.",
             "security_best_practices": "Gangway watch handover reinforced.",
             "cyber_security_notes": "USB media control discussed.",
             "latest_circular_safety_alert": "Latest safety alert reviewed.",
             "seq_message": "SEQ reminder discussed.",
         },
-        5: {
+        4: {
             "kpi_review": "Environmental KPI trend reviewed.",
             "environment_best_practices": "Garbage segregation practice reinforced.",
         },
-        6: {
+        5: {
             "health_review": "Crew health status reviewed.",
-            "rest_hours_compliance": True,
             "medical_certificates_healthy": True,
             "weekly_master_inspection": True,
             "mess_committee_meeting": True,
             "health_best_practices": "Hydration checks reinforced.",
         },
-        7: {
+        6: {
             "crew_complaint_received": False,
             "matter_status_resolved": True,
             "complaint_form_submitted": True,
             "crew_best_practices": "Crew welfare feedback captured.",
         },
-        8: {
+        7: {
             **{f"findings{index}": f"Finding {index} observation." for index in range(1, 11)},
             **{f"correctivemeasure{index}": f"Corrective measure {index}." for index in range(1, 11)},
         },
-        9: {
+        8: {
             "miscellaneous_comments": "Miscellaneous safety comments captured.",
         },
+        9: {},
     }
     for section in sections:
         section["content"] = ""
-        if section["agenda_item_number"] == 10:
+        if section["agenda_item_number"] == 9:
             section["decision"] = ""
         section["legacy_fields"] = legacy_fields.get(section["agenda_item_number"], {})
     return sections
@@ -173,7 +168,7 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(create_response.status_code, 201)
         self.assertEqual(create_response.data["meeting_type"], "REGULAR")
         self.assertEqual(create_response.data["state"], "DRAFT")
-        self.assertEqual(len(create_response.data["sections"]), 10)
+        self.assertEqual(len(create_response.data["sections"]), 9)
         self.assertEqual(create_response.data["prepared_by_crew_id"], "co-7")
 
         detail_request = self.factory.get(f"/api/safety/scm/{create_response.data['id']}/")
@@ -195,6 +190,86 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["meeting_type"], "REGULAR")
         self.assertEqual(response.data["prepared_by_crew_id"], "master-7")
+
+    def test_co_can_edit_full_meeting_until_office_review(self) -> None:
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        self.assertEqual(create_response.status_code, 201)
+
+        payload = build_payload()
+        payload["location"] = "Edited Singapore Anchorage"
+        payload["sections"][0]["content"] = "Edited structured review notes with enough content for validation."
+        patch_request = self.factory.patch(
+            f"/api/safety/scm/{create_response.data['id']}/",
+            payload,
+            format="json",
+        )
+        force_authenticate(
+            patch_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        response = self.detail_view(patch_request, id=create_response.data["id"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["location"], "Edited Singapore Anchorage")
+        self.assertEqual(
+            response.data["sections"][0]["content"],
+            "Edited structured review notes with enough content for validation.",
+        )
+
+    def test_signed_off_meeting_can_be_edited_before_office_review(self) -> None:
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        meeting = SCMMeeting.objects.get(pk=create_response.data["id"])
+        meeting.state = SCMMeeting.State.SIGNED_OFF
+        meeting.master_signed_off_at = timezone.now()
+        meeting.master_signed_off_by = "master-7"
+        meeting.save(update_fields=("state", "master_signed_off_at", "master_signed_off_by"))
+
+        payload = build_payload()
+        payload["voyage_no"] = "V2026-EDIT"
+        patch_request = self.factory.patch(
+            f"/api/safety/scm/{meeting.id}/",
+            payload,
+            format="json",
+        )
+        force_authenticate(
+            patch_request,
+            user=build_user(role_name="MASTER", process_ids=["SAF_P_002"], user_id="master-7"),
+        )
+
+        response = self.detail_view(patch_request, id=meeting.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["voyage_no"], "V2026-EDIT")
+
+    def test_office_review_locks_full_meeting_edit(self) -> None:
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+        create_response = self.list_create_view(create_request)
+        meeting = SCMMeeting.objects.get(pk=create_response.data["id"])
+        meeting.office_comment = "Office reviewed."
+        meeting.office_comment_at = timezone.now()
+        meeting.office_comment_by = "dpa-1"
+        meeting.save(update_fields=("office_comment", "office_comment_at", "office_comment_by"))
+
+        patch_request = self.factory.patch(
+            f"/api/safety/scm/{meeting.id}/",
+            build_payload(),
+            format="json",
+        )
+        force_authenticate(
+            patch_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        response = self.detail_view(patch_request, id=meeting.id)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["state"][0], "SCM meetings cannot be edited after office review is recorded.")
 
     def test_master_created_regular_targets_actual_co_for_co_signature(self) -> None:
         create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
@@ -316,7 +391,8 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(response.data["ship_position"], "P")
         section_one = response.data["sections"][0]
         self.assertTrue(section_one["legacy_fields"]["previous_minutes_reviewed"])
-        self.assertFalse(section_one["legacy_fields"]["absent_from_previous_meeting"])
+        self.assertNotIn("absent_from_previous_meeting", section_one["legacy_fields"])
+        self.assertEqual(section_one["legacy_fields"]["major_incidents_discussed"], "N/A")
         self.assertEqual(
             SCMLegacyField.objects.get(
                 meeting_id=response.data["id"],
@@ -325,8 +401,16 @@ class SCMRegularCrudTests(unittest.TestCase):
             ).field_value,
             "true",
         )
+        self.assertEqual(
+            SCMLegacyField.objects.get(
+                meeting_id=response.data["id"],
+                agenda_item_number=1,
+                field_key="major_incidents_discussed",
+            ).field_value,
+            "N/A",
+        )
 
-    def test_section_eight_persists_ten_findings_and_corrective_measure_pairs(self) -> None:
+    def test_findings_section_persists_ten_findings_and_corrective_measure_pairs(self) -> None:
         payload = build_payload()
         payload["meeting_date"] = "2026-05-02"
         payload["sections"] = build_legacy_sections()
@@ -336,27 +420,53 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.list_create_view(request)
 
         self.assertEqual(response.status_code, 201)
-        section_eight_fields = SCMLegacyField.objects.filter(
+        section_seven_fields = SCMLegacyField.objects.filter(
             meeting_id=response.data["id"],
-            agenda_item_number=8,
+            agenda_item_number=7,
         )
-        self.assertEqual(section_eight_fields.count(), 20)
+        self.assertEqual(section_seven_fields.count(), 20)
         self.assertEqual(
-            section_eight_fields.get(field_key="findings10").field_value,
+            section_seven_fields.get(field_key="findings10").field_value,
             "Finding 10 observation.",
         )
         self.assertEqual(
-            response.data["sections"][7]["legacy_fields"]["correctivemeasure10"],
+            response.data["sections"][6]["legacy_fields"]["correctivemeasure10"],
             "Corrective measure 10.",
+        )
+
+    def test_minutes_section_allows_long_text(self) -> None:
+        payload = build_payload()
+        payload["meeting_date"] = "2026-05-04"
+        sections = build_legacy_sections()
+        long_minutes = ("Long minutes note with operational detail. " * 300).strip()
+        sections[7]["legacy_fields"]["miscellaneous_comments"] = long_minutes
+        payload["sections"] = sections
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(
+            SCMLegacyField.objects.get(
+                meeting_id=response.data["id"],
+                agenda_item_number=8,
+                field_key="miscellaneous_comments",
+            ).field_value,
+            long_minutes,
+        )
+        self.assertEqual(
+            response.data["sections"][7]["legacy_fields"]["miscellaneous_comments"],
+            long_minutes,
         )
 
     def test_office_review_is_not_required_for_vessel_create(self) -> None:
         payload = build_payload()
         payload["meeting_date"] = "2026-05-03"
         sections = build_legacy_sections()
-        sections[9]["legacy_fields"] = {}
-        sections[9]["content"] = ""
-        sections[9]["decision"] = ""
+        sections[8]["legacy_fields"] = {}
+        sections[8]["content"] = ""
+        sections[8]["decision"] = ""
         payload["sections"] = sections
         request = self.factory.post("/api/safety/scm/", payload, format="json")
         force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
@@ -411,10 +521,10 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(signature.signer_crew_id, "co-7")
         self.assertEqual(signature.typed_name, "Chief Officer Seven")
 
-    def test_finalize_accepts_section_eight_legacy_findings_without_extra_decision(self) -> None:
+    def test_finalize_accepts_findings_legacy_fields_without_extra_decision(self) -> None:
         payload = build_payload()
         sections = build_legacy_sections()
-        sections[7]["decision"] = ""
+        sections[6]["decision"] = ""
         payload["sections"] = sections
         create_request = self.factory.post("/api/safety/scm/", payload, format="json")
         force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))

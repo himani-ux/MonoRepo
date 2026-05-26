@@ -18,7 +18,7 @@ export default function SafetyScmCreateAdHocRoute() {
   const autoFeedQuery = useSafetyScmOpenFindings(vesselId);
   const createMutation = useMutation({
     mutationFn: safetyApi.createScmMeeting,
-    onSuccess: (meeting) => navigate(`/safety/scm/${meeting.public_id ?? meeting.id}`),
+    onSuccess: (meeting) => navigate(`/safety/scm/${meeting.id}`),
   });
 
   if (configQuery.isLoading || autoFeedQuery.isLoading) {

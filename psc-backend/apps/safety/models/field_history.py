@@ -56,7 +56,7 @@ def _prepare_history_nested_json_value(value):
 
 class SafetyFieldHistory(PublicIdMixin):
     parent_table = models.CharField(max_length=64)
-    parent_id = models.BigIntegerField()
+    parent_id = models.UUIDField()
     field_name = models.CharField(max_length=128)
     old_value = models.JSONField(null=True, blank=True)
     new_value = models.JSONField(null=True, blank=True)

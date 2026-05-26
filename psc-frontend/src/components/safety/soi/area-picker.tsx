@@ -3,6 +3,7 @@ import type { SafetySoiAreaOption, SafetySoiSection12Status } from "../../../sch
 interface SafetyAreaPickerProps {
   areas: SafetySoiAreaOption[];
   disabledAreaIds?: number[];
+  maxSelectableAreas?: number;
   onToggleAreaId?: (areaId: number) => void;
   section12Status?: SafetySoiSection12Status;
   selectedAreaIds: number[];
@@ -20,12 +21,14 @@ function formatAuditDate(value: string | null) {
 export default function SafetyAreaPicker({
   areas,
   disabledAreaIds = [],
+  maxSelectableAreas,
   onToggleAreaId,
   section12Status,
   selectedAreaIds,
   title = "Picked areas",
 }: SafetyAreaPickerProps) {
   const disabledIds = new Set(disabledAreaIds);
+  const maxReached = typeof maxSelectableAreas === "number" && selectedAreaIds.length >= maxSelectableAreas;
 
   return (
     <section className="rounded-[1.75rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-5 shadow-sm">
@@ -37,6 +40,11 @@ export default function SafetyAreaPicker({
             surface. Section 12 is intentionally visible alongside the physical areas so
             the quarterly culture checkpoint does not drift out of the inspection cadence.
           </p>
+          {typeof maxSelectableAreas === "number" ? (
+            <p className="mt-2 text-sm font-medium text-amber-800">
+              Select up to {maxSelectableAreas} areas for one SOI. Selected: {selectedAreaIds.length}/{maxSelectableAreas}.
+            </p>
+          ) : null}
         </div>
         <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
           Standard SOI areas
@@ -70,6 +78,7 @@ export default function SafetyAreaPicker({
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {areas.map((area) => {
           const selected = selectedAreaIds.includes(area.area_id);
+          const areaDisabled = disabledIds.has(area.area_id) || (!selected && maxReached);
 
           return (
             <article
@@ -119,11 +128,15 @@ export default function SafetyAreaPicker({
                 <label className="mt-4 flex items-center gap-3 text-sm font-medium text-slate-800">
                   <input
                     checked={selected}
-                    disabled={disabledIds.has(area.area_id)}
+                    disabled={areaDisabled}
                     onChange={() => onToggleAreaId(area.area_id)}
                     type="checkbox"
                   />
-                  {disabledIds.has(area.area_id) ? "Locked for this cycle" : "Include in this SOI"}
+                  {disabledIds.has(area.area_id)
+                    ? "Locked for this cycle"
+                    : !selected && maxReached
+                      ? `Maximum ${maxSelectableAreas} areas selected`
+                      : "Include in this SOI"}
                 </label>
               ) : null}
             </article>

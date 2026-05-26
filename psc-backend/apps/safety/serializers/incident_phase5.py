@@ -49,7 +49,7 @@ class IncidentCauseTagSerializer(serializers.ModelSerializer):
         model = IncidentCauseTag
         fields = (
             "id",
-            "public_id",
+            "id",
             "source_fact_id",
             "mscat_subcode_id",
             "mscat_category_id",
@@ -64,7 +64,7 @@ class IncidentCauseTagSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "public_id",
+            "id",
             "mscat_category_id",
             "mscat_description",
             "created_by",
@@ -163,7 +163,7 @@ class IncidentSafeguardFailureSerializer(serializers.ModelSerializer):
         model = IncidentSafeguardFailure
         fields = (
             "id",
-            "public_id",
+            "id",
             "safeguard_name",
             "design_mscat_subcode_id",
             "installation_mscat_subcode_id",
@@ -173,7 +173,7 @@ class IncidentSafeguardFailureSerializer(serializers.ModelSerializer):
             "override_mscat_subcode_id",
             "notes",
         )
-        read_only_fields = ("id", "public_id")
+        read_only_fields = ("id", "id")
 
     def validate(self, attrs):
         subcode_fields = (

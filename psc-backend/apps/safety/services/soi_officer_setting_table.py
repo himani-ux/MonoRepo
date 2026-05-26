@@ -28,10 +28,9 @@ def _create_sql_server_table() -> None:
             IF OBJECT_ID(N'dbo.{TABLE_NAME}', N'U') IS NULL
             BEGIN
                 CREATE TABLE dbo.{TABLE_NAME} (
-                    id BIGINT IDENTITY(1,1) NOT NULL
+                    id UNIQUEIDENTIFIER NOT NULL
+                        CONSTRAINT df_{TABLE_NAME}_id DEFAULT NEWID()
                         CONSTRAINT pk_{TABLE_NAME} PRIMARY KEY,
-                    public_id CHAR(32) NOT NULL
-                        CONSTRAINT df_{TABLE_NAME}_public_id DEFAULT REPLACE(CONVERT(CHAR(36), NEWID()), '-', ''),
                     vessel_id NVARCHAR(64) NOT NULL,
                     alternate_enabled BIT NOT NULL
                         CONSTRAINT df_{TABLE_NAME}_enabled DEFAULT 0,
@@ -51,8 +50,6 @@ def _create_sql_server_table() -> None:
                 );
                 CREATE UNIQUE INDEX uq_{TABLE_NAME}_vessel
                     ON dbo.{TABLE_NAME} (vessel_id);
-                CREATE UNIQUE INDEX uq_{TABLE_NAME}_public_id
-                    ON dbo.{TABLE_NAME} (public_id);
                 CREATE INDEX ix_safe_sois_vsl_enabled
                     ON dbo.{TABLE_NAME} (vessel_id, alternate_enabled);
             END
@@ -65,8 +62,7 @@ def _create_generic_table() -> None:
         cursor.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                public_id VARCHAR(36) NOT NULL UNIQUE DEFAULT (lower(hex(randomblob(16)))),
+                id VARCHAR(36) PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
                 vessel_id VARCHAR(64) NOT NULL UNIQUE,
                 alternate_enabled BOOLEAN NOT NULL DEFAULT 0,
                 alternate_so_crew_id VARCHAR(64) NULL,

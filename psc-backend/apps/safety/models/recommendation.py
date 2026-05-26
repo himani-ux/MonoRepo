@@ -80,7 +80,7 @@ class CorrectiveAction(PublicIdMixin):
         REOPENED = "REOPENED", "Reopened"
 
     source_table = models.CharField(max_length=64)
-    source_id = models.BigIntegerField()
+    source_id = models.UUIDField()
     recommendation = models.ForeignKey(
         Recommendation,
         on_delete=models.SET_NULL,

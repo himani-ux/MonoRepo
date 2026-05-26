@@ -238,6 +238,7 @@ urlpatterns = [
     path("soi/officer-setting/", SOIOfficerSettingView.as_view(), name="soi-officer-setting"),
     path("soi/section-12-status/", SOISection12StatusView.as_view(), name="soi-section12-status"),
     path("soi/applicability/", SOIApplicabilityView.as_view(), name="soi-applicability"),
+    path("soi/open-findings/", SOIOpenFindingsVesselView.as_view(), name="soi-open-findings"),
     path(
         "master/soi-checklist-version/active/",
         SOIActiveChecklistVersionView.as_view(),
@@ -280,7 +281,6 @@ urlpatterns = [
     path("soi/<str:id>/pdf/", SOISummaryPDFDownloadView.as_view(), name="soi-pdf"),
     path("soi/<str:id>/pdf/summary/", SOISummaryPDFDownloadView.as_view(), name="soi-pdf-summary"),
     path("soi/<str:id>/trainees/", SOITraineeView.as_view(), name="soi-trainees"),
-    path("soi/open-findings/", SOIOpenFindingsVesselView.as_view(), name="soi-open-findings"),
     path("near-miss/", NearMissListCreateView.as_view(), name="near-miss-list"),
     path("near-miss/rate-limit/", NearMissRateLimitView.as_view(), name="near-miss-rate-limit"),
     path("near-miss/<str:id>/", NearMissDetailView.as_view(), name="near-miss-detail"),

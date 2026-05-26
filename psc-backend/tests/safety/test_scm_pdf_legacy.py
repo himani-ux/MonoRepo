@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from io import BytesIO
+import json
 import unittest
 from unittest.mock import patch
 
@@ -52,7 +53,7 @@ class SCMLegacyPdfTests(unittest.TestCase):
     def setUp(self) -> None:
         recreate_scm_tables()
 
-    def test_renderer_preserves_locked_legacy_ten_section_order(self) -> None:
+    def test_renderer_preserves_locked_legacy_section_order(self) -> None:
         meeting = SCMMeeting.objects.create(
             vessel_id="7",
             scm_number="ABC-30-Apr-2026",
@@ -73,13 +74,12 @@ class SCMLegacyPdfTests(unittest.TestCase):
         )
         agenda_labels = [
             "Structured Review",
-            "Reserved",
-            "Safety Practice",
+            "Quality and Safety Practice",
             "Security",
             "Environment",
             "Health",
             "Crew Welfare",
-            "Findings & Corrective Measures",
+            "PSC Findings & Corrective Measures",
             "Minutes of Meeting",
             "Office Review",
         ]
@@ -117,7 +117,8 @@ class SCMLegacyPdfTests(unittest.TestCase):
                     crew_id="crew-2",
                     rank_name="Bosun",
                     display_name="Bosun Two",
-                    present=True,
+                    present=False,
+                    absence_reason="Shore medical appointment.",
                     wrh_data_available=False,
                     wrh_rest_hours_24h=None,
                     wrh_rest_hours_7d=None,
@@ -139,19 +140,83 @@ class SCMLegacyPdfTests(unittest.TestCase):
                 ),
                 SCMLegacyField(
                     meeting_id=meeting.id,
-                    agenda_item_number=8,
-                    field_key="findings10",
-                    field_label="Findings 10",
+                    agenda_item_number=1,
+                    field_key="near_miss_discussion_status",
+                    field_label="Near miss discussion status",
                     field_type=SCMLegacyField.FieldType.TEXT,
-                    field_value="Finding 10 observation.",
+                    field_value=json.dumps(
+                        [
+                            {
+                                "reference": "NM/ABC/2026/001",
+                                "title": "Loose ladder pin observed near deck access.",
+                                "status": "DISCUSSED",
+                                "reason": "",
+                            },
+                            {
+                                "reference": "NM/ABC/2026/002",
+                                "title": "Near miss pending crew availability.",
+                                "status": "NOT_DISCUSSED",
+                                "reason": "Responsible crew member was on watch.",
+                            },
+                        ]
+                    ),
                 ),
                 SCMLegacyField(
                     meeting_id=meeting.id,
-                    agenda_item_number=8,
-                    field_key="correctivemeasure10",
-                    field_label="Corrective Measure 10",
+                    agenda_item_number=2,
+                    field_key="circular_discussion_status",
+                    field_label="Circular / safety alert / work instruction discussion status",
                     field_type=SCMLegacyField.FieldType.TEXT,
-                    field_value="Corrective measure 10.",
+                    field_value=json.dumps(
+                        [
+                            {
+                                "srNo": "KSM/Circular/Technical/2026-0008",
+                                "title": "Fleet alert reviewed by committee.",
+                                "status": "DISCUSSED",
+                                "reason": "",
+                            }
+                        ]
+                    ),
+                ),
+                SCMLegacyField(
+                    meeting_id=meeting.id,
+                    agenda_item_number=2,
+                    field_key="circular_not_discussed_reason",
+                    field_label="Reason if not discussed",
+                    field_type=SCMLegacyField.FieldType.TEXT,
+                    field_value="",
+                ),
+                SCMLegacyField(
+                    meeting_id=meeting.id,
+                    agenda_item_number=7,
+                    field_key="findings1",
+                    field_label="Findings 1",
+                    field_type=SCMLegacyField.FieldType.TEXT,
+                    field_value="Finding 1 observation.",
+                ),
+                SCMLegacyField(
+                    meeting_id=meeting.id,
+                    agenda_item_number=7,
+                    field_key="correctivemeasure1",
+                    field_label="Corrective Measure 1",
+                    field_type=SCMLegacyField.FieldType.TEXT,
+                    field_value="Corrective measure 1.",
+                ),
+                SCMLegacyField(
+                    meeting_id=meeting.id,
+                    agenda_item_number=7,
+                    field_key="findings2",
+                    field_label="Findings 2",
+                    field_type=SCMLegacyField.FieldType.TEXT,
+                    field_value="Finding 2 observation.",
+                ),
+                SCMLegacyField(
+                    meeting_id=meeting.id,
+                    agenda_item_number=7,
+                    field_key="correctivemeasure2",
+                    field_label="Corrective Measure 2",
+                    field_type=SCMLegacyField.FieldType.TEXT,
+                    field_value="Corrective measure 2.",
                 ),
             ]
         )
@@ -236,30 +301,40 @@ class SCMLegacyPdfTests(unittest.TestCase):
             result.section_titles,
             [
                 "1. Structured Review",
-                "2. Reserved",
-                "3. Safety Practice",
-                "4. Security",
-                "5. Environment",
-                "6. Health",
-                "7. Crew Welfare",
-                "8. Findings & Corrective Measures",
-                "9. Minutes of Meeting",
-                "10. Office Review",
+                "2. Quality and Safety Practice",
+                "3. Security",
+                "4. Environment",
+                "5. Health",
+                "6. Crew Welfare",
+                "7. PSC Findings & Corrective Measures",
+                "8. Minutes of Meeting",
+                "9. Office Review",
             ],
         )
 
         reader = PdfReader(BytesIO(result.content))
-        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        page_texts = [page.extract_text() or "" for page in reader.pages]
+        text = "\n".join(page_texts)
         self.assertIn("Safety Committee Meeting Minutes", text)
-        self.assertIn("Legacy SCM PDF structure preserved", text)
         self.assertIn("Attendance and WRH Snapshot", text)
         self.assertIn("Closed Items Since Last SCM", text)
-        self.assertIn("Document Control and SSOT Alignment", text)
-        self.assertIn("Legacy 10-Section SCM Record", text)
+        self.assertIn("Safety Committee Meeting Record", text)
+        self.assertTrue(
+            any(
+                "Safety Committee Meeting Record" in page_text and "1. Structured Review" in page_text
+                for page_text in page_texts
+            )
+        )
+        self.assertNotIn("Document Control", text)
+        self.assertNotIn("SSOT", text)
+        self.assertNotIn("D-PDF", text)
         self.assertIn("SOI Feed, Actions, Comments", text)
         self.assertIn("Digital Signatures", text)
         self.assertIn("Chief Officer One", text)
         self.assertIn("Bosun Two", text)
+        self.assertIn("Absent - Reason", text)
+        self.assertIn("Shore medical", text)
+        self.assertIn("appointment.", text)
         self.assertIn("Master Seven", text)
         self.assertIn("Chief Officer", text)
         self.assertIn("Attendee Signatures", text)
@@ -274,21 +349,53 @@ class SCMLegacyPdfTests(unittest.TestCase):
         self.assertIn("SHIP POSITION", text)
         self.assertIn("P - Port", text)
         self.assertIn("Minutes of previous safety committee reviewed?", text)
+        self.assertIn("Recommendation /", text)
+        self.assertIn("Suggestions", text)
+        self.assertIn("Decision recorded for Structured Review.", text)
+        self.assertIn("Decision recorded for Quality and Safety Practice.", text)
+        self.assertIn("Decision recorded for Security.", text)
+        self.assertIn("Decision recorded for Environment.", text)
+        self.assertIn("Decision recorded for Health.", text)
+        self.assertIn("Decision recorded for Crew Welfare.", text)
+        self.assertIn("NM/ABC/2026/001", text)
+        self.assertIn("Loose ladder pin observed near deck", text)
+        self.assertIn("access.", text)
+        self.assertIn("NM/ABC/2026/002", text)
+        self.assertIn("Responsible crew member was on", text)
+        self.assertIn("watch.", text)
+        self.assertNotIn("Quality & Safety topic 1", text)
+        self.assertNotIn("Quality & Safety topic 2", text)
+        self.assertNotIn("Quality & Safety topic 3", text)
+        self.assertIn("Reference", text)
+        self.assertIn("KSM/Circular/Techni", text)
+        self.assertIn("cal/2026-0008", text)
+        self.assertIn("Fleet alert reviewed by committee.", text)
+        self.assertNotIn("circular_discussion_status", text)
+        self.assertNotIn('"status"', text)
+        self.assertIn("Finding 1 observation", text)
+        self.assertIn("Finding 2 observation", text)
+        self.assertNotIn("Findings 10", text)
         self.assertIn("Safety Observations for the Month", text)
+        self.assertLess(text.index("SOI Feed, Actions, Comments, Signatures"), text.index("Safety Observations for the Month"))
+        self.assertLess(text.index("Closed Items Since Last SCM"), text.index("SOI Feed, Actions, Comments, Signatures"))
+        self.assertLess(text.index("Safety Observations for the Month"), text.index("Safety Committee Meeting Record"))
         self.assertIn("SOI/ABC/26/004", text)
         self.assertIn("SOI/ABC/26/003", text)
         self.assertIn("66.7%", text)
         self.assertIn("Fire door self-closing device weak.", text)
-        self.assertIn("8. Findings and Corrective Measures", text)
-        self.assertIn("Finding 10 observation.", text)
-        self.assertIn("Corrective measure 10.", text)
-        self.assertIn("Owner", text)
-        self.assertIn("Due Date", text)
-        self.assertIn("9. Minutes of Meeting", text)
-        self.assertIn("10. Office Comments and Review", text)
+        self.assertNotIn("8. Safety Observations for the Month", text)
+        self.assertIn("7. PSC Findings & Corrective Measures", text)
+        self.assertIn("Finding 1 observation.", text)
+        self.assertIn("Corrective measure 1.", text)
+        self.assertNotIn("TBD", text)
+        self.assertIn("8. Minutes of Meeting", text)
+        self.assertNotIn("Decision recorded for Minutes of Meeting.", text)
+        self.assertNotIn("Decision / Action", text)
+        self.assertIn("9. Office Comments and Review", text)
         self.assertIn("Office Comments", text)
-        self.assertIn("SOI Sign-Off Gate", text)
+        self.assertNotIn("SOI Sign-Off Gate", text)
+        self.assertIn("Review", text)
         self.assertIn("Closure Timestamp", text)
-        for title in [result.section_titles[index] for index in (0, 2, 3, 4, 5, 6)]:
+        for title in [result.section_titles[index] for index in (0, 1, 2, 3, 4, 5)]:
             self.assertIn(title, text)
-        self.assertIn("10. Office Comments and Review", text)
+        self.assertIn("9. Office Comments and Review", text)

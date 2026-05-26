@@ -16,7 +16,7 @@ class IncidentFact(PublicIdMixin):
     sequence_index = models.PositiveIntegerField(default=1)
     fact_text = models.TextField()
     fact_timestamp = models.DateTimeField(blank=True, null=True)
-    source_evidence_id = models.PositiveBigIntegerField()
+    source_evidence_id = models.UUIDField()
     confidence = models.CharField(
         max_length=16,
         choices=Confidence.choices,

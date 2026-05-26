@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.safety.models import Incident, IncidentFact
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import (
     IncidentFactContradictionSerializer,
     IncidentFactReorderSerializer,
@@ -38,7 +38,7 @@ class IncidentPhase4ViewMixin(IncidentViewMixin):
 
     def get_incident(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
-        incident = get_by_public_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
+        incident = get_by_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
         if incident.current_phase != 4:
             raise ValidationError("Phase 4 facts can only be edited while current_phase = 4.")
         return incident
@@ -168,7 +168,7 @@ class IncidentPhase4FactDetailView(IncidentPhase4ViewMixin, generics.UpdateAPIVi
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
-        return get_by_public_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

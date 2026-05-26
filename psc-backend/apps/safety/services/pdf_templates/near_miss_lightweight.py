@@ -125,11 +125,7 @@ class NearMissLightweightTemplate:
         summary_table.setStyle(self._table_style())
 
         story = [
-            Paragraph("Near Miss Lightweight PDF", self.title_style),
-            Paragraph(
-                "Step 6.3 export surface for FEAT-SAF-PDF-003. This lightweight template intentionally excludes investigation and deep causal-analysis sections.",
-                self.body_style,
-            ),
+            Paragraph("Near Miss Report", self.title_style),
             Spacer(1, 6),
             summary_table,
             Spacer(1, 6),

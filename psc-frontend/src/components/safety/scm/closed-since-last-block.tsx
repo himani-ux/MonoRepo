@@ -142,7 +142,7 @@ export default function SafetyClosedSinceLastBlock({
               <div className="mt-2 text-xs text-slate-500">{payload.cutoff.closed_at}</div>
             </>
           ) : (
-            <div className="mt-1 text-sm text-slate-500">No prior signed-off SCM yet.</div>
+            <div className="mt-1 text-sm text-slate-500">No prior SCM.</div>
           )}
         </div>
       </div>

@@ -121,7 +121,11 @@ class NearMissPdfLayoutTests(unittest.TestCase):
         self.assertLessEqual(len(reader.pages), 2)
 
         text = "\n".join(page.extract_text() or "" for page in reader.pages)
-        self.assertIn("Near Miss Lightweight PDF", text)
+        self.assertIn("Near Miss Report", text)
+        self.assertNotIn("FEAT-SAF", text)
+        self.assertNotIn("D-GAP", text)
+        self.assertNotIn("SSOT", text)
+        self.assertNotIn("Document Control", text)
         self.assertIn("What Happened", text)
         self.assertIn("Preventive Measures", text)
         self.assertIn("Immediate Action", text)

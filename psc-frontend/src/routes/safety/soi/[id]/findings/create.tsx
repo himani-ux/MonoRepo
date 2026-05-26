@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import SafetyIncidentWorthyNudgeModal from "../../../../../components/safety/soi
 import SafetyHighSeverityPhotoUpload from "../../../../../components/safety/soi/high-severity-photo-upload";
 import SafetyLifeThreatEscalationBanner from "../../../../../components/safety/soi/life-threat-escalation-banner";
 import SafetyFloatingFeedback from "../../../../../components/safety/shared/safety-floating-feedback";
+import { formatSoiCrewDisplay } from "../../../../../components/safety/soi/crew-display";
 import {
   SafetyMscatPicker,
   SafetySoiItemSelect,
@@ -14,6 +15,33 @@ import { safetyKeys, useSafetySoiInspection } from "../../../../../hooks/use-saf
 import { getErrorMessage } from "../../../../../lib/api/client";
 import { safetyApi } from "../../../../../lib/api/safety";
 import { findSafetySoiLifeThreatMatches } from "../../../../../schemas/safety/soi-finding";
+
+const RESPONSIBLE_RANK_LABELS = [
+  "MASTER",
+  "CHIEF OFFICER",
+  "CHIEF ENGINEER",
+  "SECOND ENGINEER",
+  "ELECTRO TECHNICAL OFFICER",
+] as const;
+
+function normalizeResponsibleRank(rank: string | null | undefined) {
+  const normalized = String(rank ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[-/]/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (normalized === "2 E" || normalized === "2E") {
+    return "SECOND ENGINEER";
+  }
+  if (normalized === "ETO") {
+    return "ELECTRO TECHNICAL OFFICER";
+  }
+  if (normalized === "ELECTROTECHNICAL OFFICER") {
+    return "ELECTRO TECHNICAL OFFICER";
+  }
+  return normalized;
+}
 
 export default function SafetySoiFindingCreateRoute() {
   const params = useParams();
@@ -85,6 +113,17 @@ export default function SafetySoiFindingCreateRoute() {
       setPhotoUploadError(getErrorMessage(mutationError));
     },
   });
+  const crewDisplayQuery = useQuery({
+    queryKey: ["safety", "soi", "crew-display", inspectionId, inspectionQuery.data?.vessel_id],
+    queryFn: () =>
+      safetyApi.getSoiCreateConfig({
+        plannedDate: inspectionQuery.data?.planned_date,
+        safetyOfficerCrewId: inspectionQuery.data?.safety_officer_crew_id,
+        vesselId: inspectionQuery.data?.vessel_id,
+      }),
+    enabled: Boolean(inspectionQuery.data?.vessel_id),
+    staleTime: 60_000,
+  });
 
   if (!enabled) {
     return (
@@ -112,11 +151,27 @@ export default function SafetySoiFindingCreateRoute() {
 
   const inspection = inspectionQuery.data;
   const selectedArea = inspection.selected_areas.find((item) => item.area_id === areaId);
-  const assigneeOptions = [
-    inspection.safety_officer_crew_id,
-    inspection.assistant_crew_id,
-    ...inspection.trainees.map((trainee) => trainee.crew_id),
-  ].filter((crewId, index, all) => crewId && all.indexOf(crewId) === index);
+  const crewDisplayById = new Map<string, { crew_id: string; rank?: string | null }>();
+  const addCrewDisplay = (crew: { crew_id?: string | null; rank?: string | null } | null | undefined) => {
+    const crewId = String(crew?.crew_id ?? "").trim();
+    if (crewId) {
+      crewDisplayById.set(crewId, { crew_id: crewId, rank: crew?.rank ?? null });
+    }
+  };
+  addCrewDisplay(crewDisplayQuery.data?.safety_officer);
+  crewDisplayQuery.data?.assistant_candidates.forEach(addCrewDisplay);
+  crewDisplayQuery.data?.responsible_candidates.forEach(addCrewDisplay);
+  crewDisplayQuery.data?.trainee_candidates.forEach(addCrewDisplay);
+  const responsibleOptions = (crewDisplayQuery.data?.responsible_candidates ?? [])
+    .filter((item, index, all) => item.crew_id && all.findIndex((entry) => entry.crew_id === item.crew_id) === index);
+  const availableResponsibleRanks = new Set(
+    responsibleOptions.map((candidate) => normalizeResponsibleRank(candidate.rank)),
+  );
+  const unavailableResponsibleRanks = RESPONSIBLE_RANK_LABELS.filter(
+    (rank) => !availableResponsibleRanks.has(rank),
+  );
+  const formatResponsiblePerson = (crewId: string, fallbackRank = "Safety Officer") =>
+    formatSoiCrewDisplay(crewDisplayById.get(crewId) ?? { crew_id: crewId, rank: fallbackRank });
   const hasPaperChecklist = Boolean(inspection.checklist_unique_id && inspection.checklist_generated_at);
   const lifeThreatMatches = findSafetySoiLifeThreatMatches(title, description);
   const isHighSeverity = severity === "HIGH";
@@ -274,23 +329,17 @@ export default function SafetySoiFindingCreateRoute() {
                 areaId={areaId}
                 className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900"
                 onChange={setItemId}
+                onSelectedOptionChange={(option) => {
+                  if (!option) {
+                    setTitle("");
+                    return;
+                  }
+                  setTitle(option.description);
+                }}
                 value={itemId}
               />
             </label>
           </div>
-
-          <label className="block">
-            <span className="text-sm font-semibold text-slate-900">Paper checklist unique ID</span>
-            <input
-              aria-label="Paper checklist unique ID"
-              autoComplete="off"
-              className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900"
-              onChange={(event) => setChecklistUniqueId(event.target.value)}
-              placeholder={inspection.checklist_unique_id ?? "Enter printed checklist ID"}
-              type="text"
-              value={checklistUniqueId}
-            />
-          </label>
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
@@ -324,9 +373,10 @@ export default function SafetySoiFindingCreateRoute() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-semibold text-slate-900">M-SCAT code</span>
+              <span className="text-sm font-semibold text-slate-900">Root cause</span>
               <SafetyMscatPicker
                 className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900"
+                label="Root cause"
                 onChange={(nextValue) => {
                   setMscatCategoryId(nextValue.categoryId);
                   setMscatSubcodeId(nextValue.subcodeId);
@@ -336,36 +386,44 @@ export default function SafetySoiFindingCreateRoute() {
             </label>
 
             <label className="block">
-              <span className="text-sm font-semibold text-slate-900">SHELL tag</span>
+              <span className="text-sm font-semibold text-slate-900">Category tag</span>
               <select
-                aria-label="SHELL tag"
+                aria-label="Category tag"
                 className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900"
                 onChange={(event) => setShellTag(event.target.value)}
                 value={shellTag}
               >
-                <option value="">Select SHELL tag</option>
-                <option value="Software">Software</option>
-                <option value="Hardware">Hardware</option>
+                <option value="">Select category tag</option>
+                <option value="Safety">Safety</option>
+                <option value="Security">Security</option>
                 <option value="Environment">Environment</option>
-                <option value="Liveware">Liveware</option>
-                <option value="Liveware-Liveware">Liveware-Liveware</option>
+                <option value="MLC">MLC</option>
+                <option value="Training">Training</option>
+                <option value="Operational">Operational</option>
+                <option value="Management">Management</option>
+                <option value="Others">Others</option>
               </select>
             </label>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-semibold text-slate-900">Assignee</span>
+              <span className="text-sm font-semibold text-slate-900">Person Responsible</span>
               <select
-                aria-label="Finding assignee"
+                aria-label="Person Responsible"
                 className="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900"
                 onChange={(event) => setAssignedCrewId(event.target.value)}
                 value={assignedCrewId}
               >
                 <option value="">Default to Safety Officer</option>
-                {assigneeOptions.map((crewId) => (
-                  <option key={crewId} value={crewId}>
-                    {crewId}
+                {responsibleOptions.map((candidate) => (
+                  <option key={candidate.crew_id} value={candidate.crew_id}>
+                    {formatSoiCrewDisplay(candidate)}
+                  </option>
+                ))}
+                {crewDisplayQuery.data && unavailableResponsibleRanks.map((rank) => (
+                  <option disabled key={rank} value="">
+                    {rank} (no current crew found)
                   </option>
                 ))}
               </select>
@@ -438,8 +496,11 @@ export default function SafetySoiFindingCreateRoute() {
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Default ownership</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              If you leave the assignee blank, the backend defaults the finding owner to the Safety Officer:
-              <span className="font-medium text-slate-900"> {inspection.safety_officer_crew_id}</span>.
+              If you leave Person Responsible blank, the backend defaults the finding owner to the Safety Officer:
+              <span className="font-medium text-slate-900">
+                {" "}
+                {formatResponsiblePerson(inspection.safety_officer_crew_id)}
+              </span>.
             </p>
           </section>
 
@@ -447,9 +508,6 @@ export default function SafetySoiFindingCreateRoute() {
             <h2 className="text-lg font-semibold text-slate-900">Current selection</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">
               Area {selectedArea?.area_id}: {selectedArea?.area_name}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              Checklist ID must match paper packet {inspection.checklist_unique_id ?? "pending first download"}.
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-700">
               Priority {priority} / Severity {severity}.

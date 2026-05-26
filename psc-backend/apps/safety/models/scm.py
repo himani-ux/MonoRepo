@@ -95,7 +95,7 @@ class SCMMeeting(PublicIdMixin):
 
 
 class SCMAttendance(PublicIdMixin):
-    meeting_id = models.BigIntegerField()
+    meeting_id = models.UUIDField()
     crew_id = models.CharField(max_length=64)
     rank_name = models.CharField(max_length=64)
     display_name = models.CharField(max_length=128)
@@ -125,7 +125,7 @@ class SCMSignature(PublicIdMixin):
         CO = "CO", "Chief Officer"
         ATTENDEE = "ATTENDEE", "Attendee"
 
-    meeting_id = models.BigIntegerField()
+    meeting_id = models.UUIDField()
     signer_role = models.CharField(max_length=16, choices=SignerRole.choices)
     signer_crew_id = models.CharField(max_length=64)
     display_name = models.CharField(max_length=128)
@@ -150,7 +150,7 @@ class SCMSignature(PublicIdMixin):
 
 
 class SCMAgendaItem(PublicIdMixin):
-    meeting_id = models.BigIntegerField()
+    meeting_id = models.UUIDField()
     agenda_item_number = models.IntegerField()
     section_label = models.CharField(max_length=128)
     auto_populated = models.BooleanField(default=False)
@@ -178,7 +178,7 @@ class SCMLegacyField(PublicIdMixin):
         INTEGER = "INTEGER", "Integer"
         TEXT = "TEXT", "Text"
 
-    meeting_id = models.BigIntegerField()
+    meeting_id = models.UUIDField()
     agenda_item_number = models.IntegerField()
     field_key = models.CharField(max_length=64)
     field_label = models.CharField(max_length=160)

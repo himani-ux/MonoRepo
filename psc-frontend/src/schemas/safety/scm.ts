@@ -4,70 +4,61 @@ export const SAFETY_SCM_SCHEMA_VERSION = 1 as const;
 
 export const safetyScmSectionTemplate = [
   { agenda_item_number: 1, section_label: "Structured Review" },
-  { agenda_item_number: 2, section_label: "Reserved" },
-  { agenda_item_number: 3, section_label: "Safety Practice" },
-  { agenda_item_number: 4, section_label: "Security" },
-  { agenda_item_number: 5, section_label: "Environment" },
-  { agenda_item_number: 6, section_label: "Health" },
-  { agenda_item_number: 7, section_label: "Crew Welfare" },
-  { agenda_item_number: 8, section_label: "Findings & Corrective Measures" },
-  { agenda_item_number: 9, section_label: "Minutes of Meeting" },
-  { agenda_item_number: 10, section_label: "Office Review" },
+  { agenda_item_number: 2, section_label: "Quality and Safety Practice" },
+  { agenda_item_number: 3, section_label: "Security" },
+  { agenda_item_number: 4, section_label: "Environment" },
+  { agenda_item_number: 5, section_label: "Health" },
+  { agenda_item_number: 6, section_label: "Crew Welfare" },
+  { agenda_item_number: 7, section_label: "PSC Findings & Corrective Measures" },
+  { agenda_item_number: 8, section_label: "Minutes of Meeting" },
+  { agenda_item_number: 9, section_label: "Office Review" },
 ] as const;
 
 export const safetyScmLegacyFieldTemplate = {
   1: [
     { field_key: "previous_minutes_reviewed", field_label: "Minutes previous safety committee reviewed", field_type: "BOOLEAN", required: true },
-    { field_key: "absent_from_previous_meeting", field_label: "Absent date from previous meeting", field_type: "BOOLEAN", required: true },
     { field_key: "company_topics_discussed", field_label: "Company recommended topics discussed", field_type: "BOOLEAN", required: true },
     { field_key: "deficiencies_discussed", field_label: "Safety/Deficiencies discussed", field_type: "BOOLEAN", required: true },
     { field_key: "near_misses_discussed", field_label: "Near misses discussed", field_type: "BOOLEAN", required: true },
+    { field_key: "near_miss_discussion_status", field_label: "Near miss discussion status", field_type: "TEXT" },
+    { field_key: "near_miss_not_discussed_reason", field_label: "Reason if near miss not discussed", field_type: "TEXT" },
     { field_key: "immediate_actions_discussed", field_label: "Immediate actions discussed", field_type: "BOOLEAN", required: true },
     { field_key: "major_incidents_discussed", field_label: "Major incidents discussed", field_type: "BOOLEAN", required: true },
     { field_key: "emergency_drills_discussed", field_label: "Emergency drills discussed", field_type: "BOOLEAN", required: true },
   ],
-  2: [],
-  3: [
+  2: [
     { field_key: "permit_to_work_compliance", field_label: "Compliance with PTW (Permit To Work)", field_type: "BOOLEAN", required: true },
     { field_key: "checklist_system_compliance", field_label: "Compliance with Checklist system", field_type: "BOOLEAN", required: true },
-    { field_key: "alcohol_policy", field_label: "Compliance with Alcohol policy", field_type: "BOOLEAN", required: true },
+    { field_key: "alcohol_policy", field_label: "Compliance with Drug & Alcohol policy", field_type: "BOOLEAN", required: true },
     { field_key: "risk_assessment_management", field_label: "Compliance with Risk assessment", field_type: "BOOLEAN", required: true },
     { field_key: "rest_hours", field_label: "Compliance with Rest hours", field_type: "BOOLEAN", required: true },
     { field_key: "marpol_procedure_compliance", field_label: "Compliance with MARPOL procedure", field_type: "BOOLEAN" },
-    { field_key: "latest_circular_safety_alert_received", field_label: "Received Latest Circular/safety alert?", field_type: "BOOLEAN" },
-    { field_key: "latest_circular_safety_alert", field_label: "Circular/alert Sr. No.", field_type: "TEXT" },
+    { field_key: "circular_discussion_status", field_label: "Circular / safety alert / work instruction discussion status", field_type: "TEXT" },
+    { field_key: "circular_not_discussed_reason", field_label: "Reason if not discussed", field_type: "TEXT" },
     { field_key: "best_practices", field_label: "Best practices", field_type: "TEXT" },
-    ...Array.from({ length: 10 }, (_, index) => ({
-      field_key: `quality_safety_topic_${index + 1}`,
-      field_label: `Q&S topic ${index + 1}`,
-      field_type: "TEXT",
-    })),
   ],
-  4: [
+  3: [
     { field_key: "immediate_security_concerns", field_label: "Immediate security concerns", field_type: "TEXT", required: true },
     { field_key: "security_best_practices", field_label: "Best practices", field_type: "TEXT" },
     { field_key: "cyber_security_notes", field_label: "Cyber notes", field_type: "TEXT" },
-    { field_key: "seq_message", field_label: "SEQ message", field_type: "TEXT" },
   ],
-  5: [
-    { field_key: "kpi_review", field_label: "KPI review", field_type: "TEXT", required: true, separate_display: true },
+  4: [
     { field_key: "environment_best_practices", field_label: "Best practices", field_type: "TEXT" },
   ],
-  6: [
+  5: [
     { field_key: "health_review", field_label: "Health review", field_type: "TEXT", required: true },
-    { field_key: "rest_hours_compliance", field_label: "Compliance with Rest hours", field_type: "BOOLEAN", required: true },
     { field_key: "medical_certificates_healthy", field_label: "Validity of Medical certificates", field_type: "BOOLEAN", required: true },
     { field_key: "weekly_master_inspection", field_label: "Weekly Master inspection", field_type: "BOOLEAN", required: true },
     { field_key: "mess_committee_meeting", field_label: "Mess committee", field_type: "BOOLEAN", required: true },
     { field_key: "health_best_practices", field_label: "Best practices", field_type: "TEXT" },
   ],
-  7: [
+  6: [
     { field_key: "crew_complaint_received", field_label: "Complaint received", field_type: "BOOLEAN", required: true },
     { field_key: "matter_status_resolved", field_label: "Status resolved", field_type: "BOOLEAN" },
     { field_key: "complaint_form_submitted", field_label: "Scan copy submitted", field_type: "BOOLEAN" },
     { field_key: "crew_best_practices", field_label: "Best practices", field_type: "TEXT" },
   ],
-  8: [
+  7: [
     ...Array.from({ length: 10 }, (_, index) => ({
       field_key: `findings${index + 1}`,
       field_label: `Findings ${index + 1}`,
@@ -81,10 +72,10 @@ export const safetyScmLegacyFieldTemplate = {
       required: index === 0,
     })),
   ],
-  9: [
+  8: [
     { field_key: "miscellaneous_comments", field_label: "Comments", field_type: "TEXT", required: true },
   ],
-  10: [
+  9: [
     { field_key: "officecomments", field_label: "OFFICECOMMENTS", field_type: "TEXT", office_only: true },
     { field_key: "isreviewed", field_label: "IsReviewed", field_type: "BOOLEAN", office_only: true },
   ],
@@ -92,8 +83,33 @@ export const safetyScmLegacyFieldTemplate = {
 
 const legacyFieldValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
+function circularDiscussionRows(value: unknown): Array<{ reason: string; status: string }> {
+  const rawValue = String(value ?? "").trim();
+  if (!rawValue) {
+    return [];
+  }
+  if (rawValue === "DISCUSSED" || rawValue === "NOT_DISCUSSED") {
+    return [{ reason: "", status: rawValue }];
+  }
+  if (!rawValue.startsWith("[")) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((row) => ({
+      reason: String(row?.reason ?? ""),
+      status: String(row?.status ?? ""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export const safetyScmSectionSchema = z.object({
-  agenda_item_number: z.number().int().min(1).max(10),
+  agenda_item_number: z.number().int().min(1).max(9),
   content: z.string().default(""),
   decision: z.string().default(""),
   legacy_fields: z.record(legacyFieldValueSchema).default({}),
@@ -115,7 +131,7 @@ const safetyScmBaseSchema = z.object({
   meeting_date: z.string().min(1),
   meeting_time_local: z.string().min(1),
   meeting_type: z.enum(["REGULAR", "AD_HOC"]).default("REGULAR"),
-  sections: z.array(safetyScmSectionSchema).length(10),
+  sections: z.array(safetyScmSectionSchema).length(9),
   schema_version: z.literal(SAFETY_SCM_SCHEMA_VERSION),
   vessel_code: z.string().min(1),
   vessel_id: z.string().min(1),
@@ -148,7 +164,7 @@ export const safetyScmSubmitSchema = safetyScmBaseSchema
       });
     }
     for (const section of value.sections) {
-      if (section.agenda_item_number === 10) {
+      if (section.agenda_item_number === 9) {
         continue;
       }
       const fieldTemplate = safetyScmLegacyFieldTemplate[
@@ -167,6 +183,30 @@ export const safetyScmSubmitSchema = safetyScmBaseSchema
           });
         }
       });
+      if (section.agenda_item_number === 2) {
+        const missingReason = circularDiscussionRows(section.legacy_fields.circular_discussion_status).some(
+          (row) => row.status === "NOT_DISCUSSED" && !row.reason.trim(),
+        );
+        if (missingReason) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Enter the reason for each circular / safety alert / work instruction marked not discussed.",
+            path: ["sections", section.agenda_item_number - 1, "legacy_fields", "circular_not_discussed_reason"],
+          });
+        }
+      }
+      if (section.agenda_item_number === 1) {
+        const missingReason = circularDiscussionRows(section.legacy_fields.near_miss_discussion_status).some(
+          (row) => row.status === "NOT_DISCUSSED" && !row.reason.trim(),
+        );
+        if (missingReason) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Enter the reason for each near miss marked not discussed.",
+            path: ["sections", section.agenda_item_number - 1, "legacy_fields", "near_miss_not_discussed_reason"],
+          });
+        }
+      }
     }
   });
 
@@ -193,8 +233,8 @@ export interface SafetyScmAgendaRow {
   content: string;
   decision: string | null;
   id: number;
-  linked_finding_ids: number[];
-  linked_incident_ids: number[];
+  linked_finding_ids: string[];
+  linked_incident_ids: string[];
   section_label: string;
 }
 

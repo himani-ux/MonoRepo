@@ -166,11 +166,11 @@ export default function SafetyIncidentIndexRoute() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {incidentsQuery.data.map((incident) => (
-                    <tr key={incident.public_id ?? incident.id}>
+                    <tr key={incident.id}>
                       <td className="px-4 py-4">
                         <Link
                           className="font-medium text-slate-900 hover:text-slate-600 hover:underline"
-                          to={buildIncidentRoute(incident.public_id ?? incident.id, incident.current_phase)}
+                          to={buildIncidentRoute(incident.id, incident.current_phase)}
                         >
                           {incident.incident_number || incident.draft_reference || `Incident #${incident.id}`}
                         </Link>

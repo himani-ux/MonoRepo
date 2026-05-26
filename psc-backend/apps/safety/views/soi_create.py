@@ -9,6 +9,27 @@ from apps.safety.services.field_history_recorder import resolve_actor_id, resolv
 from apps.safety.views.soi import SOIViewMixin
 
 
+SOI_RESPONSIBLE_RANKS = {
+    "MASTER",
+    "CHIEF OFFICER",
+    "CHIEF ENGINEER",
+    "SECOND ENGINEER",
+    "2/E",
+    "2E",
+    "ELECTRO TECHNICAL OFFICER",
+    "ELECTRO-TECHNICAL OFFICER",
+    "ETO",
+}
+
+
+def _filter_responsible_candidates(rows):
+    return [
+        row
+        for row in rows
+        if str(row.get("rank") or "").strip().upper() in SOI_RESPONSIBLE_RANKS
+    ]
+
+
 class SOICreateConfigView(SOIViewMixin, generics.GenericAPIView):
     serializer_class = SOICreateConfigSerializer
 
@@ -29,6 +50,7 @@ class SOICreateConfigView(SOIViewMixin, generics.GenericAPIView):
         )
         applicable_areas = self.get_soi_repository().list_available_areas(vessel_id=vessel_id)
         assistant_candidates = []
+        responsible_candidates = []
         trainee_candidates = []
         if safety_officer is not None:
             assistant_candidates = self.get_cms_repository().list_current_vessel_crew(
@@ -42,6 +64,12 @@ class SOICreateConfigView(SOIViewMixin, generics.GenericAPIView):
                 active_on=section12_date,
                 exclude_crew_id=str(safety_officer.get("crew_id") or ""),
             )
+            responsible_candidates = _filter_responsible_candidates(
+                self.get_cms_repository().list_current_vessel_crew(
+                    vessel_id=vessel_id,
+                    active_on=section12_date,
+                )
+            )
         try:
             checklist_version = self.get_checklist_version_resolver().get_active_version()
         except ChecklistVersionResolutionError:
@@ -53,6 +81,7 @@ class SOICreateConfigView(SOIViewMixin, generics.GenericAPIView):
                 "assistant_candidates": assistant_candidates,
                 "checklist_version": checklist_version,
                 "max_trainees": 3,
+                "responsible_candidates": responsible_candidates,
                 "section_12_status": self.get_section12_cycle_enforcer().get_status(
                     vessel_id=vessel_id,
                     at_date=section12_date,

@@ -43,8 +43,8 @@ class NearMissAnalysisFactSerializer(IncidentFactSerializer):
             "content_type": content_type,
             "file_name": metadata.get("file_name") or PurePosixPath(attachment_path).name,
             "preview_url": (
-                f"/api/safety/near-miss/{instance.incident.public_id}/"
-                f"analysis/evidence/{evidence.public_id}/photo/"
+                f"/api/safety/near-miss/{instance.incident.id}/"
+                f"analysis/evidence/{evidence.id}/photo/"
             ),
             "title": evidence.title,
         }
@@ -157,9 +157,9 @@ def _build_evidence_sources(near_miss: Incident, *, actor_id: str) -> list[dict[
         sources.append(
             {
                 "id": row.pk,
-                "public_id": str(row.public_id),
+                "id": str(row.id),
                 "label": row.title or f"Evidence item #{row.pk}",
-                "preview": _build_evidence_item_preview(row, near_miss_public_id=str(near_miss.public_id)),
+                "preview": _build_evidence_item_preview(row, near_miss_id=str(near_miss.id)),
                 "source_type": "EVIDENCE_ITEM",
             }
         )
@@ -167,7 +167,7 @@ def _build_evidence_sources(near_miss: Incident, *, actor_id: str) -> list[dict[
         sources.append(
             {
                 "id": row.pk,
-                "public_id": str(row.public_id),
+                "id": str(row.id),
                 "label": f"Witness note - {row.witness_name}",
                 "source_type": "WITNESS_INTERVIEW",
             }
@@ -176,7 +176,7 @@ def _build_evidence_sources(near_miss: Incident, *, actor_id: str) -> list[dict[
         sources.append(
             {
                 "id": row.pk,
-                "public_id": str(row.public_id),
+                "id": str(row.id),
                 "label": f"Physical evidence - {row.description[:80]}",
                 "source_type": "CHAIN_OF_CUSTODY",
             }
@@ -184,7 +184,7 @@ def _build_evidence_sources(near_miss: Incident, *, actor_id: str) -> list[dict[
     return sources
 
 
-def _build_evidence_item_preview(row: EvidenceItem, *, near_miss_public_id: str) -> dict[str, object] | None:
+def _build_evidence_item_preview(row: EvidenceItem, *, near_miss_id: str) -> dict[str, object] | None:
     metadata = row.metadata_json or {}
     attachment_path = str(metadata.get("attachment_path") or "").strip()
     content_type = str(metadata.get("content_type") or "").strip()
@@ -194,7 +194,7 @@ def _build_evidence_item_preview(row: EvidenceItem, *, near_miss_public_id: str)
         "attachment_path": attachment_path,
         "content_type": content_type,
         "file_name": metadata.get("file_name") or PurePosixPath(attachment_path).name,
-        "preview_url": f"/api/safety/near-miss/{near_miss_public_id}/analysis/evidence/{row.public_id}/photo/",
+        "preview_url": f"/api/safety/near-miss/{near_miss_id}/analysis/evidence/{row.id}/photo/",
         "title": row.title,
     }
 

@@ -74,7 +74,7 @@ class SOIFindingCrudTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["assigned_crew_id"], "co-7")
-        self.assertEqual(response.data["inspection_id"], self.inspection_id)
+        self.assertEqual(response.data["inspection_id"], str(uuid.UUID(self.inspection_id)))
         self.assertEqual(response.data["status"], "OPEN")
         self.assertEqual(response.data["area_id"], 3)
         self.assertIsNotNone(response.data["created_date"])
@@ -174,7 +174,10 @@ class SOIFindingCrudTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertIn("photo_attachment_path", response.data)
         self.assertTrue(response.data["photo_attachment_path"].endswith(".jpg"))
-        self.assertIn(f"soi/{self.inspection_id}/findings/photos/", response.data["photo_attachment_path"])
+        self.assertIn(
+            f"soi/{str(uuid.UUID(self.inspection_id))}/findings/photos/",
+            response.data["photo_attachment_path"],
+        )
 
         request = self.factory.post(
             f"/api/safety/soi/{self.inspection_id}/findings/",
@@ -336,12 +339,13 @@ class SOIFindingCrudTests(unittest.TestCase):
                 ],
             )
 
-    def _insert_inspection(self) -> int:
+    def _insert_inspection(self) -> str:
+        inspection_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection (
-                    public_id,
+                    id,
                     vessel_id,
                     inspection_reference,
                     cycle_label,
@@ -362,7 +366,7 @@ class SOIFindingCrudTests(unittest.TestCase):
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
-                    str(uuid.uuid4()),
+                    inspection_id,
                     "7",
                     "SOI/ABC/26/07",
                     "Q2/2026",
@@ -382,14 +386,15 @@ class SOIFindingCrudTests(unittest.TestCase):
                     "co-7",
                 ],
             )
-            return int(cursor.lastrowid)
+            return inspection_id
 
     def _insert_selected_area(self, *, area_id: int) -> None:
+        selection_id = uuid.uuid4().hex
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_inspection_area (
-                    public_id,
+                    id,
                     inspection_id,
                     area_id,
                     inspected,
@@ -398,5 +403,5 @@ class SOIFindingCrudTests(unittest.TestCase):
                     schema_version
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                [str(uuid.uuid4()), self.inspection_id, area_id, False, None, None, 1],
+                [selection_id, self.inspection_id, area_id, False, None, None, 1],
             )

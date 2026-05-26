@@ -12,7 +12,7 @@ class ExternalPartyInjurySerializer(serializers.ModelSerializer):
         model = ExternalPartyInjury
         fields = (
             "id",
-            "public_id",
+            "id",
             "incident_id",
             "party_name",
             "party_type",
@@ -27,7 +27,7 @@ class ExternalPartyInjurySerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "public_id",
+            "id",
             "incident_id",
             "created_by",
             "created_date",

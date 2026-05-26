@@ -11,7 +11,7 @@ class PdfPreviewGenerator:
             "status": "READY_TO_GENERATE" if available else "NOT_AVAILABLE",
             "incident_id": incident.pk,
             "expected_sections": 10,
-            "download_path": f"/api/safety/incidents/{incident.public_id}/pdf/",
+            "download_path": f"/api/safety/incidents/{incident.id}/pdf/",
             "message": (
                 "Formal incident PDF generation is available from the Step 6.1 renderer."
                 if available

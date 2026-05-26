@@ -5,7 +5,9 @@ import type {
   SafetyScmCreateAttendeeRow,
   SafetyScmCreatePayload,
   SafetyScmFormConfig,
+  SafetyScmNearMissFeedItem,
   SafetyScmOverdueSoiArea,
+  SafetyScmPscCarFeedItem,
 } from "../../../lib/api/safety";
 import {
   SAFETY_SCM_SCHEMA_VERSION,
@@ -25,9 +27,13 @@ interface SafetyScmSubmitPayload extends SafetyScmSubmitValues {
 interface SafetyScmTenSectionFormProps {
   autoFeedPayload?: SafetyScmAutoFeedPayload | null;
   config: SafetyScmFormConfig;
+  formMode?: "create" | "edit";
+  initialValues?: Partial<SafetyScmValues> & { attendance_rows?: SafetyScmCreateAttendeeRow[] };
   isSubmitting?: boolean;
   mode?: "adhoc" | "regular";
   onSubmit?: (values: SafetyScmSubmitPayload) => void;
+  submitLabel?: string;
+  submittingLabel?: string;
 }
 
 interface SafetyScmDraftValues extends SafetyScmValues {
@@ -36,12 +42,149 @@ interface SafetyScmDraftValues extends SafetyScmValues {
 
 type LegacyFieldValue = string | number | boolean | null;
 
+interface CircularDiscussionRow {
+  key: string;
+  reason: string;
+  srNo: string;
+  status: string;
+  title: string;
+}
+
+interface NearMissDiscussionRow {
+  closedAt: string;
+  key: string;
+  priority: string;
+  reason: string;
+  reference: string;
+  severity: string;
+  status: string;
+  title: string;
+}
+
+function circularDiscussionKey(item: SafetyScmCircularFeedItem) {
+  return String(item.id || item.sr_no || item.title).trim();
+}
+
+function nearMissDiscussionKey(item: SafetyScmNearMissFeedItem) {
+  return String(item.id || item.incident_number || item.title).trim();
+}
+
+function parseCircularDiscussionRows(
+  value: LegacyFieldValue,
+  items: SafetyScmCircularFeedItem[],
+): CircularDiscussionRow[] {
+  const rawValue = String(value ?? "").trim();
+  let storedRows: CircularDiscussionRow[] = [];
+  if (rawValue.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (Array.isArray(parsed)) {
+        storedRows = parsed.map((row) => ({
+          key: String(row?.key ?? row?.id ?? row?.srNo ?? row?.sr_no ?? ""),
+          reason: String(row?.reason ?? ""),
+          srNo: String(row?.srNo ?? row?.sr_no ?? ""),
+          status: String(row?.status ?? ""),
+          title: String(row?.title ?? ""),
+        }));
+      }
+    } catch {
+      storedRows = [];
+    }
+  }
+
+  const storedByKey = new Map(storedRows.map((row) => [row.key, row]));
+  const legacyStatus = rawValue === "DISCUSSED" || rawValue === "NOT_DISCUSSED" ? rawValue : "";
+  return items.map((item) => {
+    const key = circularDiscussionKey(item);
+    const stored = storedByKey.get(key);
+    return {
+      key,
+      reason: stored?.reason ?? "",
+      srNo: item.sr_no || stored?.srNo || "",
+      status: stored?.status || legacyStatus,
+      title: item.title || stored?.title || "Untitled circular",
+    };
+  });
+}
+
+function stringifyCircularDiscussionRows(rows: CircularDiscussionRow[]) {
+  return JSON.stringify(
+    rows.map((row) => ({
+      key: row.key,
+      reason: row.reason,
+      srNo: row.srNo,
+      status: row.status,
+      title: row.title,
+    })),
+  );
+}
+
+function parseNearMissDiscussionRows(
+  value: LegacyFieldValue,
+  items: SafetyScmNearMissFeedItem[],
+): NearMissDiscussionRow[] {
+  const rawValue = String(value ?? "").trim();
+  let storedRows: NearMissDiscussionRow[] = [];
+  if (rawValue.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (Array.isArray(parsed)) {
+        storedRows = parsed.map((row) => ({
+          closedAt: String(row?.closedAt ?? row?.closed_at ?? ""),
+          key: String(row?.key ?? row?.id ?? row?.reference ?? row?.incident_number ?? ""),
+          priority: String(row?.priority ?? ""),
+          reason: String(row?.reason ?? ""),
+          reference: String(row?.reference ?? row?.incidentNumber ?? row?.incident_number ?? ""),
+          severity: String(row?.severity ?? ""),
+          status: String(row?.status ?? ""),
+          title: String(row?.title ?? ""),
+        }));
+      }
+    } catch {
+      storedRows = [];
+    }
+  }
+
+  const storedByKey = new Map(storedRows.map((row) => [row.key, row]));
+  const legacyStatus = rawValue === "DISCUSSED" || rawValue === "NOT_DISCUSSED" ? rawValue : "";
+  return items.map((item) => {
+    const key = nearMissDiscussionKey(item);
+    const stored = storedByKey.get(key);
+    return {
+      closedAt: item.closed_at || item.occurred_at || stored?.closedAt || "",
+      key,
+      priority: item.priority || stored?.priority || "",
+      reason: stored?.reason ?? "",
+      reference: item.incident_number || stored?.reference || "",
+      severity: item.severity || stored?.severity || "",
+      status: stored?.status || legacyStatus,
+      title: item.title || stored?.title || "Untitled near miss",
+    };
+  });
+}
+
+function stringifyNearMissDiscussionRows(rows: NearMissDiscussionRow[]) {
+  return JSON.stringify(
+    rows.map((row) => ({
+      closedAt: row.closedAt,
+      key: row.key,
+      priority: row.priority,
+      reason: row.reason,
+      reference: row.reference,
+      severity: row.severity,
+      status: row.status,
+      title: row.title,
+    })),
+  );
+}
+
 function populatedIndexedFieldCount(
   legacyFields: Record<string, LegacyFieldValue>,
   prefix: string,
   maxCount: number,
+  minimumCount = 1,
 ) {
-  let count = 1;
+  let count = minimumCount;
   for (let index = 1; index <= maxCount; index += 1) {
     const value = legacyFields[`${prefix}${index}`];
     if (value !== null && value !== undefined && String(value).trim()) {
@@ -103,26 +246,38 @@ function formatRestHours(value: number | string | null | undefined) {
   return Number.isFinite(normalized) ? `${normalized.toFixed(1)} h` : "Unavailable";
 }
 
+function rankShortCode(rankName: string | null | undefined) {
+  const normalized = String(rankName ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[-/]/g, " ")
+    .replace(/\s+/g, " ");
+  const rankMap: Record<string, string> = {
+    "MASTER": "MTR",
+    "CAPTAIN": "MTR",
+    "CHIEF OFFICER": "CO",
+    "CHIEF MATE": "CO",
+    "CHIEF ENGINEER": "CE",
+    "SECOND ENGINEER": "2E",
+    "2ND ENGINEER": "2E",
+    "ELECTRO TECHNICAL OFFICER": "ETO",
+    "ELECTROTECHNICAL OFFICER": "ETO",
+    "BOSUN": "BSN",
+    "ABLE SEAMAN": "AB",
+    "ORDINARY SEAMAN": "OS",
+    "OILER": "OLR",
+    "FITTER": "FTR",
+    "COOK": "CK",
+  };
+  return rankMap[normalized] ?? "";
+}
+
 const defaultValues = (
   config: SafetyScmFormConfig,
   mode: "adhoc" | "regular",
-): SafetyScmDraftValues => ({
-  ad_hoc_trigger_reason: "",
-  attendance_rows: config.attendee_rows.map((row) => ({ ...row })),
-  chair_crew_id: config.chair?.crew_id ?? config.prepared_by?.crew_id ?? "",
-  latitude: "",
-  location: "",
-  longitude: "",
-  occasion: "M",
-  ship_position: "P",
-  ship_pos_from: "",
-  ship_pos_to: "",
-  comm_time: "10:00",
-  comp_time: "",
-  meeting_date: config.meeting_date_default,
-  meeting_time_local: "10:00",
-  meeting_type: mode === "adhoc" ? "AD_HOC" : "REGULAR",
-  sections: config.sections.map((section) => ({
+  initialValues?: SafetyScmTenSectionFormProps["initialValues"],
+): SafetyScmDraftValues => {
+  const baseSections = config.sections.map((section) => ({
     agenda_item_number: section.agenda_item_number,
     content: section.content,
     decision: section.decision ?? "",
@@ -131,29 +286,59 @@ const defaultValues = (
       ...(section.legacy_fields ?? {}),
     },
     section_label: section.section_label,
-  })),
-  schema_version: SAFETY_SCM_SCHEMA_VERSION,
-  vessel_code: config.vessel.vessel_code,
-  vessel_id: config.vessel.id,
-  voyage_no: "",
-});
+  }));
+  const initialSections = initialValues?.sections?.map((section) => ({
+    agenda_item_number: section.agenda_item_number,
+    content: section.content,
+    decision: section.decision ?? "",
+    legacy_fields: {
+      ...blankLegacyFields(section.agenda_item_number),
+      ...(section.legacy_fields ?? {}),
+    },
+    section_label: section.section_label,
+  }));
+
+  return {
+    ad_hoc_trigger_reason: initialValues?.ad_hoc_trigger_reason ?? "",
+    attendance_rows: (initialValues?.attendance_rows ?? config.attendee_rows).map((row) => ({ ...row })),
+    chair_crew_id: initialValues?.chair_crew_id ?? config.chair?.crew_id ?? config.prepared_by?.crew_id ?? "",
+    latitude: initialValues?.latitude ?? "",
+    location: initialValues?.location ?? "",
+    longitude: initialValues?.longitude ?? "",
+    occasion: initialValues?.occasion ?? "M",
+    ship_position: initialValues?.ship_position ?? "P",
+    ship_pos_from: initialValues?.ship_pos_from ?? "",
+    ship_pos_to: initialValues?.ship_pos_to ?? "",
+    comm_time: initialValues?.comm_time ?? "10:00",
+    comp_time: initialValues?.comp_time ?? "",
+    meeting_date: initialValues?.meeting_date ?? config.meeting_date_default,
+    meeting_time_local: initialValues?.meeting_time_local ?? "10:00",
+    meeting_type: initialValues?.meeting_type ?? (mode === "adhoc" ? "AD_HOC" : "REGULAR"),
+    sections: initialSections ?? baseSections,
+    schema_version: initialValues?.schema_version ?? SAFETY_SCM_SCHEMA_VERSION,
+    vessel_code: initialValues?.vessel_code ?? config.vessel.vessel_code,
+    vessel_id: initialValues?.vessel_id ?? config.vessel.id,
+    voyage_no: initialValues?.voyage_no ?? "",
+  };
+};
 
 export function SafetyScmTenSectionForm({
   autoFeedPayload = null,
   config,
+  formMode = "create",
+  initialValues,
   isSubmitting = false,
   mode = "regular",
   onSubmit,
+  submitLabel,
+  submittingLabel,
 }: SafetyScmTenSectionFormProps) {
-  const [values, setValues] = useState<SafetyScmDraftValues>(() => defaultValues(config, mode));
-  const [visibleQualityTopicCount, setVisibleQualityTopicCount] = useState(() => {
-    const section = defaultValues(config, mode).sections.find((row) => row.agenda_item_number === 3);
-    return populatedIndexedFieldCount(section?.legacy_fields ?? {}, "quality_safety_topic_", 10);
-  });
+  const [values, setValues] = useState<SafetyScmDraftValues>(() => defaultValues(config, mode, initialValues));
   const [visibleFindingCount, setVisibleFindingCount] = useState(() => {
-    const section = defaultValues(config, mode).sections.find((row) => row.agenda_item_number === 8);
+    const section = defaultValues(config, mode, initialValues).sections.find((row) => row.agenda_item_number === 7);
     return populatedIndexedFieldCount(section?.legacy_fields ?? {}, "findings", 10);
   });
+  const [showAttendanceRows, setShowAttendanceRows] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const coreValues: SafetyScmValues = {
     ad_hoc_trigger_reason: values.ad_hoc_trigger_reason,
@@ -229,6 +414,31 @@ export function SafetyScmTenSectionForm({
     }));
   }
 
+  function addPscCarToFinding(item: SafetyScmPscCarFeedItem) {
+    const findingsSection = values.sections.find((section) => section.agenda_item_number === 7);
+    const legacyFields = findingsSection?.legacy_fields ?? {};
+    const reference = item.car_number || item.def_code || item.id;
+    const existingIndex = Array.from({ length: 10 }, (_, index) => index + 1).find((index) =>
+      String(legacyFields[`findings${index}`] ?? "").includes(reference),
+    );
+    const emptyIndex = Array.from({ length: 10 }, (_, index) => index + 1).find((index) =>
+      !String(legacyFields[`findings${index}`] ?? "").trim(),
+    );
+    const targetIndex = existingIndex ?? emptyIndex;
+
+    if (!targetIndex) {
+      return;
+    }
+
+    const details = [
+      item.def_code ? `Code ${item.def_code}` : "",
+      item.deficiency_description || "PSC CAR selected for committee review",
+    ].filter(Boolean).join(" - ");
+    const findingText = `${item.car_number || "PSC CAR"}: ${details}`;
+    updateLegacyField(7, `findings${targetIndex}`, findingText);
+    setVisibleFindingCount((current) => Math.max(current, targetIndex));
+  }
+
   function updateAttendanceRow(
     crewId: string,
     patch: Partial<SafetyScmCreateAttendeeRow>,
@@ -274,9 +484,21 @@ export function SafetyScmTenSectionForm({
   }
 
   const isAdHoc = values.meeting_type === "AD_HOC";
-  const title = isAdHoc ? "Create Ad-Hoc SCM" : "Create Regular SCM";
-  const summary = isAdHoc
-    ? "Master-triggered 10-section committee record using the standard SCM format and current vessel safety inputs."
+  const sectionOne = values.sections.find((section) => section.agenda_item_number === 1);
+  const sectionTwo = values.sections.find((section) => section.agenda_item_number === 2);
+  const nearMissDiscussionRows = parseNearMissDiscussionRows(
+    sectionOne?.legacy_fields.near_miss_discussion_status ?? null,
+    config.latest_near_misses ?? [],
+  );
+  const circularDiscussionRows = parseCircularDiscussionRows(
+    sectionTwo?.legacy_fields.circular_discussion_status ?? null,
+    config.latest_circulars ?? [],
+  );
+  const title = formMode === "edit" ? "Edit Meeting" : isAdHoc ? "Create Ad-Hoc SCM" : "Create Regular SCM";
+  const summary = formMode === "edit"
+    ? "Update the existing SCM meeting fields, attendance sheet, section responses, and recommendations before office review."
+    : isAdHoc
+    ? "Master-triggered committee record using the standard SCM format and current vessel safety inputs."
     : "CO-prepared monthly committee record with vessel scope, crew roster, WRH warnings, and current safety summaries.";
 
   return (
@@ -407,8 +629,36 @@ export function SafetyScmTenSectionForm({
 
       {autoFeedPayload ? <SafetyScmAutoFeed payload={autoFeedPayload} /> : null}
 
+      <SafetyScmNearMissFeed
+        discussionRows={nearMissDiscussionRows}
+        items={config.latest_near_misses ?? []}
+        onDiscussionRowsChange={(nextRows) => {
+          updateLegacyField(1, "near_miss_discussion_status", stringifyNearMissDiscussionRows(nextRows));
+          updateLegacyField(
+            1,
+            "near_miss_not_discussed_reason",
+            nextRows
+              .filter((row) => row.status === "NOT_DISCUSSED" && row.reason.trim())
+              .map((row) => `${row.reference || row.title}: ${row.reason.trim()}`)
+              .join("; "),
+          );
+        }}
+      />
+
       <SafetyScmCircularFeed
+        discussionRows={circularDiscussionRows}
         items={config.latest_circulars ?? []}
+        onDiscussionRowsChange={(nextRows) => {
+          updateLegacyField(2, "circular_discussion_status", stringifyCircularDiscussionRows(nextRows));
+          updateLegacyField(
+            2,
+            "circular_not_discussed_reason",
+            nextRows
+              .filter((row) => row.status === "NOT_DISCUSSED" && row.reason.trim())
+              .map((row) => `${row.srNo || row.title}: ${row.reason.trim()}`)
+              .join("; "),
+          );
+        }}
       />
 
       <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-2 xl:grid-cols-6">
@@ -547,19 +797,26 @@ export function SafetyScmTenSectionForm({
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Crew attendance confirmation</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Crew list, rank, department, and WRH status come from current crew and rest-hour records. Present/absent confirmation and comments stay editable for CO/Master.
-            </p>
+            <h2 className="text-lg font-semibold text-slate-900">Crew attendance sheet</h2>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-            Warn, don&apos;t block
-          </span>
+          <button
+            aria-expanded={showAttendanceRows}
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+            onClick={() => setShowAttendanceRows((current) => !current)}
+            type="button"
+          >
+            {showAttendanceRows ? "Hide sheet" : "Open sheet"}
+            <span
+              aria-hidden="true"
+              className="mt-[-2px] h-2 w-2 border-b-2 border-r-2 border-slate-600 transition"
+              style={{ transform: showAttendanceRows ? "rotate(225deg)" : "rotate(45deg)" }}
+            />
+          </button>
         </div>
 
-        {values.attendance_rows.length === 0 ? (
+        {!showAttendanceRows ? null : values.attendance_rows.length === 0 ? (
           <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">
             No live crew roster was resolved for this vessel.
           </div>
@@ -585,7 +842,14 @@ export function SafetyScmTenSectionForm({
                       </div>
                     </td>
                     <td className="px-4 py-4 text-slate-700">
-                      <div className="font-medium text-slate-900">{row.rank_name || "Unranked"}</div>
+                      <div className="font-medium text-slate-900">
+                        {row.rank_name || "Unranked"}
+                        {rankShortCode(row.rank_name) ? (
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                            {rankShortCode(row.rank_name)}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
                         {row.department || "Unassigned department"}
                       </div>
@@ -707,31 +971,8 @@ export function SafetyScmTenSectionForm({
         )}
       </section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              KPI Review
-            </p>
-            <h2 className="text-xl font-semibold text-slate-900">KPI Review</h2>
-          </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-            Separate from Section 5
-          </span>
-        </div>
-        <label className="mt-4 block space-y-2 text-sm text-slate-700">
-          <span className="font-medium">KPI review</span>
-          <textarea
-            aria-label="KPI review"
-            className="min-h-[110px] w-full rounded-3xl border border-slate-200 px-4 py-3 leading-6"
-            onChange={(event) => updateLegacyField(5, "kpi_review", event.target.value)}
-            value={String(values.sections.find((section) => section.agenda_item_number === 5)?.legacy_fields.kpi_review ?? "")}
-          />
-        </label>
-      </section>
-
       <section className="space-y-4">
-        {values.sections.filter((section) => section.agenda_item_number !== 10 && section.agenda_item_number !== 2).map((section) => {
+        {values.sections.filter((section) => section.agenda_item_number !== 9).map((section) => {
           return (
             <article
               className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
@@ -749,6 +990,15 @@ export function SafetyScmTenSectionForm({
                 </span>
               </div>
 
+              {section.agenda_item_number === 7 ? (
+                <div className="mt-5">
+                  <SafetyScmPscCarFeed
+                    items={config.latest_psc_cars ?? []}
+                    onUseCar={addPscCarToFinding}
+                  />
+                </div>
+              ) : null}
+
               <div className="mt-4">
                 <LegacySectionFields
                   legacyFields={section.legacy_fields}
@@ -756,15 +1006,14 @@ export function SafetyScmTenSectionForm({
                     updateLegacyField(section.agenda_item_number, fieldKey, nextValue)
                   }
                   onAddFinding={() => setVisibleFindingCount((current) => Math.min(10, current + 1))}
-                  onAddQualityTopic={() => setVisibleQualityTopicCount((current) => Math.min(10, current + 1))}
                   sectionNumber={section.agenda_item_number}
                   visibleFindingCount={visibleFindingCount}
-                  visibleQualityTopicCount={visibleQualityTopicCount}
                 />
               </div>
+              {[7, 8].includes(section.agenda_item_number) ? null : (
               <div className="mt-4">
                 <label className="space-y-2 text-sm text-slate-700">
-                  <span className="font-medium">Decision / action</span>
+                  <span className="font-medium">Recommendation / Suggestions</span>
                   <textarea
                     aria-label={`${section.section_label} decision`}
                     className="min-h-[110px] w-full rounded-3xl border border-slate-200 px-4 py-3 leading-6"
@@ -775,12 +1024,13 @@ export function SafetyScmTenSectionForm({
                   />
                 </label>
               </div>
+              )}
             </article>
           );
         })}
         <article className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Section 10
+            Section 9
           </p>
           <h2 className="mt-1 text-xl font-semibold text-slate-900">Office Review</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
@@ -797,7 +1047,9 @@ export function SafetyScmTenSectionForm({
             </p>
             {submitAttempted && validationMessages.length > 0 ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <p className="font-semibold">Complete these items before creating the meeting:</p>
+                <p className="font-semibold">
+                  Complete these items before {formMode === "edit" ? "updating" : "creating"} the meeting:
+                </p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   {validationMessages.map((message, index) => (
                     <li key={`${message}-${index}`}>{message}</li>
@@ -813,10 +1065,12 @@ export function SafetyScmTenSectionForm({
             type="button"
           >
             {isSubmitting
-              ? "Creating..."
-              : isAdHoc
-                ? "Create Ad-Hoc Meeting"
-                : "Create Regular Meeting"}
+              ? (submittingLabel ?? (formMode === "edit" ? "Updating..." : "Creating..."))
+              : (submitLabel ?? (formMode === "edit"
+                ? "Update Meeting"
+                : isAdHoc
+                  ? "Create Ad-Hoc Meeting"
+                  : "Create Regular Meeting"))}
           </button>
         </div>
       </section>
@@ -828,34 +1082,46 @@ function LegacySectionFields({
   legacyFields,
   onChange,
   onAddFinding,
-  onAddQualityTopic,
   sectionNumber,
   visibleFindingCount,
-  visibleQualityTopicCount,
 }: {
   legacyFields: Record<string, LegacyFieldValue>;
   onChange: (fieldKey: string, nextValue: LegacyFieldValue) => void;
   onAddFinding: () => void;
-  onAddQualityTopic: () => void;
   sectionNumber: number;
   visibleFindingCount: number;
-  visibleQualityTopicCount: number;
 }) {
   const allFields = safetyScmLegacyFieldTemplate[
     sectionNumber as keyof typeof safetyScmLegacyFieldTemplate
   ] ?? [];
   const fields = allFields.filter((field) => {
-    if (sectionNumber === 5 && field.field_key === "kpi_review") {
+    if (
+      sectionNumber === 1
+      && ["near_miss_discussion_status", "near_miss_not_discussed_reason"].includes(field.field_key)
+    ) {
       return false;
     }
-    if (sectionNumber === 3 && field.field_key.startsWith("quality_safety_topic_")) {
-      const index = Number(field.field_key.replace("quality_safety_topic_", ""));
-      return index <= visibleQualityTopicCount;
+    if (sectionNumber === 4 && field.field_key === "kpi_review") {
+      return false;
+    }
+    if (
+      sectionNumber === 2
+      && ["circular_discussion_status", "circular_not_discussed_reason"].includes(field.field_key)
+    ) {
+      return false;
     }
     return true;
   });
 
-  if (sectionNumber === 8) {
+  if (fields.length === 0 && sectionNumber !== 7) {
+    return (
+      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm text-slate-600">
+        No input required for this reserved section.
+      </div>
+    );
+  }
+
+  if (sectionNumber === 7) {
     return (
       <div className="space-y-4">
         <div className="overflow-x-auto rounded-3xl border border-slate-200">
@@ -913,20 +1179,33 @@ function LegacySectionFields({
       {fields.map((field) => {
         const value = legacyFields[field.field_key];
         if (field.field_type === "BOOLEAN") {
+          const selectValue =
+            value === null || value === undefined
+              ? ""
+              : String(value).toUpperCase() === "N/A"
+                ? "na"
+                : value
+                  ? "true"
+                  : "false";
           return (
             <label className="space-y-2 text-sm text-slate-700" key={field.field_key}>
               <span className="font-medium">{field.field_label}</span>
               <select
                 aria-label={field.field_label}
                 className="min-h-[44px] w-full rounded-2xl border border-slate-200 px-3 py-2"
-                onChange={(event) =>
-                  onChange(field.field_key, event.target.value === "" ? null : event.target.value === "true")
-                }
-                value={value === null || value === undefined ? "" : value ? "true" : "false"}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  onChange(
+                    field.field_key,
+                    nextValue === "" ? null : nextValue === "na" ? "N/A" : nextValue === "true",
+                  );
+                }}
+                value={selectValue}
               >
                 <option value="">Select</option>
                 <option value="true">Yes</option>
                 <option value="false">No</option>
+                <option value="na">N/A</option>
               </select>
             </label>
           );
@@ -949,44 +1228,232 @@ function LegacySectionFields({
           );
         }
 
+        const textareaClassName = sectionNumber === 9
+          ? "min-h-[260px] w-full resize-y rounded-3xl border border-slate-200 px-4 py-3 leading-6"
+          : "min-h-[110px] w-full resize-y rounded-3xl border border-slate-200 px-4 py-3 leading-6";
+
         return (
           <label className="space-y-2 text-sm text-slate-700 md:col-span-2" key={field.field_key}>
             <span className="font-medium">{field.field_label}</span>
             <textarea
               aria-label={field.field_label}
-              className="min-h-[110px] w-full rounded-3xl border border-slate-200 px-4 py-3 leading-6"
+              className={textareaClassName}
               onChange={(event) => onChange(field.field_key, event.target.value)}
               value={String(value ?? "")}
             />
           </label>
         );
       })}
-      {sectionNumber === 3 && visibleQualityTopicCount < 10 ? (
-        <button
-          className="min-h-[40px] rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700 md:col-span-2"
-          onClick={onAddQualityTopic}
-          type="button"
-        >
-          Add Q&S topic
-        </button>
-      ) : null}
     </div>
   );
 }
 
-function SafetyScmCircularFeed({
+function SafetyScmPscCarFeed({
   items,
+  onUseCar,
 }: {
-  items: SafetyScmCircularFeedItem[];
+  items: SafetyScmPscCarFeedItem[];
+  onUseCar: (item: SafetyScmPscCarFeedItem) => void;
 }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-base font-semibold text-slate-900">Latest PSC CARs</h3>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+          {items.length} CAR{items.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-center text-sm text-slate-600">
+          No PSC CARs found for this vessel.
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-3xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-4 py-3 font-medium">CAR No.</th>
+                <th className="px-4 py-3 font-medium">Deficiency</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Target date</th>
+                <th className="px-4 py-3 font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {items.map((item) => (
+                <tr key={item.id || item.car_number}>
+                  <td className="px-4 py-4 text-slate-700">
+                    {item.source_route ? (
+                      <a
+                        className="font-medium text-sky-700 underline-offset-2 hover:text-sky-900 hover:underline"
+                        href={item.source_route}
+                      >
+                        {item.car_number || "Open CAR"}
+                      </a>
+                    ) : (
+                      <div className="font-medium text-slate-900">{item.car_number || "No CAR no."}</div>
+                    )}
+                    <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+                      {item.def_code || "No code"}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-slate-700">
+                    <div className="font-medium text-slate-900">
+                      {item.deficiency_description || "No deficiency description"}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {[item.port_place, formatShortDate(item.inspection_date)].filter(Boolean).join(" / ")}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-slate-600">{item.status || "Not recorded"}</td>
+                  <td className="px-4 py-4 text-slate-600">{formatShortDate(item.target_date)}</td>
+                  <td className="px-4 py-4 text-slate-700">
+                    <button
+                      className="min-h-[38px] rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700"
+                      onClick={() => onUseCar(item)}
+                      type="button"
+                    >
+                      Use in finding
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SafetyScmNearMissFeed({
+  discussionRows,
+  items,
+  onDiscussionRowsChange,
+}: {
+  discussionRows: NearMissDiscussionRow[];
+  items: SafetyScmNearMissFeedItem[];
+  onDiscussionRowsChange: (nextRows: NearMissDiscussionRow[]) => void;
+}) {
+  function updateDiscussionRow(key: string, patch: Partial<NearMissDiscussionRow>) {
+    onDiscussionRowsChange(
+      discussionRows.map((row) => {
+        if (row.key !== key) {
+          return row;
+        }
+        const nextRow = { ...row, ...patch };
+        if (patch.status && patch.status !== "NOT_DISCUSSED") {
+          nextRow.reason = "";
+        }
+        return nextRow;
+      }),
+    );
+  }
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Latest circulars / safety alerts</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Published MSC records from msc_data are shown here for Section 4 discussion.
-          </p>
+          <h2 className="text-lg font-semibold text-slate-900">Latest near misses</h2>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+          {items.length} record{items.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">
+          No near misses found for this vessel.
+        </div>
+      ) : (
+        <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-slate-600">
+              <tr>
+                <th className="px-4 py-3 font-medium">Reference</th>
+                <th className="px-4 py-3 font-medium">Title</th>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Discussion</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {items.map((item) => {
+                const key = nearMissDiscussionKey(item);
+                const row = discussionRows.find((entry) => entry.key === key);
+                return (
+                  <tr key={key}>
+                    <td className="px-4 py-4 text-slate-700">
+                      <div className="font-medium text-slate-900">{item.incident_number || "No reference"}</div>
+                      <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+                        {[item.severity, item.priority].filter(Boolean).join(" / ") || item.state}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-slate-700">{item.title || "Untitled near miss"}</td>
+                    <td className="px-4 py-4 text-slate-600">
+                      {formatShortDate(item.closed_at || item.occurred_at || item.reported_at)}
+                    </td>
+                    <td className="px-4 py-4 text-slate-700">
+                      <select
+                        aria-label={`Discussion status for ${item.incident_number || item.title}`}
+                        className="min-h-[40px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                        onChange={(event) => updateDiscussionRow(key, { status: event.target.value })}
+                        value={row?.status ?? ""}
+                      >
+                        <option value="">Select</option>
+                        <option value="DISCUSSED">Discussed</option>
+                        <option value="NOT_DISCUSSED">Not discussed</option>
+                      </select>
+                      {row?.status === "NOT_DISCUSSED" ? (
+                        <input
+                          aria-label={`Reason for not discussing ${item.incident_number || item.title}`}
+                          className="mt-2 min-h-[40px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                          onChange={(event) => updateDiscussionRow(key, { reason: event.target.value })}
+                          placeholder="Reason"
+                          value={row.reason}
+                        />
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SafetyScmCircularFeed({
+  discussionRows,
+  items,
+  onDiscussionRowsChange,
+}: {
+  discussionRows: CircularDiscussionRow[];
+  items: SafetyScmCircularFeedItem[];
+  onDiscussionRowsChange: (nextRows: CircularDiscussionRow[]) => void;
+}) {
+  function updateDiscussionRow(key: string, patch: Partial<CircularDiscussionRow>) {
+    onDiscussionRowsChange(
+      discussionRows.map((row) => {
+        if (row.key !== key) {
+          return row;
+        }
+        const nextRow = { ...row, ...patch };
+        if (patch.status && patch.status !== "NOT_DISCUSSED") {
+          nextRow.reason = "";
+        }
+        return nextRow;
+      }),
+    );
+  }
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Latest circulars / safety alerts / work instructions</h2>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
           {items.length} published
@@ -995,7 +1462,7 @@ function SafetyScmCircularFeed({
 
       {items.length === 0 ? (
         <div className="mt-5 rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm text-slate-600">
-          No published circulars or safety alerts were found for this vessel/fleet scope.
+          No published circulars, safety alerts, or work instructions were found for this vessel/fleet scope.
         </div>
       ) : (
         <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200">
@@ -1005,11 +1472,15 @@ function SafetyScmCircularFeed({
                 <th className="px-4 py-3 font-medium">Reference</th>
                 <th className="px-4 py-3 font-medium">Title</th>
                 <th className="px-4 py-3 font-medium">Date issued</th>
+                <th className="px-4 py-3 font-medium">Discussion</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {items.map((item) => (
-                <tr key={item.id || item.sr_no || item.title}>
+              {items.map((item) => {
+                const key = circularDiscussionKey(item);
+                const row = discussionRows.find((entry) => entry.key === key);
+                return (
+                <tr key={key}>
                   <td className="px-4 py-4 text-slate-700">
                     <div className="font-medium text-slate-900">{item.sr_no || "No reference"}</div>
                   </td>
@@ -1019,8 +1490,30 @@ function SafetyScmCircularFeed({
                   <td className="px-4 py-4 text-slate-600">
                     {formatShortDate(item.published_on || item.created_at)}
                   </td>
+                  <td className="px-4 py-4 text-slate-700">
+                    <select
+                      aria-label={`Discussion status for ${item.sr_no || item.title}`}
+                      className="min-h-[40px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                      onChange={(event) => updateDiscussionRow(key, { status: event.target.value })}
+                      value={row?.status ?? ""}
+                    >
+                      <option value="">Select</option>
+                      <option value="DISCUSSED">Discussed</option>
+                      <option value="NOT_DISCUSSED">Not discussed</option>
+                    </select>
+                    {row?.status === "NOT_DISCUSSED" ? (
+                      <input
+                        aria-label={`Reason for not discussing ${item.sr_no || item.title}`}
+                        className="mt-2 min-h-[40px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                        onChange={(event) => updateDiscussionRow(key, { reason: event.target.value })}
+                        placeholder="Reason"
+                        value={row.reason}
+                      />
+                    ) : null}
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

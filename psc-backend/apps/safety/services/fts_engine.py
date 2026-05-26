@@ -203,14 +203,14 @@ class SafetyFtsEngine:
         with self.connection.cursor() as cursor:
             cursor.execute(sql, [*base_where_params, *params])
             rows = cursor.fetchall()
-        return [int(row[0]) for row in rows]
+        return [row[0] for row in rows]
 
     @staticmethod
-    def order_records(records: Sequence[object], primary_keys: Sequence[int]) -> list[object]:
-        order_map = {int(primary_key): index for index, primary_key in enumerate(primary_keys)}
+    def order_records(records: Sequence[object], primary_keys: Sequence[object]) -> list[object]:
+        order_map = {str(primary_key): index for index, primary_key in enumerate(primary_keys)}
         return sorted(
             records,
-            key=lambda record: order_map.get(int(getattr(record, "pk", 0)), len(order_map)),
+            key=lambda record: order_map.get(str(getattr(record, "pk", "")), len(order_map)),
         )
 
     def _assert_sql_server_fts_ready(self, source_table: str) -> None:

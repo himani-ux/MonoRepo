@@ -356,7 +356,7 @@ export function SafetyIncidentPhase5() {
         causal_layer: causeLayer,
         mscat_subcode_id: causeSubcode,
         rationale: causeRationale,
-        source_fact_id: Number(sourceFactId),
+        source_fact_id: sourceFactId,
       });
       setCauseRationale("");
       setCauseSubcode(null);

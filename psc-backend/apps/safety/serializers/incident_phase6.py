@@ -87,7 +87,7 @@ class CorrectiveActionSerializer(serializers.ModelSerializer):
         model = CorrectiveAction
         fields = (
             "id",
-            "public_id",
+            "id",
             "title",
             "description",
             "assigned_crew_id",
@@ -108,7 +108,7 @@ class RecommendationSerializer(serializers.ModelSerializer):
         model = Recommendation
         fields = (
             "id",
-            "public_id",
+            "id",
             "tier",
             "theme_code",
             "title",
@@ -129,7 +129,7 @@ class RecommendationSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "public_id",
+            "id",
             "linked_ca_ids",
             "corrective_actions",
             "created_by",

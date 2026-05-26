@@ -1,14 +1,13 @@
 const legacySectionItems = [
   "1. Structured Review",
-  "2. Outstanding Items",
-  "3. Safety Practice",
-  "4. Security",
-  "5. Environment",
-  "6. Health",
-  "7. Crew",
-  "8. Findings & Corrective Measures",
-  "9. Miscellaneous",
-  "10. Office Review",
+  "2. Quality and Safety Practice",
+  "3. Security",
+  "4. Environment",
+  "5. Health",
+  "6. Crew Welfare",
+  "7. PSC Findings & Corrective Measures",
+  "8. Minutes of Meeting",
+  "9. Office Review",
 ];
 
 export default function SafetyScmPdfRoute() {
@@ -20,7 +19,7 @@ export default function SafetyScmPdfRoute() {
             SCM Export
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-            10-Section Legacy PDF
+            SCM Legacy PDF
           </h2>
           <p className="mt-3 max-w-3xl text-sm text-slate-600">
             Step 6.4 now exposes the live backend route at
@@ -35,7 +34,7 @@ export default function SafetyScmPdfRoute() {
             {" "}
             <code>vw_GetSCM_Master</code>
             {" "}
-            10-section order, adds the Closed-Since-Last summary block at the top,
+            SCM section order, adds the Closed-Since-Last summary block at the top,
             and keeps attendance plus signature status inline.
           </p>
         </div>

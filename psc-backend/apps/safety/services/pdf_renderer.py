@@ -96,11 +96,11 @@ class IncidentPdfRenderer:
     def render_incident_pdf(
         self,
         *,
-        incident_id: int,
+        incident_id,
         viewer_user,
         persist: bool = True,
     ) -> IncidentPdfRenderResult:
-        incident = self._get_incident(int(incident_id))
+        incident = self._get_incident(incident_id)
         self._validate_exportable(incident)
 
         context = self._build_context(incident)
@@ -119,7 +119,7 @@ class IncidentPdfRenderer:
         return IncidentPdfRenderResult(
             content=final_content,
             content_type=self.content_type,
-            download_path=f"/api/safety/incidents/{incident.public_id}/pdf/",
+            download_path=f"/api/safety/incidents/{incident.id}/pdf/",
             export_path=export_path,
             file_name=self._build_file_name(incident),
             incident_id=incident.pk,
@@ -325,7 +325,7 @@ class IncidentPdfRenderer:
             old_value=None,
             new_value={
                 "content_type": self.content_type,
-                "download_path": f"/api/safety/incidents/{incident.public_id}/pdf/",
+                "download_path": f"/api/safety/incidents/{incident.id}/pdf/",
                 "export_path": export_path,
                 "file_name": self._build_file_name(incident),
             },
@@ -443,11 +443,11 @@ class NearMissLightweightPdfRenderer:
     def render_near_miss_pdf(
         self,
         *,
-        incident_id: int,
+        incident_id,
         viewer_user,
         persist: bool = True,
     ) -> NearMissPdfRenderResult:
-        near_miss = self._get_near_miss(int(incident_id))
+        near_miss = self._get_near_miss(incident_id)
         self._validate_exportable(near_miss)
 
         context = self._build_context(near_miss, viewer_user=viewer_user)
@@ -466,7 +466,7 @@ class NearMissLightweightPdfRenderer:
         return NearMissPdfRenderResult(
             content=final_content,
             content_type=self.content_type,
-            download_path=f"/api/safety/near-miss/{near_miss.public_id}/pdf/",
+            download_path=f"/api/safety/near-miss/{near_miss.id}/pdf/",
             export_path=export_path,
             file_name=self._build_file_name(near_miss),
             incident_id=near_miss.pk,
@@ -518,9 +518,9 @@ class NearMissLightweightPdfRenderer:
             fleet_learning_text=self._nonblank(fleet_learning, default="Fleet learning / lessons are not recorded."),
             generated_at=timezone.now().isoformat(),
             visibility_note=(
-                "Reporter identity is visible for DPA, FM, and the reporter. This PDF uses the same serializer masking path as the API responses."
+                "Reporter identity is visible to authorized office reviewers and the reporter."
                 if viewer_visible
-                else "Reporter identity is masked for this viewer per D-GAP-J1. This PDF is rendered from the masked serializer payload."
+                else "Reporter identity is masked for this viewer."
             ),
             signature_rows=self._build_signature_rows(near_miss),
         )
@@ -531,7 +531,7 @@ class NearMissLightweightPdfRenderer:
             return near_miss.near_miss_immediate_action.strip()
         if (near_miss.closure_reason or "").strip():
             return near_miss.closure_reason.strip()
-        return "No immediate-action narrative is recorded in the current handover workspace."
+        return "No immediate action is recorded."
 
     @staticmethod
     def _build_suggestion_text(near_miss: Incident, suggestion: dict[str, str]) -> str:
@@ -613,7 +613,7 @@ class NearMissLightweightPdfRenderer:
             old_value=None,
             new_value={
                 "content_type": self.content_type,
-                "download_path": f"/api/safety/near-miss/{near_miss.public_id}/pdf/",
+                "download_path": f"/api/safety/near-miss/{near_miss.id}/pdf/",
                 "export_path": export_path,
                 "file_name": self._build_file_name(near_miss),
             },
@@ -670,11 +670,11 @@ class SCMLegacyPdfRenderer:
     def render_scm_pdf(
         self,
         *,
-        meeting_id: int,
+        meeting_id,
         viewer_user,
         persist: bool = True,
     ) -> SCMPdfRenderResult:
-        meeting = self._get_meeting(int(meeting_id))
+        meeting = self._get_meeting(meeting_id)
         self._validate_exportable(meeting)
 
         context = self._build_context(meeting)
@@ -693,7 +693,7 @@ class SCMLegacyPdfRenderer:
         return SCMPdfRenderResult(
             content=final_content,
             content_type=self.content_type,
-            download_path=f"/api/safety/scm/{meeting.public_id}/pdf/",
+            download_path=f"/api/safety/scm/{meeting.id}/pdf/",
             export_path=export_path,
             file_name=self._build_file_name(meeting),
             meeting_id=meeting.pk,
@@ -752,9 +752,9 @@ class SCMLegacyPdfRenderer:
         agenda_rows = list(self.repository.list_sections(meeting.id))
         legacy_map = self._build_legacy_field_map(meeting.id)
         if (meeting.office_comment or "").strip():
-            legacy_map.setdefault(10, {})["officecomments"] = meeting.office_comment.strip()
+            legacy_map.setdefault(9, {})["officecomments"] = meeting.office_comment.strip()
         if getattr(meeting, "office_comment_at", None) is not None or (meeting.office_comment or "").strip():
-            legacy_map.setdefault(10, {})["isreviewed"] = True
+            legacy_map.setdefault(9, {})["isreviewed"] = True
         if not agenda_rows:
             return [
                 SCMLegacySectionRow(
@@ -767,19 +767,67 @@ class SCMLegacyPdfRenderer:
                 for row in build_default_scm_sections()
             ]
 
-        return [
-            SCMLegacySectionRow(
-                agenda_item_number=row.agenda_item_number,
-                section_label=row.section_label,
-                content=(row.content or "").strip() or "No section content recorded.",
-                decision=(row.decision or "").strip() or None,
-                legacy_fields={
-                    **_blank_legacy_fields(int(row.agenda_item_number)),
-                    **legacy_map.get(int(row.agenda_item_number), {}),
-                },
+        agenda_map = {int(row.agenda_item_number): row for row in agenda_rows}
+        legacy_source_map = {1: 1, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10}
+        section_rows: list[SCMLegacySectionRow] = []
+        for template_row in build_default_scm_sections():
+            section_number = int(template_row["agenda_item_number"])
+            legacy_source_number = legacy_source_map.get(section_number, section_number)
+            agenda_row = self._select_section_row(
+                agenda_map,
+                section_number=section_number,
+                legacy_source_number=legacy_source_number,
             )
-            for row in agenda_rows
-        ]
+            current_legacy_fields = legacy_map.get(section_number, {})
+            legacy_source_fields = legacy_map.get(legacy_source_number, {})
+            selected_legacy_fields = (
+                current_legacy_fields
+                if self._has_nonblank_legacy_values(current_legacy_fields)
+                else legacy_source_fields
+            )
+            section_rows.append(
+                SCMLegacySectionRow(
+                    agenda_item_number=section_number,
+                    section_label=str(template_row["section_label"]),
+                    content=(
+                        (getattr(agenda_row, "content", None) or "").strip()
+                        if agenda_row is not None
+                        else "No section content recorded."
+                    )
+                    or "No section content recorded.",
+                    decision=(
+                        (getattr(agenda_row, "decision", None) or "").strip()
+                        if agenda_row is not None
+                        else None
+                    )
+                    or None,
+                    legacy_fields={
+                        **_blank_legacy_fields(section_number),
+                        **selected_legacy_fields,
+                    },
+                )
+            )
+        return section_rows
+
+    @staticmethod
+    def _select_section_row(
+        agenda_map: dict[int, object],
+        *,
+        section_number: int,
+        legacy_source_number: int,
+    ):
+        current_row = agenda_map.get(section_number)
+        legacy_row = agenda_map.get(legacy_source_number)
+        if current_row is None:
+            return legacy_row
+        current_label = str(getattr(current_row, "section_label", "") or "").strip().lower()
+        if section_number == 2 and current_label == "reserved":
+            return legacy_row or current_row
+        return current_row
+
+    @staticmethod
+    def _has_nonblank_legacy_values(values: dict[str, object]) -> bool:
+        return any(value not in (None, "") and str(value).strip() for value in values.values())
 
     def _build_legacy_field_map(self, meeting_id: int) -> dict[int, dict[str, object]]:
         legacy_map: dict[int, dict[str, object]] = {}
@@ -801,6 +849,7 @@ class SCMLegacyPdfRenderer:
                 wrh_flag=str(row.get("wrh_flag") or "GREEN"),
                 wrh_rest_hours_24h=self._string_value(row.get("wrh_rest_hours_24h")),
                 wrh_rest_hours_7d=self._string_value(row.get("wrh_rest_hours_7d")),
+                absence_reason=(str(row.get("absence_reason") or "").strip() or None),
                 remarks=(str(row.get("remarks") or "").strip() or None),
             )
             for row in serialized_rows
@@ -826,7 +875,7 @@ class SCMLegacyPdfRenderer:
                     "total_count": 0,
                 },
                 "items": [],
-                "empty_message": "Closed-since-last SCM data is unavailable in the current handover workspace.",
+                "empty_message": "Closed-since-last SCM data is unavailable.",
             }
 
         try:
@@ -842,7 +891,7 @@ class SCMLegacyPdfRenderer:
                     "total_count": 0,
                 },
                 "items": [],
-                "empty_message": "Closed-since-last SCM data could not be rendered in the current handover workspace.",
+                "empty_message": "Closed-since-last SCM data could not be rendered.",
             }
 
     @staticmethod
@@ -1012,7 +1061,7 @@ class SCMLegacyPdfRenderer:
             old_value=None,
             new_value={
                 "content_type": self.content_type,
-                "download_path": f"/api/safety/scm/{meeting.public_id}/pdf/",
+                "download_path": f"/api/safety/scm/{meeting.id}/pdf/",
                 "export_path": export_path,
                 "file_name": self._build_file_name(meeting),
             },
@@ -1073,11 +1122,11 @@ class SOISummaryPdfRenderer:
     def render_soi_pdf(
         self,
         *,
-        inspection_id: int,
+        inspection_id,
         viewer_user,
         persist: bool = True,
     ) -> SOISummaryPdfRenderResult:
-        inspection = self._get_inspection(int(inspection_id))
+        inspection = self._get_inspection(inspection_id)
         self._validate_exportable(inspection)
 
         context = self._build_context(inspection)
@@ -1096,7 +1145,7 @@ class SOISummaryPdfRenderer:
         return SOISummaryPdfRenderResult(
             content=final_content,
             content_type=self.content_type,
-            download_path=f"/api/safety/soi/{inspection.public_id}/pdf/",
+            download_path=f"/api/safety/soi/{inspection.id}/pdf/",
             export_path=export_path,
             file_name=self._build_file_name(inspection),
             inspection_id=inspection.pk,
@@ -1261,7 +1310,7 @@ class SOISummaryPdfRenderer:
             old_value=None,
             new_value={
                 "content_type": self.content_type,
-                "download_path": f"/api/safety/soi/{inspection.public_id}/pdf/",
+                "download_path": f"/api/safety/soi/{inspection.id}/pdf/",
                 "export_path": export_path,
                 "file_name": self._build_file_name(inspection),
             },
@@ -1359,7 +1408,7 @@ class MscMepc3Circ4PdfRenderer:
         return MscMepc3PdfRenderResult(
             content=final_content,
             content_type=self.content_type,
-            download_path=f"/api/safety/export/msc-mepc-3/{incident.public_id}/",
+            download_path=f"/api/safety/export/msc-mepc-3/{incident.id}/",
             export_path=export_path,
             file_name=self._build_file_name(incident),
             incident_id=incident.pk,
@@ -1849,7 +1898,7 @@ class MscMepc3Circ4PdfRenderer:
             old_value=None,
             new_value={
                 "content_type": self.content_type,
-                "download_path": f"/api/safety/export/msc-mepc-3/{incident.public_id}/",
+                "download_path": f"/api/safety/export/msc-mepc-3/{incident.id}/",
                 "export_path": export_path,
                 "file_name": self._build_file_name(incident),
             },

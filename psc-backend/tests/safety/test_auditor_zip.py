@@ -212,7 +212,7 @@ class AuditorZipExportTests(unittest.TestCase):
             "Environment",
             "Health",
             "Crew",
-            "Findings & Corrective Measures",
+            "PSC Findings & Corrective Measures",
             "Miscellaneous",
             "Office Review",
         ]

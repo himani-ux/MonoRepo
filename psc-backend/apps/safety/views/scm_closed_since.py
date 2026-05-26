@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from apps.safety.authentication.vessel_scope import get_scoped_vessel_ids, has_global_vessel_scope, user_has_vessel_access
 from apps.safety.models import SCMMeeting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.services.closed_since_last_scm import ClosedSinceLastSCMService
 from apps.safety.views.scm import SCMViewMixin, _normalized_role
 
@@ -68,7 +68,7 @@ class SCMClosedSinceLastMixin(SCMViewMixin):
 class SCMClosedSinceLastMeetingView(SCMClosedSinceLastMixin, generics.GenericAPIView):
     def get_meeting(self) -> SCMMeeting:
         queryset = self._apply_filters(SCMMeeting.objects.filter(is_deleted=False))
-        return get_by_public_id_or_pk(queryset, self.kwargs["id"])
+        return get_by_id_or_pk(queryset, self.kwargs["id"])
 
     def get(self, request, *args, **kwargs):
         payload = self.get_service().fetch_for_meeting(self.get_meeting())

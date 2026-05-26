@@ -40,14 +40,14 @@ class SOIChecklistGenerator:
     def render_for_inspection(
         self,
         *,
-        inspection_id: int,
+        inspection_id,
         output_format: str,
     ) -> SOIChecklistRenderResult:
-        inspection = self.soi_repository.read(int(inspection_id))
+        inspection = self.soi_repository.read(inspection_id)
         if not inspection.checklist_unique_id:
             raise ValueError("SOI checklist generation requires a persisted checklist_unique_id.")
 
-        selected_areas = self.soi_repository.list_selected_areas(int(inspection.id))
+        selected_areas = self.soi_repository.list_selected_areas(inspection.id)
         checklist_items = self.soi_repository.list_checklist_items_for_areas(
             area_ids=[int(area["area_id"]) for area in selected_areas],
         )

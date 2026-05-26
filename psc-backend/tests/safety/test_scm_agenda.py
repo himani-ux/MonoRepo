@@ -35,14 +35,13 @@ def build_user(
 def build_sections() -> list[dict[str, object]]:
     labels = (
         "Structured Review",
-        "Outstanding Items",
-        "Safety Practice",
+        "Quality and Safety Practice",
         "Security",
         "Environment",
         "Health",
-        "Crew",
-        "Findings & Corrective Measures",
-        "Miscellaneous",
+        "Crew Welfare",
+        "PSC Findings & Corrective Measures",
+        "Minutes of Meeting",
         "Office Review",
     )
     return [
@@ -95,7 +94,7 @@ class SCMAgendaViewTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["meeting_id"], current_meeting.id)
-        self.assertEqual(len(response.data["rows"]), 10)
+        self.assertEqual(len(response.data["rows"]), 9)
         self.assertEqual(response.data["summary"]["carried_forward_count"], 1)
         self.assertEqual(response.data["summary"]["current_action_item_count"], 0)
         self.assertEqual(len(response.data["carried_forward_items"]), 1)
@@ -121,7 +120,7 @@ class SCMAgendaViewTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["meeting_id"], meeting.id)
-        self.assertEqual(len(response.data["rows"]), 10)
+        self.assertEqual(len(response.data["rows"]), 9)
 
     def test_patch_updates_rows_and_promotes_action_item_to_corrective_action(self) -> None:
         meeting = self._create_meeting(scm_number="ABC-28-Apr-2026", meeting_date=date(2026, 4, 28))
@@ -134,7 +133,7 @@ class SCMAgendaViewTests(unittest.TestCase):
                         "agenda_item_number": 2,
                         "content": (
                             "Outstanding item review captured with enough detail to remain part "
-                            "of the fixed 10-section SCM agenda surface."
+                            "of the fixed SCM agenda surface."
                         ),
                         "decision": "Create a tracked action item with owner and due date.",
                         "action_item": {
@@ -248,7 +247,7 @@ class SCMAgendaViewTests(unittest.TestCase):
 
         valid_request = self.factory.patch(
             f"/api/safety/scm/{meeting.id}/agenda/",
-            {"rows": [{"agenda_item_number": 1, "linked_incident_ids": [in_scope.id]}]},
+            {"rows": [{"agenda_item_number": 1, "linked_incident_ids": [str(in_scope.id)]}]},
             format="json",
         )
         force_authenticate(valid_request, user=build_user(role_name="CO", user_id="co-7"))
@@ -256,7 +255,7 @@ class SCMAgendaViewTests(unittest.TestCase):
 
         invalid_request = self.factory.patch(
             f"/api/safety/scm/{meeting.id}/agenda/",
-            {"rows": [{"agenda_item_number": 1, "linked_incident_ids": [out_of_scope.id]}]},
+            {"rows": [{"agenda_item_number": 1, "linked_incident_ids": [str(out_of_scope.id)]}]},
             format="json",
         )
         force_authenticate(invalid_request, user=build_user(role_name="CO", user_id="co-7"))
@@ -264,7 +263,7 @@ class SCMAgendaViewTests(unittest.TestCase):
 
         self.assertEqual(valid_response.status_code, 200)
         row = next(item for item in valid_response.data["rows"] if item["agenda_item_number"] == 1)
-        self.assertEqual(row["linked_incident_ids"], [in_scope.id])
+        self.assertEqual(row["linked_incident_ids"], [str(in_scope.id)])
         self.assertEqual(invalid_response.status_code, 400)
         self.assertIn("linked_incident_ids", invalid_response.data)
 

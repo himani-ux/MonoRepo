@@ -85,7 +85,7 @@ class Section12CycleEnforcer:
             planned_date__lt=next_cycle_start,
         )
         if exclude_inspection_id is not None:
-            queryset = queryset.exclude(pk=int(exclude_inspection_id))
+            queryset = queryset.exclude(pk=exclude_inspection_id)
         covered_inspection = queryset.order_by("planned_date", "id").first()
 
         return Section12CycleStatus(

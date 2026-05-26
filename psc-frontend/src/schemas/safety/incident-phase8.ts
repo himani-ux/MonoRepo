@@ -1,5 +1,5 @@
 export interface SafetyRecommendationVerification {
-  recommendation_id: number;
+  recommendation_id: string;
   is_effective: boolean;
   residual_risk: string;
   verified_at: string;
@@ -8,7 +8,7 @@ export interface SafetyRecommendationVerification {
 }
 
 export interface SafetyPhase8RecommendationRow {
-  id: number;
+  id: string;
   tier: string;
   title: string;
   action_completed: boolean;
@@ -31,7 +31,7 @@ export interface SafetyPhase8PicRetention {
 }
 
 export interface SafetyPhase8WorkspacePayload {
-  incident_id: number;
+  incident_id: string;
   current_phase: number;
   state: string;
   risk_band: "GREEN" | "YELLOW" | "RED" | null;

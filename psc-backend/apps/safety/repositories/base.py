@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import logging
 import re
+import uuid
 
 from django.db import connections
 
@@ -131,7 +132,7 @@ class BaseRepository:
             return {}
         if not isinstance(params, Mapping):
             raise SPParameterError("Stored procedure parameters must be a mapping.", params=params)
-        return dict(params)
+        return {key: self._normalize_param_value(value) for key, value in params.items()}
 
     def _normalize_query_params(
         self,
@@ -140,12 +141,17 @@ class BaseRepository:
         if params is None:
             return None
         if isinstance(params, Mapping):
-            return dict(params)
+            return {key: self._normalize_param_value(value) for key, value in params.items()}
         if isinstance(params, (str, bytes, bytearray)):
             raise SPParameterError("Query parameters must be a mapping or sequence.", params=params)
         if isinstance(params, Sequence):
-            return tuple(params)
+            return tuple(self._normalize_param_value(value) for value in params)
         raise SPParameterError("Query parameters must be a mapping or sequence.", params=params)
+
+    def _normalize_param_value(self, value):
+        if isinstance(value, uuid.UUID):
+            return value.hex
+        return value
 
     def _validate_identifier(self, value: str, *, label: str) -> str:
         if not isinstance(value, str):

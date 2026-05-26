@@ -42,16 +42,16 @@ class SCMAgendaActionItemWriteSerializer(serializers.Serializer):
 
 
 class SCMAgendaRowWriteSerializer(serializers.Serializer):
-    agenda_item_number = serializers.IntegerField(min_value=1, max_value=10)
+    agenda_item_number = serializers.IntegerField(min_value=1, max_value=9)
     content = serializers.CharField(required=False, allow_blank=True)
     decision = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     linked_finding_ids = serializers.ListField(
-        child=serializers.IntegerField(min_value=1),
+        child=serializers.CharField(),
         required=False,
         allow_empty=True,
     )
     linked_incident_ids = serializers.ListField(
-        child=serializers.IntegerField(min_value=1),
+        child=serializers.CharField(),
         required=False,
         allow_empty=True,
     )

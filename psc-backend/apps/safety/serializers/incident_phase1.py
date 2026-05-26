@@ -30,7 +30,7 @@ class IncidentPhase1Serializer(serializers.ModelSerializer):
         model = Incident
         fields = (
             "id",
-            "public_id",
+            "id",
             "incident_number",
             "draft_reference",
             "vessel_id",
@@ -66,7 +66,7 @@ class IncidentPhase1Serializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "public_id",
+            "id",
             "incident_number",
             "draft_reference",
             "record_type",

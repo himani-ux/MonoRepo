@@ -33,6 +33,7 @@ function fixDate(dateString) {
 }
 
 const REMINDER_STORAGE_KEY = "circular-master-reminded-crews";
+const NOTIFICATIONS_PER_PAGE = 15;
 
 const getTypeIcon = (type) => {
   if (type === "Alert") return <AlertTriangle className="h-3 w-3" />;
@@ -65,7 +66,8 @@ const normalizeNotificationTitle = (item) => {
 const normalizeHashtags = (value) => {
   if (Array.isArray(value)) {
     return value
-      .map((tag) => String(tag || "").trim())
+      .flatMap((tag) => String(tag || "").split(/[\s,]+/))
+      .map((tag) => tag.trim())
       .filter(Boolean);
   }
 
@@ -77,6 +79,30 @@ const normalizeHashtags = (value) => {
   }
 
   return [];
+};
+
+const isCircularMasterUser = (user) => {
+  const values = [
+    user?.role,
+    user?.role_name,
+    user?.safety_role_name,
+    user?.rank,
+    user?.rank_name,
+    user?.rank_id,
+  ];
+
+  return values.some((value) => {
+    const normalized = String(value || "").trim().toUpperCase();
+    const compact = normalized.replace(/[^A-Z0-9]/g, "");
+    return (
+      normalized === "MASTER" ||
+      normalized === "CAPTAIN" ||
+      compact === "MTR" ||
+      compact === "MASTER" ||
+      compact === "CAPTAIN" ||
+      normalized.includes("MASTER")
+    );
+  });
 };
 
 const KsmLibrary = ({
@@ -102,6 +128,7 @@ const KsmLibrary = ({
   const navigate = useNavigate();
   
   const [selectedId, setSelectedId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -152,9 +179,8 @@ const KsmLibrary = ({
     const fetchNotifications = async () => {
     try {
       // ✅ DETERMINE ENDPOINT BASED ON ROLE
-      const normalizedRole = (user.role || '').toLowerCase().trim();
-      const isMaster = normalizedRole === 'master';
-      console.log('User role:', user.role, 'Normalized:', normalizedRole, 'isMaster:', isMaster);
+      const isMaster = isCircularMasterUser(user);
+      console.log('User role:', user.role, 'rank:', user.rank, 'role_name:', user.role_name, 'isMaster:', isMaster);
 
       const endpoint = isMaster
         ? 'http://localhost:8000/api/circular/api/ship/notifications/'
@@ -196,6 +222,7 @@ const KsmLibrary = ({
           delivered_at: item.delivered_at || null,
           seen_at: seenAt,
           reminder_sent_at: reminderSentAt,
+          isRankTargeted: Boolean(item.is_rank_targeted),
         };
       });
 
@@ -399,6 +426,14 @@ const KsmLibrary = ({
     const matchesUnread = !onlyUnread || n.isAck === 0;
     return matchesSearch && matchesType && matchesCriticality && matchesScope && matchesUnread;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredNotifications.length / NOTIFICATIONS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * NOTIFICATIONS_PER_PAGE;
+  const paginatedNotifications = filteredNotifications.slice(
+    pageStartIndex,
+    pageStartIndex + NOTIFICATIONS_PER_PAGE,
+  );
+  const paginationPages = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   const selectedNotification = notifications.find((n) => n.id === selectedId);
   const crewSummary = selectedNotification
@@ -453,6 +488,16 @@ const KsmLibrary = ({
 
   const showDetailPanel = canViewDetail && Boolean(selectedNotification);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, scope, selectedTypes, selectedCriticalities, onlyUnread]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   return (
     <div className="grid grid-cols-12 gap-6">
       {/* Left List Panel */}
@@ -460,7 +505,9 @@ const KsmLibrary = ({
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-neutral-800">KSM Library</h2>
           <div className="text-xs text-neutral-500">
-            {loading ? 'Loading...' : `${filteredNotifications.length} results`}
+            {loading
+              ? 'Loading...'
+              : `${filteredNotifications.length} results · Page ${safeCurrentPage} of ${totalPages}`}
           </div>
         </div>
 
@@ -472,14 +519,12 @@ const KsmLibrary = ({
           <div className="rounded-lg border border-dashed border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">No notifications match your filters</div>
         ) : (
           <div className="space-y-3">
-            {filteredNotifications.map((notification) => (
+            {paginatedNotifications.map((notification) => (
               <Card
                 key={notification.id}
                 className={`cursor-pointer border-l-4 border-l-error-500 transition-shadow hover:shadow-md ${
                   selectedId === notification.id
                     ? 'border-primary-200 bg-primary-50/40'
-                    : notification.isReminded === 1
-                    ? 'border-warning-100 bg-warning-50/30'
                     : ''
                 }`}
                 onClick={() => {
@@ -488,8 +533,14 @@ const KsmLibrary = ({
               >
                 <CardContent className="p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <div className="font-medium text-neutral-900">{notification.id || "—"}</div>
+                      {notification.isRankTargeted && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm">
+                          <AlertTriangle className="h-3 w-3" />
+                          Important, You must read it
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {canViewDetail && (
@@ -574,6 +625,43 @@ const KsmLibrary = ({
                 </CardContent>
               </Card>
             ))}
+            {totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="inline-flex h-10 min-w-10 items-center justify-center rounded-full bg-neutral-100 px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Previous page"
+                >
+                  &lt;
+                </button>
+                {paginationPages.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`inline-flex h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-semibold transition ${
+                      page === safeCurrentPage
+                        ? "bg-primary-600 text-white shadow-sm"
+                        : "bg-white text-neutral-900 underline underline-offset-4 hover:bg-neutral-100"
+                    }`}
+                    aria-current={page === safeCurrentPage ? "page" : undefined}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  className="inline-flex h-10 min-w-10 items-center justify-center rounded-full bg-neutral-100 px-3 text-sm font-semibold text-neutral-700 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Next page"
+                >
+                  &gt;
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -581,7 +669,7 @@ const KsmLibrary = ({
       {/* Detail Panel */}
       {showDetailPanel && (
         <div ref={detailsPanelRef} className="col-span-12 lg:col-span-5">
-          <Card className="shadow-md">
+          <Card className="min-h-[620px] shadow-md">
             <CardContent className="p-4 space-y-3">
               {selectedNotification ? (
                 <>
@@ -635,6 +723,12 @@ const KsmLibrary = ({
                             Reminded
                           </Badge>
                         )}
+                        {selectedNotification.isRankTargeted && (
+                          <Badge className="border-rose-100 bg-rose-50 text-rose-700 text-xs">
+                            <AlertTriangle className="h-3 w-3" />
+                            Important, You must read it
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -650,14 +744,15 @@ const KsmLibrary = ({
                       </div>
                     )}
                     <div className="flex items-center gap-2 flex-wrap mt-1">
-                      {selectedNotification.hashtags.length > 0 && (
+                      {selectedNotification.hashtags.map((tag) => (
                         <Badge
+                          key={tag}
                           variant="outline"
                           className="border-primary-200 bg-primary-50 text-primary-700 text-xs"
                         >
-                          {selectedNotification.hashtags.join(' ')}
+                          {tag.startsWith("#") ? tag : `#${tag}`}
                         </Badge>
-                      )}
+                      ))}
                       
                       {selectedNotification.attachment_url && (
                         <Button
@@ -711,7 +806,7 @@ const KsmLibrary = ({
                           ) : crewList.length === 0 ? (
                             <p className="text-xs text-neutral-500">No crew members found.</p>
                           ) : (
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                               {crewList.map((crew) => (
                                 <div
                                   key={crew.crew_id}

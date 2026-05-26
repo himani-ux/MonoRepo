@@ -997,6 +997,7 @@ const Admin = ({ onNotificationSubmit }) => {
         const payload = {
             publish_status: status,
             publish_comment: comment || "",
+            acted_by: currentUser.employee_id,
         };
 
         if (action === "approve") {
@@ -1281,8 +1282,8 @@ const Admin = ({ onNotificationSubmit }) => {
 
         const payload = {
             publish_status: 3, // rejection
-            publish_comment: comment
-            // generally don't set published_by/on for reject unless required
+            publish_comment: comment,
+            acted_by: currentUser.employee_id,
         };
 
         console.log("handleConfirmRejectWithComment: Sending reject payload:", payload);

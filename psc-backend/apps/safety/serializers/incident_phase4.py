@@ -16,13 +16,13 @@ def _uuid_or_none(value) -> uuid.UUID | None:
 
 
 def resolve_source_evidence(incident: Incident, source_evidence_id: int | str):
-    public_id = _uuid_or_none(source_evidence_id)
-    if public_id is not None:
+    source_id = _uuid_or_none(source_evidence_id)
+    if source_id is not None:
         lookups = (
-            incident.evidence_items.filter(public_id=public_id).first(),
-            incident.witness_interviews.filter(public_id=public_id).first(),
-            incident.chain_of_custody_rows.filter(public_id=public_id).first(),
-            incident.evidence_tabs.filter(public_id=public_id).first(),
+            incident.evidence_items.filter(id=source_id).first(),
+            incident.witness_interviews.filter(id=source_id).first(),
+            incident.chain_of_custody_rows.filter(id=source_id).first(),
+            incident.evidence_tabs.filter(id=source_id).first(),
         )
         for row in lookups:
             if row is not None:
@@ -53,7 +53,6 @@ class IncidentFactSerializer(serializers.ModelSerializer):
         model = IncidentFact
         fields = (
             "id",
-            "public_id",
             "sequence_index",
             "fact_text",
             "fact_timestamp",
@@ -70,7 +69,6 @@ class IncidentFactSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "public_id",
             "evidence_summary",
             "hindsight_guard_triggered",
             "created_by",
@@ -171,7 +169,7 @@ class IncidentFactSerializer(serializers.ModelSerializer):
 
 
 class IncidentFactReorderSerializer(serializers.Serializer):
-    ordered_fact_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
+    ordered_fact_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
 
     def validate_ordered_fact_ids(self, value):
         incident: Incident = self.context["incident"]
@@ -182,8 +180,8 @@ class IncidentFactReorderSerializer(serializers.Serializer):
 
 
 class IncidentFactContradictionSerializer(serializers.Serializer):
-    fact_id = serializers.IntegerField(min_value=1)
-    contradicts_fact_id = serializers.IntegerField(min_value=1)
+    fact_id = serializers.UUIDField()
+    contradicts_fact_id = serializers.UUIDField()
 
     def validate(self, attrs):
         if attrs["fact_id"] == attrs["contradicts_fact_id"]:
@@ -200,7 +198,7 @@ class IncidentLinkActionSerializer(serializers.Serializer):
     class LinkType(serializers.ChoiceField):
         pass
 
-    target_incident_id = serializers.IntegerField(required=False, min_value=1)
+    target_incident_id = serializers.UUIDField(required=False)
     link_type = serializers.ChoiceField(choices=("RELATED", "SUPERSEDE"))
 
     def validate(self, attrs):

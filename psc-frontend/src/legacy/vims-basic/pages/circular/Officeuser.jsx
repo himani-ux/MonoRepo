@@ -233,6 +233,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
   // ================= VESSEL =================
   const [showVesselPopup, setShowVesselPopup] = useState(false);
+  const [showApprovalPopup, setShowApprovalPopup] = useState(false);
   const [vessels, setVessels] = useState([]);
   const [selectedVesselIds, setSelectedVesselIds] = useState(new Set());
   const [loadingVessels, setLoadingVessels] = useState(false);
@@ -761,7 +762,7 @@ const Admin = ({ onNotificationSubmit }) => {
   // --- NEW: Fetch Vessels when Popup Opens ---
   useEffect(() => {
     const fetchVessels = async () => {
-      if (showVesselPopup) {
+      if (showVesselPopup || showApprovalPopup) {
         // Only fetch when popup is shown
         console.log("Vessel Popup: Opening, fetching vessels...");
         setLoadingVessels(true);
@@ -788,14 +789,18 @@ const Admin = ({ onNotificationSubmit }) => {
     };
 
     fetchVessels();
-  }, [showVesselPopup]); // Dependency: run when showVesselPopup changes
+  }, [showVesselPopup, showApprovalPopup]); // Dependency: run when vessel/approval popup changes
   // --- END NEW ---
 
   // --- NEW: Fetch All Ranks when Rank Popup Opens ---
   useEffect(() => {
     const fetchAllRanks = async () => {
-      if (showRankPopup) {
-        // Only fetch when rank popup is shown
+      const hasApprovalDeliveryContext =
+        showApprovalPopup ||
+        (showVesselPopup && Boolean(localStorage.getItem("approvingNotificationSrNo")));
+
+      if (showRankPopup || hasApprovalDeliveryContext) {
+        // Fetch when rank popup is shown, or when approval uses the combined delivery popup.
         setLoadingRanks(true);
         try {
           const response = await fetch(
@@ -834,7 +839,7 @@ const Admin = ({ onNotificationSubmit }) => {
       }
     };
     fetchAllRanks();
-  }, [showRankPopup]); // Dependency: run when showRankPopup changes
+  }, [showRankPopup, showApprovalPopup, showVesselPopup]); // Dependency: run when rank/approval popup changes
   // END NEW
 
   // --- NEW: Effect to check for superseding notification ID on mount ---
@@ -1102,11 +1107,13 @@ const Admin = ({ onNotificationSubmit }) => {
       }
 
       setSelectedVesselIds(new Set());
+      setSelectedRankIds(new Set());
       setCurrentVesselIdsForComment([]);
       setCommentInput("");
       setShowCommentModal(false);
       setShowRankPopup(false);
-      setShowVesselPopup(true);
+      setShowVesselPopup(false);
+      setShowApprovalPopup(true);
       console.log("📌 Vessel popup opened using existing notification data.", {
         sr_no,
         deptName,
@@ -1144,6 +1151,7 @@ const Admin = ({ onNotificationSubmit }) => {
     const payload = {
       publish_status: status,
       publish_comment: comment || "",
+      acted_by: currentUser.employee_id,
     };
 
     if (action === "approve") {
@@ -1456,6 +1464,150 @@ const Admin = ({ onNotificationSubmit }) => {
     }
   };
 
+  const handleConfirmCombinedApproval = async () => {
+    if (isApprovalActionPending) {
+      console.log(
+        "handleConfirmCombinedApproval: Approval action already in progress, ignoring duplicate click.",
+      );
+      return;
+    }
+
+    const notificationSrNo =
+      currentSrNo || localStorage.getItem("approvingNotificationSrNo");
+    const vesselIdsForApproval = Array.from(selectedVesselIds || []);
+    const rankIdsForApproval = Array.from(selectedRankIds || []);
+
+    if (!notificationSrNo) {
+      alert("Notification SR No is missing. Please refresh and try again.");
+      return;
+    }
+
+    if (vesselIdsForApproval.length === 0) {
+      alert("Please select at least one vessel before confirming approval.");
+      return;
+    }
+
+    const currentUser = user;
+    if (!currentUser || !currentUser.employee_id) {
+      alert("You must be logged in to approve notifications.");
+      return;
+    }
+
+    const approvalPayload = {
+      publish_status: 2,
+      publish_comment: commentInput || "",
+      published_by: currentUser.employee_id,
+      published_on: new Date().toISOString(),
+      vessel_ids: vesselIdsForApproval,
+    };
+
+    setIsApprovalActionPending(true);
+    setApprovalActionMessage(
+      "Approving notification and delivering circulars. Please wait...",
+    );
+
+    try {
+      const approvalResponse = await fetch(
+        `http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/update-status/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(approvalPayload),
+        },
+      );
+      const approvalResult = await approvalResponse.json();
+
+      if (!approvalResponse.ok) {
+        alert(approvalResult.error || "Failed to approve notification.");
+        console.error("handleConfirmCombinedApproval: Approval error:", approvalResult);
+        return;
+      }
+
+      const deliveryResponse = await fetch(
+        "http://localhost:8000/api/circular/api/notifications/send-emails/",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            notification_sr_no: notificationSrNo,
+            vessel_ids: vesselIdsForApproval,
+          }),
+        },
+      );
+      const deliveryResult = await deliveryResponse.json();
+
+      if (!deliveryResponse.ok) {
+        alert(
+          `Approved, but vessel delivery failed: ${deliveryResult.error || "Unknown error"}`,
+        );
+        console.error("handleConfirmCombinedApproval: Vessel delivery error:", deliveryResult);
+        return;
+      }
+
+      if (rankIdsForApproval.length > 0) {
+        const rankResponse = await fetch(
+          `http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/link-ranks/`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              selected_rank_ids: rankIdsForApproval,
+              notification_sr_no: notificationSrNo,
+            }),
+          },
+        );
+        const rankResult = await rankResponse.json();
+
+        if (!rankResponse.ok) {
+          alert(
+            `Approved and delivered to vessels, but rank delivery failed: ${rankResult.error || "Failed to link ranks"}`,
+          );
+          console.error("handleConfirmCombinedApproval: Rank link error:", rankResult);
+          return;
+        }
+      }
+
+      alert(
+        rankIdsForApproval.length > 0
+          ? "Notification approved and delivered to selected vessels and ranks."
+          : "Notification approved and delivered to selected vessels.",
+      );
+
+      localStorage.removeItem("approvingNotificationSrNo");
+      localStorage.removeItem("approvingNotificationDept");
+      localStorage.removeItem("approvingNotificationId");
+
+      setShowApprovalPopup(false);
+      setShowVesselPopup(false);
+      setShowCommentModal(false);
+      setShowRankPopup(false);
+      setSelectedVesselIds(new Set());
+      setSelectedRankIds(new Set());
+      setCommentInput("");
+      setCurrentAction("");
+      setCurrentSrNo("");
+      setCurrentVesselIdsForComment([]);
+      setEditingDraftId(null);
+      setEditingDraftSrNo(null);
+      setDraftPrefillData(null);
+      clearCircularDraftEditSession();
+
+      if (onNotificationSubmit) {
+        onNotificationSubmit();
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error(
+        "handleConfirmCombinedApproval: Network error during approval:",
+        err,
+      );
+      alert("Network error during approval.");
+    } finally {
+      setIsApprovalActionPending(false);
+      setApprovalActionMessage("");
+    }
+  };
+
   // New: Confirm reject with comment
   const handleConfirmRejectWithComment = async () => {
     if (isApprovalActionPending) {
@@ -1481,7 +1633,7 @@ const Admin = ({ onNotificationSubmit }) => {
     const payload = {
       publish_status: 3, // rejection
       publish_comment: comment,
-      // generally don't set published_by/on for reject unless required
+      acted_by: currentUser.employee_id,
     };
 
     console.log(
@@ -3314,6 +3466,10 @@ const Admin = ({ onNotificationSubmit }) => {
 
   const { deckRanks: seqRanks, technicalRanks } =
     splitCircularRanksByDepartment(allRanks);
+  const hasApprovalDeliveryContext =
+    showApprovalPopup ||
+    (showVesselPopup && Boolean(localStorage.getItem("approvingNotificationSrNo")));
+  const showLegacyVesselSelectionPopup = showVesselPopup && !hasApprovalDeliveryContext;
 
   return (
 
@@ -3588,7 +3744,258 @@ const Admin = ({ onNotificationSubmit }) => {
 
 
                         {/* --- NEW: Vessel Selection Popup Modal --- */}
-                        {showVesselPopup && (
+                        {hasApprovalDeliveryContext && (
+                            <div
+                                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                                onClick={() => {
+                                    if (isApprovalActionPending) {
+                                        return;
+                                    }
+                                    setShowApprovalPopup(false);
+                                    setShowVesselPopup(false);
+                                    setCurrentAction("");
+                                    setCurrentSrNo("");
+                                    setCommentInput("");
+                                    localStorage.removeItem("approvingNotificationSrNo");
+                                    localStorage.removeItem("approvingNotificationDept");
+                                }}
+                            >
+                                <div
+                                    className="w-full max-w-5xl rounded-xl bg-white shadow-xl"
+                                    onClick={(event) => event.stopPropagation()}
+                                >
+                                    <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+                                        <div>
+                                            <h2 className="text-lg font-semibold text-neutral-900">Approve Circular</h2>
+                                            <p className="text-sm text-neutral-500">{currentSrNo}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (isApprovalActionPending) {
+                                                    return;
+                                                }
+                                                setShowApprovalPopup(false);
+                                                setShowVesselPopup(false);
+                                                setCurrentAction("");
+                                                setCurrentSrNo("");
+                                                setCommentInput("");
+                                                localStorage.removeItem("approvingNotificationSrNo");
+                                                localStorage.removeItem("approvingNotificationDept");
+                                            }}
+                                            className="rounded-md p-1 text-gray-500 transition hover:bg-neutral-100 hover:text-gray-700"
+                                            aria-label="Close approval modal"
+                                        >
+                                            &times;
+                                        </button>
+                                    </div>
+
+                                    <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+                                        {approvalActionMessage ? (
+                                            <p className="mb-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-700">
+                                                {approvalActionMessage}
+                                            </p>
+                                        ) : null}
+
+                                        {loadingVessels || loadingRanks ? (
+                                            <div className="py-12 text-center">
+                                                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500" />
+                                                <p className="mt-3 text-sm text-neutral-500">Loading vessels and ranks...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-6">
+                                                <div className="grid gap-6 lg:grid-cols-2">
+                                                    <div className="rounded-xl border border-neutral-200 p-4">
+                                                        <div className="mb-3 flex items-center justify-between">
+                                                            <h3 className="text-sm font-semibold text-neutral-900">Select Vessels</h3>
+                                                            <label className="inline-flex items-center gap-2 text-xs text-neutral-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={vessels.length > 0 && vessels.every((vessel) => selectedVesselIds.has(vessel.id))}
+                                                                    ref={(input) => {
+                                                                        if (input) {
+                                                                            input.indeterminate = selectedVesselIds.size > 0 && selectedVesselIds.size < vessels.length;
+                                                                        }
+                                                                    }}
+                                                                    onChange={handleSelectAllChange}
+                                                                    disabled={isApprovalActionPending}
+                                                                />
+                                                                Select All
+                                                            </label>
+                                                        </div>
+                                                        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                                                            {vessels.length > 0 ? vessels.map((vessel) => (
+                                                                <label
+                                                                    key={vessel.id}
+                                                                    className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedVesselIds.has(vessel.id)}
+                                                                        onChange={() => handleVesselCheckboxChange(vessel.id)}
+                                                                        disabled={isApprovalActionPending}
+                                                                    />
+                                                                    <span>
+                                                                        {vessel.vesselName || vessel.VesselName || vessel.vessel_name || vessel.name || vessel.id}
+                                                                        {vessel.vesselCode ? ` (${vessel.vesselCode})` : ""}
+                                                                    </span>
+                                                                </label>
+                                                            )) : (
+                                                                <p className="py-4 text-center text-sm text-neutral-500">No vessels found.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="rounded-xl border border-neutral-200 p-4">
+                                                        <div className="mb-3 flex items-center justify-between">
+                                                            <h3 className="text-sm font-semibold text-neutral-900">Select Ranks</h3>
+                                                            <label className="inline-flex items-center gap-2 text-xs text-neutral-600">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={allRanks.length > 0 && allRanks.every((rank) => selectedRankIds.has(rank.id))}
+                                                                    ref={(input) => {
+                                                                        if (input) {
+                                                                            input.indeterminate = selectedRankIds.size > 0 && selectedRankIds.size < allRanks.length;
+                                                                        }
+                                                                    }}
+                                                                    onChange={handleSelectAllRanksChange}
+                                                                    disabled={isApprovalActionPending}
+                                                                />
+                                                                Select All
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="grid gap-4 md:grid-cols-2">
+                                                            <div>
+                                                                <div className="mb-2 flex items-center justify-between">
+                                                                    <h4 className="text-xs font-semibold uppercase tracking-wide text-sky-700">Deck</h4>
+                                                                    <label className="inline-flex items-center gap-2 text-[11px] text-neutral-600">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={seqRanks.length > 0 && seqRanks.every((rank) => selectedRankIds.has(rank.id))}
+                                                                            ref={(input) => {
+                                                                                if (input) {
+                                                                                    input.indeterminate = seqRanks.length > 0 && selectedRankIds.size > 0 && !seqRanks.every((rank) => selectedRankIds.has(rank.id)) && seqRanks.some((rank) => selectedRankIds.has(rank.id));
+                                                                                }
+                                                                            }}
+                                                                            onChange={handleSelectAllDeckRanksChange}
+                                                                            disabled={isApprovalActionPending}
+                                                                        />
+                                                                        Select All
+                                                                    </label>
+                                                                </div>
+                                                                <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                                                    {seqRanks.map((rank) => (
+                                                                        <label
+                                                                            key={rank.id}
+                                                                            className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
+                                                                        >
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={selectedRankIds.has(rank.id)}
+                                                                                onChange={() => handleRankCheckboxChange(rank.id)}
+                                                                                disabled={isApprovalActionPending}
+                                                                            />
+                                                                            <span>{getCircularRankDisplayName(rank)}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+
+                                                            <div>
+                                                                <div className="mb-2 flex items-center justify-between">
+                                                                    <h4 className="text-xs font-semibold uppercase tracking-wide text-sky-700">Technical</h4>
+                                                                    <label className="inline-flex items-center gap-2 text-[11px] text-neutral-600">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={technicalRanks.length > 0 && technicalRanks.every((rank) => selectedRankIds.has(rank.id))}
+                                                                            ref={(input) => {
+                                                                                if (input) {
+                                                                                    input.indeterminate = technicalRanks.length > 0 && selectedRankIds.size > 0 && !technicalRanks.every((rank) => selectedRankIds.has(rank.id)) && technicalRanks.some((rank) => selectedRankIds.has(rank.id));
+                                                                                }
+                                                                            }}
+                                                                            onChange={handleSelectAllEngineRanksChange}
+                                                                            disabled={isApprovalActionPending}
+                                                                        />
+                                                                        Select All
+                                                                    </label>
+                                                                </div>
+                                                                <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                                                    {technicalRanks.map((rank) => (
+                                                                        <label
+                                                                            key={rank.id}
+                                                                            className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-700"
+                                                                        >
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={selectedRankIds.has(rank.id)}
+                                                                                onChange={() => handleRankCheckboxChange(rank.id)}
+                                                                                disabled={isApprovalActionPending}
+                                                                            />
+                                                                            <span>{getCircularRankDisplayName(rank)}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {allRanks.length === 0 ? (
+                                                            <p className="mt-4 text-center text-sm text-neutral-500">No ranks found.</p>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="mb-2 block text-sm font-medium text-neutral-700">
+                                                        Approval Comment
+                                                    </label>
+                                                    <textarea
+                                                        value={commentInput}
+                                                        onChange={(event) => setCommentInput(event.target.value)}
+                                                        rows={4}
+                                                        placeholder="Enter approval comment..."
+                                                        className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                                                        disabled={isApprovalActionPending}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center justify-end gap-3 border-t border-neutral-200 px-6 py-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (isApprovalActionPending) {
+                                                    return;
+                                                }
+                                                setShowApprovalPopup(false);
+                                                setShowVesselPopup(false);
+                                                setCurrentAction("");
+                                                setCurrentSrNo("");
+                                                setCommentInput("");
+                                                localStorage.removeItem("approvingNotificationSrNo");
+                                                localStorage.removeItem("approvingNotificationDept");
+                                            }}
+                                            disabled={isApprovalActionPending}
+                                            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmCombinedApproval}
+                                            disabled={loadingVessels || loadingRanks || selectedVesselIds.size === 0 || isApprovalActionPending}
+                                            className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {isApprovalActionPending ? "Processing..." : "Confirm Approval"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {showLegacyVesselSelectionPopup && (
 
 
                             <div className="fixed inset-0 backdrop-blur-sm bg-black/20 flex items-center justify-center z-50">
@@ -3697,7 +4104,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
 
                         {/* --- NEW: Comment Modal --- */}
-                        {showCommentModal && (
+                        {showCommentModal && currentAction !== 'approve' && (
                             <div className="fixed inset-0 backdrop-blur-sm bg-black/20 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
                                     <div className="p-6">
@@ -3769,7 +4176,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         {/* --- END NEW: Comment Modal --- */}
 
                         {/* --- NEW: Rank Selection Popup Modal (Grouped by Department) --- */}
-                        {showRankPopup && (
+                        {showRankPopup && currentAction !== 'approve' && (
                            <div className="fixed inset-0 backdrop-blur-sm bg-black/20 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto"> {/* Increased width for two columns */}
                                     <div className="p-6">

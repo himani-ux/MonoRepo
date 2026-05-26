@@ -18,7 +18,7 @@ TAB_KEY_TO_CODE = {
 class IncidentEvidenceTabSerializer(serializers.ModelSerializer):
     class Meta:
         model = IncidentEvidence
-        fields = ("public_id", "tab_code", "summary", "entry_count", "structured_data", "status_chip", "na_justification")
+        fields = ("id", "tab_code", "summary", "entry_count", "structured_data", "status_chip", "na_justification")
 
 
 class IncidentPhase3TabWriteSerializer(serializers.Serializer):
@@ -40,8 +40,8 @@ class IncidentPhase3WorkspaceWriteSerializer(serializers.Serializer):
 class EvidenceItemMatrixSerializer(serializers.ModelSerializer):
     class Meta:
         model = EvidenceItem
-        fields = ("id", "public_id", "finding", "pro_evidence", "con_evidence", "source_label", "comments", "created_date")
-        read_only_fields = ("id", "public_id", "created_date")
+        fields = ("id", "id", "finding", "pro_evidence", "con_evidence", "source_label", "comments", "created_date")
+        read_only_fields = ("id", "id", "created_date")
 
     def create(self, validated_data):
         incident: Incident = self.context["incident"]
@@ -60,7 +60,7 @@ class EvidenceItemMatrixSerializer(serializers.ModelSerializer):
 class EvidenceDeadlineTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = EvidenceDeadlineTask
-        fields = ("id", "public_id", "task_code", "title", "due_at", "due_within", "severity", "status", "completed_at", "justification")
+        fields = ("id", "id", "task_code", "title", "due_at", "due_within", "severity", "status", "completed_at", "justification")
 
 
 class EvidenceDeadlineTaskUpdateSerializer(serializers.Serializer):
@@ -73,7 +73,7 @@ class ChainOfCustodySerializer(serializers.ModelSerializer):
         model = ChainOfCustody
         fields = (
             "id",
-            "public_id",
+            "id",
             "description",
             "collection_timestamp",
             "collector_name",
@@ -83,7 +83,7 @@ class ChainOfCustodySerializer(serializers.ModelSerializer):
             "current_holder",
             "handover_log",
         )
-        read_only_fields = ("id", "public_id", "handover_log")
+        read_only_fields = ("id", "id", "handover_log")
 
 
 class ChainOfCustodyCreateSerializer(serializers.Serializer):
@@ -138,7 +138,7 @@ class WitnessInterviewSerializer(serializers.ModelSerializer):
         model = WitnessInterview
         fields = (
             "id",
-            "public_id",
+            "id",
             "witness_name",
             "interview_type",
             "reason_formal_impossible",
@@ -153,7 +153,7 @@ class WitnessInterviewSerializer(serializers.ModelSerializer):
             "is_final",
             "phase_count",
         )
-        read_only_fields = ("id", "public_id", "is_final", "phase_count")
+        read_only_fields = ("id", "id", "is_final", "phase_count")
 
     def validate(self, attrs):
         interview_type = attrs.get("interview_type")

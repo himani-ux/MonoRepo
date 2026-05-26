@@ -23,7 +23,7 @@ interface VerificationDraft {
   is_effective: boolean;
   mode: "effective" | "defer" | "ineffective";
   notes: string;
-  recommendation_id: number | null;
+  recommendation_id: string | null;
   residual_risk: string;
 }
 
@@ -44,7 +44,7 @@ function emptyWorkspace(): SafetyPhase8WorkspacePayload {
       last_event_at: null,
       state: "RUNNING",
     },
-    incident_id: 0,
+    incident_id: "",
     physical_verification: {
       done: 0,
       pending: 0,
@@ -341,7 +341,7 @@ export function SafetyIncidentPhase8() {
                 Recommendation
                 <select
                   className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
-                  onChange={(event) => setDraft((current) => ({ ...current, recommendation_id: Number(event.target.value) }))}
+                  onChange={(event) => setDraft((current) => ({ ...current, recommendation_id: event.target.value || null }))}
                   value={draft.recommendation_id ?? ""}
                 >
                   <option value="" disabled>Select recommendation</option>

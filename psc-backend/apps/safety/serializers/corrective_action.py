@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.safety.models import CorrectiveAction, Incident, Recommendation, SCMAgendaItem
-from apps.safety.public_id import is_uuid_identifier
+from apps.safety.identifiers import is_uuid_identifier
 from apps.safety.services.ca_aging import CorrectiveActionAgingService
 from apps.safety.services.purchase_fk_enforcer import PurchaseFKEnforcer, PurchaseFKEnforcerError
 
@@ -29,13 +29,13 @@ def _aging_service(context) -> CorrectiveActionAgingService:
 class CorrectiveActionSerializer(serializers.ModelSerializer):
     aging_bucket = serializers.SerializerMethodField()
     purchase_request = serializers.SerializerMethodField()
-    recommendation_id = serializers.IntegerField(read_only=True)
+    recommendation_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = CorrectiveAction
         fields = (
             "id",
-            "public_id",
+            "id",
             "source_table",
             "source_id",
             "recommendation_id",
@@ -75,7 +75,7 @@ class CorrectiveActionSerializer(serializers.ModelSerializer):
 
 
 class CorrectiveActionWriteSerializer(serializers.ModelSerializer):
-    recommendation_id = serializers.IntegerField(required=False, allow_null=True)
+    recommendation_id = serializers.UUIDField(required=False, allow_null=True)
     source_id = serializers.CharField(required=False, allow_blank=False)
 
     class Meta:
@@ -93,7 +93,7 @@ class CorrectiveActionWriteSerializer(serializers.ModelSerializer):
             "purchase_req_id",
         )
 
-    def validate_recommendation_id(self, value: int | None) -> int | None:
+    def validate_recommendation_id(self, value):
         if value is None:
             return value
         if not Recommendation.objects.filter(pk=value, is_deleted=False).exists():
@@ -115,16 +115,13 @@ class CorrectiveActionWriteSerializer(serializers.ModelSerializer):
             elif source_table == SCMAgendaItem._meta.db_table:
                 source_model = SCMAgendaItem
             if source_model is not None:
-                row = source_model.objects.filter(public_id=source_value, is_deleted=False).values("id").first()
+                row = source_model.objects.filter(id=source_value, is_deleted=False).values("id").first()
                 if row is None:
                     raise serializers.ValidationError({"source_id": "Source record does not exist."})
-                attrs["source_id"] = int(row["id"])
+                attrs["source_id"] = row["id"]
                 return attrs
 
-        try:
-            attrs["source_id"] = int(source_value)
-        except (TypeError, ValueError) as exc:
-            raise serializers.ValidationError({"source_id": "Source ID must be a legacy integer or public UUID."}) from exc
+        raise serializers.ValidationError({"source_id": "Source ID must be a valid Safety UUID."})
         return attrs
 
     def validate_purchase_req_id(self, value: int | None) -> int | None:

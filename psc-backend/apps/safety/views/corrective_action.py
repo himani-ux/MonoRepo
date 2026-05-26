@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
 from apps.safety.authentication.vessel_scope import get_scoped_vessel_ids, has_global_vessel_scope
 from apps.safety.models import CorrectiveAction, Incident, Recommendation, SCMAgendaItem, SCMMeeting
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers.corrective_action import (
     CorrectiveActionLinkPurchaseSerializer,
     CorrectiveActionPhysicalVerifySerializer,
@@ -122,7 +122,7 @@ class CorrectiveActionViewMixin:
             raise PermissionDenied("You are not assigned to the vessel for this corrective action.")
 
     def get_object(self):
-        return get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
 
     def _filtered_actions(self) -> list[CorrectiveAction]:
         queryset = self.get_queryset()

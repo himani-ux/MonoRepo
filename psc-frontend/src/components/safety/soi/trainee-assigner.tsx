@@ -1,4 +1,5 @@
 import type { SafetySoiCrewSnapshot } from "../../../schemas/safety/soi";
+import { formatSoiCrewDisplay } from "./crew-display";
 
 interface SafetyTraineeAssignerProps {
   availableCrew: SafetySoiCrewSnapshot[];
@@ -69,7 +70,7 @@ export default function SafetyTraineeAssigner({
                     <option value="">No trainee assigned</option>
                     {availableCrew.map((candidate) => (
                       <option key={`${slot}-${candidate.crew_id}`} value={candidate.crew_id}>
-                        {candidate.crew_id} - {candidate.rank}
+                        {formatSoiCrewDisplay(candidate)}
                       </option>
                     ))}
                   </select>
@@ -78,10 +79,10 @@ export default function SafetyTraineeAssigner({
               {selectedCrew ? (
                 <>
                   <h3 className="mt-3 text-base font-semibold text-slate-900">
-                    {selectedCrew.crew_id}
+                    {formatSoiCrewDisplay(selectedCrew)}
                   </h3>
                   <p className="mt-2 text-sm text-slate-600">
-                    {selectedCrew.rank} · {selectedCrew.department}
+                    {selectedCrew.department}
                   </p>
                 </>
               ) : (

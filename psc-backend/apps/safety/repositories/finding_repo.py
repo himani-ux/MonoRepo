@@ -31,15 +31,15 @@ class FindingRepository(BaseRepository):
         self.area_map_model = area_map_model
         self.now_func = now_func
 
-    def list_for_inspection(self, inspection_id: int):
+    def list_for_inspection(self, inspection_id):
         return self.finding_model.objects.filter(
-            inspection_id=int(inspection_id),
+            inspection_id=inspection_id,
             is_deleted=False,
         ).order_by("-created_date", "-id")
 
-    def selected_area_ids(self, inspection_id: int) -> set[int]:
+    def selected_area_ids(self, inspection_id) -> set[int]:
         return set(
-            self.inspection_area_model.objects.filter(inspection_id=int(inspection_id)).values_list("area_id", flat=True)
+            self.inspection_area_model.objects.filter(inspection_id=inspection_id).values_list("area_id", flat=True)
         )
 
     def create_finding(
@@ -54,7 +54,7 @@ class FindingRepository(BaseRepository):
         if not data.get("assigned_crew_id"):
             data["assigned_crew_id"] = inspection.safety_officer_crew_id
         data.setdefault("status", SOIFinding.Status.OPEN)
-        data.setdefault("public_id", uuid.uuid4().hex)
+        data.setdefault("id", uuid.uuid4().hex)
         data.setdefault("carried_forward_count", 0)
         data.setdefault("schema_version", 1)
         data.setdefault("is_deleted", False)
@@ -65,9 +65,16 @@ class FindingRepository(BaseRepository):
         finding_id = self._insert_finding(inspection_id=inspection.id, data=data)
         return self.finding_model.objects.get(pk=finding_id)
 
-    def _insert_finding(self, *, inspection_id: int, data: Mapping[str, object]) -> int:
+    def _insert_finding(self, *, inspection_id, data: Mapping[str, object]):
+        def uuid_storage_value(value):
+            if isinstance(value, uuid.UUID):
+                return value.hex
+            if value is None:
+                return None
+            return str(value).replace("-", "")
+
         field_names = [
-            "public_id",
+            "id",
             "inspection_id",
             "area_id",
             "item_id",
@@ -95,7 +102,12 @@ class FindingRepository(BaseRepository):
             "updated_by",
             "updated_date",
         ]
-        insert_data = {"inspection_id": int(inspection_id), **dict(data)}
+        insert_data = {
+            "inspection_id": uuid_storage_value(inspection_id),
+            **dict(data),
+        }
+        insert_data["id"] = uuid_storage_value(insert_data.get("id")) or uuid.uuid4().hex
+        insert_data["item_id"] = uuid_storage_value(insert_data.get("item_id"))
         model_fields = {field.name: field for field in self.finding_model._meta.concrete_fields}
         quote_name = self.connection.ops.quote_name
         table_name = quote_name(self.finding_model._meta.db_table)
@@ -113,13 +125,13 @@ class FindingRepository(BaseRepository):
                 row = cursor.fetchone()
                 if row is None:
                     raise RuntimeError("SOI finding insert did not return a new id.")
-                return int(row[0])
+                return row[0]
 
             cursor.execute(
                 f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})",
                 values,
             )
-            return int(cursor.lastrowid)
+            return insert_data["id"]
 
     def submit_areas(
         self,

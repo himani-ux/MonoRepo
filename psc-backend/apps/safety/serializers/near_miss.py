@@ -6,7 +6,7 @@ from rest_framework import serializers
 from apps.safety.authentication.anonymity import AnonymityMixin
 from apps.safety.authentication.vessel_scope import user_has_vessel_access
 from apps.safety.models import Incident, MasterLossType, MasterMscatTaxonomy, MasterSafetyIncidentType
-from apps.safety.public_id import is_uuid_identifier
+from apps.safety.identifiers import is_uuid_identifier
 from apps.safety.serializers.vessel_display import VesselDisplayMixin
 
 
@@ -34,7 +34,7 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
         model = Incident
         fields = (
             "id",
-            "public_id",
+            "id",
             "incident_number",
             "vessel_id",
             "vessel_code",
@@ -82,7 +82,7 @@ class NearMissListSerializer(NearMissSerializer):
     class Meta(NearMissSerializer.Meta):
         fields = (
             "id",
-            "public_id",
+            "id",
             "incident_number",
             "vessel_id",
             "vessel_code",

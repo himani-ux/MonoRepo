@@ -81,7 +81,7 @@ class SCMOfficeCommentTests(unittest.TestCase):
         self.assertEqual(
             SCMLegacyField.objects.get(
                 meeting_id=self.meeting.id,
-                agenda_item_number=10,
+                agenda_item_number=9,
                 field_key="officecomments",
             ).field_value,
             "Follow up trend with vessel team.",
@@ -89,7 +89,7 @@ class SCMOfficeCommentTests(unittest.TestCase):
         self.assertEqual(
             SCMLegacyField.objects.get(
                 meeting_id=self.meeting.id,
-                agenda_item_number=10,
+                agenda_item_number=9,
                 field_key="isreviewed",
             ).field_value,
             "true",

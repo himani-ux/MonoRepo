@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useRoutes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -124,14 +125,23 @@ function SafetyRoutesHarness() {
 }
 
 function renderSafetyRoute(pathname: string, authValue: SafetyAuthUser) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[pathname]}>
-      <SafetyAuthProvider value={authValue}>
-        <Routes>
-          <Route path="/safety/*" element={<SafetyRoutesHarness />} />
-        </Routes>
-      </SafetyAuthProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[pathname]}>
+        <SafetyAuthProvider value={authValue}>
+          <Routes>
+            <Route path="/safety/*" element={<SafetyRoutesHarness />} />
+          </Routes>
+        </SafetyAuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -953,9 +963,23 @@ describe("safety routes", () => {
 
     expect(await screen.findByText("SCM Detail")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open attendance" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open agenda route" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open closed-since-last route" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit Meeting" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open closed-since-last route" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open sign-off route" })).not.toBeInTheDocument();
+  });
+
+  it("shows_edit_meeting_action_for_vessel_meeting_hosts_before_office_review", async () => {
+    renderSafetyRoute("/safety/scm/2", {
+      formIds: ["SAF_F_003"],
+      id: "co-scm",
+      isGlobal: false,
+      processIds: ["SAF_P_002"],
+      role: "CO",
+      vesselIds: ["vessel-7"],
+    });
+
+    expect(await screen.findByText("SCM Detail")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit Meeting" })).toBeInTheDocument();
   });
 
   it("passes_scoped_vessel_into_regular_scm_create_queries", async () => {
@@ -1017,7 +1041,7 @@ describe("safety routes", () => {
 
     await screen.findByText("Create Regular SCM");
     expect(screen.getByText("MV01 - Atlas")).toBeInTheDocument();
-    expect(screen.getByText("Crew attendance confirmation")).toBeInTheDocument();
+    expect(screen.getByText("Crew attendance sheet")).toBeInTheDocument();
     expect(screen.getByText("Closed since previous SCM sign-off")).toBeInTheDocument();
     expect(screen.getByText("Open previous action items")).toBeInTheDocument();
   });

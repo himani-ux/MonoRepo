@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import SafetySoiCompliancePill from "../../../components/safety/shared/soi-compliance-pill";
+import { formatSoiCrewDisplay } from "../../../components/safety/soi/crew-display";
 import { useSafetyAuth } from "../../../hooks/safety/use-auth";
 import { useSafetySoiCompliance, useSafetySoiInspections } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
@@ -197,7 +198,7 @@ function MasterAlternateOfficerPanel({
               <option value="">Select active 2/E</option>
               {candidates.map((candidate) => (
                 <option key={candidate.crew_id} value={candidate.crew_id}>
-                  {candidate.crew_name ? `${candidate.crew_name} - ` : ""}{candidate.crew_id}
+                  {formatSoiCrewDisplay(candidate)}
                 </option>
               ))}
             </select>
@@ -359,7 +360,7 @@ export default function SafetySoiIndexRoute() {
                     <td className="px-4 py-4">
                       <Link
                         className="font-medium text-slate-900 hover:text-slate-600 hover:underline"
-                        to={`/safety/soi/${item.public_id ?? item.id}/findings`}
+                        to={`/safety/soi/${item.id}/findings`}
                       >
                         {item.inspection_reference}
                       </Link>
@@ -381,21 +382,21 @@ export default function SafetySoiIndexRoute() {
                         {canCreate && canDownloadPaper(item.state) ? (
                           <Link
                             className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-800 transition hover:border-slate-400 hover:bg-slate-100"
-                            to={`/safety/soi/${item.public_id ?? item.id}/download`}
+                            to={`/safety/soi/${item.id}/download`}
                           >
                             Download paper
                           </Link>
                         ) : null}
                         <Link
                           className="inline-flex items-center rounded-full border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-sky-900 transition hover:border-sky-400 hover:bg-sky-100"
-                          to={`/safety/soi/${item.public_id ?? item.id}/findings`}
+                          to={`/safety/soi/${item.id}/findings`}
                         >
                           Findings
                         </Link>
                         {canClose && canCloseInspection(item.state) ? (
                           <Link
                             className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900 transition hover:border-emerald-400 hover:bg-emerald-100"
-                            to={`/safety/soi/${item.public_id ?? item.id}/close`}
+                            to={`/safety/soi/${item.id}/close`}
                           >
                             {item.state === "CLOSED" ? "View close" : "Close event"}
                           </Link>

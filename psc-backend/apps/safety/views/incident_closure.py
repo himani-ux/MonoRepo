@@ -28,7 +28,7 @@ class IncidentClosureView(IncidentViewMixin, generics.GenericAPIView):
         ).order_by("changed_at", "id")
 
         latest_phase_log = phase_logs.last()
-        public_identifier = str(incident.public_id)
+        incident_identifier = str(incident.id)
 
         return Response(
             {
@@ -39,15 +39,15 @@ class IncidentClosureView(IncidentViewMixin, generics.GenericAPIView):
                 "exports": {
                     "incident_pdf": {
                         "available": True,
-                        "endpoint": f"/api/safety/export/incident/{public_identifier}/pdf/",
+                        "endpoint": f"/api/safety/export/incident/{incident_identifier}/pdf/",
                     },
                     "msc_mepc3": {
                         "available": bool(incident.imo_classifier and incident.imo_classifier != Incident.ImoClassifier.NOT_APPLICABLE),
-                        "endpoint": f"/api/safety/export/msc-mepc-3/{public_identifier}/",
+                        "endpoint": f"/api/safety/export/msc-mepc-3/{incident_identifier}/",
                     },
                     "auditor_zip": {
                         "available": True,
-                        "endpoint": f"/api/safety/export/auditor-bundle/?incident_id={public_identifier}",
+                        "endpoint": f"/api/safety/export/auditor-bundle/?incident_id={incident_identifier}",
                     },
                 },
                 "audit_summary": {

@@ -94,7 +94,7 @@ class SOIOfficerSettingView(SOIViewMixin, generics.GenericAPIView):
                 cursor.execute(
                     f"""
                     INSERT INTO {TABLE_NAME} (
-                        public_id,
+                        id,
                         vessel_id,
                         alternate_enabled,
                         schema_version,

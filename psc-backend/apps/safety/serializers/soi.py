@@ -12,6 +12,7 @@ SECTION_12_ALREADY_COVERED_ERROR = (
     "Section 12 'Cross-cutting Safety & Culture' evaluated once per 3-month cycle "
     "(D-GAP-M23). This cycle already covered."
 )
+MAX_SOI_SELECTED_AREAS = 4
 
 
 def _dedupe_preserve_order(values: list[object]) -> list[object]:
@@ -38,6 +39,10 @@ def _validate_area_selection(
     normalized_area_ids = [int(area_id) for area_id in _dedupe_preserve_order(area_ids)]
     if not normalized_area_ids:
         raise serializers.ValidationError({"area_ids": "Pick at least one applicable area for the SOI."})
+    if len(normalized_area_ids) > MAX_SOI_SELECTED_AREAS:
+        raise serializers.ValidationError(
+            {"area_ids": f"Select a maximum of {MAX_SOI_SELECTED_AREAS} areas for one SOI."}
+        )
 
     available_areas = repository.list_available_areas(vessel_id=str(vessel_id))
     applicable_area_ids = {int(row["area_id"]) for row in available_areas}
@@ -94,8 +99,8 @@ def _validate_trainee_ids(trainee_crew_ids: list[str]) -> list[str]:
 
 
 class SOIInspectionAreaSerializer(serializers.Serializer):
-    selection_id = serializers.IntegerField()
-    inspection_id = serializers.IntegerField()
+    selection_id = serializers.CharField()
+    inspection_id = serializers.CharField()
     area_id = serializers.IntegerField()
     area_name = serializers.CharField()
     section_12_flag = serializers.BooleanField()
@@ -107,7 +112,7 @@ class SOIInspectionAreaSerializer(serializers.Serializer):
 
 
 class SOITraineeSerializer(serializers.Serializer):
-    inspection_id = serializers.IntegerField()
+    inspection_id = serializers.CharField()
     crew_id = serializers.CharField()
     trainee_slot = serializers.IntegerField()
     schema_version = serializers.IntegerField()
@@ -135,7 +140,6 @@ class SOIInspectionSerializer(VesselDisplayMixin, serializers.ModelSerializer):
         model = SOIInspection
         fields = (
             "id",
-            "public_id",
             "vessel_id",
             "vessel_code",
             "vessel_name",
@@ -290,7 +294,7 @@ class SOIInspectionCreateSerializer(serializers.Serializer):
 
 
 class SOIApplicabilitySerializer(serializers.Serializer):
-    map_id = serializers.IntegerField(allow_null=True)
+    map_id = serializers.CharField(allow_null=True)
     area_id = serializers.IntegerField()
     area_name = serializers.CharField()
     section_12_flag = serializers.BooleanField()
@@ -301,7 +305,7 @@ class SOIApplicabilitySerializer(serializers.Serializer):
 
 
 class SOIApplicabilityRequestResultSerializer(serializers.Serializer):
-    request_id = serializers.IntegerField()
+    request_id = serializers.CharField()
     status = serializers.CharField()
     vessel_id = serializers.CharField()
     area_id = serializers.IntegerField()
@@ -314,7 +318,7 @@ class SOIApplicabilityRequestResultSerializer(serializers.Serializer):
 
 
 class SOIApplicabilityApprovalResultSerializer(serializers.Serializer):
-    request_id = serializers.IntegerField()
+    request_id = serializers.CharField()
     status = serializers.CharField()
     decision = serializers.CharField()
     vessel_id = serializers.CharField()
@@ -326,11 +330,11 @@ class SOIApplicabilityApprovalResultSerializer(serializers.Serializer):
     reason = serializers.CharField()
     dpa_approved_by = serializers.CharField()
     dpa_approved_at = serializers.DateTimeField(allow_null=True)
-    map_id = serializers.IntegerField(allow_null=True)
+    map_id = serializers.CharField(allow_null=True)
 
 
 class SOIPendingApplicabilityRequestSerializer(serializers.Serializer):
-    request_id = serializers.IntegerField()
+    request_id = serializers.CharField()
     vessel_id = serializers.CharField()
     area_id = serializers.IntegerField()
     area_name = serializers.CharField()
@@ -428,6 +432,7 @@ class SOICreateConfigSerializer(serializers.Serializer):
     assistant_candidates = SOICrewSnapshotSerializer(many=True)
     checklist_version = SOIChecklistVersionSerializer(allow_null=True)
     max_trainees = serializers.IntegerField()
+    responsible_candidates = SOICrewSnapshotSerializer(many=True)
     section_12_status = serializers.DictField()
     safety_officer = SOICrewSnapshotSerializer(allow_null=True)
     trainee_candidates = SOICrewSnapshotSerializer(many=True)
@@ -438,7 +443,7 @@ class SOIOfficerSettingSerializer(serializers.ModelSerializer):
         model = SOIOfficerSetting
         fields = (
             "id",
-            "public_id",
+            "id",
             "vessel_id",
             "alternate_enabled",
             "alternate_so_crew_id",
@@ -485,7 +490,7 @@ class SOISection12StatusSerializer(serializers.Serializer):
     covered_this_cycle = serializers.BooleanField()
     prompt_required = serializers.BooleanField()
     next_allowed_date = serializers.DateField(allow_null=True)
-    covered_by_inspection_id = serializers.IntegerField(allow_null=True)
+    covered_by_inspection_id = serializers.CharField(allow_null=True)
     covered_by_inspection_reference = serializers.CharField(allow_null=True)
     covered_planned_date = serializers.DateField(allow_null=True)
 
@@ -549,7 +554,7 @@ class SOIDigitalSignatureSnapshotSerializer(serializers.Serializer):
 
 
 class SOICloseSnapshotSerializer(serializers.Serializer):
-    inspection_id = serializers.IntegerField()
+    inspection_id = serializers.CharField()
     vessel_id = serializers.CharField()
     inspection_reference = serializers.CharField()
     checklist_unique_id = serializers.CharField(allow_null=True)
@@ -596,7 +601,7 @@ class SOIReprintRequestSerializer(serializers.Serializer):
 
 
 class SOIPickAreasSerializer(serializers.Serializer):
-    inspection_id = serializers.IntegerField()
+    inspection_id = serializers.CharField()
     vessel_id = serializers.CharField()
     section_12_included = serializers.BooleanField()
     section_12_status = SOISection12StatusSerializer()
@@ -623,7 +628,7 @@ class SOIPickAreasUpdateSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         repository = self.context["soi_repository"]
-        inspection_id = int(kwargs["inspection_id"])
+        inspection_id = kwargs["inspection_id"]
         return repository.replace_selected_areas(
             inspection_id=inspection_id,
             area_ids=list(self.validated_data["area_ids"]),
@@ -632,7 +637,7 @@ class SOIPickAreasUpdateSerializer(serializers.Serializer):
 
 
 class SOITraineePayloadSerializer(serializers.Serializer):
-    inspection_id = serializers.IntegerField()
+    inspection_id = serializers.CharField()
     trainees = SOITraineeSerializer(many=True)
 
 
@@ -657,7 +662,7 @@ class SOITraineeUpdateSerializer(serializers.Serializer):
 
     def save(self, **kwargs):
         repository = self.context["soi_repository"]
-        inspection_id = int(kwargs["inspection_id"])
+        inspection_id = kwargs["inspection_id"]
         return repository.replace_trainees(
             inspection_id=inspection_id,
             trainee_crew_ids=list(self.validated_data.get("trainee_crew_ids") or []),

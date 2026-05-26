@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from io import BytesIO
+import json
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
@@ -10,7 +11,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,7 @@ class SCMLegacyAttendanceRow:
     wrh_flag: str
     wrh_rest_hours_24h: str
     wrh_rest_hours_7d: str
+    absence_reason: str | None = None
     remarks: str | None = None
 
 
@@ -201,10 +203,13 @@ class SCMTenSectionLegacyTemplate:
         )
 
         sections = {row.agenda_item_number: row for row in context.section_rows}
+        section_7 = sections.get(7)
+        section_8 = sections.get(8)
+        section_9 = sections.get(9)
         story: list[object] = [
             self._build_document_header(
                 "Safety Committee Meeting Minutes",
-                "Legacy SCM PDF structure preserved for D-PDF-03b and SSOT vw_GetSCM_Master alignment.",
+                "",
                 f"Meeting Type: {context.meeting_type}",
             ),
             self._build_meta_grid(context),
@@ -218,61 +223,40 @@ class SCMTenSectionLegacyTemplate:
             ),
             Paragraph("Closed Items Since Last SCM", self.section_style),
             *self._build_closed_since_last_block(context),
-            Paragraph("Document Control and SSOT Alignment", self.section_style),
-            self._build_document_control_table(context),
+            *self._build_soi_feed_block(section_7, context),
             Spacer(1, 10),
-            self._build_document_header(
-                "Legacy 10-Section SCM Record",
-                "",
-                f"SCM No: {context.scm_number}",
-            ),
         ]
 
-        for index in range(1, 8):
-            if index == 2:
-                continue
+        record_header = self._build_document_header(
+            "Safety Committee Meeting Record",
+            "",
+            f"SCM No: {context.scm_number}",
+        )
+        section_1 = sections.get(1)
+        if section_1 is not None:
+            section_1_block = self._build_section_box(section_1, self._section_subtitle(1))
+            story.append(KeepTogether([record_header, *section_1_block[:2]]))
+            story.extend(section_1_block[2:])
+        else:
+            story.append(record_header)
+
+        for index in range(2, 7):
             section = sections.get(index)
             if section is not None:
-                if index == 5:
-                    story.extend(self._build_kpi_review_box(section.legacy_fields))
                 story.extend(self._build_section_box(section, self._section_subtitle(index)))
 
-        section_8 = sections.get(8)
-        section_9 = sections.get(9)
-        section_10 = sections.get(10)
-        story.extend(
-            [
-                Spacer(1, 10),
-                self._build_document_header(
-                    "SOI Feed, Actions, Comments, Signatures",
-                    "",
-                    "Closure Anchor: Master Sign-Off",
-                ),
-            ]
-        )
-        if section_8 is not None:
+        if section_7 is not None:
             story.extend(
                 self._build_custom_section_box(
-                    "8. Safety Observations for the Month",
-                    "SOI Auto-Feed",
-                    self._build_soi_observation_block(
-                        section_8,
-                        context.soi_auto_feed_summary,
-                        context.soi_observation_rows,
-                    ),
-                )
-            )
-            story.extend(
-                self._build_custom_section_box(
-                    "8. Findings and Corrective Measures",
+                    "7. PSC Findings & Corrective Measures",
                     "Action Register",
-                    [self._build_findings_table(section_8.legacy_fields)],
+                    [self._build_findings_table(section_7.legacy_fields)],
                 )
             )
+        if section_8 is not None:
+            story.extend(self._build_minutes_box(section_8))
         if section_9 is not None:
-            story.extend(self._build_section_box(section_9, self._section_subtitle(9)))
-        if section_10 is not None:
-            story.extend(self._build_office_review_box(section_10, context))
+            story.extend(self._build_office_review_box(section_9, context))
         story.extend(
             [
                 Paragraph("Digital Signatures", self.section_style),
@@ -285,6 +269,23 @@ class SCMTenSectionLegacyTemplate:
 
         document.build(story, onFirstPage=self._draw_footer, onLaterPages=self._draw_footer)
         return buffer.getvalue()
+
+    def _build_soi_feed_block(self, section: SCMLegacySectionRow | None, context: SCMLegacyPdfContext) -> list[object]:
+        if section is None:
+            return []
+        return [
+            Spacer(1, 8),
+            Paragraph("SOI Feed, Actions, Comments, Signatures", self.section_style),
+            *self._build_custom_section_box(
+                "Safety Observations for the Month",
+                "SOI Auto-Feed",
+                self._build_soi_observation_block(
+                    section,
+                    context.soi_auto_feed_summary,
+                    context.soi_observation_rows,
+                ),
+            ),
+        ]
 
     def _build_document_header(self, title: str, subtitle: str, tag: str) -> Table:
         left: list[object] = [
@@ -403,20 +404,11 @@ class SCMTenSectionLegacyTemplate:
         )
         return table
 
-    def _build_document_control_table(self, context: SCMLegacyPdfContext) -> Table:
-        rows = [
-            ["Source Form", "Legacy SCM master format, preserving SCMNo, VesselName, SDate, Ocassion, ShipPosition, CommTime, CompTime, and section records."],
-            ["RBAC Path", "SCM module behind SAF_F_003. Master and CO can host Regular or Ad-Hoc SCM; Master must perform final sign-off."],
-            ["SOI Gate", "Overdue SOI hard-block applies only at Master sign-off. Creation and running the meeting remain available."],
-            ["Generated At", context.generated_at],
-        ]
-        return self._styled_table(rows, colWidths=[48 * mm, 122 * mm])
-
     def _build_closed_since_last_block(self, context: SCMLegacyPdfContext) -> list[object]:
         counts = context.closed_since_last_counts or {}
         summary = self._styled_table(
             [
-                ["Cutoff", context.cutoff_reference or "No prior signed-off SCM yet."],
+                ["Cutoff", context.cutoff_reference or "No prior SCM."],
                 ["Incidents", str(counts.get("incident_count", 0))],
                 ["Near misses", str(counts.get("near_miss_count", 0))],
                 ["SOI findings", str(counts.get("soi_finding_count", 0))],
@@ -454,7 +446,7 @@ class SCMTenSectionLegacyTemplate:
                     [
                         row.rank_name,
                         row.display_name,
-                        "Present" if row.present else "Absent",
+                        "Present" if row.present else self._absent_status(row),
                         self._wrh_status(row),
                         row.remarks or "Attendance recorded.",
                     ]
@@ -462,6 +454,11 @@ class SCMTenSectionLegacyTemplate:
                 ],
             ]
         return [self._styled_table(rows, repeatRows=1, colWidths=[27 * mm, 40 * mm, 28 * mm, 34 * mm, 41 * mm])]
+
+    @staticmethod
+    def _absent_status(row: SCMLegacyAttendanceRow) -> str:
+        reason = str(row.absence_reason or "").strip()
+        return f"Absent - Reason: {reason}" if reason else "Absent"
 
     def _build_signature_block(self, context: SCMLegacyPdfContext) -> list[object]:
         rows = context.signature_rows or [SCMLegacySignatureRow(label="Master signature", status="Awaiting signature")]
@@ -509,15 +506,14 @@ class SCMTenSectionLegacyTemplate:
     def _section_subtitle(self, index: int) -> str:
         return {
             1: "Yes / No",
-            2: "Reserved",
-            3: "Compliance Review",
-            4: "Shipboard Review",
-            5: "Environmental Practices",
-            6: "Health Review",
-            7: "Crew Welfare",
-            8: "Findings",
-            9: "Minutes",
-            10: "For Record",
+            2: "Compliance Review",
+            3: "Shipboard Review",
+            4: "Environmental Practices",
+            5: "Health Review",
+            6: "Crew Welfare",
+            7: "Findings",
+            8: "Minutes",
+            9: "For Record",
         }.get(index, "Record")
 
     def _build_kpi_review_box(self, legacy_fields: Mapping[str, object]) -> list[object]:
@@ -543,16 +539,17 @@ class SCMTenSectionLegacyTemplate:
         soi_observations: list[SCMLegacySoiObservationRow] | None = None,
     ) -> list[object]:
         body: list[object] = []
-        if section.agenda_item_number == 8:
+        if section.agenda_item_number == 7:
             body.extend(self._build_soi_observation_block(section, soi_summary or {}, soi_observations or []))
         if include_legacy_fields:
             body.extend(self._build_legacy_field_block(section))
         notes = []
-        if section.agenda_item_number in {8, 10}:
+        if section.agenda_item_number == 9:
             if section.content and section.content != "No section content recorded.":
                 notes.append(["Discussion / Notes", section.content])
+        if section.agenda_item_number not in {7, 8}:
             if section.decision:
-                notes.append(["Decision", section.decision])
+                notes.append(["Recommendation / Suggestions", section.decision])
         if notes:
             if body:
                 body.append(Spacer(1, 4))
@@ -572,24 +569,37 @@ class SCMTenSectionLegacyTemplate:
     ) -> list[object]:
         rows = [
             ["Office Comments", section.legacy_fields.get("officecomments") or context.office_comment or "-"],
-            ["SOI Sign-Off Gate", "Clear. No overdue SOI area exists at the time of Master sign-off."],
+            ["Review", "Clear. No overdue SOI area exists at the time of Master sign-off."],
             [
                 "Closure Timestamp",
                 context.master_signed_off_at or "This timestamp becomes the next Closed-Since-Last cutoff anchor.",
             ],
         ]
         return self._build_custom_section_box(
-            "10. Office Comments and Review",
+            "9. Office Comments and Review",
             "For Record",
             [self._styled_table(rows, colWidths=[46 * mm, 124 * mm])],
+        )
+
+    def _build_minutes_box(self, section: SCMLegacySectionRow) -> list[object]:
+        comments = (
+            section.legacy_fields.get("miscellaneous_comments")
+            or section.content
+            or "No minutes recorded."
+        )
+        return self._build_custom_section_box(
+            "8. Minutes of Meeting",
+            "Minutes",
+            [self._styled_table([[str(comments)]], colWidths=[170 * mm])],
         )
 
     @staticmethod
     def _display_section_label(section: SCMLegacySectionRow) -> str:
         return {
-            2: "Reserved",
-            7: "Crew Welfare",
-            9: "Minutes of Meeting",
+            2: "Quality and Safety Practice",
+            6: "Crew Welfare",
+            7: "PSC Findings & Corrective Measures",
+            8: "Minutes of Meeting",
         }.get(section.agenda_item_number, section.section_label)
 
     def _build_custom_section_box(self, title: str, subtitle: str, body: list[object]) -> list[object]:
@@ -610,8 +620,15 @@ class SCMTenSectionLegacyTemplate:
                 ]
             )
         )
-        # Keep section content as normal flowables so large legacy tables can split across pages.
-        return [Spacer(1, 6), title_table, *body, Spacer(1, 2)]
+        if body:
+            first_body, remaining_body = body[0], body[1:]
+            return [
+                Spacer(1, 6),
+                KeepTogether([title_table, first_body]),
+                *remaining_body,
+                Spacer(1, 2),
+            ]
+        return [Spacer(1, 6), title_table, Spacer(1, 2)]
 
     def _build_soi_observation_block(
         self,
@@ -667,50 +684,143 @@ class SCMTenSectionLegacyTemplate:
 
     @staticmethod
     def _format_observation_status(row: SCMLegacySoiObservationRow) -> str:
+        status = str(row.status or "-").replace("_", " ").title()
         if row.carried_forward_count > 0:
-            return f"{row.status} / carried {row.carried_forward_count}"
-        return row.status
+            return f"{status} ({row.carried_forward_count})"
+        return status
 
     def _build_legacy_field_block(self, section: SCMLegacySectionRow) -> list[object]:
         from apps.safety.serializers.scm import SCM_LEGACY_FIELD_TEMPLATE
 
-        boolean_rows = [["Question", "Yes", "No"]]
+        boolean_rows = [["Question", "Yes", "No", "N/A"]]
         text_rows = [["Field", "Details"]]
         for field in SCM_LEGACY_FIELD_TEMPLATE.get(section.agenda_item_number, ()):
             if field.get("separate_display"):
                 continue
             field_key = str(field["field_key"])
+            if field_key in {
+                "circular_discussion_status",
+                "circular_not_discussed_reason",
+                "near_miss_discussion_status",
+                "near_miss_not_discussed_reason",
+            }:
+                continue
             field_type = str(field["field_type"])
             value = section.legacy_fields.get(field_key)
             if field_type == "BOOLEAN":
-                yes, no = self._yes_no_marks(value)
-                boolean_rows.append([str(field["field_label"]), yes, no])
+                yes, no, not_applicable = self._yes_no_na_marks(value)
+                boolean_rows.append([str(field["field_label"]), yes, no, not_applicable])
             else:
                 text_rows.append([str(field["field_label"]), self._format_legacy_value(value, field_type)])
 
         story: list[object] = []
         if len(boolean_rows) > 1:
-            story.append(self._styled_table(boolean_rows, repeatRows=1, colWidths=[124 * mm, 23 * mm, 23 * mm]))
+            story.append(self._styled_table(boolean_rows, repeatRows=1, colWidths=[112 * mm, 19 * mm, 19 * mm, 20 * mm]))
         if len(text_rows) > 1:
             if story:
                 story.append(Spacer(1, 4))
             story.append(self._styled_table(text_rows, repeatRows=1, colWidths=[50 * mm, 120 * mm]))
+        near_miss_rows = self._build_near_miss_discussion_rows(section)
+        if near_miss_rows:
+            if story:
+                story.append(Spacer(1, 4))
+            story.append(self._styled_table(near_miss_rows, repeatRows=1, colWidths=[30 * mm, 58 * mm, 30 * mm, 52 * mm]))
+        circular_rows = self._build_circular_discussion_rows(section)
+        if circular_rows:
+            if story:
+                story.append(Spacer(1, 4))
+            story.append(self._styled_table(circular_rows, repeatRows=1, colWidths=[48 * mm, 54 * mm, 26 * mm, 42 * mm]))
         return story
 
+    def _build_near_miss_discussion_rows(self, section: SCMLegacySectionRow) -> list[list[object]]:
+        if section.agenda_item_number != 1:
+            return []
+        raw_value = str(section.legacy_fields.get("near_miss_discussion_status") or "").strip()
+        if not raw_value:
+            return []
+        return self._build_discussion_rows(
+            raw_value=raw_value,
+            fallback_reference="All listed",
+            fallback_title="Latest near misses",
+            fallback_reason=section.legacy_fields.get("near_miss_not_discussed_reason"),
+            header=["Near Miss", "Title", "Discussion", "Reason"],
+        )
+
+    def _build_circular_discussion_rows(self, section: SCMLegacySectionRow) -> list[list[object]]:
+        if section.agenda_item_number != 2:
+            return []
+        raw_value = str(section.legacy_fields.get("circular_discussion_status") or "").strip()
+        if not raw_value:
+            return []
+        return self._build_discussion_rows(
+            raw_value=raw_value,
+            fallback_reference="All listed",
+            fallback_title="Latest circulars / safety alerts / work instructions",
+            fallback_reason=section.legacy_fields.get("circular_not_discussed_reason"),
+            header=["Reference", "Title", "Discussion", "Reason"],
+        )
+
+    def _build_discussion_rows(
+        self,
+        *,
+        raw_value: str,
+        fallback_reference: str,
+        fallback_title: str,
+        fallback_reason: object,
+        header: list[object],
+    ) -> list[list[object]]:
+        rows = [header]
+        if raw_value.upper() in {"DISCUSSED", "NOT_DISCUSSED"}:
+            rows.append([
+                fallback_reference,
+                fallback_title,
+                self._format_legacy_value(raw_value, "TEXT"),
+                str(fallback_reason or "-"),
+            ])
+            return rows
+        if not raw_value.startswith("["):
+            return rows
+        try:
+            parsed = json.loads(raw_value)
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(parsed, list):
+            return []
+        for row in parsed:
+            if not isinstance(row, Mapping):
+                continue
+            status = str(row.get("status") or "").strip()
+            if not status:
+                continue
+            rows.append([
+                str(row.get("reference") or row.get("incidentNumber") or row.get("srNo") or row.get("sr_no") or row.get("key") or "-"),
+                str(row.get("title") or "-"),
+                self._format_legacy_value(status, "TEXT"),
+                str(row.get("reason") or "-"),
+            ])
+        return rows if len(rows) > 1 else []
+
     def _build_findings_table(self, legacy_fields: Mapping[str, object]) -> Table:
-        rows = [["No", "Finding", "Corrective Measure", "Owner", "Due Date", "Status"]]
+        rows = [["No", "Finding", "Corrective Measure"]]
         for index in range(1, 11):
+            finding = legacy_fields.get(f"findings{index}")
+            corrective_measure = legacy_fields.get(f"correctivemeasure{index}")
+            if self._is_blank(finding) and self._is_blank(corrective_measure):
+                continue
             rows.append(
                 [
                     str(index),
-                    self._format_legacy_value(legacy_fields.get(f"findings{index}"), "TEXT"),
-                    self._format_legacy_value(legacy_fields.get(f"correctivemeasure{index}"), "TEXT"),
-                    "TBD" if legacy_fields.get(f"findings{index}") else "",
-                    "TBD" if legacy_fields.get(f"findings{index}") else "",
-                    "Open" if legacy_fields.get(f"findings{index}") else "",
+                    self._format_legacy_value(finding, "TEXT"),
+                    self._format_legacy_value(corrective_measure, "TEXT"),
                 ]
             )
-        return self._styled_table(rows, repeatRows=1, colWidths=[10 * mm, 54 * mm, 54 * mm, 22 * mm, 18 * mm, 20 * mm])
+        if len(rows) == 1:
+            rows.append(["-", "No findings recorded.", "-"])
+        return self._styled_table(rows, repeatRows=1, colWidths=[12 * mm, 79 * mm, 79 * mm])
+
+    @staticmethod
+    def _is_blank(value: object) -> bool:
+        return value is None or str(value).strip() == ""
 
     def _styled_table(self, rows: list[list[object]], **kwargs) -> Table:
         repeat_rows = int(kwargs.get("repeatRows") or 0)
@@ -755,18 +865,27 @@ class SCMTenSectionLegacyTemplate:
         return normalized or "-"
 
     @staticmethod
-    def _yes_no_marks(value: object) -> tuple[str, str]:
+    def _yes_no_na_marks(value: object) -> tuple[str, str, str]:
         if value in (None, ""):
-            return "-", "-"
+            return "-", "-", "-"
+        if str(value).strip().upper() in {"N/A", "NA", "NOT APPLICABLE", "NOT_APPLICABLE"}:
+            return "", "", "N/A"
         is_yes = value is True or str(value).strip().lower() in {"true", "1", "yes", "y"}
-        return ("Yes", "") if is_yes else ("", "No")
+        return ("Yes", "", "") if is_yes else ("", "No", "")
 
     @staticmethod
     def _format_legacy_value(value: object, field_type: str) -> str:
         if value in (None, ""):
             return "-"
         if field_type == "BOOLEAN":
+            if str(value).strip().upper() in {"N/A", "NA", "NOT APPLICABLE", "NOT_APPLICABLE"}:
+                return "N/A"
             return "Yes" if value is True or str(value).strip().lower() in {"true", "1", "yes"} else "No"
+        normalized = str(value).strip().upper()
+        if normalized == "DISCUSSED":
+            return "Discussed"
+        if normalized == "NOT_DISCUSSED":
+            return "Not discussed"
         return str(value)
 
     @staticmethod

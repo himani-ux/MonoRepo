@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.safety.models import Incident, Recommendation
-from apps.safety.public_id import get_by_public_id_or_pk
+from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import RecommendationSerializer, build_phase6_workspace_payload
 from apps.safety.services.alarp_gate import RECOMMENDATION_THEMES
 from apps.safety.views.incident import IncidentViewMixin, _normalized_role, _resolve_actor_id
@@ -29,7 +29,7 @@ class IncidentPhase6ViewMixin(IncidentViewMixin):
 
     def get_incident(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
-        incident = get_by_public_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
+        incident = get_by_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
         return incident
 
     def get_object(self):
@@ -85,7 +85,7 @@ class IncidentRecommendationDetailView(IncidentPhase6ViewMixin, generics.UpdateA
         return self.get_incident().recommendations.filter(is_deleted=False).order_by("id")
 
     def get_object(self):
-        return get_by_public_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
+        return get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

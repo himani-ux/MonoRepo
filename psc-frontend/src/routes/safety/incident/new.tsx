@@ -51,7 +51,7 @@ export default function SafetyIncidentCreatePage() {
         description: submitted.phase_2_handoff?.message ?? "Incident advanced to Phase 2.",
         variant: "success",
       });
-      navigate(`/safety/incidents/${incident.public_id ?? incident.id}/phase-2`, {
+      navigate(`/safety/incidents/${incident.id}/phase-2`, {
         state: {
           phase2Handoff: submitted.phase_2_handoff,
         },
