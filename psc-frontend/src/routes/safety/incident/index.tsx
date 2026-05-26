@@ -80,9 +80,6 @@ export default function SafetyIncidentIndexRoute() {
             <h1 className="text-3xl font-semibold text-slate-900">
               Safety Incidents
             </h1>
-            <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Live incident register filtered by your current vessel scope and Safety permissions.
-            </p>
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div>Scoped vessels: {auth.scopedVesselLabel}</div>
@@ -203,9 +200,8 @@ export default function SafetyIncidentIndexRoute() {
             Current Scope
           </h2>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <li>Incident list reads directly from <code>/api/safety/incidents/</code>.</li>
-            <li>Record links open the current incident phase route for each record.</li>
-            <li>Risk band and state filters are applied server-side.</li>
+            <li>Records are shown for your current vessel scope.</li>
+            <li>Risk band and state filters are applied to the register.</li>
           </ul>
         </aside>
       </div>

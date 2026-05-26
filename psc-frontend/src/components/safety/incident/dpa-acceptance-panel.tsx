@@ -60,14 +60,6 @@ export default function SafetyDpaAcceptancePanel({
             {preflight.alarp_complete ? "Complete" : "Incomplete"}
           </p>
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-            Process ID
-          </p>
-          <p className="mt-2 text-lg font-semibold text-slate-900">
-            {preflight.required_process_id}
-          </p>
-        </article>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
@@ -93,11 +85,6 @@ export default function SafetyDpaAcceptancePanel({
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <p className="font-semibold text-slate-900">Draft PDF Preview</p>
             <p className="mt-2">{preflight.pdf_preview.message}</p>
-            {preflight.pdf_preview.download_path ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Download route: {preflight.pdf_preview.download_path}
-              </p>
-            ) : null}
           </div>
         </div>
 

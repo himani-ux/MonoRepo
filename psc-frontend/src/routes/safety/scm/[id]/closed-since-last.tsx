@@ -44,7 +44,7 @@ export default function SafetyScmClosedSinceLastRoute() {
           Closed-Since-Last SCM
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Records closed after the previous SCM sign-off are now shown from the live backend summary.
+          Records closed after the previous SCM sign-off are shown here.
         </p>
       </header>
 

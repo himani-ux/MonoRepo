@@ -60,11 +60,6 @@ export function SafetyFleetAlertComposer({
             value={alertText}
           />
         </label>
-        <p className="mt-3 text-xs leading-5 text-slate-500">
-          Workspace note: the real Circular-module publish API is still a carried
-          handover gap, so this route currently represents the Step 2.5 composer
-          and notification fan-out contract.
-        </p>
       </section>
 
       <div className="grid gap-5">

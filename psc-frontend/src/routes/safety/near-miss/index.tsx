@@ -52,9 +52,6 @@ export default function SafetyNearMissIndexRoute() {
             <h1 className="text-3xl font-semibold text-slate-900">
               Near Miss Register
             </h1>
-            <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Live near-miss records with API-enforced reporter masking for non-DPA/FM viewers.
-            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
             <div>Scoped vessels: {auth.scopedVesselLabel}</div>
@@ -77,9 +74,6 @@ export default function SafetyNearMissIndexRoute() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Current register</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Results are loaded from the live near-miss list endpoint.
-            </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <select

@@ -230,9 +230,6 @@ export function SafetyIncidentPhase8() {
               Track corrective actions, verify recommendation effectiveness, record deferrals with justification, and close the incident when blockers are clear.
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            Required process: <span className="font-semibold text-slate-900">{workspace.required_process_id}</span>
-          </div>
         </div>
       </header>
 

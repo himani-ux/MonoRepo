@@ -86,10 +86,6 @@ export default function SafetyAuditorExportRoute() {
           Safety / Auditor Export
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">Auditor Bundle Export</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Build a backend-generated auditor leave-behind ZIP from live Safety records. Vessel scope,
-          export authority, attachment manifests, and audit persistence are enforced server-side.
-        </p>
         <Link
           className="mt-5 inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
           to="/safety/admin"
@@ -125,7 +121,7 @@ export default function SafetyAuditorExportRoute() {
             <input
               className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-normal text-slate-900 outline-none focus:border-slate-500"
               onChange={(event) => setVesselId(event.target.value)}
-              placeholder="Optional; backend scope still applies"
+              placeholder="Optional"
               value={vesselId}
             />
           </label>
@@ -149,11 +145,6 @@ export default function SafetyAuditorExportRoute() {
             ))}
           </div>
         </fieldset>
-
-        <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">
-          Frontend selection is only request UX. The backend still applies Safety form permission,
-          role gate, vessel scope, attachment access, and audit/export persistence.
-        </section>
 
         {error ? <p className="text-sm font-medium text-rose-700">{error}</p> : null}
         {lastExportFile ? (

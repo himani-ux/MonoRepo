@@ -48,9 +48,6 @@ export default function SafetyScmIndexRoute() {
             <h1 className="text-3xl font-semibold text-slate-900">
               Safety Committee Meetings
             </h1>
-            <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Fleet and vessel SCM records with cadence status, meeting state, and agenda-section progress.
-            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
             <div>Scoped vessels: {auth.scopedVesselLabel}</div>

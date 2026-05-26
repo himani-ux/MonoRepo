@@ -73,15 +73,9 @@ export default function SafetySoiPdfRoute() {
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">
             SOI Summary PDF
           </h2>
-          <p className="mt-3 max-w-3xl text-sm text-slate-600">
-            The SOI export summary now reflects the live inspection metadata instead of demo values.
-          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Permission: <span className="font-semibold text-slate-900">SAF_P_023</span>
-          <div className="mt-2 text-xs text-slate-500">
-            Inspection #{inspection.id}
-          </div>
+          Inspection #{inspection.id}
         </div>
       </header>
 
@@ -89,7 +83,7 @@ export default function SafetySoiPdfRoute() {
         <div>
           <h3 className="text-base font-semibold text-slate-900">Signed SOI summary</h3>
           <p className="mt-1 text-sm text-slate-600">
-            Download the live backend PDF for filing, audit review, or print.
+            Download the PDF for filing, audit review, or print.
           </p>
         </div>
         <button

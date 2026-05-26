@@ -186,7 +186,7 @@ export function SafetyIncidentPhase7() {
       );
     }
     if (!hasRequiredProcess) {
-      reasons.push(`Your login does not have required process ${requiredProcessId || "for this phase"}.`);
+      reasons.push("This action is not available for your login.");
     }
     if (!hasBandAuthority) {
       reasons.push("Your current login does not match the required closer authority for this risk band.");
@@ -327,9 +327,6 @@ export function SafetyIncidentPhase7() {
                 {authorityHelp}
               </p>
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <p>
-                  Required process: <span className="font-semibold text-slate-900">{requiredProcessId}</span>
-                </p>
                 {preflight.risk_band === "GREEN" ? (
                   <p className="mt-2">
                     Assigned PIC: <span className="font-semibold text-slate-900">{assignedPicUserId || "Not assigned"}</span>

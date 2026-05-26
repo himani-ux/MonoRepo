@@ -282,7 +282,7 @@ export default function SafetyScmAgendaEditor({
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Carried-forward open items</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Open SCM-linked corrective actions remain visible on the next agenda route so accountability persists between meetings.
+              Open SCM-linked corrective actions remain visible on the next agenda so accountability persists between meetings.
             </p>
           </div>
           <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">

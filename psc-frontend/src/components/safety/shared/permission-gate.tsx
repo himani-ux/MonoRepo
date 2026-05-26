@@ -40,7 +40,7 @@ export function PermissionGate({
   children,
   fallback = (
     <DefaultDeniedFallback
-      detail="Your current Safety form permissions do not include this route. Open a route linked to one of your seeded SAF_F_* permissions or update the assigned profile."
+      detail="Your current Safety access does not include this page. Please contact the office if you need access."
       title="Form access is not available for this page."
     />
   ),
@@ -59,7 +59,7 @@ export function ProcessGate({
   children,
   fallback = (
     <DefaultDeniedFallback
-      detail="You can view this Safety area, but the required SAF_P_* process permission for this action is not assigned to your profile."
+      detail="You can view this Safety area, but this action is not available for your login."
       title="Process access is not available for this page."
     />
   ),
@@ -78,7 +78,7 @@ export function RoleGate({
   children,
   fallback = (
     <DefaultDeniedFallback
-      detail="This Safety route is limited to specific vessel or office roles in the current rollout."
+      detail="This page is limited to selected vessel or office roles."
       title="Your role cannot open this page."
     />
   ),

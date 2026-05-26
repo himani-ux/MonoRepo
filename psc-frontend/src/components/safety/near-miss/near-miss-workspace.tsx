@@ -203,7 +203,7 @@ function buildClosureBlockers({
       blockers.push("HIGH-priority near miss closure is DPA/FM only.");
     }
     if (!hasCloseApproval) {
-      blockers.push("HIGH-priority near miss closure requires SAF_P_004.");
+      blockers.push("HIGH-priority near miss closure is not available for your login.");
     }
     if (!String(preventiveMeasures ?? nearMiss.near_miss_suggestion ?? "").trim()) {
       blockers.push("HIGH-priority near miss closure requires preventive measures.");
@@ -222,7 +222,7 @@ function buildClosureBlockers({
       blockers.push("LOW-priority near miss closure is restricted to Master, PIC, DPA, or FM authority.");
     }
     if (!canClose || (!hasCloseApproval && !hasPicClose)) {
-      blockers.push("LOW-priority near miss closure requires SAF_P_004 or SAF_P_006.");
+      blockers.push("LOW-priority near miss closure is not available for your login.");
     }
   } else {
     blockers.push("Near miss priority must be LOW or HIGH before closure.");
@@ -717,7 +717,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">{modeTitle(mode)}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Lightweight near-miss workflow with backend-controlled reporter masking, DPA triage, optional HIGH-priority fact analysis, fleet alert, and closure.
+              Lightweight near-miss workflow with protected reporter identity, DPA triage, optional HIGH-priority fact analysis, fleet alert, and closure.
             </p>
           </div>
           <button className="min-h-11 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white" onClick={() => void load()} type="button">
@@ -804,7 +804,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           {mode === "triage" ? (
             <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={submitTriage}>
               <h2 className="text-xl font-semibold text-slate-900">DPA Triage</h2>
-              {!canTriage ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Triage requires DPA role and SAF_P_002.</p> : null}
+              {!canTriage ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Triage is available only for authorized DPA users.</p> : null}
               {triageBlockedByReview ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Vessel-side review must submit this near miss to office before DPA triage.</p> : null}
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
@@ -897,7 +897,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
               </section>
               <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={createFact}>
                 <h2 className="text-xl font-semibold text-slate-900">Add Fact</h2>
-                {!canAnalyze ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Fact edits require SAF_P_002 and an investigation role.</p> : null}
+                {!canAnalyze ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Fact edits are not available for your login.</p> : null}
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <label className="block text-sm font-medium text-slate-700">
                     Sequence
@@ -940,7 +940,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           {mode === "fleet-alert" ? (
             <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={issueFleetAlert}>
               <h2 className="text-xl font-semibold text-slate-900">Fleet Alert</h2>
-              {!canIssueFleetAlert ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Fleet alert issue requires DPA role and SAF_P_024.</p> : null}
+              {!canIssueFleetAlert ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Issue circular/alert is available only for authorized DPA users.</p> : null}
               <div className="mt-4 grid gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Issued</p>
@@ -1093,7 +1093,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           {mode === "pdf" ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">PDF Export</h2>
-              <p className="mt-2 text-sm text-slate-600">The PDF is generated by the backend with reporter masking applied by serializer policy.</p>
               <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating} onClick={() => void downloadPdf()} type="button">
                 {isMutating ? "Preparing..." : "Download near-miss PDF"}
               </button>

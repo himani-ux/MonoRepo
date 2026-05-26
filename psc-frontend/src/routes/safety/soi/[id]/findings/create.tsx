@@ -496,7 +496,7 @@ export default function SafetySoiFindingCreateRoute() {
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Default ownership</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              If you leave Person Responsible blank, the backend defaults the finding owner to the Safety Officer:
+              If you leave Person Responsible blank, the finding owner will be the Safety Officer:
               <span className="font-medium text-slate-900">
                 {" "}
                 {formatResponsiblePerson(inspection.safety_officer_crew_id)}

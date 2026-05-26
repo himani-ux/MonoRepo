@@ -73,9 +73,6 @@ export default function SafetySoiCloseRoute() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">SOI Close Event</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              The close package now comes from the live SOI close snapshot and posts the Master signature to the backend.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">

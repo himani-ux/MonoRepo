@@ -21,25 +21,6 @@ export default function SafetyScmPdfRoute() {
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">
             SCM Legacy PDF
           </h2>
-          <p className="mt-3 max-w-3xl text-sm text-slate-600">
-            Step 6.4 now exposes the live backend route at
-            {" "}
-            <code>/api/safety/scm/:id/pdf/</code>
-            {" "}
-            and keeps the
-            {" "}
-            <code>/api/safety/export/scm/:id/pdf/</code>
-            {" "}
-            alias alive for docs drift. The PDF preserves the locked legacy
-            {" "}
-            <code>vw_GetSCM_Master</code>
-            {" "}
-            SCM section order, adds the Closed-Since-Last summary block at the top,
-            and keeps attendance plus signature status inline.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Permission: <span className="font-semibold text-slate-900">SAF_P_023</span>
         </div>
       </header>
 

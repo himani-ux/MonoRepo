@@ -63,8 +63,7 @@ export default function SafetySoiReprintModal({
         </div>
 
         <p className="mt-4 text-sm leading-6 text-slate-600">
-          Recovery keeps the existing checklist ID and re-serves the stored format. The backend
-          appends a timestamped loss note before returning the artifact.
+          Recovery keeps the existing checklist ID and stored format. A timestamped loss note is recorded before the file is returned.
         </p>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">

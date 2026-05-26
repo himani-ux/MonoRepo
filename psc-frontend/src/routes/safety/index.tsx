@@ -30,7 +30,7 @@ function renderWithSuspense(node: ReactNode) {
     <Suspense
       fallback={
         <SafetyRoutePlaceholderPage
-          description="Loading Safety route scaffold."
+          description="Loading Safety page."
           title="Loading"
         />
       }

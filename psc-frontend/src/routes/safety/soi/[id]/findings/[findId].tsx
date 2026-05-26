@@ -336,7 +336,7 @@ export default function SafetySoiFindingDetailRoute() {
           <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Repeat-finding visibility</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">
-              Repeat detection now comes from the backend repeat-finding service for this live record.
+              Repeat findings are checked for this record.
             </p>
           </section>
 

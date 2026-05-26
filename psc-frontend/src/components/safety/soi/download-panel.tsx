@@ -183,7 +183,7 @@ export default function SafetySoiDownloadPanel({
                 </p>
               </div>
               <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                Timestamped backend note required
+                Timestamped note required
               </span>
             </div>
           </div>

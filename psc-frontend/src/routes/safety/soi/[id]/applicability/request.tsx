@@ -81,7 +81,7 @@ export default function SafetySoiApplicabilityRequestRoute() {
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">SOI Applicability Request</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Area applicability requests now use the live vessel-area payload and submit to the backend approval queue.
+              Request approval when an inspection area is not applicable for this vessel.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">

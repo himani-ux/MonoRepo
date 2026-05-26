@@ -23,16 +23,6 @@ export default function SafetyCaseStudyLibraryPanel() {
           Case Study Library
         </p>
         <h2 className="mt-2 text-2xl font-semibold text-slate-900">Navigator + Sinkfast</h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          The seeded help-drawer content stays available to investigators on
-          {" "}
-          <code>/api/safety/master/case-studies/</code>
-          , while the DPA admin surface maintains the richer
-          {" "}
-          <code>/api/safety/reference/case-studies/</code>
-          {" "}
-          library entries.
-        </p>
       </article>
 
       <div className="grid gap-4 xl:grid-cols-2">

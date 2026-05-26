@@ -28,9 +28,7 @@ export default function SafetyWorkflowBlocked({
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-amber-950">{title}</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-900">
-          This production route is blocked until it reads and writes the live
-          Safety record. Placeholder data has been removed so this screen
-          cannot be mistaken for a complete office workflow.
+          This page is not available yet.
         </p>
         {recordId ? (
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
@@ -42,7 +40,7 @@ export default function SafetyWorkflowBlocked({
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Required live API work
+            Pending work
           </h2>
           <ul className="mt-4 space-y-3 text-sm text-slate-700">
             {requiredApi.map((item) => (

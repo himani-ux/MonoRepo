@@ -270,12 +270,6 @@ export default function SafetySoiIndexRoute() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Safety Officer Inspection</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Live SOI compliance summary and inspection register for the current vessel scope.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            SCM sign-off blockers and dashboard compliance now read from the same SOI backend records.
           </div>
         </div>
         {canCreate ? (
@@ -321,9 +315,6 @@ export default function SafetySoiIndexRoute() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Current SOI register</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Inspection register now reads directly from <code>/api/safety/soi/</code>.
-            </p>
           </div>
           <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-900">
             Live register

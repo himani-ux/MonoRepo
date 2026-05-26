@@ -486,10 +486,6 @@ export function IncidentOfficeReadRoute({
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_58%,#e0f2fe_100%)] p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">{area}</p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">{title}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          This route is now backed by the live Safety API for incident #{id}. Backend vessel scope,
-          role checks, phase gates, audit logs, and field-history rules remain server-enforced.
-        </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
             className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
@@ -502,15 +498,15 @@ export function IncidentOfficeReadRoute({
             onClick={() => void reload()}
             type="button"
           >
-            Refresh backend state
+            Refresh
           </button>
         </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
         <StatusCard label="Record" value={`Incident #${id}`} />
-        <StatusCard label="Source" value="Live Safety API" />
-        <StatusCard label="Security" value="Backend vessel scope enforced" />
+        <StatusCard label="Scope" value="Current vessel access" />
+        <StatusCard label="Security" value="Access controlled" />
       </section>
 
       {children?.({ payload, reload, setPayload })}
@@ -663,7 +659,7 @@ export function IncidentPdfRoute() {
         <DownloadCard
           buttonLabel="Download incident PDF"
           downloader={safetyApi.downloadIncidentPdf}
-          helperText="Requests the generated PDF from the backend. Export permission and vessel scope are enforced server-side."
+          helperText="Download the generated PDF."
         />
       )}
     </IncidentOfficeReadRoute>
@@ -681,7 +677,7 @@ export function IncidentMscMepc3Route() {
         <DownloadCard
           buttonLabel="Download MSC-MEPC.3 export"
           downloader={safetyApi.downloadIncidentMscMepc3}
-          helperText="DPA-only backend export route for the MSC-MEPC.3/Circ.4 report."
+          helperText="Download the MSC-MEPC.3/Circ.4 report."
         />
       )}
     </IncidentOfficeReadRoute>

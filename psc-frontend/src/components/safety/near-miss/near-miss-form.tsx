@@ -246,8 +246,7 @@ export function SafetyNearMissForm({
           Create Near Miss
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Any rank may submit a near miss. Reporter identity is retained for DPA and
-          FM, but the frontend treats the anonymity boundary as server-owned.
+          Any rank may submit a near miss. Reporter identity is protected and is visible only to authorized office users.
         </p>
       </header>
 
@@ -315,7 +314,7 @@ export function SafetyNearMissForm({
               value={toDateTimeLocalValue(values.occurred_at)}
             />
             <span className="block text-xs leading-5 text-slate-500">
-              Required. The backend rejects future occurrence times.
+              Required. Future occurrence times are not allowed.
             </span>
           </label>
 
@@ -463,16 +462,13 @@ export function SafetyNearMissForm({
                   Reporter identity will be resolved from login/session; contact admin if missing.
                 </p>
               ) : null}
-              <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
-                Reporter identity is filled from the current login and submitted as backend-owned context. DPA/FM visibility is still enforced by the backend anonymity layer.
-              </p>
             </div>
           </section>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Submission guardrails</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Server-side enforcement is active on submit: near-miss descriptions must
+              On submit, near-miss descriptions must
               reach 100 characters, and each crew member is capped at 5 submissions per
               vessel-local day with reset guidance at 00:00 LT. DPA triage assigns
               LOW or HIGH priority after submission.
@@ -487,7 +483,7 @@ export function SafetyNearMissForm({
                   {rateLimitStatus.guidance_message}
                 </p>
               ) : (
-                <p>{rateLimitError ?? "Submission allowance will be checked by the backend."}</p>
+                <p>{rateLimitError ?? "Submission allowance will be checked before submit."}</p>
               )}
             </div>
             <button

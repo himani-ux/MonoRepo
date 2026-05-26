@@ -31,7 +31,7 @@ const periodOptions: Array<{
   label: string;
 }> = [
   { id: "90D", label: "90D", description: "Operational view focused on the current 90-day window." },
-  { id: "12M", label: "12M", description: "Annual trend view using the same backend rollup contract." },
+  { id: "12M", label: "12M", description: "Annual trend view for the selected scope." },
   { id: "3Y", label: "3Y", description: "Rolling 3-year baseline for the Safety health score." },
 ];
 
@@ -256,9 +256,6 @@ export default function SafetyDashboardRoute() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Score window</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Select the backend rollup period. The chosen period is stored per user on this device.
-            </p>
           </div>
           <div className="flex flex-col gap-3 lg:items-end">
             {hasVesselSelector ? (
@@ -446,18 +443,12 @@ export default function SafetyDashboardRoute() {
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                   Dashboard Export
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-slate-900">
-                  Real PDF and Excel export
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  The export action now calls the live dashboard export endpoint for the selected
-                  period and current scope.
-                </p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">PDF and Excel export</h2>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 {canExport
-                  ? "Export enabled for DPA with SAF_P_023."
-                  : "Export is limited to DPA users with SAF_P_023."}
+                  ? "Export is available for your login."
+                  : "Export is limited to authorized office users."}
               </div>
             </div>
 

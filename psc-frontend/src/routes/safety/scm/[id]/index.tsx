@@ -518,7 +518,7 @@ export default function SafetyScmDetailRoute() {
                 className="inline-flex min-h-[44px] items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
                 to={`/safety/scm/${meeting.id}/signoff`}
               >
-                Open sign-off route
+                Master's closure for scm
               </Link>
             ) : null}
           </div>

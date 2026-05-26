@@ -133,9 +133,6 @@ export function SafetyIncidentReopenWorkspace() {
               Reopen a closed Phase 9 incident with band-gated authority and an auditable reason. Reopened incidents return to Phase 5.
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            Required process: <span className="font-semibold text-slate-900">SAF_P_008</span>
-          </div>
         </div>
       </header>
 
