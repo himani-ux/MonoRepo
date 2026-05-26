@@ -19,7 +19,7 @@ const PDFArchive = () => {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch("http://localhost:8000/api/orb/api/vessels/")
+    fetch("/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -60,7 +60,7 @@ const PDFArchive = () => {
       // Use the vesselId from state or sessionStorage (it should be available now)
       // const vesselId = sessionStorage.getItem("selectedVesselId"); // Already defined above
 
-      let url = `http://localhost:8000/api/orb/api/list-pdfs/?page=${page}&page_size=10`;
+      let url = `/api/orb/api/list-pdfs/?page=${page}&page_size=10`;
       if (vesselId) {
         url += `&vessel_id=${vesselId}`;
       }
@@ -91,7 +91,7 @@ const PDFArchive = () => {
 
   const handleDownload = (downloadUrl) => {
     const link = document.createElement('a');
-    link.href = `http://localhost:8000${downloadUrl}`;
+    link.href = `${downloadUrl}`;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     document.body.appendChild(link);

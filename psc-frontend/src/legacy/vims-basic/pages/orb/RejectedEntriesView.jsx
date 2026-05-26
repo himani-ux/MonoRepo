@@ -25,7 +25,7 @@ const RejectedEntriesView = () => {
 
     try {
       // Call the NEW independent backend endpoint for rejected entries
-      const response = await fetch(`http://localhost:8000/api/orb/api/rejected-entries/?vessel_id=${vesselId}`, {
+      const response = await fetch(`/api/orb/api/rejected-entries/?vessel_id=${vesselId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +63,7 @@ const RejectedEntriesView = () => {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch("http://localhost:8000/api/orb/api/vessels/")
+    fetch("/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);

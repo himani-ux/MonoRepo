@@ -47,7 +47,7 @@ export default function PdfViewerPage() {
         console.log("crew_id:", currentUser.crew_id)
         console.log("crew_role:", currentUser.role)
         const res = await fetch(
-          `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notificationId)}&crew_id=${currentUser.crew_id}`
+          `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notificationId)}&crew_id=${currentUser.crew_id}`
         );
         console.log("Fetch response:", res.status);
 

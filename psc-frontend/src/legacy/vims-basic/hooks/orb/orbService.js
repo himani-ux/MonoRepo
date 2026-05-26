@@ -1,5 +1,5 @@
 // src/services/orbService.js
-const API_BASE_URL = "http://localhost:8000/api/orb/api";
+const API_BASE_URL = "/api/orb/api";
 
 export const orbService = {
   // Fetch operations

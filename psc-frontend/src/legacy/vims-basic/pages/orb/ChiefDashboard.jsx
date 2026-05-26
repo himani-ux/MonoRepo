@@ -71,7 +71,7 @@ export default function ChiefDashboard() {
   const refresh = async () => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
+        `/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
       );
       const data = await response.json();
       const ops = Array.isArray(data) ? data : data.results || [];
@@ -160,7 +160,7 @@ export default function ChiefDashboard() {
     console.log("📅 Date Range:", formatDate(fromDate), "to", formatDate(today));
 
     try {
-      const url = `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false`;
+      const url = `/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false`;
       console.log("🔗 Fetching from:", url);
 
       const response = await fetch(url);
@@ -252,7 +252,7 @@ export default function ChiefDashboard() {
   useEffect(() => {
     const fetchCodes = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/orb/api/codes/");
+        const res = await fetch("/api/orb/api/codes/");
         const data = await res.json();
         const codeList = Array.isArray(data) ? data : data.results || [];
         setCodes(codeList);
@@ -272,7 +272,7 @@ useEffect(() => {
   const vesselId = user?.vessel_id;
   if (!vesselId) return;
 
-  fetch("http://localhost:8000/api/orb/api/vessels/")
+  fetch("/api/orb/api/vessels/")
     .then(res => res.json())
     .then(data => {
       const vesselList = Array.isArray(data) ? data : data.results || [];
@@ -294,7 +294,7 @@ useEffect(() => {
 
   useEffect(() => {
     const fetchCSRF = async () => {
-      const response = await fetch("http://localhost:8000/api/orb/api/csrf/", {
+      const response = await fetch("/api/orb/api/csrf/", {
         credentials: 'include'  //  this is required , if not used then permissions will b denied
       });
       const data = await response.json();
@@ -345,7 +345,7 @@ useEffect(() => {
 
     try {
       //  this is sends only the date part , crops the timing
-      const url = `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false&from_date=${from}&to_date=${to}`;
+      const url = `/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false&from_date=${from}&to_date=${to}`;
       console.log("Fetching from:", url);
 
       const response = await fetch(url);
@@ -474,7 +474,7 @@ useEffect(() => {
     try {
       // Fetch the Django server's LOCAL IP address from your OWN backend endpoint
       // This endpoint now uses Python code to find the server's IP, not Node.js
-      const ipResponse = await fetch('http://localhost:8000/api/orb/api/get-internal-ip/'); // Use your backend's URL
+      const ipResponse = await fetch('/api/orb/api/get-internal-ip/'); // Use your backend's URL
       if (!ipResponse.ok) {
         throw new Error(`Failed to get server's local IP: ${ipResponse.status} - ${await ipResponse.text()}`);
       }
@@ -692,7 +692,7 @@ useEffect(() => {
         };
 
         // Send metadata to backend (backend handles file saving)
-        const metadataResponse = await fetch("http://localhost:8000/api/orb/api/save-pdf-metadata/", {
+        const metadataResponse = await fetch("/api/orb/api/save-pdf-metadata/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -768,7 +768,7 @@ useEffect(() => {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/orb/api/update-print-status/", { // this is the backend endpoint(API)
+      const response = await fetch("/api/orb/api/update-print-status/", { // this is the backend endpoint(API)
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -802,7 +802,7 @@ useEffect(() => {
     const approvedBy = `${user?.first_name || "UNKNOWN"} ${user?.surname || ""} (${user?.ran || "OFFICER"})`.trim();
 
     try {
-      const response = await fetch(`http://localhost:8000/api/orb/api/operations/${id}/approve/`, {
+      const response = await fetch(`/api/orb/api/operations/${id}/approve/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -833,7 +833,7 @@ useEffect(() => {
     const rejectedBy = `${user?.first_name || "UNKNOWN"} ${user?.surname || ""} (${user?.rank || "OFFICER"})`.trim();
 
     try {
-      const response = await fetch(`http://localhost:8000/api/orb/api/operations/${id}/reject/`, {
+      const response = await fetch(`/api/orb/api/operations/${id}/reject/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -872,7 +872,7 @@ useEffect(() => {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/orb/api/operations/", {
+      const response = await fetch("/api/orb/api/operations/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

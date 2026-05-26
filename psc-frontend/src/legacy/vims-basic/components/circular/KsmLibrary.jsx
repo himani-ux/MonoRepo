@@ -183,8 +183,8 @@ const KsmLibrary = ({
       console.log('User role:', user.role, 'rank:', user.rank, 'role_name:', user.role_name, 'isMaster:', isMaster);
 
       const endpoint = isMaster
-        ? 'http://localhost:8000/api/circular/api/ship/notifications/'
-        : 'http://localhost:8000/api/circular/api/crew/notifications/';
+        ? '/api/circular/api/ship/notifications/'
+        : '/api/circular/api/crew/notifications/';
       const crewId = user.crew_id || user.username;
       console.log('Fetching from:', endpoint);
       console.log("✅ Fetching notifications from:", endpoint, "with crew_id:", crewId);
@@ -254,7 +254,7 @@ const KsmLibrary = ({
     const fetchCrewList = async () => {
       setCrewLoading(true);
       try {
-        const res = await fetch(`http://localhost:8000/api/circular/api/crew/list/?notification_id=${selectedId}&crew_id=${user.crew_id || user.username}`);
+        const res = await fetch(`/api/circular/api/crew/list/?notification_id=${selectedId}&crew_id=${user.crew_id || user.username}`);
         if (!res.ok) throw new Error('Failed to load crew status');
         const data = await res.json();
         const localReminderState = remindedCrewByNotification[selectedId] || {};
@@ -319,7 +319,7 @@ const KsmLibrary = ({
     setSendingCrewReminder(employeeId);
 
     try {
-      const res = await fetch('http://localhost:8000/api/circular/api/msc/remind-crew/', {
+      const res = await fetch('/api/circular/api/msc/remind-crew/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -365,7 +365,7 @@ const KsmLibrary = ({
     if (!canAcknowledge) return;
     
     try {
-      const res = await fetch('http://localhost:8000/api/circular/api/msc/read-ack/', {
+      const res = await fetch('/api/circular/api/msc/read-ack/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -391,7 +391,7 @@ const KsmLibrary = ({
     try {
       const crewId = user?.crew_id || user?.username;
       const res = await fetch(
-        `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${encodeURIComponent(crewId)}`
+        `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${encodeURIComponent(crewId)}`
       );
 
       if (!res.ok) {

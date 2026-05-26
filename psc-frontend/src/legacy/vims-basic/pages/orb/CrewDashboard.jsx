@@ -176,7 +176,7 @@ export default function CrewDashboard({ isChiefMode = false, onSubmit }) {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Pending`)
+    fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Pending`)
       .then((r) => r.json())
       .then((data) => {
         const ops = Array.isArray(data) ? data : data.results || [];
@@ -205,7 +205,7 @@ export default function CrewDashboard({ isChiefMode = false, onSubmit }) {
 useEffect(() => {
   async function fetchCodes() {
     try {
-      const res = await fetch("http://localhost:8000/api/orb/api/codes/");
+      const res = await fetch("/api/orb/api/codes/");
       console.log("Fetch response in codes:", res);
       const data = await res.json();
 
@@ -243,7 +243,7 @@ useEffect(() => {
       typeof currentVessel === "string" ? currentVessel : currentVessel.id;
 
     fetch(
-      `http://localhost:8000/api/orb/api/tanks-for-orb/?vessel_id=${vesselParam}&orb_code=${formData.code}`
+      `/api/orb/api/tanks-for-orb/?vessel_id=${vesselParam}&orb_code=${formData.code}`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -306,7 +306,7 @@ useEffect(() => {
 
     try {
       // Fetch Pending entries (existing logic)
-      const res = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Pending`);
+      const res = await fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Pending`);
       if (!res.ok) {
         console.error("Failed to load entries:", await res.text());
         return;
@@ -317,19 +317,19 @@ useEffect(() => {
       setEntries(grouped);
 
       // Fetch Approved entries
-      const approvedRes = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Approved`);
+      const approvedRes = await fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Approved`);
       const approvedData = await approvedRes.json();
       const approvedOps = Array.isArray(approvedData) ? approvedData : approvedData.results || [];
       setLastApprovedEntries(approvedOps); // Store for comparison
 
       // Fetch Rejected entries
-      const rejectedRes = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Rejected`);
+      const rejectedRes = await fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false&status=Rejected`);
       const rejectedData = await rejectedRes.json();
       const rejectedOps = Array.isArray(rejectedData) ? rejectedData : rejectedData.results || [];
       setLastRejectedEntries(rejectedOps); // Store for comparison
 
       // Fetch Deleted entries
-      const deletedRes = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=true`);
+      const deletedRes = await fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=true`);
       const deletedData = await deletedRes.json();
       const deletedOps = Array.isArray(deletedData) ? deletedData : deletedData.results || [];
       setLastDeletedEntries(deletedOps); // Store for comparison
@@ -1097,7 +1097,7 @@ useEffect(() => {
       }
 
       // 🔹 1. Fetch raw entries
-      const res = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`);
+      const res = await fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`);
       const data = await res.json();
 
       let allRawEntries = [];
@@ -1352,7 +1352,7 @@ useEffect(() => {
 
     let latestEntryDate = null;
     try {
-      const latestResponse = await fetch(`http://localhost:8000/api/orb/api/latest-entry-date/?vessel_id=${vesselId}`);
+      const latestResponse = await fetch(`/api/orb/api/latest-entry-date/?vessel_id=${vesselId}`);
       if (!latestResponse.ok) {
         // If the endpoint doesn't exist yet or returns an error (e.g., no entries), handle gracefully
         // console.error("Error fetching latest entry date:", await latestResponse.text());
@@ -1425,7 +1425,7 @@ useEffect(() => {
     //   . Fetch all raw entries for validation (e.g., for Code A)
     let allRawEntries = [];
     try {
-      const res = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`);
+      const res = await fetch(`/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`);
       const data = await res.json();
       allRawEntries = Array.isArray(data) ? data : data.results || [];
     } catch (err) {
@@ -1439,7 +1439,7 @@ useEffect(() => {
       //  Fetch ALL raw entries for validation
       
       const allRawEntriesResponse = await fetch(
-        `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
+        `/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
       );
       const allRawEntries = await allRawEntriesResponse.json();
       console.log("allrawentries for c", allRawEntries)
@@ -1541,7 +1541,7 @@ useEffect(() => {
       console.log("DEBUG: Sending payload for update:", payload); // Add this line for debugging
       try {
         // Send the SINGLE 'payload' object (NOT wrapped in an array)
-        const updateResponse = await fetch(`http://localhost:8000/api/orb/api/operations/${editingEntryId}/update-group/`, {
+        const updateResponse = await fetch(`/api/orb/api/operations/${editingEntryId}/update-group/`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1599,14 +1599,14 @@ useEffect(() => {
 
       try {
         //  Save Code F
-        await fetch("http://localhost:8000/api/orb/api/operations/", {
+        await fetch("/api/orb/api/operations/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(pendingFEntry)
         });
 
         //   . Save Code I
-        await fetch("http://localhost:8000/api/orb/api/operations/", {
+        await fetch("/api/orb/api/operations/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -1629,7 +1629,7 @@ useEffect(() => {
 
     //   . For all other codes (or Code I without pending F)
     try {
-      const response = await fetch("http://localhost:8000/api/orb/api/operations/", {
+      const response = await fetch("/api/orb/api/operations/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1998,7 +1998,7 @@ useEffect(() => {
     // ... (ownership check, confirm dialog) ...
     try {
       // Send PATCH request to the main resource endpoint
-      const response = await fetch(`http://localhost:8000/api/orb/api/operations/${id}/`, { // Correct endpoint
+      const response = await fetch(`/api/orb/api/operations/${id}/`, { // Correct endpoint
         method: 'PATCH', // Use PATCH
         headers: {
           'Content-Type': 'application/json',

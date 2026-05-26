@@ -46,7 +46,7 @@ const AdminAllNotifications = () => {
             }
 
             const queryParams = new URLSearchParams(params).toString();
-            const response = await fetch(`http://localhost:8000/api/circular/api/submitted/?${queryParams}`);
+            const response = await fetch(`/api/circular/api/submitted/?${queryParams}`);
 
             if (!response.ok) {
                 if (response.status === 404) {

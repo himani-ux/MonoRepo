@@ -62,7 +62,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             console.log("fetchUserDrafts: Query params:", queryParams);
 
-            const response = await fetch(`http://localhost:8000/api/circular/api/user-drafts/?${queryParams}`);
+            const response = await fetch(`/api/circular/api/user-drafts/?${queryParams}`);
             console.log("fetchUserDrafts: Response status:", response.status);
 
             if (!response.ok) {
@@ -106,7 +106,7 @@ const DraftNotifications = ({ currentUser }) => {
         const fetchOptions = async () => {
             try {
                 // Fetch document types
-                const docRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
+                const docRes = await fetch('/api/circular/api/document-types/');
                 const docData = await docRes.json();
                 const docTypeMap = {};
                 const docIdToNameMap = {};
@@ -122,7 +122,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToTypeMap(docIdToNameMap); // Populate idToTypeMap here
 
                 // Fetch priorities
-                const prioRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
+                const prioRes = await fetch('/api/circular/api/priorities/');
                 const prioData = await prioRes.json();
                 const prioMap = {};
                 const prioIdToNameMap = {};
@@ -138,7 +138,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToPriorityMap(prioIdToNameMap); //  Populate idToPriorityMap here
 
                 // Fetch departments
-                const deptRes = await fetch('http://localhost:8000/api/circular/api/departments/');
+                const deptRes = await fetch('/api/circular/api/departments/');
                 const deptData = await deptRes.json();
                 const deptMap = {};
                 const deptIdToNameMap = {};
@@ -154,7 +154,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToDeptMap(deptIdToNameMap); //  Populate idToDeptMap here
 
                 // Fetch sub-categories
-                const subCatRes = await fetch('http://localhost:8000/api/circular/api/sub-categories/');
+                const subCatRes = await fetch('/api/circular/api/sub-categories/');
                 const subCatData = await subCatRes.json();
                 const subCatIdToNameMap = {};
                 if (Array.isArray(subCatData)) {
@@ -168,7 +168,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToSubCatMap(subCatIdToNameMap); // ✅ Populate idToSubCatMap here
 
                 // Fetch second sub-categories (example - adjust as needed)
-                const secondSubCatRes = await fetch('http://localhost:8000/api/circular/api/second-sub-categories/');
+                const secondSubCatRes = await fetch('/api/circular/api/second-sub-categories/');
                 const secondSubCatData = await secondSubCatRes.json();
                 const secondSubCatIdToNameMap = {};
                 if (Array.isArray(secondSubCatData)) {
@@ -359,7 +359,7 @@ const DraftNotifications = ({ currentUser }) => {
         try {
             console.log("handleDeleteClick: Sending delete request for SR No:", srNo);
             // Use the new delete endpoint
-            const response = await fetch(`http://localhost:8000/api/circular/api/draft/${srNo}/delete/`, {
+            const response = await fetch(`/api/circular/api/draft/${srNo}/delete/`, {
                 method: 'POST', // Using POST to avoid browser compatibility issues
                 headers: {
                     'Content-Type': 'application/json',

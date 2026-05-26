@@ -24,7 +24,7 @@ const DeletedEntriesView = () => {
     setError(null); 
     try {
       // Call the NEW independent backend endpoint for deleted entries
-      const response = await fetch(`http://localhost:8000/api/orb/api/deleted-entries/?vessel_id=${vesselId}`, {
+      const response = await fetch(`/api/orb/api/deleted-entries/?vessel_id=${vesselId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ const DeletedEntriesView = () => {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch("http://localhost:8000/api/orb/api/vessels/")
+    fetch("/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);

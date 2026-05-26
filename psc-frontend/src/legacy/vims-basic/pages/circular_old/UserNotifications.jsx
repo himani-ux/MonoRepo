@@ -39,7 +39,7 @@ const UserNotifications = ({ currentUser }) => {
                 sort_order: order,
             }).toString();
 
-            const response = await fetch(`http://localhost:8000/api/circular/api/user-notifications/?${queryParams}`);
+            const response = await fetch(`/api/circular/api/user-notifications/?${queryParams}`);
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn("User notifications endpoint not found (404).");

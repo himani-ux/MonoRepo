@@ -33,7 +33,7 @@ export default function ORBHeader() {
     }
 
     // Fetch vessel details using the storedVesselId
-    fetch("http://localhost:8000/api/orb/api/vessels/")
+    fetch("/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);

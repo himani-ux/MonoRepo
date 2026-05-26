@@ -35,7 +35,7 @@ const PdfViewer = ({
         console.log('notification.id', notification.id);
         console.log('user.crew_id', user.crew_id);
         const res = await fetch(
-          `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${user.crew_id}`
+          `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${user.crew_id}`
         );
 
         if (!res.ok) {
@@ -121,7 +121,7 @@ const PdfViewer = ({
     if (hasAcknowledged) return;
 console.log('Acknowledging notification:', notification.id,user.crew_id,user.role);
     try {
-      const res = await fetch('http://localhost:8000/api/circular/api/msc/read-ack/', {
+      const res = await fetch('/api/circular/api/msc/read-ack/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
