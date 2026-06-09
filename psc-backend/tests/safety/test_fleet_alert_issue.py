@@ -56,7 +56,7 @@ class FleetAlertIssueTests(unittest.TestCase):
             incident_number="NM/2026/023",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="HIGH",
             narrative="A suspended-work platform staging pin was found unsecured before anyone transferred load, so the team stopped work, isolated the ladder, and reported the exposure immediately for fleet learning.",

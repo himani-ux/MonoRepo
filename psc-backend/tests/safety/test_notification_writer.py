@@ -47,3 +47,26 @@ class NotificationWriterTests(unittest.TestCase):
         self.assertEqual(len(persisted), 3)
         self.assertEqual([row[0] for row in persisted], ["PIC-1", "DPA", "SAFETY_CHANNEL"])
         self.assertTrue(all(row[1] == "INCIDENT_PHASE_2_SUBMITTED" for row in persisted))
+
+    def test_skips_write_when_master_notification_schema_is_old(self) -> None:
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS master_notification")
+            cursor.execute(
+                """
+                CREATE TABLE master_notification (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title VARCHAR(256) NOT NULL,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+
+        rows = self.writer.write_notification(
+            record_id=42,
+            recipients=["PIC-1"],
+            kind="INCIDENT_PHASE_2_SUBMITTED",
+            title="Incident submitted to office",
+            message="Incident 42 has entered Phase 3.",
+        )
+
+        self.assertEqual(rows, [])

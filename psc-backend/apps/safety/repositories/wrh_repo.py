@@ -73,6 +73,59 @@ class WRHRepository(BaseRepository):
         )
         return rows[0] if rows else None
 
+    def list_latest_rest_snapshots(
+        self,
+        *,
+        crew_ids: Iterable[str],
+        vessel_id: str,
+        meeting_date: date | datetime | str,
+    ) -> list[dict[str, object]]:
+        normalized_crew_ids = [str(crew_id).strip() for crew_id in crew_ids if str(crew_id).strip()]
+        if not normalized_crew_ids:
+            return []
+
+        placeholders = ", ".join(["%s"] * len(normalized_crew_ids))
+        return self.execute_query(
+            f"""
+            WITH ranked_wrh AS (
+                SELECT
+                    d.crew_id,
+                    m.vessel_id,
+                    d.work_date_local,
+                    d.total_rest_24h,
+                    d.total_rest_7d,
+                    d.mlc_10h_24h_status,
+                    d.mlc_77h_7d_status,
+                    d.is_not_onboard,
+                    d.is_dateline_skip,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY d.crew_id
+                        ORDER BY d.work_date_local DESC, d.id DESC
+                    ) AS row_number
+                FROM wrh_s520_day_entry d
+                INNER JOIN wrh_s520_month m ON m.id = d.s520_month_id
+                WHERE m.vessel_id = %s
+                  AND d.crew_id IN ({placeholders})
+                  AND d.work_date_local <= %s
+                  AND COALESCE(d.is_not_onboard, 0) = 0
+                  AND COALESCE(d.is_dateline_skip, 0) = 0
+            )
+            SELECT
+                crew_id,
+                vessel_id,
+                work_date_local,
+                total_rest_24h,
+                total_rest_7d,
+                mlc_10h_24h_status,
+                mlc_77h_7d_status,
+                is_not_onboard,
+                is_dateline_skip
+            FROM ranked_wrh
+            WHERE row_number = 1
+            """,
+            [str(vessel_id), *normalized_crew_ids, self._coerce_date(meeting_date).isoformat()],
+        )
+
     def list_fatigue_lookback_rows(
         self,
         *,

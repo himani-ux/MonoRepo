@@ -138,11 +138,15 @@ export function SafetyLossTypeSelect({
 export function SafetyMscatPicker({
   className,
   label = "M-SCAT code",
+  bottomOptionLabel,
+  onBottomOptionSelect,
   onChange,
   value,
 }: {
   className?: string;
   label?: string;
+  bottomOptionLabel?: string;
+  onBottomOptionSelect?: () => void;
   onChange: (value: { categoryId: number | null; subcodeId: string | null }) => void;
   value?: { categoryId?: number | null; subcodeId?: string | null };
 }) {
@@ -175,8 +179,38 @@ export function SafetyMscatPicker({
           .toLowerCase()
           .includes(normalizedQuery);
       })
-      .slice(0, 80);
+      .sort((left, right) => {
+        if (left.category_id !== right.category_id) {
+          return left.category_id - right.category_id;
+        }
+        return compareNaturalItemNumber(left.subcode_id, right.subcode_id);
+      });
   }, [options, query]);
+  const groupedFilteredOptions = useMemo(() => {
+    const groups: Array<{
+      categoryId: number;
+      categoryName: string;
+      options: SafetyReferenceMscatOption[];
+    }> = [];
+    const groupIndex = new Map<string, number>();
+
+    filteredOptions.forEach((option) => {
+      const key = `${option.category_id}-${option.category_name}`;
+      let index = groupIndex.get(key);
+      if (index === undefined) {
+        index = groups.length;
+        groupIndex.set(key, index);
+        groups.push({
+          categoryId: option.category_id,
+          categoryName: option.category_name,
+          options: [],
+        });
+      }
+      groups[index].options.push(option);
+    });
+
+    return groups;
+  }, [filteredOptions]);
 
   useEffect(() => {
     if (!selectedOption) {
@@ -208,32 +242,50 @@ export function SafetyMscatPicker({
       {isOpen && (
         <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
           {filteredOptions.length ? (
-            filteredOptions.map((option) => (
-              <button
-                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
-                key={option.id}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  setQuery(`${option.subcode_id} - ${option.subcode_description}`);
-                  setIsOpen(false);
-                  onChange({
-                    categoryId: option.category_id,
-                    subcodeId: option.subcode_id,
-                  });
-                }}
-                type="button"
-              >
-                <span className="block font-medium text-slate-900">
-                  {option.subcode_id} - {option.subcode_description}
-                </span>
-                <span className="block text-xs text-slate-500">
-                  {option.category_id} {option.category_name}
-                </span>
-              </button>
+            groupedFilteredOptions.map((group) => (
+              <div key={`${group.categoryId}-${group.categoryName}`}>
+                <div className="sticky top-0 z-10 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold uppercase text-slate-600">
+                  {group.categoryId} {group.categoryName}
+                </div>
+                {group.options.map((option) => (
+                  <button
+                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                    key={option.id}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      setQuery(`${option.subcode_id} - ${option.subcode_description}`);
+                      setIsOpen(false);
+                      onChange({
+                        categoryId: option.category_id,
+                        subcodeId: option.subcode_id,
+                      });
+                    }}
+                    type="button"
+                  >
+                    <span className="block font-medium text-slate-900">
+                      {option.subcode_id} - {option.subcode_description}
+                    </span>
+                  </button>
+                ))}
+              </div>
             ))
           ) : (
-            <div className="px-3 py-2 text-sm text-slate-500">No matching root cause found.</div>
+            <div className="px-3 py-2 text-sm text-slate-500">No matching M-SCAT code found.</div>
           )}
+          {bottomOptionLabel ? (
+            <button
+              className="mt-1 block w-full rounded-xl border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                setQuery(bottomOptionLabel);
+                setIsOpen(false);
+                onBottomOptionSelect?.();
+              }}
+              type="button"
+            >
+              {bottomOptionLabel}
+            </button>
+          ) : null}
         </div>
       )}
     </div>

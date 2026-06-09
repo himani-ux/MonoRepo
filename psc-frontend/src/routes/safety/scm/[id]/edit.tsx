@@ -2,7 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
 import SafetyScmTenSectionForm from "../../../../components/safety/scm/scm-10-section-form";
+import { useSafetyAuth } from "../../../../hooks/safety/use-auth";
 import {
+  useSafetyScmAgenda,
   useSafetyScmAttendance,
   useSafetyScmCreateAdhocConfig,
   useSafetyScmCreateRegularConfig,
@@ -11,6 +13,7 @@ import {
 } from "../../../../hooks/use-safety";
 import { getErrorMessage } from "../../../../lib/api/client";
 import { safetyApi, type SafetyScmCreateAttendeeRow } from "../../../../lib/api/safety";
+import { getSafetyDeviceFingerprint, resolveSignatureTypedName } from "../../../../lib/safety/digital-signature";
 
 function normalizeMeetingType(value: string | null | undefined): "REGULAR" | "AD_HOC" {
   return String(value || "").toUpperCase() === "AD_HOC" ? "AD_HOC" : "REGULAR";
@@ -37,6 +40,7 @@ function normalizeAttendanceRows(rows: SafetyScmCreateAttendeeRow[]): SafetyScmC
 export default function SafetyScmEditRoute() {
   const params = useParams();
   const navigate = useNavigate();
+  const auth = useSafetyAuth();
   const meetingId = params.id ?? "";
   const enabled = Boolean(meetingId);
   const meetingQuery = useSafetyScmMeeting(meetingId, enabled);
@@ -51,10 +55,20 @@ export default function SafetyScmEditRoute() {
     vesselId,
     enabled && Boolean(vesselId) && meetingType === "AD_HOC",
   );
+  const agendaQuery = useSafetyScmAgenda(meetingId, enabled);
   const attendanceQuery = useSafetyScmAttendance(meetingId, enabled);
   const autoFeedQuery = useSafetyScmOpenFindings(vesselId, enabled && Boolean(vesselId));
   const updateMutation = useMutation({
-    mutationFn: safetyApi.updateScmMeeting.bind(null, meetingId),
+    mutationFn: async (values: Parameters<typeof safetyApi.updateScmMeeting>[1]) => {
+      const updated = await safetyApi.updateScmMeeting(meetingId, values);
+      if (String(updated.state || "").toUpperCase() !== "DRAFT") {
+        return updated;
+      }
+      return safetyApi.submitScmMeeting(updated.id, {
+        device_fingerprint: getSafetyDeviceFingerprint(),
+        typed_name: resolveSignatureTypedName(auth.user),
+      });
+    },
     onSuccess: (updated) => navigate(`/safety/scm/${updated.id}`),
   });
 
@@ -67,7 +81,7 @@ export default function SafetyScmEditRoute() {
   }
 
   const configQuery = meetingType === "AD_HOC" ? adhocConfigQuery : regularConfigQuery;
-  if (meetingQuery.isLoading || configQuery.isLoading || attendanceQuery.isLoading || autoFeedQuery.isLoading) {
+  if (meetingQuery.isLoading || configQuery.isLoading || agendaQuery.isLoading || attendanceQuery.isLoading) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
         Loading SCM edit form...
@@ -75,8 +89,8 @@ export default function SafetyScmEditRoute() {
     );
   }
 
-  if (meetingQuery.isError || configQuery.isError || attendanceQuery.isError || autoFeedQuery.isError) {
-    const error = meetingQuery.error ?? configQuery.error ?? attendanceQuery.error ?? autoFeedQuery.error;
+  if (meetingQuery.isError || configQuery.isError || agendaQuery.isError || attendanceQuery.isError) {
+    const error = meetingQuery.error ?? configQuery.error ?? agendaQuery.error ?? attendanceQuery.error;
     return (
       <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
         {getErrorMessage(error)}
@@ -103,12 +117,22 @@ export default function SafetyScmEditRoute() {
   const attendanceRows = normalizeAttendanceRows(
     (attendanceQuery.data?.rows as SafetyScmCreateAttendeeRow[] | undefined) ?? configQuery.data.attendee_rows,
   );
+  const agendaSections = (agendaQuery.data?.rows ?? meeting.sections).map((section) => ({
+    agenda_item_number: section.agenda_item_number,
+    auto_populated: section.auto_populated,
+    content: section.content,
+    decision: section.decision,
+    legacy_field_meta: section.legacy_field_meta,
+    legacy_fields: section.legacy_fields,
+    schema_version: section.schema_version ?? 1,
+    section_label: section.section_label,
+  }));
   const editConfig = {
     ...configQuery.data,
     attendee_rows: attendanceRows,
     meeting_date_default: meeting.meeting_date,
     meeting_type: meetingType,
-    sections: meeting.sections,
+    sections: agendaSections,
     vessel: {
       id: meeting.vessel_id,
       vessel_code: meeting.vessel_code || configQuery.data.vessel.vessel_code,
@@ -119,7 +143,7 @@ export default function SafetyScmEditRoute() {
   return (
     <>
       <SafetyScmTenSectionForm
-        autoFeedPayload={autoFeedQuery.data}
+        autoFeedPayload={autoFeedQuery.data ?? null}
         config={editConfig}
         formMode="edit"
         initialValues={{
@@ -136,7 +160,7 @@ export default function SafetyScmEditRoute() {
           meeting_type: meetingType,
           occasion: meeting.occasion || "M",
           schema_version: meeting.schema_version,
-          sections: meeting.sections,
+          sections: agendaSections,
           ship_pos_from: meeting.ship_pos_from ?? "",
           ship_pos_to: meeting.ship_pos_to ?? "",
           ship_position: meeting.ship_position === "S" ? "S" : "P",
@@ -151,12 +175,17 @@ export default function SafetyScmEditRoute() {
             updateMutation.mutate(values);
           }
         }}
-        submitLabel="Update Meeting"
-        submittingLabel="Updating..."
+        submitLabel="Submit to office"
+        submittingLabel="Submitting to office..."
       />
       {updateMutation.isError ? (
         <section className="mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900 shadow-sm">
           {getErrorMessage(updateMutation.error)}
+        </section>
+      ) : null}
+      {autoFeedQuery.isError ? (
+        <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
+          SOI findings could not be loaded: {getErrorMessage(autoFeedQuery.error)}
         </section>
       ) : null}
     </>

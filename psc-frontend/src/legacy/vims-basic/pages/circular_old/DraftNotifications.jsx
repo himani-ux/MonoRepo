@@ -1,4 +1,4 @@
-// src/components/DraftNotifications.jsx
+﻿// src/components/DraftNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
@@ -62,7 +62,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             console.log("fetchUserDrafts: Query params:", queryParams);
 
-            const response = await fetch(`/api/circular/api/user-drafts/?${queryParams}`);
+            const response = await fetch(`http://localhost:8000/api/circular/api/user-drafts/?${queryParams}`);
             console.log("fetchUserDrafts: Response status:", response.status);
 
             if (!response.ok) {
@@ -106,7 +106,7 @@ const DraftNotifications = ({ currentUser }) => {
         const fetchOptions = async () => {
             try {
                 // Fetch document types
-                const docRes = await fetch('/api/circular/api/document-types/');
+                const docRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
                 const docData = await docRes.json();
                 const docTypeMap = {};
                 const docIdToNameMap = {};
@@ -122,7 +122,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToTypeMap(docIdToNameMap); // Populate idToTypeMap here
 
                 // Fetch priorities
-                const prioRes = await fetch('/api/circular/api/priorities/');
+                const prioRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
                 const prioData = await prioRes.json();
                 const prioMap = {};
                 const prioIdToNameMap = {};
@@ -138,7 +138,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToPriorityMap(prioIdToNameMap); //  Populate idToPriorityMap here
 
                 // Fetch departments
-                const deptRes = await fetch('/api/circular/api/departments/');
+                const deptRes = await fetch('http://localhost:8000/api/circular/api/departments/');
                 const deptData = await deptRes.json();
                 const deptMap = {};
                 const deptIdToNameMap = {};
@@ -154,7 +154,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToDeptMap(deptIdToNameMap); //  Populate idToDeptMap here
 
                 // Fetch sub-categories
-                const subCatRes = await fetch('/api/circular/api/sub-categories/');
+                const subCatRes = await fetch('http://localhost:8000/api/circular/api/sub-categories/');
                 const subCatData = await subCatRes.json();
                 const subCatIdToNameMap = {};
                 if (Array.isArray(subCatData)) {
@@ -165,10 +165,10 @@ const DraftNotifications = ({ currentUser }) => {
                     });
                 }
                 setSubCategories(subCatData);
-                setIdToSubCatMap(subCatIdToNameMap); // ✅ Populate idToSubCatMap here
+                setIdToSubCatMap(subCatIdToNameMap); // âœ… Populate idToSubCatMap here
 
                 // Fetch second sub-categories (example - adjust as needed)
-                const secondSubCatRes = await fetch('/api/circular/api/second-sub-categories/');
+                const secondSubCatRes = await fetch('http://localhost:8000/api/circular/api/second-sub-categories/');
                 const secondSubCatData = await secondSubCatRes.json();
                 const secondSubCatIdToNameMap = {};
                 if (Array.isArray(secondSubCatData)) {
@@ -213,7 +213,7 @@ const DraftNotifications = ({ currentUser }) => {
     // --- NEW: Define handleEditClick INSIDE the component ---
 
     const handleEditClick = async (notificationId) => {
-        console.log("🚀 handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
+        console.log("ðŸš€ handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
 
         try {
             const primaryDashboardPath = isAdmin ? '/circular/admin' : '/circular/office';
@@ -242,7 +242,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             // Map priority UUID to frontend state value (e.g., 'critical', 'high')
             if (draftData.priority) {
-                const mappedPriorityName = idToPriorityMap[draftData.priority]; // ✅ Access the state variable
+                const mappedPriorityName = idToPriorityMap[draftData.priority]; // âœ… Access the state variable
                 if (mappedPriorityName) {
                     draftData.selectedSeverityForPreFill = mappedPriorityName;
                     console.log("handleEditClick: Mapped priority UUID '", draftData.priority, "' to frontend state value '", draftData.selectedSeverityForPreFill, "'");
@@ -257,7 +257,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             // Map dept UUID to frontend state value (e.g., 'seq', 'technical')
             if (draftData.dept) {
-                const deptNameFromUuid = idToDeptMap[draftData.dept]; // ✅ Access the state variable
+                const deptNameFromUuid = idToDeptMap[draftData.dept]; // âœ… Access the state variable
                 if (deptNameFromUuid) {
                     // Map department name to frontend option ('Deck' -> 'seq', 'Engine' -> 'technical')
                     const deptNameToOptionMap = { 'Deck': 'seq', 'Engine': 'technical' }; // Adjust as needed
@@ -283,7 +283,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             // Map sub_category UUID to frontend state values (Set of names)
             if (draftData.sub_category) {
-                const subCatName = idToSubCatMap[draftData.sub_category]; // ✅ Access the state variable
+                const subCatName = idToSubCatMap[draftData.sub_category]; // âœ… Access the state variable
                 if (subCatName) {
                     draftData.selectedSub1ForPreFill = [subCatName];
                     console.log("handleEditClick: Set selectedSub1ForPreFill to array containing:", subCatName);
@@ -298,7 +298,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             // Map second_sub_category UUID to frontend state values (Set of names)
             if (draftData.second_sub_category) {
-                const secondSubCatName = idToSecondSubCatMap[draftData.second_sub_category]; // ✅ Access the state variable
+                const secondSubCatName = idToSecondSubCatMap[draftData.second_sub_category]; // âœ… Access the state variable
                 if (secondSubCatName) {
                     draftData.selectedSub2ForPreFill = [secondSubCatName];
                     console.log("handleEditClick: Set selectedSub2ForPreFill to array containing:", secondSubCatName);
@@ -324,7 +324,7 @@ const DraftNotifications = ({ currentUser }) => {
                 const normalizedDraftId = String(draftData.id).trim().toLowerCase();
                 localStorage.setItem('editingDraftId', normalizedDraftId);
                 localStorage.setItem('editingDraftSrNo', draftData.sr_no);
-                console.log("✅ handleEditClick: Stored editingDraftId (database ID) in localStorage:", normalizedDraftId);
+                console.log("âœ… handleEditClick: Stored editingDraftId (database ID) in localStorage:", normalizedDraftId);
             } else {
                 console.error("handleEditClick: Draft data does not contain an 'id' field!");
                 alert("Error: Draft data is incomplete. Cannot edit.");
@@ -346,7 +346,7 @@ const DraftNotifications = ({ currentUser }) => {
 
     // --- Handle Delete Click ---
     const handleDeleteClick = async (srNo, displaySrNo) => {
-        console.log("🚀 handleDeleteClick: Delete clicked for SR No:", srNo, "Display SR No:", displaySrNo);
+        console.log("ðŸš€ handleDeleteClick: Delete clicked for SR No:", srNo, "Display SR No:", displaySrNo);
 
         const confirmed = window.confirm(`Are you sure you want to delete draft notification ${displaySrNo}?`);
         console.log("handleDeleteClick: User confirmed:", confirmed);
@@ -359,7 +359,7 @@ const DraftNotifications = ({ currentUser }) => {
         try {
             console.log("handleDeleteClick: Sending delete request for SR No:", srNo);
             // Use the new delete endpoint
-            const response = await fetch(`/api/circular/api/draft/${srNo}/delete/`, {
+            const response = await fetch(`http://localhost:8000/api/circular/api/draft/${srNo}/delete/`, {
                 method: 'POST', // Using POST to avoid browser compatibility issues
                 headers: {
                     'Content-Type': 'application/json',
@@ -511,7 +511,7 @@ const DraftNotifications = ({ currentUser }) => {
                                         title="Click to view full comment"
                                     >
                                         <div className="line-clamp-2">
-                                            {notification.publish_comment || '—'}
+                                            {notification.publish_comment || 'â€”'}
                                         </div>
                                     </td>
 

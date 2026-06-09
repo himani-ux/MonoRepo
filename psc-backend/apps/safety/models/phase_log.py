@@ -5,6 +5,16 @@ from django.db.models import Q
 
 from .base import PublicIdMixin
 
+MAX_ACTOR_ID_LENGTH = 64
+MAX_ACTOR_ROLE_CODE_LENGTH = 16
+MAX_DEVICE_FINGERPRINT_LENGTH = 256
+
+
+def _fit_char(value, max_length: int):
+    if value in (None, ""):
+        return value
+    return str(value).strip()[:max_length]
+
 
 class IncidentPhaseLog(PublicIdMixin):
     class PhaseNumber(models.IntegerChoices):
@@ -86,6 +96,9 @@ class IncidentPhaseLog(PublicIdMixin):
     def save(self, *args, **kwargs):
         if self.pk is not None and not self._state.adding:
             raise IntegrityError("Incident phase log rows are append-only.")
+        self.actor_user_id = _fit_char(self.actor_user_id, MAX_ACTOR_ID_LENGTH) or "system"
+        self.actor_role_code = _fit_char(self.actor_role_code, MAX_ACTOR_ROLE_CODE_LENGTH) or "SYSTEM"
+        self.device_fingerprint = _fit_char(self.device_fingerprint, MAX_DEVICE_FINGERPRINT_LENGTH)
         return super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

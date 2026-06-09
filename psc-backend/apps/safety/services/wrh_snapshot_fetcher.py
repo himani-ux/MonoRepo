@@ -89,6 +89,88 @@ class WRHSnapshotFetcher:
                 warning_codes=["missing_data"],
             )
 
+        return self._snapshot_from_rest_row(
+            snapshot_row,
+            timezone_offset_minutes=timezone_offset_minutes,
+        )
+
+    def fetch_many_24h_and_7d(
+        self,
+        *,
+        crew_ids: Sequence[str],
+        meeting_date: date | datetime | str,
+        vessel_id: str,
+    ) -> dict[str, dict[str, object]]:
+        timezone_offset_minutes = self.fetch_timezone_offset(
+            vessel_id=vessel_id,
+            meeting_date=meeting_date,
+        )
+
+        normalized_crew_ids = [str(crew_id).strip() for crew_id in crew_ids if str(crew_id).strip()]
+        if not normalized_crew_ids or not vessel_id:
+            return {
+                crew_id: self._missing_snapshot(
+                    timezone_offset_minutes=timezone_offset_minutes,
+                    warning_codes=["missing_data"],
+                )
+                for crew_id in normalized_crew_ids
+            }
+
+        if not self.wrh_repository.has_required_tables():
+            return {
+                crew_id: self._missing_snapshot(
+                    timezone_offset_minutes=timezone_offset_minutes,
+                    warning_codes=["lookup_failed"],
+                )
+                for crew_id in normalized_crew_ids
+            }
+
+        try:
+            rows = self.wrh_repository.list_latest_rest_snapshots(
+                crew_ids=normalized_crew_ids,
+                vessel_id=vessel_id,
+                meeting_date=meeting_date,
+            )
+        except SPTimeoutError:
+            return {
+                crew_id: self._missing_snapshot(
+                    timezone_offset_minutes=timezone_offset_minutes,
+                    warning_codes=["lookup_timeout"],
+                )
+                for crew_id in normalized_crew_ids
+            }
+        except SPExecutionError:
+            return {
+                crew_id: self._missing_snapshot(
+                    timezone_offset_minutes=timezone_offset_minutes,
+                    warning_codes=["lookup_failed"],
+                )
+                for crew_id in normalized_crew_ids
+            }
+
+        snapshots = {
+            str(row.get("crew_id")): self._snapshot_from_rest_row(
+                row,
+                timezone_offset_minutes=timezone_offset_minutes,
+            )
+            for row in rows
+        }
+        for crew_id in normalized_crew_ids:
+            snapshots.setdefault(
+                crew_id,
+                self._missing_snapshot(
+                    timezone_offset_minutes=timezone_offset_minutes,
+                    warning_codes=["missing_data"],
+                ),
+            )
+        return snapshots
+
+    def _snapshot_from_rest_row(
+        self,
+        snapshot_row: dict[str, object],
+        *,
+        timezone_offset_minutes: int | None,
+    ) -> dict[str, object]:
         status_24h = self._normalize_status(snapshot_row.get("mlc_10h_24h_status"))
         status_7d = self._normalize_status(snapshot_row.get("mlc_77h_7d_status"))
         wrh_non_compliance_flag = status_24h not in ("", "OK") or status_7d not in ("", "OK")

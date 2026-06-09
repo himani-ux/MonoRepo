@@ -1,7 +1,7 @@
 # VIMS Safety Module — Product Requirements Document (PRD)
 
 > **Version:** 1.0
-> **Last Updated:** 2026-04-17
+> **Last Updated:** 2026-06-09
 > **Status:** Requirements Locked — Ready for Build
 > **Decision Owner:** Prince (Product Owner)
 > **Source:** `VIMS-SAFETY-MODULE-SSOT.md` (§2B M-SCAT, §2C SOI, §3 Incident, §4 Near Miss, §5 SCM, §6 Decisions Log) + `VIMS-SAFETY-GAP-ANALYSIS.md` (Session 5 A–M + DESIGN + R01–R23)
@@ -35,7 +35,7 @@
 
 **V1 scope (4 sub-features):**
 - **Incident Reporting** — 9-phase workflow (Intake → Notifications → Evidence → Sequence → Analysis → Recommendations → Actions → Verification → Closure), IMO SMC/MC/MI classifier + internal risk band GREEN/YELLOW/RED, ALARP gate, causal layering Immediate/Intermediate/Root over M-SCAT, 8 bias guards, Chain-of-Custody, 10-section PDF.
-- **Near Miss Reporting** — reporter anonymity (D-GAP-J1), Low vs High priority triage (D-GAP-R22), reporter visible only to DPA + FM.
+- **Near Miss Reporting** — reporter details visible to Master and authorized users (D-GAP-J1 revised), Office Comments priority decision (LOW/MEDIUM by PIC, HIGH by DPA), no anonymous reporting concept.
 - **Safety Committee Meeting (SCM)** — Regular monthly + Ad-Hoc meetings, same form, Master/CO host authority with `meeting_type` selection, aligned with KSM SSQE Manual Rev 01 Feb 2026 §9.
 - **Safety Officer Inspection (SOI)** — 13 areas × 329 items (12 physical + Section 12 Cross-cutting Safety & Culture + Compressor House), paper-first no-scan (D-GAP-E4), unique-ID linkage, state pill "SOI Compliance %" (D-GAP-DESIGN-01).
 
@@ -127,17 +127,17 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-SAF-INC-041 | MSC-MEPC.3 Position Auto-Fill (±12h tolerance) | INC | V1 | D-DNV-12, D-GAP-M09, D-GAP-M10 |
 | FEAT-SAF-NM-001 | Near Miss Creation (Any Rank) | NM | V1 | D-RBAC-11 |
 | FEAT-SAF-NM-002 | Reporter Identity Masking (DPA/FM-only view) | NM | V1 | D-GAP-J1 |
-| FEAT-SAF-NM-003 | Low vs High Priority Triage | NM | V1 | D-GAP-R22 |
-| FEAT-SAF-NM-004 | Near Miss Lightweight Analysis (Fact Tree only) | NM | V1 | §4.3 SSOT |
+| FEAT-SAF-NM-003 | Near Miss Office Comments + Priority Decision | NM | V1 | D-GAP-R22 |
+| FEAT-SAF-NM-004 | Near Miss Lightweight Record Review | NM | V1 | §4.3 SSOT |
 | FEAT-SAF-NM-005 | Near Miss Rate-Limit + Minimum-Detail | NM | V1 | D-GAP-M38 |
 | FEAT-SAF-NM-006 | Fleet Alert within 1 Week for High-Priority Near Miss | NM | V1 | D-GAP-R22 |
 | FEAT-SAF-SCM-001 | SCM Regular — Monthly Cadence | SCM | V1 | §5, D-GAP-M-ADHOC |
 | FEAT-SAF-SCM-002 | SCM Ad-Hoc — Host-Triggered | SCM | V1 | D-GAP-M-ADHOC |
 | FEAT-SAF-SCM-003 | 10-Section SCM Form (legacy `vw_GetSCM_Master` structure) | SCM | V1 | D-PDF-03b |
-| FEAT-SAF-SCM-004 | SCM Host Creation by Master/CO, Sign-Off by Master | SCM | V1 | D-RBAC-06 |
+| FEAT-SAF-SCM-004 | SCM Host Creation by Master/CO, Office Comment Closure | SCM | V1 | D-RBAC-06 |
 | FEAT-SAF-SCM-005 | WRH Attendance Warn-Don't-Block | SCM | V1 | D-GAP-M11, D-GAP-M26 |
 | FEAT-SAF-SCM-006 | Closed-Since-Last-SCM Summary Block | SCM | V1 | D-SOI-14, D-GAP-M22 |
-| FEAT-SAF-SCM-007 | SCM Hard-Block on Overdue SOI (Sign-Off Only) | SCM | V1 | D-GAP-M20 |
+| FEAT-SAF-SCM-007 | SCM SOI Overdue Visibility (Warning Only) | SCM | V1 | D-GAP-M20 |
 | FEAT-SAF-SCM-008 | Agenda + Action-Item Tracking | SCM | V1 | §5.4 |
 | FEAT-SAF-SOI-001 | 13-Area Inspection Taxonomy | SOI | V1 | §2C.5, D-SOI-13, D-SOI-16 |
 | FEAT-SAF-SOI-002 | Area-Applicability Toggle + Audit Log | SOI | V1 | D-SOI-12, D-GAP-M19 |
@@ -570,7 +570,7 @@ The incident module is the largest V1 surface. 41 features cover the DNV-aligned
 - SHELL tagging optional per cause: S / H / E / L-central / L-peripheral.
 - 7-domain checklist (People / Organisation / Working conditions / Ship factors / Shore-side / External / Sequence) rendered as tabs; each has free-text + "considered — n/a" toggle.
 - Additional 8th domain added per D-GAP-R21: **Risk & Change Management** (Risk control inadequacy · Monitoring gaps · Change-management effectiveness · Regulatory-compliance failures).
-- Near miss variant uses SHELL only; no 7/8-domain expansion (§2B.10).
+- Near miss variant uses category tag and immediate-cause selection only; no 7/8-domain expansion (§2B.10).
 **Dependencies:** FEAT-SAF-INC-017.
 **Decisions:** D-DNV-09, D-GAP-R21.
 **SSOT refs:** see SSOT §2B.10; §6 D-GAP-R21.
@@ -783,48 +783,49 @@ Near miss is the reporting-culture pillar. The module uses the same underlying `
 **Acceptance criteria:**
 - Any rank may create a near miss (not top-4 limited) per D-RBAC-11.
 - `record_type='near_miss'` set at creation.
-- Form is lighter than Incident (no Phase 7 DPA acceptance, Fact Tree only, no 7-domain IMO A.884(21) expansion, no mandatory CA/PA — Lessons Learned + Immediate Action only).
+- The form captures place (`At Anchor`, `At Sea`, `At Port`), a single user-facing Category field that combines the previous Category and Possible Loss Type dropdown options, and Immediate Cause. Near Miss Type is not used.
+- Category allows up to 3 selections and supports `Other - Specify`. Immediate Cause supports `Other - Specify` inside the dropdown at the bottom.
+- Form is lighter than Incident (no Phase 7 DPA acceptance, no separate analysis page, no 7-domain IMO A.884(21) expansion, no mandatory CA/PA - Lessons Learned + Immediate Action only).
 - Submission controls per FEAT-SAF-NM-005.
 **Dependencies:** FEAT-SAF-NM-002, FEAT-SAF-NM-003, FEAT-SAF-NM-005.
 **Decisions:** D-RBAC-11.
 **SSOT refs:** see SSOT §4.1; §4.3; §6 D-RBAC-11.
 
-### FEAT-SAF-NM-002 — Reporter Identity Masking (DPA/FM-only view)
+### FEAT-SAF-NM-002 — Reporter Identity Visibility
 
 **Priority:** V1
-**User story:** As a crew member reporting a near miss, my identity must be hidden from Master and HOD but visible to DPA + FM (and myself) so reporting-culture fear-of-retaliation is mitigated without losing audit trail.
+**User story:** As a Master or authorized Safety user, I can see who reported a near miss so follow-up and rework can be handled clearly.
 **Acceptance criteria:**
 - Stored: reporter's CrewId + name (full audit data).
-- UI masking: Master and HOD views show "Reporter: (identity withheld)"; PDF exports to Master/HOD show the same.
-- DPA and FM views render full identity.
-- Reporter themselves see their own name.
-- Masking enforced at serializer layer in `apps/safety/authentication/anonymity.py` (ref `<vims_integration>`).
-- `vims_safety_field_history` records the reporter field but does not expose it to masked-role queries.
+- Master and authorized users within vessel scope can see reporter name, rank, and user reference.
+- The UI and PDF must not show `Anonymous Reporter`, `identity withheld`, or "Reporter identity is masked" wording.
+- Reporter details remain in field history/audit trail.
 **Dependencies:** FEAT-SAF-NM-001, FEAT-SAF-RBAC-005.
 **Decisions:** D-GAP-J1.
 **SSOT refs:** see SSOT §6 D-GAP-J1.
 
-### FEAT-SAF-NM-003 — Low vs High Priority Triage
+### FEAT-SAF-NM-003 — Near Miss Office Comments + Priority Decision
 
 **Priority:** V1
-**User story:** As the auto-classifier, I need to suggest Low (Master/DPA correspondence) vs High (full investigation + fleet alert) priority at creation so resources match risk.
+**User story:** As the office reviewer, I need one Office Comments page to confirm priority, correct category/immediate cause if needed, accept the report, or send it back to the vessel for rework.
 **Acceptance criteria:**
-- Auto-classifier at submission suggests LOW or HIGH based on incident-type + type-of-loss + SHELL hints.
-- SO may override with reason logged.
-- LOW → close with explanatory note; limited analysis.
-- HIGH → full investigation · onboard + ashore causal analysis · preventive measures with timeline · fleet alert within 1 week (FEAT-SAF-NM-006).
+- Auto-classifier at submission suggests LOW or HIGH based on Category, immediate-cause hints, description, and severity.
+- PIC accepts LOW and MEDIUM cases; DPA accepts HIGH cases.
+- `Accept` saves priority, category tag, immediate cause, and office comment.
+- `Send to Rework` sends the item back to the vessel side with a required reason.
+- LOW → close with explanatory note.
+- HIGH → preventive measures with timeline and fleet alert within 1 week (FEAT-SAF-NM-006).
 - Priority field stored on `vims_safety_incident.near_miss_priority`.
 **Dependencies:** FEAT-SAF-NM-001, FEAT-SAF-NM-006.
 **Decisions:** D-GAP-R22.
 **SSOT refs:** see SSOT §6 D-GAP-R22.
 
-### FEAT-SAF-NM-004 — Near Miss Lightweight Analysis (Fact Tree only)
+### FEAT-SAF-NM-004 — Near Miss Lightweight Record Review
 
 **Priority:** V1
-**User story:** As the near-miss handler, I need a reduced analysis surface (Fact Tree only, SHELL tag only, no mandatory 5-tool workspace) so submission is frictionless.
+**User story:** As the near-miss handler, I need a reduced review surface with category tag and immediate-cause selection, no mandatory incident-style analysis workspace, so submission is frictionless.
 **Acceptance criteria:**
-- Only Fact Tree required (not STEP / ECF / Barrier / Change).
-- SHELL tagging only; no IMO A.884(21) 7/8-domain checklist.
+- Category tag and immediate-cause selection only; no IMO A.884(21) 7/8-domain checklist.
 - No mandatory System Action — Lessons Learned + Immediate Action only; System Action optional.
 - Bias guards 1, 2, 3 still apply; bias guards 4, 5, 6, 7, 8 skipped for LOW; applied for HIGH.
 - No mandatory physical verification.
@@ -833,15 +834,13 @@ Near miss is the reporting-culture pillar. The module uses the same underlying `
 **Decisions:** §4.3 SSOT.
 **SSOT refs:** see SSOT §4.3; §4.4.
 
-### FEAT-SAF-NM-005 — Near Miss Rate-Limit + Minimum-Detail
+### FEAT-SAF-NM-005 — Near Miss Minimum Detail
 
 **Priority:** V1
-**User story:** As the system, I enforce a rate-limit and minimum-detail on near miss submissions so spam is throttled without deterring honest reporting.
+**User story:** As the system, I enforce minimum detail on near miss submissions so records are useful without limiting how many valid reports a user can submit in a day.
 **Acceptance criteria:**
-- Max 5 near miss submissions per crew member per 24 hours (server-side enforcement).
 - Each submission requires description ≥ 100 characters + severity selected.
-- Rate-limit breach returns HTTP 429 with guidance message.
-- Rate-limit reset at midnight vessel local time (from `wrh_ship_time_config` — D-GAP-M26).
+- No daily near-miss submission cap.
 **Dependencies:** FEAT-SAF-NM-001, FEAT-SAF-XMOD-002.
 **Decisions:** D-GAP-M38, D-GAP-M26.
 **SSOT refs:** see SSOT §6 D-GAP-M38; D-GAP-M26.
@@ -900,22 +899,26 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. V1 supports Regular monthly
 **User story:** As CO preparing minutes, I need the SCM form to match the legacy `vw_GetSCM_Master` structure so historical-new consistency is preserved.
 **Acceptance criteria:**
 - Old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9.
-- Section 7 "Findings of Safety and environmental inspection" auto-answers "Yes" when any SOI event occurred in the period, with count + coverage-% figures surfaced (D-SOI-14).
-- "Safety Observations for the Month" table auto-populated from open SOI findings since last SCM (FEAT-SAF-SOI-020).
+- Section 7 "PSC Findings & Corrective Measures" is the single place where finding/corrective-measure rows are printed.
+- SOI feed summary shows count + coverage-% figures when SOI data exists; it must not print the old "Section 7 auto-answer NO" line when no SOI inspections exist.
+- Open SOI finding details are not duplicated in the SOI feed; Section 7 remains authoritative for findings and corrective measures.
 - Free-text fields min 20 chars each.
-- Signature block: Master + CO + attendees (digital per D-GAP-D1).
+- PDF signature block: plain Master Signature and Chief Officer Signature lines only. SCM does not capture attendee digital signatures.
 **Dependencies:** FEAT-SAF-SOI-020, FEAT-SAF-AUDIT-003.
 **Decisions:** D-PDF-03b, D-SOI-14.
 **SSOT refs:** see SSOT §5.3; §6 D-PDF-03b.
 
-### FEAT-SAF-SCM-004 — SCM Host Creation by Master/CO, Sign-Off by Master
+### FEAT-SAF-SCM-004 — SCM Host Creation by Master/CO, Office Comment Closure
 
 **Priority:** V1
-**User story:** As Master or CO, I can host and prepare SCM minutes; as Master, I sign off so final closure accountability remains clear.
+**User story:** As Master or CO, I can host and prepare SCM minutes; as office reviewer, I add the Office Comment and close the meeting so final shore review is clear.
 **Acceptance criteria:**
-- `SAF_F_003` + `SAF_P_*` IDs: Master and CO have Create + Edit/Finalize host authority.
+- `SAF_F_003` + `SAF_P_*` IDs: Master and CO have Create + Edit host authority until office comment closes the meeting.
 - Ad-Hoc meetings allow Master or CO to create directly with a mandatory trigger reason.
-- Sign-Off is the closure event; Closed-Since-Last snapshot cutoff = sign-off timestamp (D-GAP-M22).
+- PDF is downloadable after meeting creation; it does not wait for Master sign-off.
+- Office Comment is the closure event. DPA, FM, Shore HOD, and Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` can save Office Comment.
+- Saving Office Comment sets state to Closed and prevents further vessel-side edits.
+- Closed-Since-Last snapshot cutoff = office comment closure timestamp for new SCM records; legacy Master sign-off timestamps remain valid for historical records (D-GAP-M22).
 **Dependencies:** FEAT-SAF-RBAC-005.
 **Decisions:** D-RBAC-06, D-GAP-M22.
 **SSOT refs:** see SSOT §3.4; §6 D-RBAC-06.
@@ -923,13 +926,14 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. V1 supports Regular monthly
 ### FEAT-SAF-SCM-005 — WRH Attendance Warn-Don't-Block
 
 **Priority:** V1
-**User story:** As Master, when an SCM attendee has missing or non-compliant WRH data I want a warning (not a block) so meeting recording is never prevented by roster sync timing.
+**User story:** As Master, CO, or office reviewer, when an SCM attendee has missing or non-compliant WRH data I want a warning (not a block) so meeting recording and office closure are never prevented by roster sync timing.
 **Acceptance criteria:**
-- On Sign-Off: live join to `vims_wrh_*` for each listed attendee.
+- On attendance save/display: live join to `vims_wrh_*` for each listed attendee.
 - If WRH data missing for attendee: row flagged "WRH data unavailable"; warning shown; do NOT block.
 - If WRH indicates non-compliance (insufficient rest): row flagged with amber badge; warning shown; do NOT block.
 - Timezone from `wrh_ship_time_config` per D-GAP-M26.
-- `vims_safety_scm_attendance` row stores WRH snapshot at sign-off time for audit.
+- `vims_safety_scm_attendance` row stores WRH snapshot values for audit and PDF.
+- Office users can view the Attendance + WRH snapshot. Only Master/CO can edit attendance before closure.
 **Dependencies:** FEAT-SAF-XMOD-002.
 **Decisions:** D-GAP-M11, D-GAP-M26.
 **SSOT refs:** see SSOT §6 D-GAP-M11; D-GAP-M26.
@@ -940,22 +944,22 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. V1 supports Regular monthly
 **User story:** As DPA, I need a "Closed-Since-Last-SCM" summary block at the top of every SCM so closed findings get for-record visibility without cluttering main discussion.
 **Acceptance criteria:**
 - Summary block placed between Attendance and Section 8 of SCM.
-- Lists findings closed by SO + Master since prior SCM's closure timestamp (D-GAP-M22).
+- Lists findings closed by SO + Master since prior closed SCM timestamp (D-GAP-M22).
 - For-record only; no discussion required unless DPA flags.
 - Each row links to source SOI finding (unique-ID linkage via FEAT-SAF-SOI-008).
-- Snapshot cutoff is unambiguous through reschedules and Ad-Hoc meetings (D-GAP-M22).
+- Snapshot cutoff is unambiguous through reschedules and Ad-Hoc meetings. New records anchor on office comment closure; legacy records may anchor on Master sign-off timestamp (D-GAP-M22).
 **Dependencies:** FEAT-SAF-SOI-020, FEAT-SAF-SCM-003.
 **Decisions:** D-SOI-14, D-GAP-M22.
 **SSOT refs:** see SSOT §2C.14; §6 D-GAP-M22.
 
-### FEAT-SAF-SCM-007 — SCM Hard-Block on Overdue SOI (Sign-Off Only)
+### FEAT-SAF-SCM-007 — SCM SOI Overdue Visibility (Warning Only)
 
 **Priority:** V1
-**User story:** As Master, I want SCM Sign-Off blocked when any applicable SOI area is overdue (>90 days) so regulatory compliance is enforced without preventing the meeting itself.
+**User story:** As Master, CO, or office reviewer, I want overdue SOI areas visible in SCM so the committee can discuss them without blocking meeting creation, PDF export, or office closure.
 **Acceptance criteria:**
-- Hard-block on Sign-Off only — meeting creation and running are not blocked.
-- Block message: lists specific overdue areas per D-SOI-04.
-- Once overdue areas cleared (any inspection completed stamping those areas), Sign-Off is re-enabled.
+- SCM displays specific overdue areas per D-SOI-04 where available.
+- Overdue SOI areas do not block meeting creation, meeting editing, PDF download, or Office Comment closure.
+- Once overdue areas are cleared, warning badges disappear from new SCM snapshots.
 - Surfaces on dashboard before the meeting so Master is forewarned.
 **Dependencies:** FEAT-SAF-SOI-005, FEAT-SAF-SCM-004.
 **Decisions:** D-GAP-M20, D-SOI-04.
@@ -966,10 +970,11 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. V1 supports Regular monthly
 **Priority:** V1
 **User story:** As Master, I track agenda items and action items with owners and due dates so accountability persists to the next SCM.
 **Acceptance criteria:**
-- `vims_safety_scm_agenda` table stores agenda items + decisions.
+- `vims_safety_scm_agenda` table stores agenda items + suggestions / recommendations.
 - Action items carry owner (CrewId), due date, status (Open / In Progress / Closed / Carried Forward).
 - Open items auto-carry-forward to next SCM (matches SSQE §4.5.2 closing paragraph).
 - Overdue action items flagged on DPA dashboard.
+- Agenda editing is restricted to Master or Chief Officer and stops after Office Comment closure.
 **Dependencies:** FEAT-SAF-SCM-003.
 **Decisions:** §5.4 SSOT.
 **SSOT refs:** see SSOT §5.4.
@@ -1061,7 +1066,7 @@ Seed CSV at `safety-reference-data/soi_checklist_v1.csv` (329 rows — 317 basel
 - Soft warning: 80 days = amber flag, email to CO + Master.
 - Target: 1/3 of applicable areas per month (SSQE §4.5.2), but SO chooses which specific areas each cycle.
 - No strict per-month segmentation; any 3-consecutive-months span must cover all applicable areas.
-- Overdue triggers SCM Sign-Off hard-block (FEAT-SAF-SCM-007).
+- Overdue SOI areas surface in SCM as warning/visibility only (FEAT-SAF-SCM-007).
 **Dependencies:** FEAT-SAF-SCM-007, FEAT-SAF-DASH-005.
 **Decisions:** D-SOI-04.
 **SSOT refs:** see SSOT §2C.8.
@@ -1337,7 +1342,7 @@ Same-DB (`ksm_marine_live`) live joins per D-GAP-I2 — no ETL, no staleness. Al
 ### FEAT-SAF-XMOD-002 — Safety ↔ WRH (SCM Attendance + Fatigue Lookback)
 
 **Priority:** V1
-**User story:** As Master signing off an SCM, WRH rest-hour compliance per attendee is surfaced (warn-don't-block); as an investigator on a personal-injury incident, WRH 96-hour lookback per FEAT-SAF-INC-010 uses same live join.
+**User story:** As Master, CO, or office reviewer viewing an SCM, WRH rest-hour compliance per attendee is surfaced (warn-don't-block); as an investigator on a personal-injury incident, WRH 96-hour lookback per FEAT-SAF-INC-010 uses same live join.
 **Acceptance criteria:**
 - Live join to `vims_wrh_*` tables; no ETL.
 - SCM attendance: warn-don't-block on missing / non-compliant WRH (D-GAP-M11).
@@ -1450,7 +1455,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 **Acceptance criteria:**
 - 1–2 page template; sections: Header + What Happened + Suggestion + Immediate Action + Signatures.
 - No investigation / cause tree.
-- Reporter identity masked per FEAT-SAF-NM-002 when exported to Master/HOD.
+- Reporter identity is visible to authorized users. PDF output must not print anonymous or masked-reporter wording.
 **Dependencies:** FEAT-SAF-NM-002.
 **Decisions:** D-PDF-03a.
 **SSOT refs:** see SSOT §6 D-PDF-03a.
@@ -1463,9 +1468,9 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 - Old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9.
 - Closed-since-last summary block appears at top (per FEAT-SAF-SCM-006).
 - Attendance block + WRH flags inline.
-- Signatures: Master + CO + attendees (digital per D-GAP-D1).
+- Signature box: plain Master Signature and Chief Officer Signature lines. No attendee digital signature status and no device fingerprint text.
 - Regular and Ad-Hoc use same template; meeting type printed on cover.
-**Dependencies:** FEAT-SAF-SCM-003, FEAT-SAF-SCM-006, FEAT-SAF-AUDIT-003.
+**Dependencies:** FEAT-SAF-SCM-003, FEAT-SAF-SCM-006.
 **Decisions:** D-PDF-03b, D-GAP-M-ADHOC.
 **SSOT refs:** see SSOT §6 D-PDF-03b; D-GAP-M-ADHOC.
 
@@ -1886,13 +1891,15 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 - Regular monthly cadence + Ad-Hoc meetings hosted by Master or CO.
 - Cadence counter + Closed-Since-Last snapshot anchor on last SCM closure timestamp **regardless of meeting type**.
 - SCM form matches legacy `vw_GetSCM_Master` structure with the reserved section removed and later sections renumbered.
-- Sign-Off hard-blocks on overdue SOI areas (not meeting creation/running).
+- Office Comment closes SCM and stops editing.
+- PDF is downloadable after meeting creation and includes plain Master/CO signature lines only.
+- Overdue SOI areas are warning/visibility only; they do not block meeting creation/running/office closure.
 - WRH attendance warn-don't-block.
 
 ### Near Miss
-- Reporter identity stored; masked from Master/HOD; visible to DPA/FM/reporter only.
-- LOW vs HIGH priority triage at creation.
-- Rate-limit: 5 per crew/24h; min 100 chars description.
+- Reporter identity stored and visible to Master and authorized users within scope.
+- LOW, MEDIUM, or HIGH priority is finalized in Office Comments.
+- No daily submission cap; min 100 chars description.
 - HIGH priority triggers fleet alert within 1 week.
 
 ### Timezone, dates, units
@@ -1949,8 +1956,8 @@ Expansions on first use: **DPA** (Designated Person Ashore, ISM Code §4); **FM*
 | Action | Any crew | Master | HOD | DPA | FM |
 |--------|----------|--------|-----|-----|-----|
 | Create near miss | **Yes** | Yes | Yes | — | — |
-| See reporter identity | Self only | **No (masked)** | **No (masked)** | **Yes** | **Yes** |
-| Triage LOW/HIGH override | — | — | — | Yes | — |
+| See reporter identity | Self | **Yes** | **Yes** | **Yes** | **Yes** |
+| Office Comments priority decision | — | — | PIC for LOW/MEDIUM | HIGH only | — |
 | Close (PIC) | — | — | — | — | — |
 | Fleet-alert generate (HIGH) | — | — | — | Yes | — |
 
@@ -1958,10 +1965,11 @@ Expansions on first use: **DPA** (Designated Person Ashore, ISM Code §4); **FM*
 
 | Action | CO | Master | DPA | FM |
 |--------|-----|--------|-----|-----|
-| Create Regular SCM | **Yes (prepares)** | — | — | — |
-| Create Ad-Hoc SCM | — | **Yes** | — | — |
-| Chair + Sign-Off | — | **Yes** | — | — |
-| Approve attendance (WRH warn) | — | Yes | — | — |
+| Create Regular SCM | **Yes** | **Yes** | — | — |
+| Create Ad-Hoc SCM | **Yes** | **Yes** | — | — |
+| Edit before Office Comment | **Yes** | **Yes** | — | — |
+| Office Comment + Close | — | — | **Yes** | **Yes** |
+| Attendance / WRH edit | **Yes** | **Yes** | Read | Read |
 | Read fleet-wide | — | Closed records | All | All |
 
 ### 15.4 SOI module

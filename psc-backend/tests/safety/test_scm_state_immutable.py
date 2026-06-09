@@ -115,13 +115,16 @@ class SCMStateImmutableTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_office_user_cannot_read_attendance_editor_payload(self) -> None:
+    def test_office_user_can_read_attendance_wrh_snapshot(self) -> None:
         request = self.factory.get(f"/api/safety/scm/{self.meeting.id}/attendance/")
         force_authenticate(request, user=build_user(role_name="OFFICE_PIC", process_ids=[]))
 
         response = self.attendance_view(request, id=self.meeting.id)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(response.data["meeting_id"]), str(self.meeting.id))
+        self.assertIn("rows", response.data)
+        self.assertIn("warnings", response.data)
 
     def _create_signed_off_meeting(self) -> SCMMeeting:
         meeting = SCMMeeting.objects.create(

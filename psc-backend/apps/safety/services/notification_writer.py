@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.request
 from dataclasses import dataclass
 
 from django.db import connection
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,17 @@ class SlackWebhookNotifier:
 class NotificationWriter:
     table_name = "master_notification"
     module_code = "SAFETY"
+    required_columns = {
+        "module_code",
+        "record_id",
+        "recipient_ref",
+        "notification_kind",
+        "title",
+        "message",
+        "delivery_channel",
+        "payload_json",
+        "created_at",
+    }
 
     def __init__(self, *, slack_notifier: object | None = None) -> None:
         self.slack_notifier = slack_notifier or SlackWebhookNotifier()
@@ -52,10 +66,30 @@ class NotificationWriter:
     def table_exists(self) -> bool:
         return self.table_name in connection.introspection.table_names()
 
+    def table_has_required_columns(self) -> bool:
+        if not self.table_exists():
+            return False
+
+        with connection.cursor() as cursor:
+            columns = {
+                column.name.lower()
+                for column in connection.introspection.get_table_description(cursor, self.table_name)
+            }
+
+        missing_columns = sorted(self.required_columns - columns)
+        if missing_columns:
+            logger.warning(
+                "%s is missing Safety notification columns: %s",
+                self.table_name,
+                ", ".join(missing_columns),
+            )
+            return False
+        return True
+
     def dispatch_notification(
         self,
         *,
-        record_id: int,
+        record_id: object,
         recipients: list[str],
         kind: str,
         title: str,
@@ -103,7 +137,7 @@ class NotificationWriter:
     def write_notification(
         self,
         *,
-        record_id: int,
+        record_id: object,
         recipients: list[str],
         kind: str,
         title: str,
@@ -111,11 +145,12 @@ class NotificationWriter:
         payload: dict[str, object] | None = None,
         delivery_channel: str = "IN_APP",
     ) -> list[dict[str, object]]:
-        if not self.table_exists():
+        if not self.table_has_required_columns():
             return []
 
         unique_recipients = [recipient for recipient in dict.fromkeys(recipients) if recipient]
         now = timezone.now()
+        record_id_value = str(record_id)
         payload_json = json.dumps(payload or {}, sort_keys=True, default=str)
         rows: list[dict[str, object]] = []
 
@@ -137,7 +172,7 @@ class NotificationWriter:
                     """,
                     [
                         self.module_code,
-                        record_id,
+                        record_id_value,
                         recipient,
                         kind,
                         title,
@@ -150,7 +185,7 @@ class NotificationWriter:
                 rows.append(
                     {
                         "module_code": self.module_code,
-                        "record_id": record_id,
+                        "record_id": record_id_value,
                         "recipient_ref": recipient,
                         "notification_kind": kind,
                         "title": title,

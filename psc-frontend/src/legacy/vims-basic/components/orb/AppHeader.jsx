@@ -1,4 +1,4 @@
-// src/components/ORBHeader.jsx
+﻿// src/components/ORBHeader.jsx
 import "../../styles/orb/AppHeader.css";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -33,7 +33,7 @@ export default function ORBHeader() {
     }
 
     // Fetch vessel details using the storedVesselId
-    fetch("/api/orb/api/vessels/")
+    fetch("http://localhost:8000/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -128,7 +128,7 @@ export default function ORBHeader() {
       <div className="app-header orb-theme">
         <div className="header-content">
           <button className="sidebar-toggle" onClick={toggleSidebar} aria-label="Open ORB navigation">
-            ☰
+            â˜°
           </button>
 
           <h1 className="app-title">
@@ -179,7 +179,7 @@ function Sidebar({ isVisible, onClose, hasNewApproved, hasNewRejected, hasNewDel
   return (
     <div id="sidebar" className="sidebar-overlay">
       <div className="sidebar-content">
-        <button className="close-btn" onClick={onClose} aria-label="Close ORB navigation">×</button>
+        <button className="close-btn" onClick={onClose} aria-label="Close ORB navigation">Ã—</button>
         <ul className="sidebar-menu">
           <li onClick={() => handleNavigation('/approved-entries')}>
             <span>Approved Entries</span>

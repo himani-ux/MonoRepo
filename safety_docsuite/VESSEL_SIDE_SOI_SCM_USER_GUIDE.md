@@ -1,536 +1,274 @@
-# Vessel Side User Guide for Safety Module
+# Vessel Safety User Guide
 
-This guide is for vessel users.
+This guide is for vessel crew.
 
-This guide covers only:
+It explains three things:
 
+- KSM Circulars, Safety Alerts, and Work Instructions
 - Safety Officer Inspection
 - Safety Committee Meeting
-- KSM Circulars, Safety Alerts, and Work Instructions
 
-Incident workflow is not covered in this guide.
+Incident reporting is not included in this guide.
 
-## 1. Simple Words Used in This Guide
+## 1. Simple Meaning
 
 SOI means Safety Officer Inspection.
 
 SCM means Safety Committee Meeting.
 
-Circular means company information sent to the vessel.
+Circular means company information.
 
-Safety Alert means important safety learning or warning from the company.
+Safety Alert means important safety warning.
 
-Work Instruction means instruction from the company about how work must be done.
+Work Instruction means company instruction for doing work.
 
-Finding means a safety problem found during inspection or meeting.
+Finding means a safety problem.
 
-Corrective Measure means what action will be taken to fix the finding.
+Corrective Measure means action to fix the problem.
 
-Master means the Captain.
+Master means Captain.
 
-Chief Officer means the officer normally handling safety work on board.
+Chief Officer normally handles safety work on board.
 
-Safety Officer means the officer doing the SOI inspection. Normally this is Chief Officer, unless another officer is assigned.
+Safety Officer normally does the SOI.
 
-DPA or Office means shore office safety team.
+Office means shore safety team.
 
-## 2. Why We Use This Module
+## 2. General Rules
 
-This module is used to keep safety records in one place.
+Write true information only.
 
-The vessel must use it to:
+Write in simple English.
 
-- record safety inspections
-- record safety meeting minutes
-- record findings and corrective measures
-- show that circulars, alerts, and work instructions were read and discussed
-- download and print safety records
-- close records with proper approval
-
-Do not enter false information.
+Do not write only "OK".
 
 Do not leave important fields blank.
 
-Use simple and clear English.
+If you do not understand, ask Master or Chief Officer.
 
-## 3. KSM Circulars, Safety Alerts, and Work Instructions
+## 3. Circulars, Alerts, and Work Instructions
 
-### Purpose
+Open KSM Library to read company circulars, alerts, and work instructions.
 
-The company sends circulars, safety alerts, and work instructions so the vessel knows important safety information.
+If office sends it to your vessel, all crew on that vessel can see it.
 
-Crew must read them carefully.
+If office sends it to your rank, only that rank can see it in personal login.
 
-Some circulars may be normal information.
+If you see "Important, You must read it", read it carefully.
 
-Some circulars may be important and must be read.
+Do not ignore important circulars.
 
-### Where To See Them
+After reading:
 
-Open the KSM Library or Circular section.
-
-If a circular, safety alert, or work instruction is sent to your vessel, all crew on that vessel can see it.
-
-If a circular is sent to your rank only, you can see it in your own login.
-
-### Important Circulars
-
-If the office specially selects your rank, the circular may show as important.
-
-Important means:
-
-- you must read it
-- do not ignore it
-- follow the instruction if it applies to your work
-- ask Master or Chief Officer if you do not understand
-
-### What Crew Should Do
-
-When you see a new circular, alert, or work instruction:
-
-1. Open it.
-2. Read the title.
-3. Read the instructions.
-4. Check if it applies to your rank or work.
-5. If it is important, read it carefully.
-6. Follow the instruction.
-7. If the topic needs discussion, bring it to the Safety Committee Meeting.
-
-### What Master and Chief Officer Should Do
-
-Master and Chief Officer should make sure important circulars, alerts, and work instructions are discussed during the Safety Committee Meeting.
-
-If action is required, write it in the meeting and assign the person responsible.
+- understand the instruction
+- follow it if it applies to your work
+- ask Master or Chief Officer if not clear
+- discuss it in SCM if needed
 
 ## 4. Safety Officer Inspection
 
-### Purpose
+SOI is used to inspect vessel areas and find safety problems.
 
-Safety Officer Inspection is used to inspect the vessel and find safety problems.
+SOI uses paper checklist.
 
-The aim is to fix problems before they cause injury, pollution, damage, or unsafe work.
+Simple flow:
 
-SOI is a paper-first inspection.
+1. Create SOI.
+2. Select areas.
+3. Select assistant.
+4. Download checklist.
+5. Print checklist.
+6. Do inspection on board.
+7. Write on paper checklist.
+8. Enter findings in system.
+9. Submit findings.
+10. Master reviews and closes.
 
-This means:
+Keep the signed paper checklist on board.
 
-- the system creates the inspection record
-- the checklist is downloaded and printed
-- the inspection is done on paper
-- the paper is signed on board
-- only findings are entered back into the system
-- the paper checklist must be kept on board as record
+There is no scan upload.
 
-There is no scan upload required.
+## 5. SOI Create Fields
 
-### Who Creates SOI
+Vessel:
+Check vessel name is correct.
 
-Normally the Safety Officer creates SOI.
+Planned Date:
+Select the inspection date.
 
-On most vessels, the Chief Officer is the Safety Officer.
+Inspection Areas:
+Select only the areas you will inspect.
 
-If another officer is assigned, follow Master's instruction.
+Assistant:
+Select the person helping the Safety Officer.
 
-### SOI Main Steps
+Trainees:
+Select crew who are joining for learning.
 
-Step 1: Create SOI.
+Generate Checklist:
+Use this to download PDF or Excel checklist.
 
-Step 2: Select inspection areas.
-
-Step 3: Select assistant and trainees if required.
-
-Step 4: Download and print checklist.
-
-Step 5: Carry out inspection on board.
-
-Step 6: Enter findings in the system.
-
-Step 7: Submit findings.
-
-Step 8: Master reviews and closes.
-
-## 5. SOI Create Screen Fields
-
-### Vessel
-
-This is the vessel for the inspection.
-
-Normally it comes from your login.
-
-Check that the vessel name is correct.
-
-### Planned Date
-
-This is the date when inspection is planned.
-
-Use the actual planned inspection date.
-
-### Inspection Areas
-
-These are vessel areas to inspect.
-
-Example:
-
-- Bridge
-- Deck
-- Engine Room
-- Galley
-- Accommodation
-
-Select the areas that will be inspected.
-
-Do not select an area if you will not inspect it.
-
-### Section 12
-
-Section 12 is a general safety culture section.
-
-It is not a physical area.
-
-It is normally done once in the required cycle.
-
-If the system shows Section 12 is needed, include it.
-
-### Assistant
-
-Assistant is the crew member who helps the Safety Officer during inspection.
-
-The assistant should normally be from a different department.
-
-This gives a better and fair inspection.
-
-### Trainees
-
-Trainees are crew members who join the inspection for learning.
-
-They observe and learn.
-
-They do not replace the Safety Officer or Assistant.
-
-### Generate Checklist
-
-Use this to create the PDF or Excel checklist.
-
-After generating, download and print it.
-
-### Checklist Unique ID
-
-The system creates a unique ID for the checklist.
-
-This ID connects the paper checklist with the digital record.
-
+Checklist Unique ID:
+This connects the paper checklist with system record.
 Do not change it.
 
-Do not create your own ID.
+Barcode:
+Barcode shows the checklist ID.
+It helps identify the checklist.
 
-When adding findings, use the same checklist ID from the paper.
+## 6. During SOI
 
-### Barcode
+Take printed checklist to the area.
 
-The barcode is printed on the checklist.
+Check each item properly.
 
-It represents the checklist unique ID.
-
-It helps identify the correct checklist.
-
-It does not replace the paper signature.
-
-## 6. Doing The SOI Inspection On Board
-
-Take the printed checklist to the inspection area.
-
-Check each item carefully.
-
-Mark the paper checklist during inspection.
+Mark the paper checklist.
 
 If everything is okay, no finding is needed.
 
-If something is unsafe or not correct, create a finding in the system.
+If there is a problem, create a finding in the system.
 
-Paper checklist must be signed by Safety Officer and Assistant.
+Take photo if required.
 
-Keep the signed paper checklist in the vessel safety file.
+Get paper signatures.
+
+Keep paper checklist safely.
 
 ## 7. SOI Finding Fields
 
-### Area
+Area:
+Select where the problem was found.
 
-Select the area where the problem was found.
+Checklist Item:
+Select the related checklist item.
 
-Example:
-
-- Deck
-- Engine Room
-- Galley
-- Accommodation
-
-### Checklist Item
-
-Select the checklist item related to the problem.
-
-Use the item from the printed checklist.
-
-### Finding Title
-
-This should be a short name for the problem.
+Title:
+Write a short name of the problem.
 
 Example:
+Fire door not closing.
 
-Fire door not closing properly.
+Description:
+Write what you saw.
 
-### Finding Description
+Good:
+Fire door near galley is not closing fully.
 
-Write what you found.
-
-Write clearly.
-
-Good example:
-
-Fire door at galley entrance is not closing fully. Door closer is weak and needs adjustment.
-
-Bad example:
-
+Bad:
 Door problem.
 
-### Severity
+Severity:
+Select Low, Medium, or High.
 
-Select how serious the finding is.
+Root Cause:
+Select why the problem happened.
 
-Low means small issue.
+Category Tag:
+Select Safety, Security, Environment, MLC, Training, Operational, Management, or Others.
 
-Medium means important issue.
-
-High means serious safety issue.
-
-If high severity is selected, photo may be required.
-
-### Root Cause
-
-Select the reason why the problem happened.
-
-Example:
-
-- Poor maintenance
-- Not following procedure
-- Missing checklist
-- Lack of training
-
-Choose the best matching reason.
-
-### Category Tag
-
-Select the safety category.
-
-Options include:
-
-- Safety
-- Security
-- Environment
-- MLC
-- Training
-- Operational
-- Management
-- Others
-
-### Person Responsible
-
-Select the person who will take action.
-
+Person Responsible:
+Select who will make sure action is completed.
 This is not blame.
 
-This means this person will make sure the action is completed.
+Due Date:
+Select date to complete the action.
 
-Usually this may be:
-
-- Master
-- Chief Officer
-- Chief Engineer
-- Second Engineer
-- Electro Technical Officer
-
-### Due Date
-
-Enter the date by which the action should be completed.
-
-Do not put an unrealistic date.
-
-### Corrective Action
-
-Write what will be done to fix the problem.
+Corrective Action:
+Write what will be done.
 
 Example:
+Adjust door closer and test the door.
 
-Adjust door closer and test the door closing three times.
+Photo:
+Attach photo if required or useful.
 
-### Photo or Evidence
-
-Attach photo if required or available.
-
-For high severity, attach photo if the system asks for it.
-
-Photo should clearly show the problem.
-
-### Submit Finding
-
-After checking the finding details, submit it.
-
-Once submitted, Master can review it.
+Submit:
+Submit after checking all details.
 
 ## 8. SOI Finding Closure
 
-### Who Closes Finding
+First, action must be completed.
 
-Master reviews and approves closure where required.
-
-The responsible person must complete the action first.
-
-### What Master Checks
+Then Master checks the finding.
 
 Master checks:
 
-- finding is clear
-- corrective action is completed
+- problem is fixed
 - evidence is enough
 - closure reason is written
 - no unsafe condition remains
 
-### If Master Rejects Closure
-
-If the finding is not properly closed, Master can send it back.
-
-The reason must be written.
-
-The responsible person or Safety Officer must correct it and submit again.
+If not correct, Master can send it back.
 
 ## 9. Safety Committee Meeting
 
-### Purpose
-
-Safety Committee Meeting is the vessel safety meeting.
+SCM is the vessel safety meeting record.
 
 It is used to discuss:
 
 - previous meeting points
-- safety and deficiencies
-- circulars, safety alerts, and work instructions
-- near misses if shown in the system
+- circulars, alerts, and work instructions
+- near miss items if shown
 - SOI findings
 - PSC findings and corrective measures
+- security
+- environment
+- health
 - crew welfare
-- health and environment matters
-- minutes of meeting
+- meeting minutes
 
-The meeting record becomes proof that the vessel discussed safety matters.
+## 10. SCM Simple Flow
 
-## 10. Who Creates SCM
+1. Create meeting.
+2. Fill meeting details.
+3. Complete attendance sheet.
+4. Fill all sections.
+5. Discuss circulars, alerts, work instructions, near miss, and findings.
+6. Download PDF if needed.
+7. Edit meeting if correction is needed.
+8. Office adds Office Comment.
+9. After Office Comment, meeting is closed.
+10. Keep latest PDF in vessel records.
 
-Master or Chief Officer can create the meeting, based on permission.
+Office can add Office Comment after the meeting is created.
 
-Regular meeting and Ad-Hoc meeting can be created.
+After Office Comment, vessel cannot edit the meeting.
 
-Regular meeting is the normal planned safety meeting.
+## 11. SCM Meeting Details
 
-Ad-Hoc meeting is an extra meeting for special reason.
-
-## 11. SCM Main Steps
-
-Step 1: Create the meeting.
-
-Step 2: Fill meeting details.
-
-Step 3: Complete attendance sheet.
-
-Step 4: Complete Sections 1 to 8.
-
-Step 5: Check circulars, alerts, work instructions, near miss items, and findings.
-
-Step 6: Finalize the meeting.
-
-Step 7: Master closes the meeting.
-
-Step 8: Download and print signed PDF.
-
-Step 9: Office adds Section 9 review after Master closure.
-
-## 12. SCM Meeting Details Fields
-
-### Meeting Type
-
+Meeting Type:
 Select Regular or Ad-Hoc.
 
-Regular is normal safety meeting.
+Meeting Date:
+Select meeting date.
 
-Ad-Hoc is special meeting.
+Meeting Time:
+Enter start time.
 
-### Meeting Date
+Location:
+Enter where meeting happened.
 
-Enter the meeting date.
+Voyage Number:
+Enter if available.
 
-### Meeting Time
+Ship Position:
+Select port, sea, or other position.
 
-Enter the meeting start time.
+Commence Time:
+Meeting start time.
 
-### Location
+Completion Time:
+Meeting end time.
 
-Enter where the meeting happened.
+## 12. Attendance Sheet
 
-Example:
+Mark who attended the meeting.
 
-Ship office, bridge, conference room, or at sea.
+If crew is present, mark present.
 
-### Voyage Number
+If crew is absent, enter reason.
 
-Enter voyage number if applicable.
-
-If not available, leave blank if allowed.
-
-### Occasion
-
-This tells why the meeting is held.
-
-Example:
-
-Monthly meeting.
-
-### Ship Position
-
-Select whether the vessel is in port, at sea, or another position.
-
-### Position From and Position To
-
-Use this if the meeting is during voyage or movement.
-
-Example:
-
-From Singapore to Dubai.
-
-### Commence Time
-
-This is meeting start time.
-
-### Completion Time
-
-This is meeting end time.
-
-## 13. SCM Attendance Sheet
-
-### Purpose
-
-Attendance sheet records who attended the meeting.
-
-All expected crew are shown from the vessel crew list.
-
-### Present
-
-Tick present if the person attended.
-
-Untick if the person was absent.
-
-### Absence Reason
-
-If person is absent, write the reason.
-
-Example:
+Example reasons:
 
 - On watch
 - Rest hour
@@ -538,328 +276,163 @@ Example:
 - Medical reason
 - Not on board
 
-Absent person and reason will be printed in the SCM PDF.
+Absent crew and reason will print in PDF.
 
-### Comments
+Office side can see the attendance and WRH snapshot.
 
-Use comments for extra note.
+WRH warning does not stop the meeting.
 
-Example:
+## 13. SCM Sections
 
-Joined late due to watch handover.
+Fill each section in simple words.
 
-### WRH Status
-
-WRH means Work and Rest Hours.
-
-If warning is shown, Master must check it.
-
-WRH warning does not stop meeting creation.
-
-But it may need acknowledgement before Master closure.
-
-## 14. SCM Section 1: Structured Review
-
-This section is for reviewing previous and current safety matters.
-
-Fields include:
-
-- previous minutes reviewed
-- company topics discussed
-- safety or deficiencies discussed
-- near misses discussed
-- immediate actions discussed
-- major incidents discussed
-- emergency drills discussed
-
-Select Yes, No, or N/A where available.
+Use Yes, No, or N/A where shown.
 
 Use N/A only when the point does not apply.
 
-Write clear recommendation or suggestion if action is needed.
+If action is needed, write recommendation or suggestion.
 
-## 15. SCM Section 2: Quality and Safety Practice
+## 14. Circulars in SCM
 
-This section is for checking safe work practice.
+Latest circulars, alerts, and work instructions may appear in SCM.
 
-Fields include:
-
-- compliance with permit to work
-- compliance with checklist system
-- compliance with alcohol policy
-- compliance with risk assessment
-- compliance with rest hours
-- compliance with MARPOL procedure
-
-Select Yes, No, or N/A.
-
-If No is selected, write what needs to be improved.
-
-## 16. Circulars, Safety Alerts, and Work Instructions in SCM
-
-The system shows latest circulars, safety alerts, and work instructions.
-
-For each item, choose:
+For each item, select:
 
 - Discussed
 - Not Discussed
 
-If Not Discussed is selected, write the reason.
+If Not Discussed, write reason.
 
 Example:
+Received after meeting time.
 
-Not discussed because circular was received after meeting time.
+## 15. Near Miss in SCM
 
-If any action is required from a circular, write it in recommendation or finding section.
+If near miss items appear, review them.
 
-Important circulars must be read by crew.
+For each item, select Discussed or Not Discussed.
 
-If office marks a circular as important for your rank, do not ignore it.
+If Not Discussed, write reason.
 
-## 17. Near Miss Items in SCM
+Do not write hidden reporter name.
 
-If near miss items are shown, review them in the meeting.
-
-For each item, choose:
-
-- Discussed
-- Not Discussed
-
-If Not Discussed is selected, write the reason.
-
-Do not write crew name if identity is hidden by system.
-
-## 18. SCM Section 3: Security
-
-This section is for security matters.
-
-Write immediate security concerns if any.
-
-Write security best practices discussed.
-
-Write cyber security notes if discussed.
-
-If no issue, write No security concern noted.
-
-## 19. SCM Section 4: Environment
-
-This section is for environmental matters.
-
-Write environmental best practices.
-
-Example:
-
-Garbage segregation reminded to all crew.
-
-Oil spill prevention discussed.
-
-## 20. SCM Section 5: Health
-
-This section is for crew health and hygiene matters.
-
-Fields include:
-
-- health review
-- validity of medical certificates
-- weekly inspection by Master
-- mess committee meeting for quality
-- best practices
-
-Write clearly if any health issue needs action.
-
-## 21. SCM Section 6: Crew Welfare
-
-This section is for crew welfare matters.
-
-Fields include:
-
-- any complaint received from crew
-- matter status resolved
-- complaint form submitted to office
-- best practices
-
-Do not write unnecessary personal details.
-
-Only write what is needed for safety and welfare record.
-
-## 22. SCM Section 7: PSC Findings and Corrective Measures
-
-This section is for PSC findings, safety findings, and corrective measures discussed in the meeting.
+## 16. PSC Findings and Corrective Measures
 
 If PSC CAR is shown, review it.
 
-Click the CAR number if you need to open the related record.
+Write:
 
-Write finding clearly.
+- what was discussed
+- what action will be taken
+- who will follow up
 
-Write corrective measure clearly.
+Click CAR number if you need to open it.
 
-Example Finding:
+## 17. Minutes of Meeting
 
-PSC observation on fire drill record reviewed.
+Write final meeting notes.
 
-Example Corrective Measure:
+Write main points only.
 
-Chief Officer to update drill record and verify during next weekly check.
-
-## 23. SCM Section 8: Minutes of Meeting
-
-This is the final meeting notes.
-
-Write the main points discussed.
-
-Do not write very short comments like OK.
-
-Write simple full sentences.
+Do not write only "OK".
 
 Example:
+The committee discussed circulars, SOI findings, rest hours, and deck safety. Chief Officer will follow up open items before next meeting.
 
-The committee discussed circulars, SOI findings, rest hours, and deck safety. Chief Officer will follow up open findings before next meeting.
+## 18. Edit Meeting
 
-## 24. SCM Section 9: Office Review
+Use Edit Meeting if correction is needed.
 
-This section is filled by office after Master closes the meeting.
-
-Vessel side normally does not fill this section.
-
-Office writes review comments.
-
-After office review, vessel cannot edit the meeting.
-
-## 25. Editing SCM
-
-Before office review, Master or Chief Officer can use Edit Meeting.
-
-Use Edit Meeting if you need to correct:
-
-- meeting details
-- attendance
-- section answers
-- recommendations
-- findings
-- minutes
+You can edit before office review.
 
 After office review, editing is stopped.
 
-## 26. Finalize and Master Closure
+## 19. Office Comment and Closure
 
-When meeting is complete, click Finalize.
-
-After Finalize, Master checks the meeting.
-
-Master uses Master's closure for scm.
-
-After Master closure, the meeting is closed.
-
-The signed PDF can be downloaded and printed.
-
-The PDF includes:
-
-- meeting details
-- attendance
-- absent crew reason
-- sections
-- findings
-- circular discussion
-- near miss discussion if available
-- signatures
-- office review after office completes it
-
-## 27. What To Check Before Closing SCM
-
-Before closing, Master should check:
+Before office closes the meeting, Master or Chief Officer should check:
 
 - attendance is correct
-- absent crew reason is entered
-- all required sections are filled
-- circulars, safety alerts, and work instructions are reviewed
+- absent reasons are entered
+- all sections are filled
 - important circulars are read
-- findings and corrective measures are clear
-- minutes of meeting are clear
-- no false or incomplete information is entered
+- findings are clear
+- corrective measures are clear
+- minutes are clear
 
-## 28. Simple Rules For Users
+Office enters Office Comment.
 
-Use simple English.
+When Office Comment is saved, the meeting is closed.
 
-Write facts only.
+After closure, download latest PDF if required.
 
-Do not write unnecessary personal remarks.
+PDF has a signature box for Master and Chief Officer.
 
-Do not leave reason blank when system asks for reason.
+The system does not capture SCM digital signatures.
 
-Do not ignore important circulars.
+## 20. Common Mistakes
 
-Do not close record without checking it.
-
-If you do not understand a field, ask Master or Chief Officer.
-
-## 29. Common Mistakes To Avoid
-
-Do not select Present if the crew member was absent.
+Do not mark absent crew as present.
 
 Do not leave absence reason blank.
 
-Do not write only OK in findings or minutes.
+Do not select Discussed if not discussed.
 
-Do not select Discussed if the item was not discussed.
+Do not select Not Discussed without reason.
 
-Do not select Not Discussed without writing reason.
+Do not create finding without corrective action.
 
-Do not create findings without clear corrective measure.
+Do not ignore important circulars.
 
-Do not ignore red or warning messages.
+Do not use old PDF after making changes. Download latest PDF.
 
-Do not download old PDF and assume it is latest. Generate or download latest PDF after changes.
+Do not wait for Master's digital sign off. SCM closes when Office Comment is saved.
 
-## 30. Quick Checklist For SOI
+## 21. Quick SOI Checklist
 
-Before SOI:
+Before inspection:
 
-- Check vessel name.
-- Select correct date.
-- Select correct areas.
-- Select assistant.
-- Download and print checklist.
+- check vessel name
+- select date
+- select areas
+- select assistant
+- download and print checklist
 
-During SOI:
+During inspection:
 
-- Inspect properly.
-- Mark paper checklist.
-- Take photos if required.
-- Get paper signatures.
+- inspect properly
+- mark paper checklist
+- take photo if needed
+- get signatures
 
-After SOI:
+After inspection:
 
-- Enter findings.
-- Add corrective action.
-- Assign person responsible.
-- Submit for closure.
-- Keep signed paper checklist on board.
+- enter findings
+- add corrective action
+- select person responsible
+- submit
+- keep signed paper checklist
 
-## 31. Quick Checklist For SCM
+## 22. Quick SCM Checklist
 
 Before meeting:
 
-- Check latest circulars, alerts, and work instructions.
-- Check important circulars.
-- Check open SOI findings.
-- Check PSC CAR if shown.
+- check circulars, alerts, and work instructions
+- check important circulars
+- check SOI findings
+- check PSC CAR if shown
 
 During meeting:
 
-- Mark attendance.
-- Enter absence reason.
-- Discuss each section.
-- Record recommendations.
-- Record findings and corrective measures.
-- Write minutes.
+- mark attendance
+- enter absence reasons
+- discuss sections
+- record findings
+- write minutes
 
 After meeting:
 
-- Review all entries.
-- Finalize meeting.
-- Master closes meeting.
-- Download and print PDF.
-- Keep PDF in vessel records.
-
+- review all entries
+- office adds Office Comment
+- meeting closes
+- download latest PDF
+- keep PDF in vessel records

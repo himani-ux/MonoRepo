@@ -9,13 +9,14 @@ import { useSafetyAuth } from "../../../../hooks/safety/use-auth";
 import {
   safetyKeys,
   useSafetyScmAgenda,
+  useSafetyScmAttendance,
   useSafetyScmAutoFeed,
   useSafetyScmClosedSinceLast,
   useSafetyScmMeeting,
 } from "../../../../hooks/use-safety";
 import { safetyApi, type SafetyScmSection } from "../../../../lib/api/safety";
 import { getErrorMessage } from "../../../../lib/api/client";
-import { getSafetyDeviceFingerprint, resolveSignatureTypedName } from "../../../../lib/safety/digital-signature";
+import { formatScmState } from "../../../../lib/safety/scm-status";
 
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
@@ -31,6 +32,12 @@ function DetailCard({ label, value }: { label: string; value: string }) {
 function isRole(role: string | null, ...values: string[]) {
   const normalizedRole = (role ?? "").trim().toUpperCase();
   return values.some((value) => normalizedRole === value);
+}
+
+const MARINE_SUPERINTENDENT_PROFILE_ID = "407ef017-0f1c-ef11-a9f1-f348983bae6b";
+
+function hasMarineSuperintendentProfile(profileId?: string | null) {
+  return String(profileId ?? "").trim().toLowerCase() === MARINE_SUPERINTENDENT_PROFILE_ID;
 }
 
 function downloadBlob({ blob, fileName }: { blob: Blob; fileName: string }) {
@@ -50,6 +57,36 @@ function formatDateTime(value?: string | null) {
   }
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+function formatRestHours(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  const numericValue = Number(value);
+  return Number.isNaN(numericValue) ? String(value) : numericValue.toFixed(2);
+}
+
+function formatTimezoneOffset(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") {
+    return "Unavailable";
+  }
+
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return "Unavailable";
+  }
+
+  const sign = numericValue >= 0 ? "+" : "-";
+  const absoluteMinutes = Math.abs(numericValue);
+  const hours = Math.trunc(absoluteMinutes / 60);
+  const minutes = absoluteMinutes % 60;
+
+  if (minutes === 0) {
+    return `UTC ${sign} ${hours} hr${hours === 1 ? "" : "s"}`;
+  }
+
+  return `UTC ${sign} ${hours} hr${hours === 1 ? "" : "s"} ${minutes} min`;
 }
 
 function formatLegacyValue(value: string | number | boolean | null | undefined, fieldType?: string) {
@@ -106,6 +143,8 @@ const hiddenLegacyFields = new Set([
   "near_miss_discussion_status",
   "near_miss_not_discussed_reason",
 ]);
+
+type ScmSectionTabKey = number | "office-review";
 
 function SectionContent({ section }: { section: SafetyScmSection }) {
   const legacyRows = (section.legacy_field_meta ?? [])
@@ -192,22 +231,19 @@ export default function SafetyScmDetailRoute() {
   const queryClient = useQueryClient();
   const meetingId = params.id ?? "";
   const enabled = Boolean(meetingId);
-  const canSignOff = isRole(auth.role, "MASTER");
   const canManageScm = isRole(auth.role, "CO", "MASTER");
-  const [finalizeName, setFinalizeName] = useState(() => resolveSignatureTypedName(auth.user));
-  const [finalizeDevice] = useState(() => getSafetyDeviceFingerprint());
-  const [finalizePending, setFinalizePending] = useState(false);
-  const [finalizeError, setFinalizeError] = useState<unknown>(null);
-  const [finalized, setFinalized] = useState(false);
   const [pdfPending, setPdfPending] = useState(false);
   const [pdfError, setPdfError] = useState<unknown>(null);
   const [officeCommentDraft, setOfficeCommentDraft] = useState("");
   const [officeReviewPending, setOfficeReviewPending] = useState(false);
   const [officeReviewError, setOfficeReviewError] = useState<unknown>(null);
   const [officeReviewSaved, setOfficeReviewSaved] = useState(false);
+  const [activeSectionKey, setActiveSectionKey] = useState<ScmSectionTabKey | null>(null);
+  const [showAttendanceRows, setShowAttendanceRows] = useState(false);
 
   const meetingQuery = useSafetyScmMeeting(meetingId, enabled);
   const agendaQuery = useSafetyScmAgenda(meetingId, enabled);
+  const attendanceQuery = useSafetyScmAttendance(meetingId, enabled);
   const closedQuery = useSafetyScmClosedSinceLast(meetingId, enabled);
   const autoFeedQuery = useSafetyScmAutoFeed(meetingId, enabled);
 
@@ -225,27 +261,6 @@ export default function SafetyScmDetailRoute() {
     meetingQuery.data?.office_comment,
     meetingQuery.data?.office_comment_at,
   ]);
-
-  async function handleFinalize() {
-    setFinalizePending(true);
-    setFinalizeError(null);
-    try {
-      await safetyApi.submitScmMeeting(meetingId, {
-        typed_name: finalizeName,
-        device_fingerprint: finalizeDevice,
-      });
-      setFinalized(true);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: safetyKeys.scmMeeting(meetingId) }),
-        queryClient.invalidateQueries({ queryKey: safetyKeys.scmSignoffPreflight(meetingId) }),
-        queryClient.invalidateQueries({ queryKey: safetyKeys.scmMeetings({}) }),
-      ]);
-    } catch (error) {
-      setFinalizeError(error);
-    } finally {
-      setFinalizePending(false);
-    }
-  }
 
   async function handleDownloadPdf() {
     setPdfPending(true);
@@ -289,7 +304,6 @@ export default function SafetyScmDetailRoute() {
     meetingQuery.isLoading
     || agendaQuery.isLoading
     || closedQuery.isLoading
-    || autoFeedQuery.isLoading
   ) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
@@ -298,8 +312,8 @@ export default function SafetyScmDetailRoute() {
     );
   }
 
-  if (meetingQuery.isError || agendaQuery.isError || closedQuery.isError || autoFeedQuery.isError) {
-    const error = meetingQuery.error ?? agendaQuery.error ?? closedQuery.error ?? autoFeedQuery.error;
+  if (meetingQuery.isError || agendaQuery.isError || closedQuery.isError) {
+    const error = meetingQuery.error ?? agendaQuery.error ?? closedQuery.error;
     return (
       <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
         {getErrorMessage(error)}
@@ -309,33 +323,42 @@ export default function SafetyScmDetailRoute() {
 
   const meeting = meetingQuery.data;
   const agenda = agendaQuery.data;
+  const attendance = attendanceQuery.data;
   const closedSinceLast = closedQuery.data;
   const autoFeed = autoFeedQuery.data;
-  const canFinalize = meeting.state === "DRAFT" && canManageScm;
-  const canOpenSignoff = canSignOff && ["SUBMITTED", "REOPENED", "SIGNED_OFF"].includes(meeting.state);
-  const pdfIsSigned = meeting.state === "SIGNED_OFF" || Boolean(meeting.master_signed_off_at);
-  const canOfficeReview = isRole(auth.role, "DPA", "FM", "HOD SHORE", "SHORE HOD");
-  const officeReviewAvailable = meeting.state === "SIGNED_OFF" && Boolean(meeting.master_signed_off_at);
+  const canOfficeReview =
+    isRole(auth.role, "DPA", "FM", "HOD SHORE", "SHORE HOD")
+    || hasMarineSuperintendentProfile(auth.user?.profileId);
+  const officeReviewAvailable = meeting.state !== "CLOSED" && !meeting.office_comment_at;
   const officeReviewEditable = canOfficeReview && officeReviewAvailable;
   const canEditMeeting = canManageScm && !meeting.is_reviewed && !meeting.office_comment_at;
-  const detailSections = meeting.sections.filter((section) => section.agenda_item_number !== 9);
-  const actionError = pdfError ?? finalizeError ?? officeReviewError;
-  const actionSuccess = finalized
-    ? "SCM finalized for Master sign-off."
-    : officeReviewSaved
-      ? "Section 9 Office Review saved."
+  const detailSections = (agenda?.rows ?? []).filter((section) => section.agenda_item_number !== 9);
+  const firstSectionKey: ScmSectionTabKey = detailSections[0]?.agenda_item_number ?? "office-review";
+  const selectedSectionKey: ScmSectionTabKey =
+    activeSectionKey === "office-review"
+    || detailSections.some((section) => section.agenda_item_number === activeSectionKey)
+      ? activeSectionKey
+      : firstSectionKey;
+  const activeDetailSection =
+    typeof selectedSectionKey === "number"
+      ? detailSections.find((section) => section.agenda_item_number === selectedSectionKey) ?? null
       : null;
+  const actionError = pdfError ?? officeReviewError;
+  const actionSuccess = officeReviewSaved ? "Section 9 Office Review saved and meeting closed." : null;
+  const attendanceRows = attendance?.rows ?? [];
+  const presentCount = attendanceRows.filter((row) => row.present).length;
+  const absentCount = attendanceRows.length - presentCount;
+  const wrhUnavailableCount = attendanceRows.filter((row) => !row.wrh_data_available || row.wrh_flag === "RED").length;
+  const wrhNonCompliantCount = attendanceRows.filter((row) => row.wrh_non_compliance_flag || row.wrh_flag === "YELLOW").length;
+  const wrhClear = attendanceRows.length > 0 && wrhUnavailableCount === 0 && wrhNonCompliantCount === 0 && (attendance?.warnings.length ?? 0) === 0;
   const officeReviewSection = (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             Section 9
           </p>
-          <h2 className="mt-2 text-lg font-semibold text-slate-900">Office Review</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            OFFICECOMMENTS and IsReviewed are completed by DPA/FM/Shore HOD after Master sign-off.
-          </p>
+          <h2 className="mt-2 text-lg font-semibold text-slate-900">Office Comment</h2>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
           meeting.is_reviewed ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
@@ -351,15 +374,17 @@ export default function SafetyScmDetailRoute() {
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
           {meeting.office_comment?.trim() || "No office review recorded yet."}
         </p>
-        <p className="mt-3 text-xs text-slate-500">
-          Reviewed by {meeting.office_comment_by ?? "Not recorded"} Â· {formatDateTime(meeting.office_comment_at)}
-        </p>
+        {meeting.office_comment_at ? (
+          <p className="mt-3 text-xs text-slate-500">
+            Reviewed by {meeting.office_comment_by ?? "Not recorded"} Â· {formatDateTime(meeting.office_comment_at)}
+          </p>
+        ) : null}
       </div>
 
       {officeReviewEditable ? (
         <div className="mt-5 space-y-4">
           <label className="block">
-            <span className="text-sm font-semibold text-slate-800">OFFICECOMMENTS</span>
+            <span className="text-sm font-semibold text-slate-800">OFFICE COMMENTS</span>
             <textarea
               className="mt-2 min-h-[140px] w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm leading-6 outline-none focus:border-slate-400"
               onChange={(event) => {
@@ -384,8 +409,8 @@ export default function SafetyScmDetailRoute() {
       ) : (
         <p className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
           {officeReviewAvailable
-            ? "Office review entry is restricted to DPA/FM/Shore HOD users."
-            : "Section 9 becomes editable after Master sign-off."}
+            ? "Office review entry is restricted to DPA/FM/Shore HOD/Marine Superintendent users."
+            : "Office review has been completed and the meeting is closed."}
         </p>
       )}
     </section>
@@ -410,52 +435,44 @@ export default function SafetyScmDetailRoute() {
         <DetailCard label="Meeting No" value={meeting.scm_number ?? `#${meeting.id}`} />
         <DetailCard label="Type" value={meeting.meeting_type} />
         <DetailCard label="Chair" value={meeting.chair_crew_id ?? "Not assigned"} />
-        <DetailCard label="State" value={meeting.state} />
+        <DetailCard label="State" value={formatScmState(meeting.state)} />
       </section>
 
-      <section className={`rounded-3xl border p-5 shadow-sm ${
-        pdfIsSigned ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-      }`}>
+      <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">SCM PDF</h2>
-            <p className={`mt-2 text-sm leading-6 ${pdfIsSigned ? "text-emerald-900" : "text-amber-900"}`}>
-              {pdfIsSigned
-                ? "Master sign-off is complete. Download the signed SCM PDF for filing or printing."
-                : meeting.state === "DRAFT"
-                  ? "Signed PDF is created after the meeting host finalizes the meeting and Master completes sign-off."
-                  : "Meeting is finalized for Master sign-off. Signed PDF will be available after Master signs."}
+            <p className="mt-2 text-sm leading-6 text-emerald-900">
+              Download the current SCM PDF at any time after the meeting is created.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            {canOpenSignoff ? (
-              <Link
-                className="inline-flex min-h-[44px] items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
-                to={`/safety/scm/${meeting.id}/signoff`}
-              >
-                Master's closure for scm
-              </Link>
-            ) : null}
-            {pdfIsSigned ? (
-              <button
-                className="inline-flex min-h-[44px] items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                disabled={pdfPending}
-                onClick={() => void handleDownloadPdf()}
-                type="button"
-              >
-                {pdfPending ? "Preparing PDF..." : "Download / Print Signed PDF"}
-              </button>
-            ) : null}
+            <button
+              className="inline-flex min-h-[44px] items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={pdfPending}
+              onClick={() => void handleDownloadPdf()}
+              type="button"
+            >
+              {pdfPending ? "Preparing PDF..." : "Download / Print PDF"}
+            </button>
           </div>
         </div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Attendance + WRH snapshot</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Attendance rows and WRH warnings come from the saved attendance record for this meeting.
+              {attendanceQuery.isLoading
+                ? "Loading saved attendance and WRH status..."
+                : attendanceQuery.isError
+                  ? getErrorMessage(attendanceQuery.error)
+                  : attendanceRows.length === 0
+                    ? "No attendees recorded yet."
+                    : wrhClear
+                      ? "All saved attendance rows are WRH compliant."
+                      : "WRH warnings are present in the saved attendance record."}
             </p>
           </div>
           {canManageScm ? (
@@ -467,99 +484,188 @@ export default function SafetyScmDetailRoute() {
             </Link>
           ) : null}
         </div>
+        {attendanceQuery.isSuccess ? (
+          <div className="mt-5 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <DetailCard label="Attendees" value={String(attendanceRows.length)} />
+              <DetailCard label="Present" value={String(presentCount)} />
+              <DetailCard label="Absent" value={String(absentCount)} />
+              <DetailCard label="WRH data unavailable" value={String(wrhUnavailableCount)} />
+              <DetailCard label="WRH warnings" value={String(wrhNonCompliantCount)} />
+              <DetailCard
+                label="Ship time"
+                value={formatTimezoneOffset(attendance?.timezone_offset_minutes)}
+              />
+            </div>
+            {attendanceRows.length > 0 ? (
+              <div className="flex justify-end">
+                <button
+                  aria-expanded={showAttendanceRows}
+                  className="inline-flex min-h-[40px] items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+                  onClick={() => setShowAttendanceRows((current) => !current)}
+                  type="button"
+                >
+                  {showAttendanceRows ? "Hide sheet" : "Open sheet"}
+                  <span
+                    aria-hidden="true"
+                    className="mt-[-2px] h-2 w-2 border-b-2 border-r-2 border-slate-600 transition"
+                    style={{ transform: showAttendanceRows ? "rotate(225deg)" : "rotate(45deg)" }}
+                  />
+                </button>
+              </div>
+            ) : null}
+            {attendanceRows.length > 0 && showAttendanceRows ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Crew</th>
+                      <th className="px-4 py-3 font-medium">Attendance</th>
+                      <th className="px-4 py-3 font-medium">WRH status</th>
+                      <th className="px-4 py-3 font-medium">Rest hours</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {attendanceRows.map((row) => (
+                      <tr key={row.crew_id}>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900">{row.display_name}</div>
+                          <div className="mt-1 text-xs uppercase tracking-[0.14em] text-slate-500">{row.rank_name || "-"}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {row.present ? "Present" : `Absent${row.absence_reason ? ` - ${row.absence_reason}` : ""}`}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            row.wrh_flag === "GREEN"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : row.wrh_flag === "YELLOW"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-rose-100 text-rose-800"
+                          }`}>
+                            {row.wrh_flag === "GREEN"
+                              ? "Compliant"
+                              : row.wrh_flag === "YELLOW"
+                                ? "Non-compliant"
+                                : "WRH data unavailable"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          24h {formatRestHours(row.wrh_rest_hours_24h)} / 7d {formatRestHours(row.wrh_rest_hours_7d)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {attendance?.warnings.length ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {attendance.warnings.map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
-      {canFinalize ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Finalize for Sign-Off</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-            <input
-              aria-label="Typed signature"
-              className="min-h-[44px] rounded-2xl border border-slate-200 px-3 py-2"
-              onChange={(event) => setFinalizeName(event.target.value)}
-              placeholder="Typed name"
-              value={finalizeName}
-            />
-            <button
-              className="min-h-[44px] rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300"
-              disabled={finalizePending || finalized || !finalizeName.trim()}
-              onClick={() => void handleFinalize()}
-              type="button"
-            >
-              {finalizePending ? "Finalizing..." : finalized ? "Finalized" : "Finalize"}
-            </button>
-          </div>
+      <SafetyClosedSinceLastBlock payload={closedSinceLast} />
+      {autoFeed ? <SafetyScmAutoFeed payload={autoFeed} /> : null}
+      {autoFeedQuery.isError ? (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
+          SOI findings could not be loaded: {getErrorMessage(autoFeedQuery.error)}
         </section>
       ) : null}
 
-      <SafetyClosedSinceLastBlock payload={closedSinceLast} />
-      <SafetyScmAutoFeed payload={autoFeed} />
 
+      {canEditMeeting ? (
+        <div className="flex justify-end">
+          <Link
+            className="inline-flex min-h-[44px] items-center rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+            to={`/safety/scm/${meeting.id}/edit`}
+          >
+            Edit Meeting
+          </Link>
+        </div>
+      ) : null}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Meeting actions</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Update meeting details before office review.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {canEditMeeting ? (
-              <Link
-                className="inline-flex min-h-[44px] items-center rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                to={`/safety/scm/${meeting.id}/edit`}
-              >
-                Edit Meeting
-              </Link>
-            ) : null}
-            {canOpenSignoff ? (
-              <Link
-                className="inline-flex min-h-[44px] items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
-                to={`/safety/scm/${meeting.id}/signoff`}
-              >
-                Master's closure for scm
-              </Link>
-            ) : null}
+      <section className="space-y-4">
+        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div
+            aria-label="SCM meeting sections"
+            className="flex min-w-max gap-2"
+            role="tablist"
+          >
+            {detailSections.map((section) => {
+              const isSelected = selectedSectionKey === section.agenda_item_number;
+
+              return (
+                <button
+                  aria-selected={isSelected}
+                  className={`min-h-[56px] max-w-[260px] whitespace-nowrap rounded-2xl border px-4 py-2 text-left transition ${
+                    isSelected
+                      ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                  key={section.agenda_item_number}
+                  onClick={() => setActiveSectionKey(section.agenda_item_number)}
+                  role="tab"
+                  type="button"
+                >
+                  <span className={`block text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                    isSelected ? "text-slate-200" : "text-slate-500"
+                  }`}>
+                    Section {section.agenda_item_number}
+                  </span>
+                  <span className="block overflow-hidden text-ellipsis text-sm font-semibold">
+                    {section.section_label}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              aria-selected={selectedSectionKey === "office-review"}
+              className={`min-h-[56px] whitespace-nowrap rounded-2xl border px-4 py-2 text-left transition ${
+                selectedSectionKey === "office-review"
+                  ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+              onClick={() => setActiveSectionKey("office-review")}
+              role="tab"
+              type="button"
+            >
+              <span className={`block text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                selectedSectionKey === "office-review" ? "text-slate-200" : "text-slate-500"
+              }`}>
+                Section 9
+              </span>
+              <span className="block text-sm font-semibold">Office Comment</span>
+            </button>
           </div>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <DetailCard
-            label="Current action items"
-            value={String(agenda.summary.current_action_item_count)}
-          />
-          <DetailCard
-            label="Open action items"
-            value={String(agenda.summary.open_action_item_count)}
-          />
-          <DetailCard
-            label="Carried forward"
-            value={String(agenda.summary.carried_forward_count)}
-          />
-        </div>
-      </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        {detailSections.map((section) => (
+        {activeDetailSection ? (
           <article
             className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-            key={section.agenda_item_number}
+            role="tabpanel"
           >
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Section {section.agenda_item_number}
+              Section {activeDetailSection.agenda_item_number}
             </p>
             <h2 className="mt-2 text-lg font-semibold text-slate-900">
-              {section.section_label}
+              {activeDetailSection.section_label}
             </h2>
-            <SectionContent section={section} />
-            {section.decision ? (
+            <SectionContent section={activeDetailSection} />
+            {activeDetailSection.decision ? (
               <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                Decision: {section.decision}
+                Suggestions / Recommendations: {activeDetailSection.decision}
               </p>
             ) : null}
           </article>
-        ))}
-        {officeReviewSection}
+        ) : (
+          officeReviewSection
+        )}
       </section>
     </section>
   );

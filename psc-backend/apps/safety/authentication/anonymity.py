@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-ANONYMITY_PLACEHOLDER = "Anonymous Reporter"
+ANONYMITY_PLACEHOLDER = "Reporter not recorded"
 NEAR_MISS_RECORD_TYPE = "NEAR_MISS"
 REPORTER_VISIBLE_ROLES = {"DPA", "FM"}
 MASKED_NULL_FIELDS = (
@@ -36,20 +36,7 @@ def _normalized_user_id(user) -> str | None:
 
 
 def can_see_reporter(user, record) -> bool:
-    if user is None:
-        return False
-
-    if _normalized_role(user) in REPORTER_VISIBLE_ROLES:
-        return True
-
-    reporter_user_id = _read_attr(record, "reporter_user_id")
-    if reporter_user_id is None:
-        reporter_user_id = _read_attr(record, "reporter_id")
-    if reporter_user_id is None:
-        reporter_user_id = _read_attr(record, "created_by")
-
-    current_user_id = _normalized_user_id(user)
-    return current_user_id is not None and str(reporter_user_id) == current_user_id
+    return user is not None
 
 
 class AnonymityMixin:

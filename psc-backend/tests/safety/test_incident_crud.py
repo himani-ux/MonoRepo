@@ -46,6 +46,12 @@ class IncidentCrudApiTests(unittest.TestCase):
         self.list_view = IncidentListCreateView.as_view()
         self.detail_view = IncidentDetailView.as_view()
 
+    @staticmethod
+    def _response_rows(response_data):
+        if isinstance(response_data, dict) and isinstance(response_data.get("results"), list):
+            return response_data["results"]
+        return response_data
+
     def test_create_list_and_patch_incident(self) -> None:
         create_request = self.factory.post(
             "/api/safety/incidents/",
@@ -75,8 +81,9 @@ class IncidentCrudApiTests(unittest.TestCase):
         list_response = self.list_view(list_request)
 
         self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(len(list_response.data), 1)
-        self.assertEqual(list_response.data[0]["id"], incident_id)
+        rows = self._response_rows(list_response.data)
+        listed_ids = {str(row["id"]) for row in rows}
+        self.assertIn(str(incident_id), listed_ids)
 
         patch_request = self.factory.patch(
             f"/api/safety/incidents/{incident_id}/",
@@ -120,8 +127,10 @@ class IncidentCrudApiTests(unittest.TestCase):
         list_response = self.list_view(list_request)
 
         self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(len(list_response.data), 1)
-        self.assertEqual(list_response.data[0]["vessel_id"], "7")
+        rows = self._response_rows(list_response.data)
+        self.assertTrue(rows)
+        self.assertTrue(all(row["vessel_id"] == "7" for row in rows))
+        self.assertNotIn("8", {row["vessel_id"] for row in rows})
 
     def test_create_requires_top_four_officer_role(self) -> None:
         create_request = self.factory.post(

@@ -22,19 +22,19 @@ export function SafetyBlameFixationBanner({
       }`}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.2em]">
-        FEAT-SAF-INC-025
+        Analysis review
       </p>
       <h2 className="mt-1 text-xl font-semibold">
-        Blame-Fixation {overrideBy ? "Override" : "Hard Block"}
+        {overrideBy ? "Review accepted" : "Review required"}
       </h2>
       <p className="mt-3 text-sm">
         {overrideBy
-          ? `Override already recorded by ${overrideBy}.`
-          : "The analysis language or root-cause pattern is clustering around blame-only conclusions."}
+          ? `Approval already recorded by ${overrideBy}.`
+          : "The analysis is focusing too much on individual blame. Add system or process causes, or record an approved reason."}
       </p>
       {triggerTerms.length > 0 ? (
         <p className="mt-2 text-sm">
-          Trigger terms: {triggerTerms.join(", ")}
+          Words to review: {triggerTerms.join(", ")}
         </p>
       ) : null}
     </section>

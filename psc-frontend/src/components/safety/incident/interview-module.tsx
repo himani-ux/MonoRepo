@@ -13,10 +13,10 @@ export function SafetyInterviewModule({
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-012 / 013
+            Witness interviews
           </p>
           <h2 className="text-xl font-semibold text-slate-900">
-            Structured 4-Phase Interview Module
+            Witness Interview Notes
           </h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">

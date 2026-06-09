@@ -1,4 +1,4 @@
-// src/components/AdminAllNotifications.jsx
+﻿// src/components/AdminAllNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // For back button if needed
 import PageLayout from '../../components/layout/PageLayout';
@@ -46,7 +46,7 @@ const AdminAllNotifications = () => {
             }
 
             const queryParams = new URLSearchParams(params).toString();
-            const response = await fetch(`/api/circular/api/submitted/?${queryParams}`);
+            const response = await fetch(`http://localhost:8000/api/circular/api/submitted/?${queryParams}`);
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -232,13 +232,13 @@ const AdminAllNotifications = () => {
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{new Date(n.created_at).toLocaleDateString()}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{getStatusBadge(n.publish_status)}</td>
 
-                                    {/* ✅ Comment (clickable popup) */}
+                                    {/* âœ… Comment (clickable popup) */}
                                     <td
                                         className="px-3 py-4 text-sm text-gray-500 max-w-xs cursor-pointer hover:text-indigo-600"
                                         onClick={() => handleCommentClick(n.publish_comment)}
                                         title="Click to view full comment"
                                     >
-                                        <div className="line-clamp-2">{n.publish_comment || '—'}</div>
+                                        <div className="line-clamp-2">{n.publish_comment || 'â€”'}</div>
                                     </td>
 
                                     {/* Download */}

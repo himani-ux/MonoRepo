@@ -3226,6 +3226,33 @@ class TestFEAT_RPT_002_BulkCARPDFExport(BaseInspectionAPITestCase):
         for call in mock_generate.call_args_list:
             self.assertEqual(call.kwargs.get("audience"), "external")
 
+    @patch("apps.inspection.report_views.generate_car_pdf", return_value=b"%PDF-1.4 bulk")
+    def test_bulk_export_attaches_follow_up_reports_to_each_car_payload(self, mock_generate):
+        InspectionReport.objects.create(
+            inspection=self.inspection,
+            report_type="FOLLOW_UP",
+            file_name="psc-follow-up-report.pdf",
+            file_path="psc/follow-up-report.pdf",
+            file_size=2048,
+            mime_type="application/pdf",
+            description="Follow-up report uploaded after action code change.",
+            uploaded_by=str(self.vessel_master.id),
+        )
+
+        response = self._export(audience="external")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_generate.call_count, 2)
+        for call in mock_generate.call_args_list:
+            payload = call.args[0]
+            self.assertEqual(call.kwargs.get("audience"), "external")
+            self.assertEqual(len(payload["follow_up_reports"]), 1)
+            self.assertEqual(payload["follow_up_reports"][0]["file_name"], "psc-follow-up-report.pdf")
+            self.assertEqual(
+                payload["follow_up_reports"][0]["description"],
+                "Follow-up report uploaded after action code change.",
+            )
+
 
 class TestFEAT_RPT_002_DeficiencyExcelExport(BaseInspectionAPITestCase):
     """

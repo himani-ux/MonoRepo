@@ -2522,7 +2522,8 @@ class TestFEAT_RPT_001_CARPDFExport(BaseCARAPITestCase):
              patch("apps.car.reports._build_corrective_actions", side_effect=track("corrective_actions", car_reports._build_corrective_actions)) as mock_actions, \
              patch("apps.car.reports._build_evidence_list", side_effect=track("evidence", car_reports._build_evidence_list)) as mock_evidence, \
              patch("apps.car.reports._build_review_history", side_effect=track("history", car_reports._build_review_history)) as mock_history, \
-             patch("apps.car.reports._build_physical_verification", side_effect=track("physical_verification", car_reports._build_physical_verification)) as mock_pv:
+             patch("apps.car.reports._build_physical_verification", side_effect=track("physical_verification", car_reports._build_physical_verification)) as mock_pv, \
+             patch("apps.car.reports._build_follow_up_reports", side_effect=track("follow_up_reports", car_reports._build_follow_up_reports)) as mock_follow_up_reports:
             generate_car_pdf(sample_data)
 
         self.assertEqual(call_order, [
@@ -2535,11 +2536,13 @@ class TestFEAT_RPT_001_CARPDFExport(BaseCARAPITestCase):
             "physical_verification",
             "evidence",
             "history",
+            "follow_up_reports",
         ])
         mock_header.assert_called_once()
         mock_car_info.assert_called_once()
         mock_deficiency.assert_called_once()
         mock_root_cause.assert_called_once()
+        mock_follow_up_reports.assert_called_once()
         mock_review_comments.assert_called_once()
         mock_actions.assert_called_once()
         mock_evidence.assert_called_once()
@@ -2563,6 +2566,57 @@ class TestFEAT_RPT_001_CARPDFExport(BaseCARAPITestCase):
         logo_cell = header_table._cellvalues[0][0]
         self.assertIsInstance(logo_cell, (Drawing, RLImage))
         self.assertNotIn("[Company Logo]", str(logo_cell))
+
+    def test_follow_up_details_print_in_external_pdf_body(self):
+        styles = car_reports._build_styles()
+        elements: list = []
+        content_width = car_reports.PAGE_WIDTH - car_reports.MARGIN_LEFT - car_reports.MARGIN_RIGHT
+
+        car_reports._build_follow_up_reports(
+            elements=elements,
+            car_data={
+                "follow_up_summary": {
+                    "reinspection_date": "2026-06-03",
+                    "notes": "General follow-up notes entered by the vessel.",
+                    "recorded_by": "Master User",
+                    "recorded_at": "2026-06-03T10:20:00+00:00",
+                },
+                "follow_up_action_updates": [
+                    {
+                        "deficiency_code": "01113",
+                        "deficiency_description": "Fire safety issue.",
+                        "from_action_code": "50",
+                        "to_action_code": "10",
+                        "notes": "Rectified at port.",
+                        "changed_by": "Master User",
+                        "changed_at": "2026-06-03T10:25:00+00:00",
+                    }
+                ],
+                "follow_up_reports": [
+                    {
+                        "file_name": "psc-follow-up-report.pdf",
+                        "file_url": "https://example.test/report.pdf",
+                        "description": "Follow-up report uploaded after action code change.",
+                        "uploaded_at": "2026-06-03T10:30:00+00:00",
+                        "uploaded_by": "VESSEL_MASTER",
+                    }
+                ]
+            },
+            styles=styles,
+            content_width=content_width,
+        )
+
+        merged = self._flatten_flowable_text(elements)
+        self.assertIn("Follow-up Details", merged)
+        self.assertIn("03 Jun 2026", merged)
+        self.assertIn("General follow-up notes entered by the vessel.", merged)
+        self.assertNotIn("Action Code Updates", merged)
+        self.assertNotIn("Fire safety issue.", merged)
+        self.assertNotIn("Rectified at port.", merged)
+        self.assertIn("Master User", merged)
+        self.assertIn("psc-follow-up-report.pdf", merged)
+        self.assertIn("Follow-up report uploaded after action code change.", merged)
+        self.assertIn("03 Jun 2026, 10:30", merged)
 
     @patch("apps.car.reports._fetch_clc_item_names", return_value={"1-1": "1-1 Violation by individual"})
     def test_feat_rpt_001_root_cause_prints_human_labels_without_codes(self, _mock_clc_names):
@@ -2849,6 +2903,7 @@ class TestCARReportPrintFormatting(TestCase):
                         "to": "30",
                         "changed_at": "2026-02-10T10:00:00",
                         "changed_by": "PIC Office",
+                        "reason": "Follow-up inspection accepted the correction.",
                     },
                     "is_cleared": False,
                 }
@@ -2861,6 +2916,7 @@ class TestCARReportPrintFormatting(TestCase):
         self.assertIn("Action Code at Inspection", merged)
         self.assertIn("Current Action Code", merged)
         self.assertIn("Changed from 10 to 30 on 10 Feb 2026 10:00 by PIC Office", merged)
+        self.assertIn("Reason: Follow-up inspection accepted the correction.", merged)
 
     def test_corrective_actions_internal_system_text_is_withheld_but_normal_text_renders(self):
         styles = car_reports._build_styles()

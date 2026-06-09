@@ -16,6 +16,7 @@ class SCMMeeting(PublicIdMixin):
         SUBMITTED = "SUBMITTED", "Submitted"
         SIGNED_OFF = "SIGNED_OFF", "Signed Off"
         REOPENED = "REOPENED", "Reopened"
+        CLOSED = "CLOSED", "Closed"
 
     vessel_id = models.CharField(max_length=64)
     scm_number = models.CharField(max_length=48, unique=True)
@@ -70,7 +71,7 @@ class SCMMeeting(PublicIdMixin):
                 name="ck_vims_safety_scm_meeting_type",
             ),
             models.CheckConstraint(
-                condition=Q(state__in=["DRAFT", "SUBMITTED", "SIGNED_OFF", "REOPENED"]),
+                condition=Q(state__in=["DRAFT", "SUBMITTED", "SIGNED_OFF", "REOPENED", "CLOSED"]),
                 name="ck_vims_safety_scm_meeting_state",
             ),
             models.CheckConstraint(

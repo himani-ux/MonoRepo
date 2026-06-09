@@ -27,9 +27,9 @@ export function SafetyMultiToolWorkspace({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-020
+            Analysis methods
           </p>
-          <h2 className="text-xl font-semibold text-slate-900">Multi-Tool Workspace</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Analysis Notes</h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
           {tools.length}/{minimumToolsRequired} tools

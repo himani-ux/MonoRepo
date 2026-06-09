@@ -253,7 +253,6 @@ class DashboardCompositeView(DashboardPermissionMixin, generics.GenericAPIView):
         scope = service.resolve_scope(vessel_id=vessel_id, user=request.user)
         payload = service.build_rollup(scope=scope, period_code=requested_period)
         payload["available_vessels"] = _list_available_vessels(user=request.user)
-        service.save_rollup(scope=scope, period_code=requested_period)
         return Response(payload)
 
 

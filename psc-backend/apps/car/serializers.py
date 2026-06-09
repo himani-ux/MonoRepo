@@ -213,6 +213,7 @@ def _resolve_action_code_change_note(
         'to': latest.new_action_code or current_action_code,
         'changed_at': latest.changed_at,
         'changed_by': latest.changed_by or '',
+        'reason': latest.change_reason or '',
     }
 
 
@@ -703,6 +704,9 @@ class CARDetailSerializer(serializers.ModelSerializer):
     activity_history = serializers.SerializerMethodField()
     audit_log = serializers.SerializerMethodField()
     available_actions = serializers.SerializerMethodField()
+    follow_up_reports = serializers.SerializerMethodField()
+    follow_up_summary = serializers.SerializerMethodField()
+    follow_up_action_updates = serializers.SerializerMethodField()
 
     # Status display
     status_display = serializers.CharField(source='get_status_display', read_only=True)
@@ -752,6 +756,9 @@ class CARDetailSerializer(serializers.ModelSerializer):
             'activity_history',
             'audit_log',
             'available_actions',
+            'follow_up_reports',
+            'follow_up_summary',
+            'follow_up_action_updates',
         ]
 
     def get_deficiency(self, obj):
@@ -859,6 +866,30 @@ class CARDetailSerializer(serializers.ModelSerializer):
         from apps.inspection.workflow import get_available_actions
         actions = get_available_actions(obj, request.user)
         return actions
+
+    def _follow_up_payload(self, obj):
+        cached = getattr(obj, '_follow_up_payload_cache', None)
+        if cached is not None:
+            return cached
+
+        from apps.car.follow_up_reports import attach_follow_up_reports
+
+        payload = {
+            'inspection': self.get_inspection(obj) or {},
+            'deficiency': self.get_deficiency(obj) or {},
+        }
+        cached = attach_follow_up_reports(payload, request=self.context.get('request'))
+        setattr(obj, '_follow_up_payload_cache', cached)
+        return cached
+
+    def get_follow_up_reports(self, obj):
+        return self._follow_up_payload(obj).get('follow_up_reports') or []
+
+    def get_follow_up_summary(self, obj):
+        return self._follow_up_payload(obj).get('follow_up_summary') or {}
+
+    def get_follow_up_action_updates(self, obj):
+        return self._follow_up_payload(obj).get('follow_up_action_updates') or []
 
 
 class CARUpdateSerializer(serializers.Serializer):

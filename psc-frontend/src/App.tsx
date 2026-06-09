@@ -137,6 +137,7 @@ function SafetyModuleRouter() {
     isGlobal: hasFleetWideSafetyScope,
     login_id: user?.login_id,
     processIds: [...new Set(processIds.map((id) => String(id).trim().toUpperCase()).filter((id) => id.startsWith('SAF_P_')))],
+    profileId: user?.profile_id ?? user?.profileId ?? user?.office_profile_id,
     role: safetyRole,
     surname: user?.surname,
     userName: user?.username ?? user?.UserName,

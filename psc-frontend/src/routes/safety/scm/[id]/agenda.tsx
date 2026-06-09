@@ -8,7 +8,7 @@ export default function SafetyScmAgendaRoute() {
   const params = useParams();
   const meetingId = params.id ?? "";
   const enabled = Boolean(meetingId);
-  const agendaQuery = useSafetyScmAgenda(meetingId, enabled);
+  const agendaQuery = useSafetyScmAgenda(meetingId, enabled, true);
 
   if (!enabled) {
     return (

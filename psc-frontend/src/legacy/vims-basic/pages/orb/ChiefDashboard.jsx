@@ -1,4 +1,4 @@
-// src/components/ChiefDashboard.jsx
+﻿// src/components/ChiefDashboard.jsx
 import  { useEffect, useState } from "react";
 
 import CrewDashboard from "./CrewDashboard";
@@ -71,7 +71,7 @@ export default function ChiefDashboard() {
   const refresh = async () => {
     try {
       const response = await fetch(
-        `/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
+        `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
       );
       const data = await response.json();
       const ops = Array.isArray(data) ? data : data.results || [];
@@ -157,11 +157,11 @@ export default function ChiefDashboard() {
         fromDate = new Date(0);
     }
 
-    console.log("📅 Date Range:", formatDate(fromDate), "to", formatDate(today));
+    console.log("ðŸ“… Date Range:", formatDate(fromDate), "to", formatDate(today));
 
     try {
-      const url = `/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false`;
-      console.log("🔗 Fetching from:", url);
+      const url = `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false`;
+      console.log("ðŸ”— Fetching from:", url);
 
       const response = await fetch(url);
       if (!response.ok) {
@@ -231,7 +231,7 @@ export default function ChiefDashboard() {
         }
       }).filter(Boolean); //this is for removing nulls
 
-      console.log("📊 Formatted Rows:", formatted);
+      console.log("ðŸ“Š Formatted Rows:", formatted);
       setReportData(formatted);
 
     } catch (err) {
@@ -252,7 +252,7 @@ export default function ChiefDashboard() {
   useEffect(() => {
     const fetchCodes = async () => {
       try {
-        const res = await fetch("/api/orb/api/codes/");
+        const res = await fetch("http://localhost:8000/api/orb/api/codes/");
         const data = await res.json();
         const codeList = Array.isArray(data) ? data : data.results || [];
         setCodes(codeList);
@@ -272,11 +272,11 @@ useEffect(() => {
   const vesselId = user?.vessel_id;
   if (!vesselId) return;
 
-  fetch("/api/orb/api/vessels/")
+  fetch("http://localhost:8000/api/orb/api/vessels/")
     .then(res => res.json())
     .then(data => {
       const vesselList = Array.isArray(data) ? data : data.results || [];
-      // ✅ Use case-insensitive comparision
+      // âœ… Use case-insensitive comparision
       const selectedVessel = vesselList.find(v => v.id.toLowerCase() === vesselId.toLowerCase());
 
       if (selectedVessel) {
@@ -294,7 +294,7 @@ useEffect(() => {
 
   useEffect(() => {
     const fetchCSRF = async () => {
-      const response = await fetch("/api/orb/api/csrf/", {
+      const response = await fetch("http://localhost:8000/api/orb/api/csrf/", {
         credentials: 'include'  //  this is required , if not used then permissions will b denied
       });
       const data = await response.json();
@@ -345,7 +345,7 @@ useEffect(() => {
 
     try {
       //  this is sends only the date part , crops the timing
-      const url = `/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false&from_date=${from}&to_date=${to}`;
+      const url = `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&status=Approved&is_deleted=false&from_date=${from}&to_date=${to}`;
       console.log("Fetching from:", url);
 
       const response = await fetch(url);
@@ -406,7 +406,7 @@ useEffect(() => {
     return;
   }
 
-  // ✅ Check if vessel details are loaded using the 'vessel' state
+  // âœ… Check if vessel details are loaded using the 'vessel' state
   if (!vessel || !vessel.vesselName || !vessel.imoNumber) {
     alert("Vessel details not loaded yet");
     return;
@@ -419,7 +419,7 @@ useEffect(() => {
     return;
   }
 
-  // ✅ Parse the user object from sessionStorage
+  // âœ… Parse the user object from sessionStorage
   
 
   // Get rank and standardize case, also trim potential spaces
@@ -440,7 +440,7 @@ useEffect(() => {
     alert("Only the Master is authorized to print.");
     return; // Stop execution if not the Master
   }
-  console.log(`✅ Print initiated by Master (${userRank}). Proceeding with print and potential UI clear.`);
+  console.log(`âœ… Print initiated by Master (${userRank}). Proceeding with print and potential UI clear.`);
   // --- End Check User Rank ---
 
   //Get vessel_id from sessionStorage (most reliable)
@@ -450,7 +450,7 @@ useEffect(() => {
     return;
   }
 
-  // ✅ Use vessel details from the 'vessel' state (already validated)
+  // âœ… Use vessel details from the 'vessel' state (already validated)
   const { vesselName, imoNumber } = vessel;
   console.log("Vessel object full:", vessel);
 
@@ -459,7 +459,7 @@ useEffect(() => {
     let lastPageNumber = 0;
     try {
       console.log("Fetching last page with vessel_id:", vesselId);
-      const res = await fetch(`/api/get_last_page_number/?vessel_id=${vesselId}`);
+      const res = await fetch(`http://localhost:8000/api/get_last_page_number/?vessel_id=${vesselId}`);
       const data = await res.json();
       console.log("data : ", data);
       lastPageNumber = data.last_page || 0;
@@ -474,7 +474,7 @@ useEffect(() => {
     try {
       // Fetch the Django server's LOCAL IP address from your OWN backend endpoint
       // This endpoint now uses Python code to find the server's IP, not Node.js
-      const ipResponse = await fetch('/api/orb/api/get-internal-ip/'); // Use your backend's URL
+      const ipResponse = await fetch('http://localhost:8000/api/orb/api/get-internal-ip/'); // Use your backend's URL
       if (!ipResponse.ok) {
         throw new Error(`Failed to get server's local IP: ${ipResponse.status} - ${await ipResponse.text()}`);
       }
@@ -510,7 +510,7 @@ useEffect(() => {
         switch (entry.code) {
           case "A":
             if (line.startsWith("TANK(S) BALLASTED")) itemNo = "1";
-            else if (line.includes("TANK CLEANED SINCE") || line.includes("NOT CLEANED – PREVIOUS OIL")) itemNo = "2";
+            else if (line.includes("TANK CLEANED SINCE") || line.includes("NOT CLEANED â€“ PREVIOUS OIL")) itemNo = "2";
             else if (line.startsWith("START BALLAST")) itemNo = "4.1";
             else if (line.includes("START") && line.includes("HRS")) itemNo = "3.1";
             else if (line.includes("RINSING") || line.includes("STEAMING") || line.includes("CHEMICAL")) itemNo = "3.2";
@@ -519,17 +519,17 @@ useEffect(() => {
             break;
 
           case "B":
-            if (idx === 1 || /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line)) itemNo = "6";
-            else if (idx === 2 || /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line)) itemNo = "7";
+            if (idx === 1 || /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line)) itemNo = "6";
+            else if (idx === 2 || /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line)) itemNo = "7";
             else if (line.includes("KNOTS")) itemNo = "8";
             else if (line.includes("THROUGH 15 PPM EQUIPMENT")) itemNo = "9.1";
             else if (line.includes("TO RECEPTION FACILITY")) itemNo = "9.2";
-            else if (line.includes("M³")) itemNo = "10";
+            else if (line.includes("MÂ³")) itemNo = "10";
             break;
 
           case "C":
-            if (idx === 1 && line.includes("M³")) itemNo = "11.2";
-            else if (idx === 2 && line.includes("M³")) itemNo = "11.3";
+            if (idx === 1 && line.includes("MÂ³")) itemNo = "11.2";
+            else if (idx === 2 && line.includes("MÂ³")) itemNo = "11.3";
             else if (line.includes("COLLECTED FROM")) itemNo = "11.4";
             else if (line.includes("RECEPTION FACILITY")) itemNo = "12.1";
             else if (line.includes("TRANSFERRED TO") && line.includes("TANK")) itemNo = "12.2";
@@ -553,7 +553,7 @@ useEffect(() => {
 
           case "G":
             if (idx === 0) itemNo = '22'
-            if (idx === 1 || /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line)) itemNo = "23";
+            if (idx === 1 || /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line)) itemNo = "23";
             if (idx === 2) itemNo = "24";
             else if (idx === 3) itemNo = "25";
             break;
@@ -577,7 +577,7 @@ useEffect(() => {
             break;
 
           default:
-            if (line.includes("M³") || line.includes("MT")) itemNo = "10";
+            if (line.includes("MÂ³") || line.includes("MT")) itemNo = "10";
             break;
         }
 
@@ -692,7 +692,7 @@ useEffect(() => {
         };
 
         // Send metadata to backend (backend handles file saving)
-        const metadataResponse = await fetch("/api/orb/api/save-pdf-metadata/", {
+        const metadataResponse = await fetch("http://localhost:8000/api/orb/api/save-pdf-metadata/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -713,7 +713,7 @@ useEffect(() => {
 
         // --- CRITICAL: Clear the UI state only after successful print and DB update (Master only) ---
         setApproved([]); // Clear the approved entries state in the UI
-        console.log("✅ UI state 'approved' cleared after Master's successful print and DB update.");
+        console.log("âœ… UI state 'approved' cleared after Master's successful print and DB update.");
 
         alert("PDF saved and UI cleared by Master!");
       };
@@ -737,7 +737,7 @@ useEffect(() => {
     // --- CRITICAL: Clear the UI state only after successful print and DB update (Master only) ---
     // This ensures the list is cleared only by the Master upon successful action.
     setApproved([]); // Clear the approved entries state in the UI
-    console.log("✅ UI state 'approved' cleared after Master's successful print and DB update.");
+    console.log("âœ… UI state 'approved' cleared after Master's successful print and DB update.");
 
     alert("PDF saved and UI cleared by Master!");
   } catch (err) {
@@ -768,7 +768,7 @@ useEffect(() => {
     };
 
     try {
-      const response = await fetch("/api/orb/api/update-print-status/", { // this is the backend endpoint(API)
+      const response = await fetch("http://localhost:8000/api/orb/api/update-print-status/", { // this is the backend endpoint(API)
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -802,7 +802,7 @@ useEffect(() => {
     const approvedBy = `${user?.first_name || "UNKNOWN"} ${user?.surname || ""} (${user?.ran || "OFFICER"})`.trim();
 
     try {
-      const response = await fetch(`/api/orb/api/operations/${id}/approve/`, {
+      const response = await fetch(`http://localhost:8000/api/orb/api/operations/${id}/approve/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -833,7 +833,7 @@ useEffect(() => {
     const rejectedBy = `${user?.first_name || "UNKNOWN"} ${user?.surname || ""} (${user?.rank || "OFFICER"})`.trim();
 
     try {
-      const response = await fetch(`/api/orb/api/operations/${id}/reject/`, {
+      const response = await fetch(`http://localhost:8000/api/orb/api/operations/${id}/reject/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -872,7 +872,7 @@ useEffect(() => {
     };
 
     try {
-      const response = await fetch("/api/orb/api/operations/", {
+      const response = await fetch("http://localhost:8000/api/orb/api/operations/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -894,7 +894,7 @@ useEffect(() => {
 
 
 
-  //  Reuse ORBTable from CrewDashboard — same format, just change actions
+  //  Reuse ORBTable from CrewDashboard â€” same format, just change actions
   function ORBTable({ entries, onApprove, onReject }) {
     if (!entries || entries.length === 0) {
       return <p>No Entries Found.</p>;
@@ -934,7 +934,7 @@ useEffect(() => {
                   case 'A':
                     if (line.startsWith('TANK(S) BALLASTED')) {
                       itemNo = '1';
-                    } else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) {
+                    } else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) {
                       itemNo = '2';
                     } else if (line.startsWith('START BALLAST')) {
                       itemNo = '4.1';
@@ -961,16 +961,16 @@ useEffect(() => {
                       itemNo = '9.1';
                     } else if (line.includes('TO RECEPTION FACILITY')) {
                       itemNo = '9.2';
-                    } else if (line.includes('M³')) {
+                    } else if (line.includes('MÂ³')) {
                       itemNo = '10';
                     }
                     break;
 
                   case 'C':
                     // 11.1 is already set on first line
-                    if (line.includes('M³')) {
+                    if (line.includes('MÂ³')) {
                       itemNo = '11.2';
-                    } if ((lineIdx == 2) && line.includes('M³')) {
+                    } if ((lineIdx == 2) && line.includes('MÂ³')) {
                       itemNo = '11.3';
                     } if (line.includes('COLLECTED FROM')) {
                       itemNo = '11.4';
@@ -1021,8 +1021,8 @@ useEffect(() => {
                     else if ((lineIdx == 1) ||
                       line.toUpperCase().includes('POSITION') ||
                       line.toUpperCase().includes('PLACE OR POSITION') ||
-                      // Match typical position format: digits, N/S, E/W (e.g., 12°15'N 079°30'E)
-                      /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line)
+                      // Match typical position format: digits, N/S, E/W (e.g., 12Â°15'N 079Â°30'E)
+                      /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line)
                     ) {
                       itemNo = '23';
                     }
@@ -1030,7 +1030,7 @@ useEffect(() => {
                     else if (
                       line.toUpperCase().includes('QUANTITY') ||
                       line.toUpperCase().includes('TYPE OF OIL') ||
-                      (line.includes('M³') || line.includes('MT')) // Oil quantity
+                      (line.includes('MÂ³') || line.includes('MT')) // Oil quantity
                     ) {
                       itemNo = '24';
                     }
@@ -1062,7 +1062,7 @@ useEffect(() => {
 
                   default:
                     // Fallback for unknown codes
-                    if (line.includes('M³') || line.includes('MT')) {
+                    if (line.includes('MÂ³') || line.includes('MT')) {
                       itemNo = '10';
                     } else if (line.startsWith('SIGNED:')) {
                       itemNo = '';
@@ -1218,7 +1218,7 @@ useEffect(() => {
             }}
             style={{ marginLeft: '10px', padding: '10px 20px', float: 'right' }}
           >
-            🗙 Close Report
+            ðŸ—™ Close Report
           </Button>
         )}
       </div>
@@ -1313,7 +1313,7 @@ useEffect(() => {
                           case 'A':
                             if (line.startsWith('TANK(S) BALLASTED')) {
                               itemNo = '1';
-                            } else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) {
+                            } else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) {
                               itemNo = '2';
                             } else if (line.startsWith('START BALLAST')) {
                               itemNo = '4.1';
@@ -1333,13 +1333,13 @@ useEffect(() => {
                             if (
                               line.toUpperCase().includes('START') &&
                               (line.toUpperCase().includes('POSITION') ||
-                                /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line))
+                                /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line))
                             ) {
                               itemNo = '6';
                             } else if (
                               line.toUpperCase().includes('END') &&
                               (line.toUpperCase().includes('POSITION') ||
-                                /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line))
+                                /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line))
                             ) {
                               itemNo = '7';
                             } else if (line.includes('KNOTS')) {
@@ -1348,16 +1348,16 @@ useEffect(() => {
                               itemNo = '9.1';
                             } else if (line.includes('TO RECEPTION FACILITY')) {
                               itemNo = '9.2';
-                            } else if (line.includes('M³')) {
+                            } else if (line.includes('MÂ³')) {
                               itemNo = '10';
                             }
                             break;
 
                           case 'C':
                             // 11.1 is already set on first line
-                            if (line.includes('M³')) {
+                            if (line.includes('MÂ³')) {
                               itemNo = '11.2';
-                            } if (line.startsWith('RETAINED') && line.includes('M³')) {
+                            } if (line.startsWith('RETAINED') && line.includes('MÂ³')) {
                               itemNo = '11.3';
                             } if (line.includes('COLLECTED FROM')) {
                               itemNo = '11.4';
@@ -1408,8 +1408,8 @@ useEffect(() => {
                             else if (
                               line.toUpperCase().includes('POSITION') ||
                               line.toUpperCase().includes('PLACE OR POSITION') ||
-                              // Match typical position format: digits, N/S, E/W (e.g., 12°15'N 079°30'E)
-                              /(\d{1,3}°\d+'[NS])\s*(\d{1,3}°\d+'[EW])/.test(line)
+                              // Match typical position format: digits, N/S, E/W (e.g., 12Â°15'N 079Â°30'E)
+                              /(\d{1,3}Â°\d+'[NS])\s*(\d{1,3}Â°\d+'[EW])/.test(line)
                             ) {
                               itemNo = '23';
                             }
@@ -1417,7 +1417,7 @@ useEffect(() => {
                             else if (
                               line.toUpperCase().includes('QUANTITY') ||
                               line.toUpperCase().includes('TYPE OF OIL') ||
-                              (line.includes('M³') || line.includes('MT')) // Oil quantity
+                              (line.includes('MÂ³') || line.includes('MT')) // Oil quantity
                             ) {
                               itemNo = '24';
                             }
@@ -1450,7 +1450,7 @@ useEffect(() => {
 
                           default:
                             // Fallback for unknown codes
-                            if (line.includes('M³') || line.includes('MT')) {
+                            if (line.includes('MÂ³') || line.includes('MT')) {
                               itemNo = '10';
                             } else if (line.startsWith('SIGNED:')) {
                               itemNo = '';

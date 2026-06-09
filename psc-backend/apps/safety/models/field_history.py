@@ -9,6 +9,14 @@ from .base import PublicIdMixin
 
 
 SCALAR_ENVELOPE_KEY = "__history_scalar__"
+MAX_ACTOR_ID_LENGTH = 64
+MAX_ACTOR_ROLE_CODE_LENGTH = 16
+
+
+def _fit_char(value, max_length: int):
+    if value in (None, ""):
+        return value
+    return str(value).strip()[:max_length]
 
 
 def _prepare_history_json_value(value, *, envelope_scalars: bool = False):
@@ -73,6 +81,8 @@ class SafetyFieldHistory(PublicIdMixin):
     def save(self, *args, **kwargs):
         if self.pk is not None and not self._state.adding:
             raise IntegrityError("Safety field history rows are append-only.")
+        self.actor_user_id = _fit_char(self.actor_user_id, MAX_ACTOR_ID_LENGTH) or "system"
+        self.actor_role_code = _fit_char(self.actor_role_code, MAX_ACTOR_ROLE_CODE_LENGTH) or "SYSTEM"
         using = kwargs.get("using") or self._state.db or "default"
         envelope_scalars = connections[using].vendor == "microsoft"
         self.old_value = _prepare_history_json_value(self.old_value, envelope_scalars=envelope_scalars)

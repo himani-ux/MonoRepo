@@ -121,13 +121,13 @@ class IncidentPdfTenSectionTests(unittest.TestCase):
 
         self.assertTrue(result.content.startswith(b"%PDF"))
         self.assertEqual(result.section_titles, [
-            "1. Cover + Classification",
+            "1. Cover and Classification",
             "2. Investigator / Team Credentials",
             "3. Evidence Collected",
-            "4. Root-Cause Analysis",
-            "5. Causal-Factor Enumeration",
-            "6. Actions + Timeline",
-            "7. Lessons Learnt Narrative",
+            "4. Causes Identified",
+            "5. Contributing Factors",
+            "6. Actions and Timeline",
+            "7. Lessons Learned",
             "8. Fleet Notification Plan",
             "9. Signatures",
             "10. Appendices",
@@ -140,3 +140,8 @@ class IncidentPdfTenSectionTests(unittest.TestCase):
         self.assertIn("KSM-INC-2026-0042", text)
         self.assertIn("Fleet ladder-condition alert", text)
         self.assertIn("Replace anti-slip edge strip", text)
+        self.assertIn("27 Apr 2026, 10:15", text)
+        self.assertIn("Prepared by", text)
+        self.assertNotIn("Step 6.1", text)
+        self.assertNotIn("internal 10-section contract", text)
+        self.assertNotIn("Narrative owner", text)

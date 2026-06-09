@@ -47,7 +47,7 @@ class NearMissHighPrioritySupersedeTests(unittest.TestCase):
             incident_number="DRAFT-ABC/2026/T015",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state=Incident.State.READY_FOR_DPA_TRIAGE,
+            state=Incident.State.READY_FOR_OFFICE_COMMENTS,
             current_phase=1,
             occurred_at=timezone.now(),
             reported_at=timezone.now(),
@@ -67,11 +67,12 @@ class NearMissHighPrioritySupersedeTests(unittest.TestCase):
 
     def test_high_priority_triage_can_supersede_to_incident(self) -> None:
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {
                 "near_miss_priority": "HIGH",
                 "supersede_to_incident": True,
                 "override_reason": "Potential machinery-space fire exposure requires full incident workflow.",
+                "priority_change_reason": "Potential machinery-space fire exposure requires high priority.",
             },
             format="json",
         )
@@ -95,7 +96,7 @@ class NearMissHighPrioritySupersedeTests(unittest.TestCase):
 
     def test_supersede_to_incident_requires_dpa_reason(self) -> None:
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {
                 "near_miss_priority": "HIGH",
                 "supersede_to_incident": True,
@@ -107,4 +108,4 @@ class NearMissHighPrioritySupersedeTests(unittest.TestCase):
         response = self.view(request, id=self.near_miss.pk)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Supersede-to-incident requires", str(response.data))
+        self.assertIn("Please enter the reason before superseding", str(response.data))

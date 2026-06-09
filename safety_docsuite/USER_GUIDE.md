@@ -41,7 +41,7 @@ Expanded on first use per the VIMS Safety docsuite glossary. Subsequent occurren
 | **CE** | Chief Engineer. |
 | **SO** | Safety Officer (SOLAS Reg VI, COSWP 2026 Ch 13). In V1, CO is SO by default; Master may toggle 2/E as alternate SO (D-SOI-02). |
 | **PIC** | Person-in-Charge (Vessel Superintendent) — shore side, default closer for GREEN incidents + PIC on Near Miss (LOW). |
-| **SCM** | Safety Committee Meeting — Regular (monthly) and Ad-Hoc (host-triggered by Master or CO). |
+| **SCM** | Safety Committee Meeting — Regular (monthly) and Ad-Hoc (host-triggered by Master or CO). Office Comment closes the meeting. |
 | **SOI** | Safety Officer Inspection — 13-area paper-first quarterly-cycle inspection. |
 | **MoC** | Management of Change. |
 | **RCA** | Root Cause Analysis — VIMS uses the DNV M-SCAT taxonomy. |
@@ -72,7 +72,7 @@ Safety uses the shared `master_notification` channel. You do not maintain a sepa
 3. Under **Safety**, confirm the channels you want for each event category:
    - Incident assignment / state change
    - Near Miss triage needed (DPA only)
-   - SCM invitation / sign-off required
+   - SCM meeting created / Office Comment required
    - SOI 80-day / 90-day compliance alerts
    - CA due / overdue
 4. Save. Changes apply immediately.
@@ -368,13 +368,13 @@ Your day begins with the dashboard tile on `/safety/dashboard/`. You have one YE
 | Incident (RED) | Phase 6 (before DPA + FM closure) | After Reporter, before HOD | `V-INC-070` / `V-INC-071` |
 | Near Miss (LOW) | — (PIC closes) | Reporter only below | n/a |
 | Near Miss (HIGH) | After Reporter, before HOD → DPA | Fleet-alert chain | D-GAP-J1 (reporter identity masked to you) |
-| SCM Regular | Host/preparer is Master or CO; Master signs at closure | Terminal | `SAF_P_004` on `SAF_F_003` |
-| SCM Ad-Hoc | Host/preparer is Master or CO; Master signs at closure | Terminal | D-GAP-M-ADHOC |
+| SCM Regular | Host/preparer is Master or CO; office adds Office Comment to close | No digital SCM signature | `SAF_F_003` |
+| SCM Ad-Hoc | Host/preparer is Master or CO; office adds Office Comment to close | No digital SCM signature | D-GAP-M-ADHOC |
 | SOI event | Digital counter-signature at approval (not on paper) | After SO + Assistant paper | D-GAP-M15 |
 | SOI finding closure | Approve per D-SOI-07 | After SO | `SAF_P_004` on `SAF_F_004` |
 | SOI area-applicability false | Request (DPA approves) | Two-party | D-GAP-M19 |
 
-Signature type: typed name + ISO-8601 timestamp + device fingerprint (D-GAP-D1). No PKI. No wet signature substitution in the digital chain (wet scan accepted as attachment only).
+Incident and SOI signature type: typed name + ISO-8601 timestamp + device fingerprint (D-GAP-D1). SCM does not capture digital signatures; its PDF prints blank Master and CO signature lines for record copy.
 
 ### 6.3 Triggering an Ad-Hoc SCM (D-GAP-M-ADHOC)
 
@@ -393,11 +393,11 @@ Signature type: typed name + ISO-8601 timestamp + device fingerprint (D-GAP-D1).
 2. Enter:
    - **Trigger reason** — free text (e.g., "RED-band fall-from-height incident 2026-04-17 — crew brief before full investigation completes").
    - **Scheduled date/time** — when the meeting will run.
-   - **Agenda** — draft items (you can edit up to sign-off).
+   - **Agenda** — draft items (you can edit until office adds Office Comment).
    - **Attendee picklist** — pre-populated from CMS crew roster, WRH-checked.
 3. Save Draft. System creates the SCM record with `meeting_type = 'AD_HOC'`.
-4. At meeting time, go to `/safety/scm/:id/`, run through agenda, record decisions in `/safety/scm/:id/agenda/`.
-5. Close at `/safety/scm/:id/signoff/` — attendance review, WRH badges (warn-don't-block per D-GAP-M11), overdue SOI check, sign-and-close.
+4. At meeting time, go to `/safety/scm/:id/`, run through agenda, record Suggestions / Recommendations in `/safety/scm/:id/agenda/`.
+5. Office adds Office Comment on the SCM detail page. Saving Office Comment closes the meeting. WRH badges and overdue SOI items are warnings only and do not block closure.
 
 > **An Ad-Hoc SCM does NOT replace the monthly Regular SCM.** The cadence counter + Closed-Since-Last-SCM snapshot anchors on **last SCM closure timestamp regardless of type** (D-GAP-M-ADHOC). If the Ad-Hoc happens on the 15th, your Regular is still due 30 days after that.
 
@@ -405,13 +405,14 @@ Signature type: typed name + ISO-8601 timestamp + device fingerprint (D-GAP-D1).
 
 1. Master or CO prepares the draft at `/safety/scm/create-regular/` using the **Meeting type** selector (D-RBAC-06).
 2. You attend the scheduled meeting. The system auto-assembles on `/safety/scm/:id/`:
-   - **Closed-Since-Last-SCM** block — SOI findings + Near Miss + Incident records closed since prior SCM's sign-off timestamp (`/safety/scm/:id/closed-since-last/`, D-GAP-M22).
+   - **Closed-Since-Last-SCM** block — SOI findings + Near Miss + Incident records closed since prior SCM closure timestamp (`/safety/scm/:id/closed-since-last/`, D-GAP-M22).
    - **Safety Observations** — auto-filled from open SOI findings (FEAT-SAF-SOI-020 / `/api/safety/soi/open-findings/`).
    - **Attendance** — WRH join; per-row badges + tooltip (D-GAP-M11 / D-GAP-M26).
    - **Agenda** — 10-section template derived from legacy `vw_GetSCM_Master`.
-3. Chair the discussion. Record decisions under `/safety/scm/:id/agenda/`.
-4. Navigate to `/safety/scm/:id/signoff/`. Preflight returns `{overdue_soi_areas, attendance_acknowledged, agenda_complete}`. Resolve any red flags.
-5. Tap **[Sign & Close Meeting]**. The SCM PDF generates at `/safety/scm/:id/pdf/` (10-section layout, attendance + WRH badges inline, signatures = Master + CO + attendees digital).
+3. Chair the discussion. Record Suggestions / Recommendations under `/safety/scm/:id/agenda/`.
+4. Use **Edit Meeting** if any correction is needed. Editing is allowed only until office saves Office Comment.
+5. Download the SCM PDF from `/safety/scm/:id/pdf/`. The PDF is available after meeting creation and includes the 10-section layout, attendance + WRH badges inline, and blank Master/CO signature lines.
+6. Office saves **Office Comment** on the SCM detail page. This closes the meeting and stops further vessel edits.
 
 ### 6.5 Approving SOI Closure & Findings
 
@@ -442,7 +443,7 @@ You have fleet-wide read-only access to **closed** incidents on sister vessels (
 | `/safety/dashboard/` | Fleet dashboard (your vessel default; cross-vessel read) |
 | `/safety/incidents/:id/phase-6/` | Master signature + recommendations review |
 | `/safety/scm/create-adhoc/` | Host Ad-Hoc SCM (D-GAP-M-ADHOC) |
-| `/safety/scm/:id/signoff/` | Sign-off + close SCM |
+| `/safety/scm/:id/` | SCM detail, Edit Meeting, Office Comment, PDF download |
 | `/safety/soi/:id/findings/:findId/` | Approve SOI finding closure |
 | `/safety/soi/:id/applicability/request/` | Request area non-applicability |
 | `/safety/soi/:id/close/` | Close SOI event |
@@ -633,7 +634,7 @@ SOI is designed for offline use via paper. Once you download the PDF or Excel at
 
 - Incident Phase 1 intake can be drafted offline via local browser storage; Phase 2 submission requires connectivity (to fire notifications and assign the formal reference).
 - Near Miss submission requires connectivity (to hit the rate-limit endpoint and issue the reference).
-- SCM sign-off requires connectivity (for the WRH live join and PDF generation).
+- SCM Office Comment closure requires connectivity. WRH live join warnings do not block closure.
 
 ### 9.4 Phone-Specific Limitations
 
@@ -776,7 +777,6 @@ This index cross-references every route from `APP_FLOW.md` against the roles tha
 | `/safety/scm/:id/attendance/` | Master, CO | §6.4 |
 | `/safety/scm/:id/agenda/` | Master, CO | §6.3, §6.4 |
 | `/safety/scm/:id/closed-since-last/` | Master, CO (auto) | §6.4 |
-| `/safety/scm/:id/signoff/` | Master | §6.3, §6.4 |
 | `/safety/scm/:id/pdf/` | All (read) | §6.4 |
 | `/safety/soi/` | All | §5.7 |
 | `/safety/soi/create/` | SO | §5.2 |

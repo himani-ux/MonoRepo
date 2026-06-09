@@ -4,7 +4,17 @@
  */
 
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+function normalizeApiBaseUrl(value: string): string {
+  return value
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/api\/(?:psc|safety)$/i, '')
+    .replace(/\/api$/i, '');
+}
+
+export const API_BASE_URL = normalizeApiBaseUrl(RAW_API_BASE_URL);
 export const API_PREFIX = '/api/psc';
 
 // Authentication
@@ -168,5 +178,4 @@ export const ROUTES = {
   SYNC: '/sync',
   CIRCULAR: '/circular',
   ORB: '/orb',
-  SAFETY_SCM_SIGNOFF: '/safety/scm/:id/signoff',
 } as const;

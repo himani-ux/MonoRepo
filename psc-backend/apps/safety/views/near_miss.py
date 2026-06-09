@@ -5,7 +5,6 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from apps.safety.authentication.anonymity import REPORTER_VISIBLE_ROLES
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
 from apps.safety.authentication.roles import normalized_authority_role
 from apps.safety.authentication.vessel_scope import filter_by_vessel_scope, get_scoped_vessel_ids, user_has_vessel_access
@@ -13,7 +12,7 @@ from apps.safety.models import Incident
 from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import IncidentRepository
 from apps.safety.serializers import NearMissCreateSerializer, NearMissListSerializer, NearMissSerializer
-from apps.safety.services import NearMissRateLimiter, NotificationWriter, PhaseStateMachine
+from apps.safety.services import NotificationWriter, PhaseStateMachine
 
 
 def _normalized_role(user) -> str:
@@ -94,7 +93,6 @@ class NearMissViewMixin:
     form_permission_class = HasFormPermission.requiring("SAF_F_002")
     process_permission_class = HasProcessPermission.requiring("SAF_P_001")
     phase_state_machine_class = PhaseStateMachine
-    rate_limiter_class = NearMissRateLimiter
     notification_writer_class = NotificationWriter
 
     def get_permissions(self):
@@ -108,9 +106,6 @@ class NearMissViewMixin:
 
     def get_phase_state_machine(self) -> PhaseStateMachine:
         return self.phase_state_machine_class()
-
-    def get_rate_limiter(self) -> NearMissRateLimiter:
-        return self.rate_limiter_class()
 
     def get_notification_writer(self) -> NotificationWriter:
         return self.notification_writer_class()
@@ -132,10 +127,6 @@ class NearMissViewMixin:
         if priority := request.query_params.get("priority"):
             queryset = queryset.filter(near_miss_priority=str(priority).strip().upper())
         if reporter_id := request.query_params.get("reporter_id"):
-            if _normalized_role(getattr(request, "user", None)) not in REPORTER_VISIBLE_ROLES:
-                raise PermissionDenied(
-                    "Forbidden - reporter identity is restricted to DPA and FM (D-GAP-J1)."
-                )
             queryset = queryset.filter(reporter_id=reporter_id)
 
         if date_from := request.query_params.get("date_from"):
@@ -165,19 +156,6 @@ class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        actor_id = _resolve_actor_id(request.user)
-        vessel_id = str(serializer.validated_data.get("vessel_id") or "")
-        rate_limit_status = self.get_rate_limiter().check_allowed(
-            actor_id=actor_id,
-            vessel_id=vessel_id or None,
-        )
-        if not rate_limit_status.allowed:
-            return Response(
-                {"detail": rate_limit_status.guidance_message},
-                headers={"Retry-After": str(rate_limit_status.retry_after_seconds)},
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
-
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -198,7 +176,6 @@ class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
             reporter_department=reporter_identity["reporter_department"],
         )
         self.get_phase_state_machine().log_creation(near_miss, user)
-        self.get_rate_limiter().record_submission(actor_id=actor_id, created_at=near_miss.created_date)
         self.get_notification_writer().dispatch_notification(
             record_id=near_miss.pk,
             recipients=["PIC", "DPA", "SAFETY_CHANNEL"],
@@ -231,25 +208,17 @@ class NearMissRateLimitView(NearMissViewMixin, generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         actor_id = _resolve_actor_id(request.user)
         requested_crew_id = request.query_params.get("crew_id")
-        if requested_crew_id not in (None, "", actor_id) and _normalized_role(request.user) not in REPORTER_VISIBLE_ROLES:
-            raise PermissionDenied(
-                "Forbidden - reporter identity is restricted to DPA and FM (D-GAP-J1)."
-            )
 
         subject_actor_id = requested_crew_id or actor_id
-        rate_limit_status = self.get_rate_limiter().get_status(
-            actor_id=subject_actor_id,
-            vessel_id=_resolve_vessel_id(request),
-        )
         return Response(
             {
-                "allowed": rate_limit_status.allowed,
-                "guidance_message": rate_limit_status.guidance_message,
-                "limit": rate_limit_status.limit,
-                "remaining": rate_limit_status.remaining,
-                "reset_at": rate_limit_status.reset_at,
-                "retry_after_seconds": rate_limit_status.retry_after_seconds,
-                "scope": rate_limit_status.scope,
-                "used": rate_limit_status.used,
+                "allowed": True,
+                "guidance_message": None,
+                "limit": None,
+                "remaining": None,
+                "reset_at": None,
+                "retry_after_seconds": 0,
+                "scope": "unlimited",
+                "used": 0,
             }
         )

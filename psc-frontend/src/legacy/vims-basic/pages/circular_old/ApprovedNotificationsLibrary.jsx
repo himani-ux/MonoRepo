@@ -1,4 +1,4 @@
-// src/components/ApprovedNotificationsLibrary.jsx
+﻿// src/components/ApprovedNotificationsLibrary.jsx
 import React, { useState, useEffect } from "react";
 import {
     ArrowDownUp,
@@ -58,7 +58,7 @@ const ApprovedNotificationsLibrary = () => {
             // console.log("ApprovedNotificationsLibrary: Fetching lookup maps (type, priority)...");
             try {
                 // Fetch Document Types
-                const typeRes = await fetch('/api/circular/api/document-types/');
+                const typeRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
                 if (!typeRes.ok) {
                     throw new Error(`Failed to fetch document types: ${typeRes.status} ${typeRes.statusText}`);
                 }
@@ -83,7 +83,7 @@ const ApprovedNotificationsLibrary = () => {
                 // console.log("ApprovedNotificationsLibrary: Built type UUID to name map:", typeMap);
 
                 // Fetch Priorities
-                const priorityRes = await fetch('/api/circular/api/priorities/');
+                const priorityRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
                 if (!priorityRes.ok) {
                     throw new Error(`Failed to fetch priorities: ${priorityRes.status} ${priorityRes.statusText}`);
                 }
@@ -139,7 +139,7 @@ const ApprovedNotificationsLibrary = () => {
                 setLoading(true);
                 // console.log("ApprovedNotificationsLibrary: Fetching approved notifications...");
                 const response = await fetch(
-                    "/api/circular/api/approved-notifications/"
+                    "http://localhost:8000/api/circular/api/approved-notifications/"
                 );
                 if (!response.ok) {
                     throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
@@ -266,7 +266,7 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for Send Reminder Button ---
     const handleSendReminder = async (srNoForReminder) => {
-        console.log("🔔 handleSendReminder: Sending reminder for notification SR No:", srNoForReminder);
+        console.log("ðŸ”” handleSendReminder: Sending reminder for notification SR No:", srNoForReminder);
         const confirmed = window.confirm(`Are you sure you want to send a reminder for notification ${srNoForReminder}?`);
         if (!confirmed) {
             console.log("handleSendReminder: User cancelled reminder.");
@@ -275,7 +275,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             // Call the backend endpoint to update the reminder_sent_at field
-            const response = await fetch(`/api/circular/api/notifications/${srNoForReminder}/send-reminder/`, { // Use your new reminder endpoint
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoForReminder}/send-reminder/`, { // Use your new reminder endpoint
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -287,7 +287,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("✅ handleSendReminder: Reminder sent successfully for notification", srNoForReminder);
+                console.log("âœ… handleSendReminder: Reminder sent successfully for notification", srNoForReminder);
                 alert(`Reminder sent successfully for notification ${srNoForReminder}.`);
                 // Optionally, you could refresh the list here if needed to reflect the updated reminder timestamp
                 // fetchUserNotifications(sortDirection, sortCriteria);
@@ -306,12 +306,12 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for View Seen Crews Button ---
     const handleViewSeenCrews = async (notificationSrNo) => { // Accept the SR No string
-        console.log("🚀 handleViewSeenCrews: Fetching seen crews for notification SR No:", notificationSrNo);
+        console.log("ðŸš€ handleViewSeenCrews: Fetching seen crews for notification SR No:", notificationSrNo);
         setViewingSeenCrews(notificationSrNo); // Set the SR No to view
         setLoadingSeenCrews(true); // Start loading
 
         try {
-            const response = await fetch(`/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -321,7 +321,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("✅ handleViewSeenCrews: Successfully fetched delivery records for notification", notificationSrNo);
+                console.log("âœ… handleViewSeenCrews: Successfully fetched delivery records for notification", notificationSrNo);
                 setSeenCrewsData(result.delivery_records || []); // Store the data (ensure it's an array)
                 setLoadingSeenCrews(false); // Stop loading
             } else {
@@ -344,7 +344,7 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for Send Individual Reminder Button ---
     const handleSendIndividualReminder = async (notificationSrNo, crewId) => {
-        console.log(`🔔 handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
+        console.log(`ðŸ”” handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
         const confirmed = window.confirm(`Are you sure you want to send a reminder to crew ${crewId} for notification ${notificationSrNo}?`);
         if (!confirmed) {
             console.log("handleSendIndividualReminder: User cancelled individual reminder.");
@@ -356,7 +356,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             // Call the backend endpoint to update the reminder_sent_at field for this specific crew and notification
-            const response = await fetch(`/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -369,7 +369,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("✅ handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
+                console.log("âœ… handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
                 alert(`Reminder sent successfully to crew ${crewId}.`);
                 // window.location.reload();
 
@@ -397,7 +397,7 @@ const ApprovedNotificationsLibrary = () => {
     // --- NEW: Handler for Delete Button (with Role-Based Check) ---
 
      const handleDelete = async (srNoToDelete) => {
-        console.log(`🚀 handleDelete: Attempting to delete notification ${srNoToDelete}`);
+        console.log(`ðŸš€ handleDelete: Attempting to delete notification ${srNoToDelete}`);
 
         // --- REMOVED: Admin Role Check ---
         // Any user can now attempt to delete
@@ -410,7 +410,7 @@ const ApprovedNotificationsLibrary = () => {
         }
 
         try {
-            const response = await fetch(`/api/circular/api/notifications/${srNoToDelete}/delete/`, {
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoToDelete}/delete/`, {
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -423,7 +423,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log(`✅ handleDelete: Successfully deleted notification ${srNoToDelete}`);
+                console.log(`âœ… handleDelete: Successfully deleted notification ${srNoToDelete}`);
                 alert(result.message || 'Notification deleted successfully.');
 
                 // Update the local state to remove the deleted notification
@@ -435,11 +435,11 @@ const ApprovedNotificationsLibrary = () => {
                 );
 
             } else {
-                console.error(`❌ handleDelete: Failed to delete notification ${srNoToDelete}`, result.error);
+                console.error(`âŒ handleDelete: Failed to delete notification ${srNoToDelete}`, result.error);
                 alert(`Error deleting notification: ${result.error || 'Unknown error'}`);
             }
         } catch (err) {
-            console.error(`💥 handleDelete: Network error deleting notification ${srNoToDelete}`, err);
+            console.error(`ðŸ’¥ handleDelete: Network error deleting notification ${srNoToDelete}`, err);
             alert('Network error occurred while deleting notification.');
         }
     };
@@ -468,7 +468,7 @@ const ApprovedNotificationsLibrary = () => {
         console.log("handleDownloadCSV: Query parameters for CSV download:", params.toString());
 
         // Construct the full URL for the CSV endpoint
-        const csvDownloadUrl = `/api/circular/api/approved-notifications/download-csv/?${params}`;
+        const csvDownloadUrl = `http://localhost:8000/api/circular/api/approved-notifications/download-csv/?${params}`;
 
         // Trigger the download by setting window.location.href
         // This is the standard way to trigger a file download from a link via JavaScript
@@ -493,11 +493,11 @@ const ApprovedNotificationsLibrary = () => {
                 ? '/circular/admin'
                 : '/circular/office')
             : '/login';
-        console.log(`🚀 handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
+        console.log(`ðŸš€ handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
 
         try {
             localStorage.setItem('supersedingNotificationId', srNoToSupersede); // Store the OLD SR No
-            console.log(`✅ handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
+            console.log(`âœ… handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
 
             localStorage.setItem('oldNotificationType', notificationToSupersede.msc_type || '');
             localStorage.setItem(
@@ -512,7 +512,7 @@ const ApprovedNotificationsLibrary = () => {
             localStorage.setItem('oldNotificationSubCatNames', JSON.stringify(oldSubCatNames));
             localStorage.setItem('oldNotificationSecondSubCatNames', JSON.stringify(oldSecondSubCatNames));
 
-            console.log(`✅ handleSupersede: Stored old notification details in localStorage for pre-filling.`);
+            console.log(`âœ… handleSupersede: Stored old notification details in localStorage for pre-filling.`);
 
             // 4. Determine user type to redirect correctly
             if (currentUser) {
@@ -534,7 +534,7 @@ const ApprovedNotificationsLibrary = () => {
             // # This frontend handler just initiates the process by storing the OLD details and ID, then redirecting.
 
         } catch (storageError) {
-            console.error(`❌ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
+            console.error(`âŒ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
             localStorage.setItem('supersedingNotificationId', srNoToSupersede);
             window.location.href = redirectPath;
         }
@@ -600,7 +600,7 @@ const ApprovedNotificationsLibrary = () => {
             <div className="max-w-7xl mx-auto mb-6 bg-white/95 shadow-md rounded-xl border border-sky-100 px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
 
-                    {/* Left Section – Search + Filters */}
+                    {/* Left Section â€“ Search + Filters */}
                     <div className="flex flex-wrap items-center gap-4">
 
                         {/* Search */}
@@ -641,7 +641,7 @@ const ApprovedNotificationsLibrary = () => {
                         </select>
                     </div>
 
-                    {/* Right Section – Sort & Buttons */}
+                    {/* Right Section â€“ Sort & Buttons */}
                     <div className="flex items-center gap-3">
 
                         {/* Sort */}

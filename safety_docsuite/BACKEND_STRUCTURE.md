@@ -1,7 +1,7 @@
 # BACKEND_STRUCTURE.md — Database, APIs, Auth
 ## VIMS Safety Module — Incident / Near Miss / SCM / SOI
 
-**Version:** 1.0 | **Date:** 2026-04-17 | **Status:** INITIAL RELEASE | **Target DB:** `ksm_marine_live` (shared SQL Server)
+**Version:** 1.0 | **Date:** 2026-06-09 | **Status:** INITIAL RELEASE | **Target DB:** `ksm_marine_live` (shared SQL Server)
 
 > This document is the single source of truth for the Safety module's persistence layer, REST contracts, and authorization chain. Every `CREATE TABLE`, every `/api/safety/*` endpoint, every cross-module live-join is enumerated here. It is consumed by Django (apps.safety), React (`src/routes/safety/`), and downstream PDF/dashboard services.
 
@@ -78,12 +78,12 @@ Safety is a **child Django app inside the VIMS monorepo** — not a standalone s
 │       │   ├── permissions.py      ← HasFormPermission / HasProcessPermission for SAF_F_*/SAF_P_*
 │       │   ├── backends.py         ← Reuse VIMS SimpleJWT config; no new token issuer
 │       │   ├── vessel_scope.py     ← Reuse master_RoleByVessel (office) + Crew_Onboarding_History (ship)
-│       │   └── anonymity.py        ← D-GAP-J1: strip reporter identity from serializers for
-│       │                              non-DPA/FM roles — enforced before JSON render and PDF interpolation
+│       │   └── reporter_identity.py ← D-GAP-J1 revised: reporter details visible to authorized users
+│       │                               within vessel scope; no anonymous/masked reporter output
 │       ├── serializers/
 │       │   ├── __init__.py
 │       │   ├── incident.py
-│       │   ├── near_miss.py        ← Applies AnonymityMixin for roles ∉ {DPA, FM, reporter}
+│       │   ├── near_miss.py        ← Returns reporter details for authorized users; no anonymous/masked display
 │       │   ├── scm.py
 │       │   ├── soi.py
 │       │   ├── action.py
@@ -91,7 +91,7 @@ Safety is a **child Django app inside the VIMS monorepo** — not a standalone s
 │       ├── views/
 │       │   ├── __init__.py
 │       │   ├── incident_views.py   ← CRUD + 9 phase-transition endpoints + PDF + search
-│       │   ├── near_miss_views.py  ← CRUD + triage + anonymity-aware PDF
+│       │   ├── near_miss_views.py  ← CRUD + Office Comments priority decision + reporter-visible PDF
 │       │   ├── scm_views.py        ← Regular + Ad-Hoc; attendance roll; agenda; PDF
 │       │   ├── soi_views.py        ← CRUD + area-applicability + paper-first checklist generator
 │       │   │                          + finding registration + unique-ID endpoint
@@ -132,7 +132,7 @@ Safety is a **child Django app inside the VIMS monorepo** — not a standalone s
         ├── test_auth.py
         ├── test_permissions.py
         ├── test_vessel_scope.py
-        ├── test_anonymity.py       ← D-GAP-J1: reporter hidden from Master/HOD, visible to DPA/FM
+        ├── test_reporter_identity.py ← D-GAP-J1 revised: reporter details visible to authorized users
         ├── test_phase_state_machine.py
         ├── test_soi_paper_first.py ← No scan-upload column, no upload endpoint (D-GAP-E4)
         ├── test_ca_fk.py           ← vims_safety_corrective_action.purchase_req_id hard FK
@@ -180,14 +180,14 @@ urlpatterns = [
 │       ├── index.tsx               ← Lazy-loaded route defs; each wrapped with PermissionGate(SAF_F_*)
 │       ├── layout.tsx              ← Safety module chrome (breadcrumbs, vessel dropdown slot)
 │       ├── incident/               ← 9-phase sub-routes (intake → closure)
-│       ├── near-miss/              ← lightweight lifecycle; anonymity badge
+│       ├── near-miss/              ← lightweight lifecycle; reporter identity visible by permission
 │       ├── scm/                    ← Regular + Ad-Hoc
 │       └── soi/                    ← Paper-first 13-area / 329-item
 ├── components/
 │   └── safety/                     ← NEW
 │       ├── shared/
 │       │   ├── SignatureBlock.tsx
-│       │   ├── AnonymityBadge.tsx
+│       │   ├── ReporterIdentity.tsx
 │       │   ├── MScatPicker.tsx
 │       │   ├── BiasGuardChecklist.tsx
 │       │   ├── BarrierAnalysisCanvas.tsx
@@ -284,7 +284,7 @@ Mirror Reporting's `RPT_F_*` / `RPT_P_*` pattern. Registered in `msc_profiles` b
 | `SAF_F_003` | Incident phase workbench (3–6) |
 | `SAF_F_004` | Near Miss list + detail |
 | `SAF_F_005` | Near Miss create |
-| `SAF_F_006` | Near Miss reporter-identity view (DPA / FM only) |
+| `SAF_F_006` | Near Miss reporter-identity view for authorized users |
 | `SAF_F_007` | SCM list + detail |
 | `SAF_F_008` | SCM Regular create |
 | `SAF_F_009` | SCM Ad-Hoc trigger (Master/CO host) |
@@ -310,7 +310,7 @@ Mirror Reporting's `RPT_F_*` / `RPT_P_*` pattern. Registered in `msc_profiles` b
 | `SAF_P_004` | DPA accept (Phase 7) |
 | `SAF_P_005` | FM approve RED closure |
 | `SAF_P_006` | PIC close GREEN |
-| `SAF_P_007` | Master sign-off (SCM, SOI closure, incident) |
+| `SAF_P_007` | PDF/export and formal close actions (SOI closure, incident); SCM closure is Office Comment |
 | `SAF_P_008` | Re-open closed incident |
 | `SAF_P_009` | Override blame-fixation hard block |
 | `SAF_P_010` | Override ALARP gate |
@@ -365,33 +365,15 @@ class HasVesselScope(BasePermission):
     # Crew_Onboarding_History for ship users. Global-access flag bypasses.
 ```
 
-### 3.4 Near-miss reporter anonymity (D-GAP-J1)
+### 3.4 Near-miss reporter identity (D-GAP-J1 revised 2026-06-09)
 
-`apps/safety/authentication/anonymity.py` intercepts every serializer that touches `vims_safety_incident` rows with `record_type='NEAR_MISS'`. The pattern:
+Anonymous near-miss reporting is removed from V1. The backend stores reporter user id, name, rank, and device fingerprint on `vims_safety_incident` rows with `record_type='NEAR_MISS'`.
 
-```python
-class AnonymityMixin:
-    """Strip reporter_id / reporter_name / reporter_rank / reporter_email
-    for any requesting user whose role is not DPA or FM (and is not the reporter
-    themselves). Enforced before JSON render and before PDF template interpolation."""
-
-    ANON_FIELDS = ('reporter_id', 'reporter_name', 'reporter_rank', 'reporter_email',
-                   'reporter_department', 'reporter_device_fingerprint')
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        if instance.record_type != 'NEAR_MISS':
-            return data
-        user = self.context['request'].user
-        if user.role_code in {'DPA', 'FM'} or user.user_id == instance.reporter_id:
-            return data
-        for f in self.ANON_FIELDS:
-            data[f] = None  # hard strip; no placeholder name
-        data['_reporter_masked'] = True
-        return data
-```
-
-The PDF renderer applies the same stripping before `reportlab` interpolates the template. The DB always stores the reporter identity (SSOT §4.4 "System stores the name; UI masks it outside the DPA/FM view"). No row is ever deleted / nulled at rest.
+Serializer and PDF behavior:
+- Reporter fields are returned to authorized users according to Safety permissions and vessel scope.
+- The API must not replace the reporter with `Anonymous Reporter`.
+- The PDF renderer must not print "Reporter identity is masked" or any equivalent masking text.
+- Field history retains reporter changes like any other audited field.
 
 ---
 
@@ -446,12 +428,19 @@ CREATE TABLE vims_safety_incident (
   resources_allocated         NVARCHAR(MAX) NULL,              -- JSON blob of role → assignee
   -- ── Near Miss specific ────────────────────────────────────────────
   near_miss_priority          VARCHAR(8)    NULL,              -- CHECK IN ('LOW','HIGH') D-GAP-R22 (NM only)
-  reporter_id                 NVARCHAR(64)  NULL,              -- CrewId or user_id — D-GAP-J1 masked in serializer
-  reporter_name               NVARCHAR(128) NULL,              -- Masked
-  reporter_rank               NVARCHAR(64)  NULL,              -- Masked
-  reporter_email              NVARCHAR(128) NULL,              -- Masked
-  reporter_department         NVARCHAR(64)  NULL,              -- Masked
-  reporter_device_fingerprint NVARCHAR(256) NULL,              -- Masked; D-GAP-D1 hybrid signature
+  near_miss_place             VARCHAR(16)   NULL,              -- 'AT_ANCHOR' | 'AT_SEA' | 'AT_PORT' (NM only)
+  near_miss_shell_tag         VARCHAR(32)   NULL,              -- first selected category tag for compatibility
+  near_miss_category_tags     NVARCHAR(MAX) NULL,              -- JSON array, up to 3 category tags
+  near_miss_incident_type_ids NVARCHAR(MAX) NULL,              -- legacy compatibility only; Near Miss Type is not shown in V1 UI
+  near_miss_mscat_category_id INT           NULL,              -- first selected immediate-cause category for compatibility
+  near_miss_mscat_subcode_id  VARCHAR(16)   NULL,              -- first selected immediate-cause subcode for compatibility
+  near_miss_mscat_subcode_ids NVARCHAR(MAX) NULL,              -- JSON array, up to 3 immediate-cause subcodes
+  reporter_id                 NVARCHAR(64)  NULL,              -- CrewId or user_id — visible by vessel scope + Safety permission
+  reporter_name               NVARCHAR(128) NULL,
+  reporter_rank               NVARCHAR(64)  NULL,
+  reporter_email              NVARCHAR(128) NULL,
+  reporter_department         NVARCHAR(64)  NULL,
+  reporter_device_fingerprint NVARCHAR(256) NULL,              -- D-GAP-D1 hybrid signature/audit
   -- ── Phase 3 evidence sentinel flags ───────────────────────────────
   chain_of_custody_ok         BIT           NOT NULL DEFAULT 0,-- D-GAP-R04
   marine_docs_checklist_done  BIT           NOT NULL DEFAULT 0,-- D-GAP-R05
@@ -782,7 +771,7 @@ CREATE INDEX IX_vims_safety_soi_trainee_crew ON vims_safety_soi_trainee (crew_id
 
 ### 4.10 `vims_safety_scm_meeting` — SCM event master (Regular + Ad-Hoc)
 
-Per SSOT §5 + D-GAP-M-ADHOC. Same form, same table, discriminated by `meeting_type`. Regular and Ad-Hoc can be hosted by Master or CO; Master remains final sign-off authority (plus DPA visibility).
+Per SSOT §5 + D-GAP-M-ADHOC. Same form, same table, discriminated by `meeting_type`. Regular and Ad-Hoc can be hosted by Master or CO. Active V1 flow is `DRAFT` → `SUBMITTED` → `CLOSED`; UI displays `SUBMITTED` as `Submitted to Office`. New SCM records are closed by office review: DPA, FM, Shore HOD, or Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` saves the Office Comment, which freezes vessel-side editing.
 
 ```sql
 CREATE TABLE vims_safety_scm_meeting (
@@ -799,12 +788,12 @@ CREATE TABLE vims_safety_scm_meeting (
   chair_crew_id           NVARCHAR(64)  NOT NULL,            -- Master for Regular; host for Ad-Hoc
   prepared_by_crew_id     NVARCHAR(64)  NOT NULL,            -- SCM host: Master or CO
   ad_hoc_trigger_reason   NVARCHAR(MAX) NULL,                -- Mandatory when meeting_type='AD_HOC'
-  office_comment          NVARCHAR(MAX) NULL,                -- DPA/FM comment post-submit (legacy vw_GetSCM_Master)
+  office_comment          NVARCHAR(MAX) NULL,                -- Office Comment; saving closes SCM
   office_comment_by       NVARCHAR(64)  NULL,
   office_comment_at       DATETIME2     NULL,
-  state                   VARCHAR(24)   NOT NULL,            -- CHECK IN ('DRAFT','SUBMITTED','SIGNED_OFF','REOPENED')
-  master_signed_off_at    DATETIME2     NULL,                -- D-GAP-M20 sign-off hard-block if SOI overdue
-  master_signed_off_by    NVARCHAR(64)  NULL,
+  state                   VARCHAR(24)   NOT NULL,            -- Active flow: DRAFT -> SUBMITTED -> CLOSED; UI shows SUBMITTED as Submitted to Office
+  master_signed_off_at    DATETIME2     NULL,                -- legacy compatibility only; no active SCM digital sign-off
+  master_signed_off_by    NVARCHAR(64)  NULL,                -- legacy compatibility only
   pdf_export_path         NVARCHAR(512) NULL,                -- D-PDF-03b legacy SCM PDF preserved
   schema_version          INT           NOT NULL DEFAULT 1,
   is_deleted              BIT           NOT NULL DEFAULT 0,
@@ -818,7 +807,7 @@ CREATE TABLE vims_safety_scm_meeting (
   CONSTRAINT FK_vims_safety_scm_meeting_vessel FOREIGN KEY (vessel_id) REFERENCES VesselData(VesselID),
   CONSTRAINT CK_vims_safety_scm_meeting_type CHECK (meeting_type IN ('REGULAR','AD_HOC')),
   CONSTRAINT CK_vims_safety_scm_meeting_state CHECK
-      (state IN ('DRAFT','SUBMITTED','SIGNED_OFF','REOPENED')),
+      (state IN ('DRAFT','SUBMITTED','SIGNED_OFF','REOPENED','CLOSED')),
   CONSTRAINT CK_vims_safety_scm_meeting_adhoc_reason CHECK
       (meeting_type <> 'AD_HOC' OR ad_hoc_trigger_reason IS NOT NULL)
 );
@@ -843,7 +832,7 @@ CREATE TABLE vims_safety_scm_attendance (
   wrh_data_available          BIT           NOT NULL DEFAULT 1,   -- FALSE → render "WRH data unavailable" badge
   wrh_rest_hours_24h          DECIMAL(5,2)  NULL,                 -- Previous 24h rest hours from wrh_attendance
   wrh_rest_hours_7d           DECIMAL(5,2)  NULL,                 -- Previous 7d rest hours
-  wrh_non_compliance_flag     BIT           NOT NULL DEFAULT 0,   -- TRUE → warn-only; never blocks submit
+  wrh_non_compliance_flag     BIT           NOT NULL DEFAULT 0,   -- TRUE → warn-only; never blocks SCM workflow
   remarks                     NVARCHAR(MAX) NULL,
   schema_version              INT           NOT NULL DEFAULT 1,
   CONSTRAINT PK_vims_safety_scm_attendance PRIMARY KEY (id),
@@ -858,7 +847,7 @@ CREATE INDEX IX_vims_safety_scm_attendance_crew    ON vims_safety_scm_attendance
 
 > **Build-time deferral #7:** WRH lookback window (24h / 72h / 168h / query timeout) for attendance live-join. Current lock: 24h + 7d snapshots on save; not streamed. Resolution owner: Backend + WRH lead, required by Phase 3.
 
-### 4.12 `vims_safety_scm_agenda` — agenda items + decisions
+### 4.12 `vims_safety_scm_agenda` — agenda items + Suggestions / Recommendations
 
 ```sql
 CREATE TABLE vims_safety_scm_agenda (
@@ -868,7 +857,7 @@ CREATE TABLE vims_safety_scm_agenda (
   section_label           NVARCHAR(128) NOT NULL,                 -- e.g. 'Safety Observations for the Month', 'Closed Items Since Last Meeting'
   auto_populated          BIT           NOT NULL DEFAULT 0,       -- D-SOI-14: Open findings feed, Closed items feed
   content                 NVARCHAR(MAX) NOT NULL,
-  decision                NVARCHAR(MAX) NULL,
+  decision                NVARCHAR(MAX) NULL,                     -- legacy column; UI/PDF label is "Suggestions / Recommendations"
   linked_finding_ids      NVARCHAR(MAX) NULL,                     -- CSV of vims_safety_soi_finding.id (optional)
   linked_incident_ids     NVARCHAR(MAX) NULL,                     -- CSV of vims_safety_incident.id (optional)
   schema_version          INT           NOT NULL DEFAULT 1,
@@ -1284,7 +1273,7 @@ Per master prompt §6, the following 12 items are explicitly deferred to build-t
 
 **#6 — `vims_safety_incident_phase_log` shape.** See §4.2. Options: (a) typed phase_from/phase_to (current); (b) free-form JSON; (c) generic key-value pairs. Impact: phase-timeline UI query shape.
 
-**#7 — WRH lookback window.** See §4.11. Options: (a) 24h + 7d snapshots on save (current lock); (b) streaming query at render time (can hit WRH timeouts); (c) configurable via env var. Impact: SCM submit latency; warn-don't-block contract (D-GAP-M11).
+**#7 — WRH lookback window.** See §4.11. Options: (a) 24h + 7d snapshots on save (current lock); (b) streaming query at render time (can hit WRH timeouts); (c) configurable via env var. Impact: SCM attendance save latency; warn-don't-block contract (D-GAP-M11).
 
 **#8 — FTS engine.** See TECH_STACK §2.3. Options: (a) SQL Server native CONTAINS/FREETEXT (no new dependency; platform-native); (b) Elasticsearch (richer relevance, new infra); (c) PostgreSQL FTS (requires platform DB change — unlikely). Impact: FEAT-SAF-DASH-007 + FEAT-SAF-INC-009 + FEAT-SAF-SOI-019. V1 fallback is LIKE-based narrow search. Current BLOCKED stub in TECH_STACK.
 
@@ -1321,7 +1310,7 @@ Per master prompt §6, the following 12 items are explicitly deferred to build-t
   |------|------|------|
   | 400 | `{"detail":"...","errors":{...}}` | Malformed request |
   | 401 | `{"detail":"Authentication credentials were not provided."}` | Missing/expired JWT |
-  | 403 | `{"detail":"You do not have permission to perform this action."}` | `form_id`/`process_id` missing OR vessel out of scope OR anonymity-mask violation |
+  | 403 | `{"detail":"You do not have permission to perform this action."}` | `form_id`/`process_id` missing OR vessel out of scope |
   | 404 | `{"detail":"Not found."}` | Resource missing or out of scope |
   | 409 | `{"detail":"Phase transition denied.","errors":{"state":[...],"current_phase":N}}` | Phase-state-machine rejection |
   | 422 | `{"detail":"Validation failed.","errors":{"field":["V-INC-nnn: ..."]}}` | VALIDATION_RULES violation |
@@ -1376,7 +1365,7 @@ Create incident / near miss. `record_type` in body determines row class.
 
 #### 9.2.3 `GET /api/safety/incidents/{id}/`
 
-Full detail. Near-miss anonymity applied via `AnonymityMixin`.
+Full detail. Near-miss reporter details are returned for authorized users within vessel scope; anonymous/masked reporter display is not used.
 
 - **Auth:** `SAF_F_001` + vessel scope.
 - **Response 200:** full row + eager-loaded `phase_log`, `recommendations`, `corrective_actions`, `signatures`, `evidence_ids`.
@@ -1441,11 +1430,11 @@ Multi-vessel linkage / supersede-and-create-new (D-EDGE-01, D-EDGE-07).
 
 - **Request body:** `{"target_incident_id": 456, "link_type": "SUPERSEDE" | "RELATED"}`.
 
-#### 9.2.12 `GET /api/safety/near-miss/reporter/{incident_id}/` (DPA / FM only)
+#### 9.2.12 `GET /api/safety/near-miss/reporter/{incident_id}/`
 
-Return the masked reporter identity — only `SAF_F_006` grants access.
+Return reporter identity for authorized users within vessel scope. Anonymous/masked reporter display is not used in V1.
 
-- **Auth:** `SAF_F_006`. 403 otherwise; 404 if incident is not `record_type='NEAR_MISS'`.
+- **Auth:** `SAF_F_002` plus vessel scope and any stricter Safety permission configured for reporter-detail access. 404 if incident is not `record_type='NEAR_MISS'`.
 
 ### 9.3 SCM endpoints
 
@@ -1457,7 +1446,7 @@ List SCM meetings. Filter by `vessel_id`, `meeting_type`, `date_from`, `date_to`
 
 #### 9.3.2 `POST /api/safety/scm/`
 
-Create SCM. Ship-side — meeting_type=REGULAR created by CO (`SAF_F_008`); meeting_type=AD_HOC created by Master (`SAF_F_009` + `SAF_P_012` + mandatory `ad_hoc_trigger_reason`).
+Create SCM draft. Ship-side — both `meeting_type=REGULAR` and `meeting_type=AD_HOC` can be created by Master or Chief Officer. Ad-Hoc requires `ad_hoc_trigger_reason`. Frontend "Submit to Office" saves the draft and immediately calls the submit endpoint below.
 
 - **Request body:**
   ```json
@@ -1469,9 +1458,13 @@ Create SCM. Ship-side — meeting_type=REGULAR created by CO (`SAF_F_008`); meet
   }
   ```
 
-#### 9.3.3 `POST /api/safety/scm/{id}/attendance/`
+#### 9.3.2A `POST /api/safety/scm/{id}/submit/`
 
-Bulk-append attendance rows. For each row, the backend runs a **live join on `wrh_attendance` and `wrh_ship_time_config`** (D-GAP-M11, D-GAP-M26) to populate `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing WRH → `wrh_data_available=false`, warning surfaces in response, **never blocks**.
+Submit SCM to office. Master or Chief Officer can submit a `DRAFT` meeting after agenda/attendance preflight passes. State changes to `SUBMITTED`; UI displays `Submitted to Office`.
+
+#### 9.3.3 `GET|POST /api/safety/scm/{id}/attendance/`
+
+Read or bulk-save attendance rows. GET is visible to office reviewers so they can see the Attendance + WRH snapshot. POST/write is restricted to Master or Chief Officer while the SCM is not closed. For each row, the backend runs a **live join on `wrh_attendance` and `wrh_ship_time_config`** (D-GAP-M11, D-GAP-M26) to populate `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing WRH → `wrh_data_available=false`, warning surfaces in response, **never blocks**.
 
 - **Request body:**
   ```json
@@ -1485,17 +1478,17 @@ Bulk-append attendance rows. For each row, the backend runs a **live join on `wr
 
 Return Open findings (D-SOI-14 "Safety Observations for the Month") + Closed-Since-Last-SCM summary block — both auto-populated from `vims_safety_soi_finding` via cross-table query.
 
-#### 9.3.5 `POST /api/safety/scm/{id}/submit/`
+#### 9.3.5 `PATCH /api/safety/scm/{id}/agenda/`
 
-Moves state DRAFT→SUBMITTED. Blocks sign-off only when `vims_safety_soi_vessel_area_map.due_at < NOW()` for any applicable area (D-GAP-M20). **Meeting creation / running is NOT blocked.**
+Updates agenda section text and suggestions / recommendations. Write is restricted to Master or Chief Officer and rejected after Office Comment closure.
 
-#### 9.3.6 `POST /api/safety/scm/{id}/sign-off/`
+#### 9.3.6 `POST /api/safety/scm/{id}/office-comment/`
 
-Master sign-off. State SUBMITTED → SIGNED_OFF. Writes `master_signed_off_at`, `master_signed_off_by`. Hard-blocks if any SOI area overdue (D-GAP-M20) — 422 with `{"errors":{"soi_overdue":["Area 3 overdue by 5 days"]}}`.
+Office review closure. DPA, FM, Shore HOD, or Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` saves `office_comment`. State `SUBMITTED` or `DRAFT` → `CLOSED`; writes `office_comment_by` and `office_comment_at`. Once closed, vessel-side meeting/attendance/agenda edits are rejected. Overdue SOI and WRH gaps remain warnings/visibility only and do not block closure.
 
 #### 9.3.7 `GET /api/safety/scm/{id}/pdf/`
 
-Emit D-PDF-03b legacy SCM layout. The old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9.
+Emit D-PDF-03b legacy SCM layout. Available immediately after meeting creation for any non-deleted SCM. The old reserved Section 2 is removed; former Sections 3-10 are renumbered to Sections 2-9. The PDF prints Attendance + WRH snapshot, Closed-Since-Last, SOI summary without duplicate finding details, Section 7 findings/corrective measures, Office Comment, and plain Master Signature / Chief Officer Signature lines. It does not print attendee digital signature status or device fingerprints.
 
 ### 9.4 SOI endpoints
 
@@ -1664,6 +1657,8 @@ Physical verification record (Q45 pattern).
 
 `POST /api/safety/circular/from-incident/{id}/` — writes to **existing VIMS Circular module** (per D-GAP-R17 lock; see TECH_STACK §7). Safety module emits a draft; VIMS Circular approval chain runs independently.
 
+Near Miss Office Comments are handled through `/api/safety/near-miss/{id}/office-comments/` with the legacy `/triage/` route retained as a compatibility alias. `Accept` saves priority, category tag, immediate cause, and office comment; `Send to Rework` moves the record back to vessel rework with a required reason. PIC/office PIC accepts LOW/MEDIUM cases; DPA accepts HIGH cases.
+
 Near Miss HIGH-priority fleet alerts use a UI handoff, not a Safety-owned Circular insert. `/api/safety/near-miss/{id}/fleet-alert/draft/` prepares anonymised title/body text. The frontend stores that text as a one-time Circular prefill and opens `/circular/office?safety_prefill=near_miss_fleet_alert`; DPA completes recipients/category/priority/attachments and publishes from the Circular module. The Near Miss `[Issue fleet alert]` action records Safety workflow completion separately and must not be treated as Circular publication.
 
 ---
@@ -1698,7 +1693,7 @@ User may **edit the auto-filled value** — writes `position_source='DAILY_REPOR
 
 ### 10.2 Safety ↔ WRH — SCM attendance (D-GAP-M11, D-GAP-M26)
 
-On SCM attendance save, a live join warms `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing rows → `wrh_data_available=0`, never blocks. Timezone resolution via `wrh_ship_time_config`:
+On SCM attendance save/display, a live join warms `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing rows → `wrh_data_available=0`, never blocks meeting creation, PDF export, or office closure. Timezone resolution via `wrh_ship_time_config`:
 
 ```sql
 -- SCM attendance WRH warm-up (executed in scm_repo.py on POST /attendance/)
@@ -1956,7 +1951,7 @@ def seed_permissions(apps, schema_editor):
 | Django AppConfig + URL include + INSTALLED_APPS step documented | PASS | §1.2 INSTALLED_APPS; §1.3 URL include; §1.1 AppConfig `name='apps.safety'` |
 | DB router points to `ksm_marine_live` | PASS | §2.2 SafetyRouter returns `'default'`; no new alias |
 | Migration dependencies on platform masters stated | PASS | §13.1 precondition list + §13.2 migration chain |
-| Near-miss anonymity serializer-level stripping documented | PASS | §3.4 AnonymityMixin code + PDF pipeline integration |
+| Near-miss reporter identity visibility documented | PASS | §3.4 reporter identity contract + PDF pipeline integration |
 | No `safety_X` scan-upload column on SOI | PASS | §4.4 + §11.2 explicit NOT-supported list |
 | CA ↔ Purchase hard FK present | PASS | §4.13 FK constraint + §10.4 RI contract |
 | WRH warn-don't-block + timezone reuse | PASS | §4.11 `wrh_non_compliance_flag` (warn-only); §10.2 SQL example |

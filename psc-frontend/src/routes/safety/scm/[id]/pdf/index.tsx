@@ -54,7 +54,7 @@ export default function SafetyScmPdfRoute() {
                 Attendance + WRH flags
               </li>
               <li className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                Master + CO + attendee signature status
+                Master and CO signature box
               </li>
             </ul>
           </article>

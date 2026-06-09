@@ -32,6 +32,44 @@ from core.db_utils import vessel_name_annotation, vessel_code_annotation, imo_nu
 from django.db.models.expressions import RawSQL
 
 
+REPORT_FILE_NAME_MAX_LENGTH = 255
+REPORT_DESCRIPTION_MAX_LENGTH = 500
+REPORT_MIME_TYPE_MAX_LENGTH = 100
+REPORT_EXTENSION_MAX_LENGTH = 20
+AUDIT_USER_ID_MAX_LENGTH = 100
+AUDIT_USER_NAME_MAX_LENGTH = 200
+ACTION_CHANGE_REASON_MAX_LENGTH = 500
+ACTIVITY_DESCRIPTION_MAX_LENGTH = 500
+FOLLOW_UP_DEFICIENCY_MARKER_PREFIX = '[CAR_DEFICIENCIES:'
+
+
+def _truncate_text(value, max_length):
+    text = str(value or '').strip()
+    return text[:max_length]
+
+
+def _truncate_file_name(file_name, max_length=REPORT_FILE_NAME_MAX_LENGTH):
+    clean_name = os.path.basename(str(file_name or 'follow-up.pdf')).strip() or 'follow-up.pdf'
+    if len(clean_name) <= max_length:
+        return clean_name
+
+    stem, ext = os.path.splitext(clean_name)
+    ext = ext[: min(len(ext), 20)]
+    stem_length = max_length - len(ext)
+    return f"{stem[:stem_length]}{ext}" if stem_length > 0 else clean_name[:max_length]
+
+
+def _append_deficiency_marker(description, deficiencies):
+    deficiency_ids = ','.join(str(deficiency.id).replace('-', '') for deficiency in deficiencies)
+    marker = f" {FOLLOW_UP_DEFICIENCY_MARKER_PREFIX}{deficiency_ids}]"
+    if len(marker) >= REPORT_DESCRIPTION_MAX_LENGTH:
+        return _truncate_text(description, REPORT_DESCRIPTION_MAX_LENGTH)
+
+    visible_description = description or 'Follow-up report'
+    visible_max_length = REPORT_DESCRIPTION_MAX_LENGTH - len(marker)
+    return f"{_truncate_text(visible_description, visible_max_length)}{marker}"
+
+
 class FollowUpView(APIView):
     """
     POST /api/psc/inspections/<inspection_id>/follow-up/
@@ -46,7 +84,7 @@ class FollowUpView(APIView):
     - reinspection_date: date string (YYYY-MM-DD)
     - notes: optional string
     - report_file: optional PDF file
-    - report_description: required if report_file is present
+    - report_description: optional when report_file is present
 
     Roles: VESSEL_MASTER only
     """
@@ -100,12 +138,16 @@ class FollowUpView(APIView):
 
         validated = serializer.validated_data
         user = request.user
-        user_id = str(user.id)
-        user_name = getattr(user, 'display_name', None) or getattr(user, 'username', user_id)
+        user_id = _truncate_text(user.id, AUDIT_USER_ID_MAX_LENGTH)
+        user_name = _truncate_text(
+            getattr(user, 'display_name', None) or getattr(user, 'username', user_id),
+            AUDIT_USER_NAME_MAX_LENGTH,
+        )
+        action_changed_by = _truncate_text(user_name, AUDIT_USER_ID_MAX_LENGTH)
 
         # Optional report file validation
         report_file = request.FILES.get('report_file')
-        report_description = request.data.get('report_description', '')
+        report_description = str(request.data.get('report_description', '') or '').strip()
         if report_file:
             # Validate PDF type
             if report_file.content_type not in ('application/pdf',):
@@ -120,24 +162,26 @@ class FollowUpView(APIView):
                     {'error': 'VALIDATION_ERROR', 'message': 'Report file exceeds 5MB limit.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if not report_description.strip():
-                return Response(
-                    {'error': 'VALIDATION_ERROR', 'message': 'Report description is required when uploading a file.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            report_description = _truncate_text(
+                report_description or 'Follow-up report',
+                REPORT_DESCRIPTION_MAX_LENGTH,
+            )
 
         with transaction.atomic():
             # 1. Update deficiency action codes
             updates = validated['deficiency_updates']
+            updated_deficiencies = []
             for update_item in updates:
                 deficiency = Deficiency.objects.get(
                     id=update_item['deficiency_id'],
                     is_deleted=False,
                 )
+                updated_deficiencies.append(deficiency)
                 action_code_id = update_item['action_code_id']
                 action_code_obj = PSCActionCode.objects.get(action_code=action_code_id)
                 new_action_code = str(action_code_obj.action_code)
                 change_reason = update_item.get('notes', '') or 'Updated via follow-up wizard'
+                change_reason = _truncate_text(change_reason, ACTION_CHANGE_REASON_MAX_LENGTH)
 
                 # Create action history
                 DeficiencyActionHistory.objects.create(
@@ -146,8 +190,9 @@ class FollowUpView(APIView):
                     previous_action_code=deficiency.action_code,
                     new_action_code_id=action_code_id,
                     new_action_code=new_action_code,
+                    follow_up_inspection=inspection,
                     change_reason=change_reason,
-                    changed_by=user_name,
+                    changed_by=action_changed_by,
                 )
 
                 # Update deficiency (do NOT touch is_cleared or CAR.status)
@@ -161,7 +206,8 @@ class FollowUpView(APIView):
 
             # 2. Optionally save follow-up report
             if report_file:
-                file_ext = os.path.splitext(report_file.name)[1]
+                safe_original_name = _truncate_file_name(report_file.name)
+                file_ext = os.path.splitext(safe_original_name)[1][:REPORT_EXTENSION_MAX_LENGTH]
                 unique_filename = f"{uuid_lib.uuid4()}{file_ext}"
                 relative_path = (
                     f"psc/{inspection.vessel_id}/inspections/{inspection.id}/{unique_filename}"
@@ -178,14 +224,18 @@ class FollowUpView(APIView):
                     for chunk in report_file.chunks():
                         destination.write(chunk)
 
+                marked_report_description = _append_deficiency_marker(
+                    report_description,
+                    updated_deficiencies,
+                )
                 InspectionReport.objects.create(
                     inspection=inspection,
                     report_type='FOLLOW_UP',
-                    file_name=report_file.name,
+                    file_name=safe_original_name,
                     file_path=relative_path,
                     file_size=report_file.size,
-                    mime_type=report_file.content_type,
-                    description=report_description,
+                    mime_type=_truncate_text(report_file.content_type, REPORT_MIME_TYPE_MAX_LENGTH),
+                    description=marked_report_description,
                     uploaded_by=user_id,
                 )
 
@@ -203,7 +253,7 @@ class FollowUpView(APIView):
                 entity_id=str(inspection.id),
                 vessel_id=str(inspection.vessel_id) if inspection.vessel_id else None,
                 event_type='PSC_FOLLOW_UP_RECORDED',
-                event_description=' '.join(desc_parts),
+                event_description=_truncate_text(' '.join(desc_parts), ACTIVITY_DESCRIPTION_MAX_LENGTH),
                 performed_by=user_id,
                 performed_by_name=user_name,
             )

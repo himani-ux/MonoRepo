@@ -1,4 +1,4 @@
-// Admin.jsx
+﻿// Admin.jsx
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import '../../styles/circular/Officeuser.css';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/circular/ui/card';
@@ -147,7 +147,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         const fetchDraftForEditing = async () => {
             try {
-                const response = await fetch(`/api/circular/api/draft/${normalizedDraftSrNo}/`);
+                const response = await fetch(`http://localhost:8000/api/circular/api/draft/${normalizedDraftSrNo}/`);
 
                 if (!response.ok) {
                     throw new Error(`Failed to fetch draft: ${response.status} ${response.statusText}`);
@@ -297,7 +297,7 @@ const Admin = ({ onNotificationSubmit }) => {
         const fetchOptions = async () => {
             try {
                 // --- Document Types ---
-                const docRes = await fetch('/api/circular/api/document-types/');
+                const docRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
                 const docData = await docRes.json();
                 console.log("Fetched Document Types:", docData);
                 if (Array.isArray(docData)) {
@@ -319,7 +319,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 }
 
                 // Departments - Handle list of arrays
-                const deptRes = await fetch('/api/circular/api/departments/');
+                const deptRes = await fetch('http://localhost:8000/api/circular/api/departments/');
                 const deptData = await deptRes.json();
                 // console.log("Fetched Departments:", deptData); // Log to verify structure
 
@@ -345,7 +345,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
 
                 // --- Priorities ---
-                const prioRes = await fetch('/api/circular/api/priorities/');
+                const prioRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
                 const prioData = await prioRes.json();
                 console.log("Fetched Priorities:", prioData);
                 if (Array.isArray(prioData)) {
@@ -365,7 +365,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 }
 
                 // --- Sub-categories ---
-                const subCatRes = await fetch('/api/circular/api/sub-categories/');
+                const subCatRes = await fetch('http://localhost:8000/api/circular/api/sub-categories/');
                 const subCatData = await subCatRes.json();
                 console.log("Fetched Sub-Categories:", subCatData);
                 if (Array.isArray(subCatData)) {
@@ -386,7 +386,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                 // --- Second Sub-categories (example, adjust structure as needed) ---
                 // You might need a similar useEffect for second sub-categories if they are fetched dynamically based on department
-                // const secondSubCatRes = await fetch('/api/circular/api/second-sub-categories/');
+                // const secondSubCatRes = await fetch('http://localhost:8000/api/circular/api/second-sub-categories/');
                 // const secondSubCatData = await secondSubCatRes.json();
                 // ... create map and set state ...
 
@@ -406,11 +406,11 @@ const Admin = ({ onNotificationSubmit }) => {
         const fetchLookupData = async () => {
             try {
                 const [typesRes, catsRes, subCatsRes, secondSubCatsRes, prioritiesRes] = await Promise.all([
-                    fetch('/api/circular/api/document-types/'), // Example endpoint for MscType
-                    // fetch('/api/circular/api/msc-categories/'), // Example endpoint for MscCategory
-                    fetch('/api/circular/api/sub-categories/'), // Example endpoint for MscSubCat
-                    fetch('/api/circular/api/second-sub-categories/'), // Example endpoint for Msc2ndSubCat
-                    fetch('/api/circular/api/priorities/') // Example endpoint for MscPriority
+                    fetch('http://localhost:8000/api/circular/api/document-types/'), // Example endpoint for MscType
+                    // fetch('http://localhost:8000/api/circular/api/msc-categories/'), // Example endpoint for MscCategory
+                    fetch('http://localhost:8000/api/circular/api/sub-categories/'), // Example endpoint for MscSubCat
+                    fetch('http://localhost:8000/api/circular/api/second-sub-categories/'), // Example endpoint for Msc2ndSubCat
+                    fetch('http://localhost:8000/api/circular/api/priorities/') // Example endpoint for MscPriority
                 ]);
 
                 const types = await typesRes.json();
@@ -511,7 +511,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
     useEffect(() => {
         const handleRefresh = () => {
-            console.log("🔄 Page refreshed — clearing supersede data");
+            console.log("ðŸ”„ Page refreshed â€” clearing supersede data");
 
             clearCircularPrefillStorage();
         };
@@ -527,7 +527,7 @@ const Admin = ({ onNotificationSubmit }) => {
         useEffect(() => {
             const fetchSubmittedRequests = async () => {
                 try {
-                    const res = await fetch('/api/circular/api/submitted/');
+                    const res = await fetch('http://localhost:8000/api/circular/api/submitted/');
                     const data = await res.json();
 
                     const publishedRequests = Array.isArray(data)
@@ -543,7 +543,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         submitted: req.created_at
 
                             ? new Date(req.created_at).toLocaleString()
-                            : '—',
+                            : 'â€”',
                         status: 'Pending',
                         created_by: req.created_by,
                         attachment_url: req.attachment_url,
@@ -575,7 +575,7 @@ const Admin = ({ onNotificationSubmit }) => {
     useEffect(() => {
         const fetchPendingRequests = async () => {
             try {
-                const res = await fetch('/api/circular/api/submitted/');
+                const res = await fetch('http://localhost:8000/api/circular/api/submitted/');
                 const data = await res.json();
 
                 const pendingRequests = Array.isArray(data)
@@ -590,7 +590,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     priority: req.priority || 'Medium',
                     submitted: req.created_at
                         ? new Date(req.created_at).toLocaleString()
-                        : '—',
+                        : 'â€”',
                     status: 'Pending',
                     created_by: req.created_by,
                     attachment_url: req.attachment_url,
@@ -627,7 +627,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         const fetchSecondSub = async () => {
             try {
-                const res = await fetch('/api/circular/api/second-sub-categories/');
+                const res = await fetch('http://localhost:8000/api/circular/api/second-sub-categories/');
                 const allData = await res.json();
 
                 const targetDeptUuid = selectedMainOption === 'seq'
@@ -680,7 +680,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 console.log("Vessel Popup: Opening, fetching vessels...");
                 setLoadingVessels(true);
                 try {
-                    const response = await fetch('/api/circular/api/vessels/'); // Use your vessel API endpoint
+                    const response = await fetch('http://localhost:8000/api/circular/api/vessels/'); // Use your vessel API endpoint
                     if (!response.ok) {
                         throw new Error(`Failed to fetch vessels: ${response.status} ${response.statusText}`);
                     }
@@ -711,7 +711,7 @@ const Admin = ({ onNotificationSubmit }) => {
             if (showRankPopup) { // Only fetch when rank popup is shown
                 setLoadingRanks(true);
                 try {
-                    const response = await fetch('/api/circular/api/ranks/'); // Use the new endpoint
+                    const response = await fetch('http://localhost:8000/api/circular/api/ranks/'); // Use the new endpoint
                     if (!response.ok) {
                         throw new Error(`Failed to fetch all ranks: ${response.status} ${response.statusText}`);
                     }
@@ -771,12 +771,12 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // --- NEW: Handler for Edit Pending Notification Button ---
     const handleEditPendingNotification = async (srNoToEdit) => {
-        console.log("🚀 handleEditPendingNotification: Edit clicked for notification SR No:", srNoToEdit);
+        console.log("ðŸš€ handleEditPendingNotification: Edit clicked for notification SR No:", srNoToEdit);
 
         // 1. Fetch the notification details by its SR No
         console.log("handleEditPendingNotification: Fetching notification details for SR No:", srNoToEdit);
         try {
-            const response = await fetch(`/api/circular/api/submitted/${srNoToEdit}/`); // Use your endpoint to get single notification details by SR No
+            const response = await fetch(`http://localhost:8000/api/circular/api/submitted/${srNoToEdit}/`); // Use your endpoint to get single notification details by SR No
             if (!response.ok) {
                 throw new Error(`Failed to fetch notification details: ${response.status} ${response.statusText}`);
             }
@@ -788,7 +788,7 @@ const Admin = ({ onNotificationSubmit }) => {
             localStorage.setItem('editingPendingNotificationData', JSON.stringify(notificationDetails));
             localStorage.setItem('editingPendingNotificationSrNo', notificationDetails.sr_no); // Store SR No
             localStorage.setItem('editingPendingNotificationId', notificationDetails.id); // Store DB ID (UUID)
-            console.log("✅ Stored editingPendingNotificationData, editingPendingNotificationSrNo, and editingPendingNotificationId in localStorage.");
+            console.log("âœ… Stored editingPendingNotificationData, editingPendingNotificationSrNo, and editingPendingNotificationId in localStorage.");
 
             // 3. Navigate to the main create page to load the form with the data
             // This will trigger the main form component (Officeuser/Admin) to check localStorage
@@ -798,7 +798,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         } catch (detailsError) {
             console.error("handleEditPendingNotification: Error fetching notification details:", detailsError);
-            alert(`⚠️ Could not fetch notification details for editing: ${detailsError.message}`);
+            alert(`âš ï¸ Could not fetch notification details for editing: ${detailsError.message}`);
         }
     };
     // --- END NEW ---
@@ -928,7 +928,7 @@ const Admin = ({ onNotificationSubmit }) => {
         const request =
             requestOrSrNo && typeof requestOrSrNo === 'object' ? requestOrSrNo : null;
         const sr_no = request?.sr_no || requestOrSrNo;
-        console.log("🚀 handleApproveReject: Start → SR No:", sr_no, "Action:", action);
+        console.log("ðŸš€ handleApproveReject: Start â†’ SR No:", sr_no, "Action:", action);
 
         if (!sr_no) {
             alert('Notification SR No is missing. Please refresh and try again.');
@@ -946,7 +946,7 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         /* ============================================================
-           1️⃣ APPROVE → First fetch details → then open vessel popup
+           1ï¸âƒ£ APPROVE â†’ First fetch details â†’ then open vessel popup
            ============================================================ */
         if (action === "approve") {
             const deptName = resolveCircularRequestDepartmentName(request);
@@ -963,9 +963,9 @@ const Admin = ({ onNotificationSubmit }) => {
             setCommentInput('');
             setShowCommentModal(false);
             setShowRankPopup(false);
-            // Show vessel popup and stop here — final approval happens after popup confirm
+            // Show vessel popup and stop here â€” final approval happens after popup confirm
             setShowVesselPopup(true);
-            console.log("📌 Vessel popup opened using existing notification data.", {
+            console.log("ðŸ“Œ Vessel popup opened using existing notification data.", {
                 sr_no,
                 deptName,
             });
@@ -973,10 +973,10 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         /* ============================================================
-           2️⃣ REJECT → Show modal and wait for comment
+           2ï¸âƒ£ REJECT â†’ Show modal and wait for comment
            ============================================================ */
         setShowCommentModal(true);
-        console.log("📝 Reject → showing comment modal.");
+        console.log("ðŸ“ Reject â†’ showing comment modal.");
 
         // The rest will run ONLY after comment submit, so we stop here
         // This prevents premature status update
@@ -984,12 +984,12 @@ const Admin = ({ onNotificationSubmit }) => {
     };
 
     /* ============================================================
-       3️⃣ FINAL APPROVAL / REJECTION API CALL
+       3ï¸âƒ£ FINAL APPROVAL / REJECTION API CALL
            CALL THIS AFTER COMMENT or AFTER VESSEL POPUP CONFIRM
        ============================================================ */
 
     const submitApprovalOrRejection = async (sr_no, action, comment, vesselIds = null) => {
-        console.log("🚀 Final submit:", { sr_no, action, comment, vesselIds });
+        console.log("ðŸš€ Final submit:", { sr_no, action, comment, vesselIds });
 
         const currentUser = user
         const status = action === "approve" ? 2 : 3;
@@ -1008,7 +1008,7 @@ const Admin = ({ onNotificationSubmit }) => {
         try {
             // ---- Update publish status ----
             const response = await fetch(
-                `/api/circular/api/notifications/${sr_no}/update-status/`,
+                `http://localhost:8000/api/circular/api/notifications/${sr_no}/update-status/`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1024,13 +1024,13 @@ const Admin = ({ onNotificationSubmit }) => {
             }
 
             alert(action === "approve" ? "Approved!" : "Rejected!");
-            console.log("✅ Status updated");
+            console.log("âœ… Status updated");
 
             /* ---------------------------------------------------
-               📧 EMAIL SENDING ONLY FOR APPROVAL
+               ðŸ“§ EMAIL SENDING ONLY FOR APPROVAL
             --------------------------------------------------- */
             if (action === "approve" && vesselIds && vesselIds.length > 0) {
-                console.log("📧 Sending emails to vessels:", vesselIds);
+                console.log("ðŸ“§ Sending emails to vessels:", vesselIds);
 
                 const emailPayload = {
                     notification_sr_no: sr_no,
@@ -1038,7 +1038,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 };
 
                 const emailResponse = await fetch(
-                    "/api/circular/api/notifications/send-emails/",
+                    "http://localhost:8000/api/circular/api/notifications/send-emails/",
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1050,7 +1050,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                 if (emailResponse.ok) {
                     console.log(
-                        `📨 Emails sent to ${emailResult.emails_sent} vessels.`
+                        `ðŸ“¨ Emails sent to ${emailResult.emails_sent} vessels.`
                     );
                 } else {
                     alert(`Approved, but email error: ${emailResult.error}`);
@@ -1058,7 +1058,7 @@ const Admin = ({ onNotificationSubmit }) => {
             }
 
             // ---- Refresh pending list ----
-            const res = await fetch("/api/circular/api/submitted/");
+            const res = await fetch("http://localhost:8000/api/circular/api/submitted/");
             const data = await res.json();
 
             const pendingRequests = (data || []).filter(
@@ -1072,7 +1072,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 priority: req.priority || "Medium",
                 submitted: req.created_at
                     ? new Date(req.created_at).toLocaleString()
-                    : "—",
+                    : "â€”",
                 status: "Pending",
                 created_by: req.created_by,
                 attachment_url: req.attachment_url,
@@ -1092,7 +1092,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
             setSubmittedRequests(mappedRequests);
         } catch (err) {
-            console.error("💥 Network error:", err);
+            console.error("ðŸ’¥ Network error:", err);
             alert("Network error occurred");
         }
     };
@@ -1116,7 +1116,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         if (!approvingNotificationSrNo) {
             // If creating a new notification, delegate to handleConfirmPublish as before
-            console.log("No approvingNotificationSrNo found — treating this as a new submission.");
+            console.log("No approvingNotificationSrNo found â€” treating this as a new submission.");
             setIsApprovalActionPending(true);
             setApprovalActionMessage("Publishing notification. Please wait...");
             try {
@@ -1146,7 +1146,7 @@ const Admin = ({ onNotificationSubmit }) => {
             setIsApprovalActionPending(false);
             setApprovalActionMessage("");
         }, 0);
-        console.log("handleConfirmVesselSelectionForApproval: Opened comment modal — waiting for user to confirm comment.");
+        console.log("handleConfirmVesselSelectionForApproval: Opened comment modal â€” waiting for user to confirm comment.");
     };
 
 
@@ -1196,7 +1196,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         try {
             const response = await fetch(
-                `/api/circular/api/notifications/${notificationSrNoForComment}/update-status/`,
+                `http://localhost:8000/api/circular/api/notifications/${notificationSrNoForComment}/update-status/`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1225,13 +1225,13 @@ const Admin = ({ onNotificationSubmit }) => {
             setCurrentVesselIdsForComment([]);
             setShowRankPopup(true);
 
-            // Send emails (optional: you already have this logic elsewhere — keep it here or delegate)
+            // Send emails (optional: you already have this logic elsewhere â€” keep it here or delegate)
             try {
                 const emailPayload = {
                     notification_sr_no: notificationSrNoForComment,
                     vessel_ids: vesselIdsForComment
                 };
-                const emailResponse = await fetch('/api/circular/api/notifications/send-emails/', {
+                const emailResponse = await fetch('http://localhost:8000/api/circular/api/notifications/send-emails/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(emailPayload),
@@ -1292,7 +1292,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         try {
             const response = await fetch(
-                `/api/circular/api/notifications/${notificationSrNo}/update-status/`,
+                `http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/update-status/`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1318,7 +1318,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
             // Refresh list (reuse existing logic or call submitApprovalOrRejection/mapped refresh)
             // For simple approach, re-fetch submitted list:
-            const res = await fetch('/api/circular/api/submitted/');
+            const res = await fetch('http://localhost:8000/api/circular/api/submitted/');
             const data = await res.json();
             const pendingRequests = Array.isArray(data) ? data.filter(req => req.publish_status === 1) : [];
             const mappedRequests = pendingRequests.map(req => ({
@@ -1326,7 +1326,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 sr_no: req.sr_no,
                 type: req.msc_type?.toLowerCase() || 'alert',
                 priority: req.priority || 'Medium',
-                submitted: req.created_at ? new Date(req.created_at).toLocaleString() : '—',
+                submitted: req.created_at ? new Date(req.created_at).toLocaleString() : 'â€”',
                 status: 'Pending',
                 created_by: req.created_by,
                 attachment_url: req.attachment_url,
@@ -1392,7 +1392,7 @@ const Admin = ({ onNotificationSubmit }) => {
             // Send the selected rank IDs to the backend
             // You might need a new endpoint or modify an existing one to handle this
             // Example: Send to a new endpoint to link notification to ranks
-            const response = await fetch(`/api/circular/api/notifications/${approvingNotificationSrNo}/link-ranks/`, { // Use a new endpoint
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${approvingNotificationSrNo}/link-ranks/`, { // Use a new endpoint
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(rankPayload), // Send the payload with selected ranks and notification context
@@ -1558,7 +1558,7 @@ const Admin = ({ onNotificationSubmit }) => {
     //         files.forEach(file => formData.append('attachment', file));
 
     //         try {
-    //             const response = await fetch('/api/circular/api/notifications/', {
+    //             const response = await fetch('http://localhost:8000/api/circular/api/notifications/', {
     //                 method: 'POST',
     //                 body: formData, // Not JSON!
     //             });
@@ -1635,7 +1635,7 @@ const Admin = ({ onNotificationSubmit }) => {
             console.error("Missing ID for selected type:", selectedType, "Map:", typeToIdMap);
             return;
         }
-        formData.append('type', selectedTypeId); // ✅ Send the UUID ID
+        formData.append('type', selectedTypeId); // âœ… Send the UUID ID
 
         // Get the ID for 'department' using the map
         // Assuming selectedMainOption is 'seq' or 'technical'
@@ -1647,7 +1647,7 @@ const Admin = ({ onNotificationSubmit }) => {
             console.error("Missing ID for department key:", deptNameForMap, "Map:", deptToIdMap);
             return;
         }
-        formData.append('department', selectedDeptId); // ✅ Send the UUID ID
+        formData.append('department', selectedDeptId); // âœ… Send the UUID ID
 
         // For 'category', assuming it's still a string field (not a FK yet)
         formData.append('category', selectedCategory); // Send the name string
@@ -1661,20 +1661,20 @@ const Admin = ({ onNotificationSubmit }) => {
             console.error("Missing ID for selected priority key:", selectedSeverity, "Map:", priorityToIdMap);
             return;
         }
-        formData.append('priority', selectedPriorityId); // ✅ Send the UUID ID
+        formData.append('priority', selectedPriorityId); // âœ… Send the UUID ID
 
         // Add other simple fields
         formData.append('title', title);
         formData.append('body', body);
         formData.append('hashtags', hashtags);
-        formData.append('publish_status', 0); // ✅ Draft status
+        formData.append('publish_status', 0); // âœ… Draft status
         formData.append('created_by', currentUser.employee_id);
 
         // Add sub-categories (send array of IDs using maps)
         Array.from(selectedSub1).forEach(name => {
             const id = subCatToIdMap[name]; // Look up the ID using the name
             if (id) {
-                formData.append('sub_cat', id); // ✅ Append the UUID ID
+                formData.append('sub_cat', id); // âœ… Append the UUID ID
             } else {
                 console.warn(`handleSaveDraft: Could not find ID for sub-category name: ${name}`);
                 // You might want to alert the user or handle this differently
@@ -1688,7 +1688,7 @@ const Admin = ({ onNotificationSubmit }) => {
         Array.from(selectedSub2).forEach(name => {
             const id = secondSubCatToIdMap[name]; // Look up the ID using the name
             if (id) {
-                formData.append('second_sub_cat', id); // ✅ Append the UUID ID
+                formData.append('second_sub_cat', id); // âœ… Append the UUID ID
             } else {
                 console.warn(`handleSaveDraft: Could not find ID for second sub-category name: ${name}`);
                 // You might want to alert the user or handle this differently
@@ -1708,7 +1708,7 @@ const Admin = ({ onNotificationSubmit }) => {
             isEditingDraftSession,
         } = resolveEditingDraftContext();
         const draftUpdateUrl = activeDraftSrNo
-            ? `/api/circular/api/draft/${activeDraftSrNo}/update/`
+            ? `http://localhost:8000/api/circular/api/draft/${activeDraftSrNo}/update/`
             : null;
 
         if (isEditingDraftSession && !draftUpdateUrl) {
@@ -1716,13 +1716,13 @@ const Admin = ({ onNotificationSubmit }) => {
             return;
         }
 
-        console.log("📤 Saving draft with FormData:", Object.fromEntries(formData.entries())); // Debug log
+        console.log("ðŸ“¤ Saving draft with FormData:", Object.fromEntries(formData.entries())); // Debug log
 
         try {
             const response = await fetch(
-                draftUpdateUrl || '/api/circular/api/notifications/', {
+                draftUpdateUrl || 'http://localhost:8000/api/circular/api/notifications/', {
                 method: 'POST',
-                //  DO NOT set Content-Type — browser sets it automatically with boundary for FormData
+                //  DO NOT set Content-Type â€” browser sets it automatically with boundary for FormData
                 body: formData, //  Send formData, not JSON
             });
 
@@ -1733,7 +1733,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 setEditingDraftSrNo(null);
                 setDraftPrefillData(null);
                 clearCircularDraftEditSession();
-                console.log("✅ Draft saved with ID:", result.id);
+                console.log("âœ… Draft saved with ID:", result.id);
                 window.location.reload();
                 // Optional: Reset form or redirect
                 // resetForm(); // Implement this if you want to clear the form
@@ -1925,7 +1925,7 @@ const Admin = ({ onNotificationSubmit }) => {
             try {
                 // --- CRITICAL: Use SR No in the URL ---
                 // Send the request to the update-status endpoint for the specific notification being approved
-                const response = await fetch(`/api/circular/api/notifications/${approvingNotificationSrNo}/update-status/`, { // Use SR No here
+                const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${approvingNotificationSrNo}/update-status/`, { // Use SR No here
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload), // Send the payload with status, comment, publisher info, and vessel IDs
@@ -1957,7 +1957,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     // Let's fetch the notification details again to get the department
                     try {
                         console.log("handleConfirmPublish: Fetching notification details again to get department for rank fetch...");
-                        const detailsResponse = await fetch(`/api/circular/api/submitted/${approvingNotificationSrNo}/`); // Fetch using SR No
+                        const detailsResponse = await fetch(`http://localhost:8000/api/circular/api/submitted/${approvingNotificationSrNo}/`); // Fetch using SR No
                         if (!detailsResponse.ok) {
                             throw new Error(`Failed to fetch notification details: ${detailsResponse.status} ${detailsResponse.statusText}`);
                         }
@@ -1973,7 +1973,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                         if (deptNameForRanks === 'Unknown') {
                             console.warn("handleConfirmPublish: Could not determine department for notification SR No", approvingNotificationSrNo, ". Cannot fetch ranks for popup.");
-                            alert("⚠️ Could not determine department for rank selection.");
+                            alert("âš ï¸ Could not determine department for rank selection.");
                             // Continue without rank selection if department cannot be determined
                             // Optionally, you could store the department in localStorage when the approval starts
                             // and access it here without refetching.
@@ -2127,7 +2127,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
             try {
                 console.log("handleConfirmPublish: Sending new notification creation request...");
-                const response = await fetch('/api/circular/api/notifications/', {
+                const response = await fetch('http://localhost:8000/api/circular/api/notifications/', {
                     method: 'POST',
                     body: formData, // Send the new data
                 });
@@ -2139,14 +2139,14 @@ const Admin = ({ onNotificationSubmit }) => {
                     const newNotificationId = result.id;
 
                     if (newNotificationSrNo) {
-                        console.log("✅ New notification created successfully! SR No:", newNotificationSrNo);
+                        console.log("âœ… New notification created successfully! SR No:", newNotificationSrNo);
                         // Store the new SR No in localStorage for subsequent use (e.g., vessel selection popup)
                         localStorage.setItem('approvingNotificationSrNo', newNotificationSrNo);
-                        console.log("✅ Stored new notification SR No in localStorage for vessel selection.");
+                        console.log("âœ… Stored new notification SR No in localStorage for vessel selection.");
 
                         // Also store the ID if you need it later
                         localStorage.setItem('approvingNotificationId', newNotificationId);
-                        console.log("✅ Stored new notification ID in localStorage.");
+                        console.log("âœ… Stored new notification ID in localStorage.");
 
                         // NOW Show the Vessel Selection Popup
                         // Clear any previously selected vessels for this *new* notification
@@ -2154,7 +2154,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         setShowVesselPopup(true); // Show the popup AFTER creation
                         console.log("handleConfirmPublish: Vessel selection popup displayed for newly created notification.");
                     } else {
-                        console.error("❌ Error: Backend did not return an SR No in the creation response:", result);
+                        console.error("âŒ Error: Backend did not return an SR No in the creation response:", result);
                         alert("Notification was saved, but an error occurred (SR No not returned).");
                     }
 
@@ -2393,7 +2393,7 @@ const Admin = ({ onNotificationSubmit }) => {
             isEditingDraftSession,
         } = resolveEditingDraftContext();
         const draftUpdateUrl = activeDraftSrNo
-            ? `/api/circular/api/draft/${activeDraftSrNo}/update/`
+            ? `http://localhost:8000/api/circular/api/draft/${activeDraftSrNo}/update/`
             : null;
 
         if (isEditingDraftSession && !draftUpdateUrl) {
@@ -2471,7 +2471,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                 // The publish_status is Already Set To 1 Above
 
-                response = await fetch('/api/circular/api/notifications/', {
+                response = await fetch('http://localhost:8000/api/circular/api/notifications/', {
                     method: 'POST',
                     body: formData, // Send the new data (pending approval), potentially including superseded_id
                 });
@@ -2512,7 +2512,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     try {
                         // 1. Fetch the list of crews for the department
                         console.log("Fetching crews from Django API...");
-                        const crewFetchUrl = `/api/circular/api/crews-by-department-and-vessel/?department=${deptNameForShipside}`;
+                        const crewFetchUrl = `http://localhost:8000/api/circular/api/crews-by-department-and-vessel/?department=${deptNameForShipside}`;
                         console.log("Crew fetch URL:", crewFetchUrl);
 
                         const crewResponse = await fetch(crewFetchUrl);
@@ -2523,7 +2523,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         }
 
                         const crews = await crewResponse.json();
-                        console.log("✅ Successfully fetched crews:", crews);
+                        console.log("âœ… Successfully fetched crews:", crews);
 
                         // --- NEW: Display the crew list ---
                         if (Array.isArray(crews) && crews.length > 0) {
@@ -2533,21 +2533,21 @@ const Admin = ({ onNotificationSubmit }) => {
                             ).join('\n');
 
                             // Show alert with crew list
-                            // alert(`🔔 Notification will be sent to:\n\n${crewList}`);
+                            // alert(`ðŸ”” Notification will be sent to:\n\n${crewList}`);
 
                             // Or log it to console in a nicely formatted way
-                            console.log("📋 Crew List for Notification:");
+                            console.log("ðŸ“‹ Crew List for Notification:");
                             crews.forEach((crew, index) => {
                                 console.log(`  ${index + 1}. ${crew.name || crew.employee_id || crew.CrewID || 'Unknown'}`);
                             });
                         } else {
-                            console.warn("⚠️ No crews found for department:", deptNameForShipside);
-                            // alert("⚠️ No crew members found for this department.");
+                            console.warn("âš ï¸ No crews found for department:", deptNameForShipside);
+                            // alert("âš ï¸ No crew members found for this department.");
                         }
                         // --- END: Display the Crew list ---
                     } catch (crewListError) {
                         // Handle network errors or other issues during the crew list fetch
-                        console.error("💥 Error during crew list fetch process:", crewListError);
+                        console.error("ðŸ’¥ Error during crew list fetch process:", crewListError);
                         // alert(`Notification saved, but there was an error fetching crew list: ${crewListError.message}`);
                     }
                     console.log("=== Finished Crew List Display Process ===");
@@ -2862,7 +2862,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                     <path d="M12 14l-4-4m4 4l4-4"></path>
                                     <path d="M12 14v6"></path>
                                 </svg>
-                                <span>Add files…</span>
+                                <span>Add filesâ€¦</span>
                                 <input type="file" className="hidden" multiple onChange={handleFileChange} accept={CIRCULAR_ATTACHMENT_ACCEPT} />
                             </label>
                             {files.length > 0 && (
@@ -3443,7 +3443,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             <div className="mb-3">
                                 <strong>Body / Instructions:</strong><br />
                                 <div className="bg-sky-50 p-3 rounded-md mt-1 border border-sky-200 whitespace-pre-wrap">
-                                    {viewingRequest.details.body || '—'}
+                                    {viewingRequest.details.body || 'â€”'}
                                 </div>
                             </div>
 
@@ -3457,7 +3457,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                         {/* Construct the full URL using the backend host and the path from the API response */}
                                         {/* Ensure the URL starts with  (or your actual backend URL) */}
                                         <a
-                                            href={`${viewingRequest.attachment_url}`} //Correctly prepend the base URL
+                                            href={/^https?:\/\//i.test(viewingRequest.attachment_url) ? viewingRequest.attachment_url : "http://localhost:8000" + viewingRequest.attachment_url} //Correctly prepend the base URL
                                             target="_blank" // Opens the PDF in a new tab
                                             rel="noopener noreferrer" // Security best practice for target="_blank"
                                             className="inline-flex items-center px-3 py-1 border border-sky-300 text-sm font-medium rounded-md text-sky-700 bg-white hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-200"
@@ -3616,7 +3616,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         <div className="mb-3">
                             <strong>Body / Instructions:</strong><br />
                             <div className="bg-sky-50 p-3 rounded-md mt-1 border border-sky-200 whitespace-pre-wrap">
-                                {viewingRequest.details.body || '—'}
+                                {viewingRequest.details.body || 'â€”'}
                             </div>
                         </div>
 
@@ -3627,7 +3627,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                 <div className="mt-2">
 
                                     <a
-                                        href={`${viewingRequest.attachment_url}`}
+                                        href={/^https?:\/\//i.test(viewingRequest.attachment_url) ? viewingRequest.attachment_url : "http://localhost:8000" + viewingRequest.attachment_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center px-3 py-2 border border-sky-300 text-sm font-medium rounded-md text-sky-700 bg-white hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-200"

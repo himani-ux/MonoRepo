@@ -12,7 +12,7 @@ export function SafetyHealthFatiguePanel({
   return (
     <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-        FEAT-SAF-INC-010
+        Health and fatigue
       </p>
       <h2 className="mt-1 text-xl font-semibold text-emerald-950">
         Health / Fatigue Evidence

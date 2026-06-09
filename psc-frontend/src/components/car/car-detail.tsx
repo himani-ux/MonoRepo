@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Calendar, MapPin, Tag, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Tag, AlertCircle, FileText } from 'lucide-react';
 import { Card, CardContent, Badge } from '@/components/ui';
 import { StatusBadge } from '@/components/shared';
 import { RootCauseSection } from './root-cause-section';
@@ -25,6 +25,12 @@ function formatDate(dateString: string): string {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export const CARDetail: FC<CARDetailProps> = ({
@@ -174,6 +180,90 @@ export const CARDetail: FC<CARDetailProps> = ({
         carId={car.id}
         onUpload={onUploadEvidence}
       />
+
+      {((car.follow_up_reports?.length ?? 0) > 0 ||
+        (car.follow_up_action_updates?.length ?? 0) > 0) && (
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="mb-3 text-base font-semibold text-gray-900">
+              FOLLOW-UP REPORTS
+            </h2>
+
+            {car.follow_up_summary?.reinspection_date && (
+              <div className="mb-3 rounded-md bg-neutral-50 p-3 text-sm text-gray-700">
+                <div>
+                  Reinspection: {formatDate(car.follow_up_summary.reinspection_date)}
+                </div>
+                {car.follow_up_summary.notes && (
+                  <div className="mt-1 whitespace-pre-wrap break-words">
+                    {car.follow_up_summary.notes}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {car.follow_up_action_updates?.length > 0 && (
+              <div className="mb-3 space-y-2">
+                {car.follow_up_action_updates.map((update, index) => (
+                  <div
+                    key={`${update.changed_at}-${index}`}
+                    className="rounded-md border border-neutral-200 bg-white p-3 text-sm"
+                  >
+                    <div className="font-medium text-gray-900">
+                      Action Code: {update.from_action_code || '-'} to{' '}
+                      {update.to_action_code || '-'}
+                    </div>
+                    {update.notes && (
+                      <div className="mt-1 whitespace-pre-wrap break-words text-gray-600">
+                        {update.notes}
+                      </div>
+                    )}
+                    <div className="mt-1 text-xs text-gray-500">
+                      {formatDate(update.changed_at)} &middot; {update.changed_by}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {car.follow_up_reports?.length > 0 ? (
+              <div className="space-y-2">
+                {car.follow_up_reports.map((report) => (
+                  <div
+                    key={report.id}
+                    className="flex items-start gap-3 rounded-md border border-neutral-200 bg-white p-3"
+                  >
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded bg-neutral-100">
+                      <FileText className="h-5 w-5 text-error-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <a
+                        href={report.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-sm font-medium text-primary-600 hover:underline"
+                      >
+                        {report.file_name}
+                      </a>
+                      {report.description && (
+                        <p className="text-xs text-gray-500">{report.description}</p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-400">
+                        {formatDate(report.uploaded_at)} &middot;{' '}
+                        {formatFileSize(report.file_size)} &middot; {report.uploaded_by}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm italic text-gray-500">
+                No follow-up report uploaded for this CAR.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Activity History (all users) */}
       <ActivityHistory events={car.activity_history} />

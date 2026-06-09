@@ -1,19 +1,29 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../hooks/use-auth";
 import { getErrorMessage } from "../../../lib/api/client";
 import { safetyApi } from "../../../lib/api/safety";
 import { getSafetyDeviceFingerprint, resolveSignatureTypedName } from "../../../lib/safety/digital-signature";
 import { formatVesselName } from "../../../lib/safety/vessel-display";
+import {
+  SAFETY_NEAR_MISS_CATEGORY_TAGS,
+  SAFETY_NEAR_MISS_SCHEMA_VERSION,
+  type SafetyNearMissSubmitValues,
+  type SafetyNearMissValues,
+} from "../../../schemas/safety/near-miss";
+import { SafetyMscatPicker } from "../shared/reference-pickers";
 import SafetyFloatingFeedback from "../shared/safety-floating-feedback";
+import { SafetyNearMissForm } from "./near-miss-form";
 
-type NearMissMode = "detail" | "review" | "rework" | "triage" | "analysis" | "fleet-alert" | "closure" | "audit" | "pdf";
+type NearMissMode = "detail" | "review" | "rework" | "office-comments" | "fleet-alert" | "closure" | "audit" | "pdf";
 const SAFETY_CIRCULAR_PREFILL_KEY = "safetyCircularPrefill";
 
 interface NearMissRecord {
   id: string;
   incident_number: string | null;
+  incident_type_id?: number | null;
+  loss_type_primary_id?: number | null;
   vessel_id: string;
   state: string;
   current_phase?: number;
@@ -21,52 +31,36 @@ interface NearMissRecord {
   reported_at?: string | null;
   near_miss_immediate_action?: string | null;
   near_miss_mscat_subcode_id?: string | null;
+  near_miss_mscat_category_id?: number | null;
   narrative?: string | null;
-  near_miss_priority?: "LOW" | "HIGH" | string | null;
+  near_miss_priority?: "LOW" | "MEDIUM" | "HIGH" | string | null;
   near_miss_severity?: "HIGH" | "MED" | "LOW" | string | null;
+  near_miss_place?: "AT_ANCHOR" | "AT_SEA" | "AT_PORT" | string | null;
   near_miss_shell_tag?: string | null;
+  near_miss_category_tags?: string[];
+  near_miss_incident_type_ids?: number[];
   near_miss_suggestion?: string | null;
+  near_miss_mscat_subcode_ids?: string[];
+  near_miss_root_cause_detail?: string | null;
+  near_miss_corrective_action?: string | null;
+  near_miss_weather_voyage_details?: string | null;
+  near_miss_equipment_details?: string | null;
+  near_miss_lessons_learned?: string | null;
   reporter_name?: string | null;
   reporter_rank?: string | null;
+  reporter_user_id?: string | null;
   vessel_code?: string | null;
   vessel_display_name?: string | null;
   vessel_name?: string | null;
   visibility_rule?: string;
   closure_reason?: string | null;
   closed_at?: string | null;
-}
-
-interface AnalysisFact {
-  evidence_preview?: EvidencePreview | null;
-  id: string;
-  sequence_index: number;
-  fact_text: string;
-  fact_timestamp: string | null;
-  source_evidence_id: number | string;
-  evidence_summary?: string;
-  confidence: "LOW" | "MEDIUM" | "HIGH" | string;
-}
-
-interface EvidenceSourceOption {
-  id: string;
-  label: string;
-  preview?: EvidencePreview | null;
-  source_type: string;
-}
-
-interface EvidencePreview {
-  content_type: string;
-  file_name?: string | null;
-  preview_url: string;
-  title?: string | null;
-}
-
-interface AnalysisPayload {
-  analysis_mode: string;
-  evidence_sources?: EvidenceSourceOption[];
-  near_miss: NearMissRecord;
-  facts: AnalysisFact[];
-  requirements: Record<string, boolean>;
+  rework_summary?: {
+    comment?: string | null;
+    requested_at?: string | null;
+    requested_by?: string | null;
+    requested_by_role?: string | null;
+  } | null;
 }
 
 interface FleetAlertPayload {
@@ -115,18 +109,21 @@ interface AuditPayload {
   field_history?: Array<{
     id: string;
     field_name: string;
+    old_value?: unknown;
     actor_user_id: string;
     actor_role_code: string;
+    change_reason?: string | null;
     changed_at: string;
     new_value: unknown;
   }>;
 }
 
-const PRIORITIES = ["LOW", "HIGH"] as const;
-const CONFIDENCE = ["LOW", "MEDIUM", "HIGH"] as const;
-const CONFLICT_APPROVER_ROLES = ["", "DPA", "FM", "MASTER", "HOD"] as const;
+const PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
+const READY_FOR_OFFICE_COMMENTS_STATE = "READY_FOR_OFFICE_COMMENTS";
+const OFFICE_COMMENTS_COMPLETED_STATE = "OFFICE_COMMENTS_COMPLETED";
 const VESSEL_REVIEW_ROLES = new Set(["MASTER", "CAPTAIN", "CO", "CE", "HOD", "CHIEF OFFICER", "CHIEF ENGINEER", "HEAD OF DEPARTMENT"]);
 const HIGH_PRIORITY_CLOSE_ROLES = new Set(["DPA", "FM", "FLEET MANAGER"]);
+const OFFICE_COMMENT_PIC_ROLES = new Set(["PIC", "OFFICE_PIC", "OFFICE_SSQE", "OFFICE_SUPT", "VESSEL SUPERINTENDENT"]);
 const LOW_PRIORITY_CLOSE_ROLES = new Set([
   "MASTER",
   "CAPTAIN",
@@ -141,6 +138,113 @@ const LOW_PRIORITY_CLOSE_ROLES = new Set([
 
 function normalizeCode(value: unknown) {
   return String(value ?? "").trim().toUpperCase();
+}
+
+function formatNearMissState(value: unknown) {
+  const state = normalizeCode(value);
+  switch (state) {
+    case READY_FOR_OFFICE_COMMENTS_STATE:
+      return "Ready for Office Comments";
+    case OFFICE_COMMENTS_COMPLETED_STATE:
+      return "Office Comments Completed";
+    case "PENDING_VESSEL_REVIEW":
+      return "Pending Vessel Review";
+    case "REWORK_REQUIRED":
+      return "Rework Required";
+    default:
+      return state ? state.replace(/_/g, " ") : "Not recorded";
+  }
+}
+
+function buildOfficeReworkSummary({
+  categoryChanged,
+  categoryReason,
+  currentCategory,
+  currentPriority,
+  immediateCause,
+  officeComment,
+  priorityChanged,
+  priorityReason,
+  suggestedCategory,
+  suggestedPriority,
+}: {
+  categoryChanged: boolean;
+  categoryReason: string;
+  currentCategory?: string | null;
+  currentPriority?: string | null;
+  immediateCause?: string | null;
+  officeComment: string;
+  priorityChanged: boolean;
+  priorityReason: string;
+  suggestedCategory?: string | null;
+  suggestedPriority: string;
+}) {
+  const parts = [
+    officeComment.trim() ? `Office comment: ${officeComment.trim()}` : "",
+    priorityChanged ? `Suggested priority: ${normalizeCode(currentPriority || "LOW") || "Not selected"} -> ${suggestedPriority}` : "",
+    priorityChanged && priorityReason.trim() ? `Reason for priority change: ${priorityReason.trim()}` : "",
+    categoryChanged ? `Suggested category: ${currentCategory || "Not selected"} -> ${suggestedCategory || "Not selected"}` : "",
+    categoryChanged && categoryReason.trim() ? `Reason for category change: ${categoryReason.trim()}` : "",
+    immediateCause ? `Suggested immediate cause: ${immediateCause}` : "",
+  ].filter(Boolean);
+  return parts.join("\n");
+}
+
+function asNumberList(values: unknown, fallback?: number | null) {
+  const list = Array.isArray(values) ? values : [];
+  const cleaned = list
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (cleaned.length) {
+    return Array.from(new Set(cleaned)).slice(0, 3);
+  }
+  return fallback ? [fallback] : [];
+}
+
+function asStringList(values: unknown, fallback?: string | null) {
+  const list = Array.isArray(values) ? values : [];
+  const cleaned = list
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  if (cleaned.length) {
+    return Array.from(new Set(cleaned)).slice(0, 3);
+  }
+  return fallback?.trim() ? [fallback.trim()] : [];
+}
+
+function buildReworkInitialValues(nearMiss: NearMissRecord): Partial<SafetyNearMissValues> {
+  const incidentTypeIds = asNumberList(nearMiss.near_miss_incident_type_ids, nearMiss.incident_type_id ?? null);
+  const categoryTags = asStringList(nearMiss.near_miss_category_tags, nearMiss.near_miss_shell_tag);
+  const immediateCauseIds = asStringList(nearMiss.near_miss_mscat_subcode_ids, nearMiss.near_miss_mscat_subcode_id);
+
+  return {
+    incident_type_id: incidentTypeIds[0] ?? null,
+    loss_type_primary_id: nearMiss.loss_type_primary_id ?? null,
+    narrative: nearMiss.narrative ?? "",
+    near_miss_immediate_action: nearMiss.near_miss_immediate_action ?? "",
+    near_miss_place: (nearMiss.near_miss_place || null) as SafetyNearMissValues["near_miss_place"],
+    near_miss_category_tags: categoryTags as SafetyNearMissValues["near_miss_category_tags"],
+    near_miss_incident_type_ids: incidentTypeIds,
+    near_miss_mscat_category_id: nearMiss.near_miss_mscat_category_id ?? null,
+    near_miss_mscat_subcode_id: nearMiss.near_miss_mscat_subcode_id ?? null,
+    near_miss_mscat_subcode_ids: immediateCauseIds,
+    near_miss_severity: (nearMiss.near_miss_severity || null) as SafetyNearMissValues["near_miss_severity"],
+    near_miss_shell_tag: (categoryTags[0] ?? null) as SafetyNearMissValues["near_miss_shell_tag"],
+    near_miss_suggestion: nearMiss.near_miss_suggestion ?? "",
+    near_miss_root_cause_detail: nearMiss.near_miss_root_cause_detail ?? "",
+    near_miss_corrective_action: nearMiss.near_miss_corrective_action ?? "",
+    near_miss_weather_voyage_details: nearMiss.near_miss_weather_voyage_details ?? "",
+    near_miss_equipment_details: nearMiss.near_miss_equipment_details ?? "",
+    near_miss_lessons_learned: nearMiss.near_miss_lessons_learned ?? "",
+    occurred_at: nearMiss.occurred_at ?? "",
+    reporter_device_fingerprint: nearMiss.reporter_device_fingerprint || getSafetyDeviceFingerprint(),
+    reporter_name: nearMiss.reporter_name ?? "",
+    reporter_rank: nearMiss.reporter_rank ?? "",
+    reporter_user_id: nearMiss.reporter_user_id ?? "",
+    schema_version: SAFETY_NEAR_MISS_SCHEMA_VERSION,
+    vessel_code: nearMiss.vessel_code ?? undefined,
+    vessel_id: nearMiss.vessel_id,
+  };
 }
 
 export function resolveAuthorityRole(user: unknown, fallbackRole: unknown) {
@@ -167,20 +271,12 @@ function buildClosureBlockers({
   hasCloseApproval,
   hasPicClose,
   nearMiss,
-  preventiveMeasures,
-  preventiveMeasureDueDate,
-  preventiveMeasureOwner,
-  preventiveMeasureStatus,
 }: {
   canClose: boolean;
   currentRole: string;
   hasCloseApproval: boolean;
   hasPicClose: boolean;
   nearMiss: NearMissRecord | null;
-  preventiveMeasures?: string;
-  preventiveMeasureDueDate?: string;
-  preventiveMeasureOwner?: string;
-  preventiveMeasureStatus?: string;
 }) {
   if (!nearMiss) {
     return ["Near-miss details are still loading."];
@@ -194,8 +290,8 @@ function buildClosureBlockers({
     blockers.push("Near miss is already closed.");
   } else if (state === "SUPERSEDED") {
     blockers.push("Superseded near misses continue in the incident workflow.");
-  } else if (state !== "TRIAGED") {
-    blockers.push("DPA triage must be completed before closure.");
+  } else if (state !== OFFICE_COMMENTS_COMPLETED_STATE) {
+    blockers.push("Office comments must be completed before closure.");
   }
 
   if (priority === "HIGH") {
@@ -205,27 +301,15 @@ function buildClosureBlockers({
     if (!hasCloseApproval) {
       blockers.push("HIGH-priority near miss closure is not available for your login.");
     }
-    if (!String(preventiveMeasures ?? nearMiss.near_miss_suggestion ?? "").trim()) {
-      blockers.push("HIGH-priority near miss closure requires preventive measures.");
-    }
-    if (!String(preventiveMeasureOwner ?? "").trim()) {
-      blockers.push("HIGH-priority near miss closure requires a preventive-measure owner.");
-    }
-    if (!String(preventiveMeasureDueDate ?? "").trim()) {
-      blockers.push("HIGH-priority near miss closure requires a preventive-measure due date.");
-    }
-    if (!String(preventiveMeasureStatus ?? "").trim()) {
-      blockers.push("HIGH-priority near miss closure requires a preventive-measure status.");
-    }
-  } else if (priority === "LOW") {
+  } else if (priority === "LOW" || priority === "MEDIUM") {
     if (!LOW_PRIORITY_CLOSE_ROLES.has(currentRole)) {
-      blockers.push("LOW-priority near miss closure is restricted to Master, PIC, DPA, or FM authority.");
+      blockers.push("LOW/MEDIUM-priority near miss closure is restricted to Master, PIC, DPA, or FM authority.");
     }
     if (!canClose || (!hasCloseApproval && !hasPicClose)) {
-      blockers.push("LOW-priority near miss closure is not available for your login.");
+      blockers.push("LOW/MEDIUM-priority near miss closure is not available for your login.");
     }
   } else {
-    blockers.push("Near miss priority must be LOW or HIGH before closure.");
+    blockers.push("Near miss priority must be LOW, MEDIUM, or HIGH before closure.");
   }
 
   return blockers;
@@ -248,13 +332,12 @@ function lifecycleLinks(id: string | undefined) {
   }
   return [
     ["Detail", `/safety/near-miss/${id}`],
-    ["Review", `/safety/near-miss/${id}/review`],
+    ["Vessel Review", `/safety/near-miss/${id}/review`],
     ["Rework", `/safety/near-miss/${id}/rework`],
-    ["Triage", `/safety/near-miss/${id}/triage`],
-    ["Analysis", `/safety/near-miss/${id}/analysis`],
-    ["Fleet alert", `/safety/near-miss/${id}/fleet-alert`],
+    ["Office Comments", `/safety/near-miss/${id}/office-comments`],
     ["Closure", `/safety/near-miss/${id}/closure`],
-    ["Audit", `/safety/near-miss/${id}/audit`],
+    ["Fleet alert", `/safety/near-miss/${id}/fleet-alert`],
+    ["History", `/safety/near-miss/${id}/audit`],
     ["PDF", `/safety/near-miss/${id}/pdf`],
   ] as const;
 }
@@ -265,16 +348,14 @@ function modeTitle(mode: NearMissMode) {
       return "Near Miss Vessel Review";
     case "rework":
       return "Near Miss Rework";
-    case "triage":
-      return "Near Miss Triage";
-    case "analysis":
-      return "Near Miss Fact Analysis";
+    case "office-comments":
+      return "Near Miss Office Comments";
     case "fleet-alert":
       return "Near Miss Fleet Alert";
     case "closure":
       return "Near Miss Closure";
     case "audit":
-      return "Near Miss Audit Trail";
+      return "Near Miss History";
     case "pdf":
       return "Near Miss PDF Export";
     default:
@@ -285,6 +366,7 @@ function modeTitle(mode: NearMissMode) {
 export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const initialResultMessage =
     typeof location.state === "object" &&
     location.state !== null &&
@@ -301,8 +383,16 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   const [isMutating, setIsMutating] = useState(false);
   const [triage, setTriage] = useState({
     near_miss_priority: "LOW",
+    category_tag_change_reason: "",
     override_reason: "",
+    priority_change_reason: "",
     supersede_to_incident: false,
+  });
+  const [reclassificationDraft, setReclassificationDraft] = useState({
+    near_miss_mscat_category_id: null as number | null,
+    near_miss_mscat_subcode_id: null as string | null,
+    near_miss_shell_tag: "",
+    reason: "",
   });
   const [reviewDraft, setReviewDraft] = useState({
     comment: "",
@@ -312,21 +402,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   });
   const [reworkDraft, setReworkDraft] = useState({
     comment: "",
-  });
-  const [factDraft, setFactDraft] = useState({
-    confidence: "MEDIUM",
-    fact_text: "",
-    fact_timestamp: "",
-    hindsight_override_reason: "",
-    sequence_index: 1,
-    source_evidence_id: "",
-  });
-  const [evidenceDraft, setEvidenceDraft] = useState({
-    description: "",
-    evidence_type: "PHOTO",
-    photo_file: null as File | null,
-    source_label: "",
-    title: "",
   });
   const [alertDraft, setAlertDraft] = useState(() => ({
     alert_text: "",
@@ -341,23 +416,22 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     conflict_acknowledged: false,
     conflict_approver_role: "",
     device_fingerprint: getSafetyDeviceFingerprint(),
-    near_miss_suggestion: "",
-    preventive_measure_due_date: "",
-    preventive_measure_owner: "",
-    preventive_measure_status: "OPEN",
     typed_name: signatureTypedName,
   }));
 
   const currentRole = resolveAuthorityRole(user, role);
-  const canTriage = currentRole === "DPA" && hasProcess("SAF_P_002");
+  const isHighOfficeComment = triage.near_miss_priority === "HIGH";
+  const canAcceptOfficeComment = isHighOfficeComment
+    ? currentRole === "DPA" && hasProcess("SAF_P_002")
+    : OFFICE_COMMENT_PIC_ROLES.has(currentRole) && hasProcess("SAF_P_006");
+  const canSendBackOfficeComment = (currentRole === "DPA" && hasProcess("SAF_P_002"))
+    || (OFFICE_COMMENT_PIC_ROLES.has(currentRole) && hasProcess("SAF_P_006"));
   const canReview = VESSEL_REVIEW_ROLES.has(currentRole) && (hasProcess("SAF_P_002") || hasProcess("SAF_P_006"));
   const canSubmitRework = hasProcess("SAF_P_001");
   const canIssueFleetAlert = currentRole === "DPA" && hasProcess("SAF_P_024");
   const hasCloseApproval = hasProcess("SAF_P_004");
   const hasPicClose = hasProcess("SAF_P_006");
   const canClose = hasCloseApproval || hasPicClose;
-  const canAnalyze = hasProcess("SAF_P_002");
-
   const load = useCallback(async () => {
     if (!id) {
       setError("Invalid near-miss id.");
@@ -368,9 +442,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     setIsLoading(true);
     try {
       let response: unknown;
-      if (mode === "analysis") {
-        response = await safetyApi.getNearMissAnalysis(id);
-      } else if (mode === "fleet-alert") {
+      if (mode === "fleet-alert") {
         response = await safetyApi.getNearMissFleetAlert(id);
       } else if (mode === "audit") {
         response = await safetyApi.getNearMissAudit(id);
@@ -382,10 +454,12 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
       if (nearMiss?.near_miss_priority) {
         setTriage((current) => ({ ...current, near_miss_priority: String(nearMiss.near_miss_priority).toUpperCase() }));
       }
-      if (nearMiss?.near_miss_suggestion) {
-        setClosureDraft((current) => ({
+      if (nearMiss) {
+        setReclassificationDraft((current) => ({
           ...current,
-          near_miss_suggestion: current.near_miss_suggestion || nearMiss.near_miss_suggestion || "",
+          near_miss_mscat_category_id: nearMiss.near_miss_mscat_category_id ?? null,
+          near_miss_mscat_subcode_id: nearMiss.near_miss_mscat_subcode_id ?? null,
+          near_miss_shell_tag: nearMiss.near_miss_shell_tag ?? "",
         }));
       }
       if (mode === "fleet-alert") {
@@ -403,22 +477,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           setAlertDraft((current) => ({
             ...current,
             recipient_vessel_ids: current.recipient_vessel_ids.length ? current.recipient_vessel_ids : fleet.recipients ?? [],
-          }));
-        }
-      }
-      if (mode === "analysis") {
-        const analysisPayload = (response ?? {}) as AnalysisPayload;
-        const nextSequence =
-          (analysisPayload.facts ?? []).reduce((maxSequence, fact) => Math.max(maxSequence, Number(fact.sequence_index) || 0), 0) + 1;
-        setFactDraft((current) => ({
-          ...current,
-          sequence_index: current.sequence_index > nextSequence ? current.sequence_index : nextSequence,
-        }));
-        const firstSourceId = analysisPayload.evidence_sources?.[0]?.id;
-        if (firstSourceId) {
-          setFactDraft((current) => ({
-            ...current,
-            source_evidence_id: current.source_evidence_id || String(firstSourceId),
           }));
         }
       }
@@ -448,8 +506,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   }, [signatureTypedName]);
 
   const nearMiss = extractNearMiss(payload);
-  const analysis = mode === "analysis" ? (payload as AnalysisPayload | null) : null;
-  const evidenceSources = analysis?.evidence_sources ?? [];
   const fleetAlert = mode === "fleet-alert" ? (payload as FleetAlertPayload | null) : null;
   const recipientLabels = (fleetAlert?.recipient_vessels ?? []).map((recipient) => {
     const code = recipient.vessel_code ? `${recipient.vessel_code} - ` : "";
@@ -457,25 +513,38 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   });
   const audit = mode === "audit" ? (payload as AuditPayload | null) : null;
   const isHigh = normalizeCode(nearMiss?.near_miss_priority) === "HIGH" || normalizeCode(fleetAlert?.near_miss?.near_miss_priority) === "HIGH";
-  const showHighLinks = isHigh || mode === "analysis" || mode === "fleet-alert";
+  const showHighLinks = isHigh || mode === "fleet-alert";
   const closureBlockers = buildClosureBlockers({
     canClose,
     currentRole,
     hasCloseApproval,
     hasPicClose,
     nearMiss,
-    preventiveMeasureDueDate: closureDraft.preventive_measure_due_date,
-    preventiveMeasureOwner: closureDraft.preventive_measure_owner,
-    preventiveMeasureStatus: closureDraft.preventive_measure_status,
-    preventiveMeasures: closureDraft.near_miss_suggestion,
   });
   const closureDisabled = isMutating || closureBlockers.length > 0 || !closureDraft.closure_reason.trim() || !closureDraft.typed_name.trim();
-  const triageBlockedByReview = nearMiss ? normalizeCode(nearMiss.state) !== "READY_FOR_DPA_TRIAGE" : true;
+  const triageBlockedByReview = nearMiss ? normalizeCode(nearMiss.state) !== READY_FOR_OFFICE_COMMENTS_STATE : true;
+  const officePriorityChanged = nearMiss
+    ? triage.near_miss_priority !== normalizeCode(nearMiss.near_miss_priority || "LOW")
+    : false;
+  const officeCategoryChanged = nearMiss
+    ? (reclassificationDraft.near_miss_shell_tag || "") !== (nearMiss.near_miss_shell_tag || "")
+    : false;
+  const officeImmediateCauseChanged = nearMiss
+    ? (reclassificationDraft.near_miss_mscat_subcode_id || "") !== (nearMiss.near_miss_mscat_subcode_id || "")
+    : false;
+  const categoryChangeReasonMissing = officeCategoryChanged && !triage.category_tag_change_reason.trim();
+  const supersedeReasonMissing = triage.supersede_to_incident && !triage.override_reason.trim();
+  const officeReasonMissing = categoryChangeReasonMissing || supersedeReasonMissing;
+  const officeReworkReasonMissing = !triage.override_reason.trim() || categoryChangeReasonMissing;
+  const nearMissState = normalizeCode(nearMiss?.state);
 
   const visibleLinks = useMemo(
     () =>
       lifecycleLinks(id).filter(([label]) => {
-        if ((label === "Analysis" || label === "Fleet alert") && !showHighLinks) {
+        if (label === "Fleet alert" && !showHighLinks) {
+          return false;
+        }
+        if (label === "Vessel Review" && nearMissState !== "PENDING_VESSEL_REVIEW") {
           return false;
         }
         if (label === "Rework" && normalizeCode(nearMiss?.state) !== "REWORK_REQUIRED") {
@@ -483,12 +552,22 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
         }
         return true;
       }),
-    [id, nearMiss?.state, showHighLinks],
+    [id, nearMiss?.state, nearMissState, showHighLinks],
   );
 
   async function submitReview(event: FormEvent) {
     event.preventDefault();
     if (!id) {
+      return;
+    }
+    if (nearMissState === READY_FOR_OFFICE_COMMENTS_STATE || nearMissState === OFFICE_COMMENTS_COMPLETED_STATE) {
+      navigate(`/safety/near-miss/${id}/office-comments`, {
+        state: { resultMessage: "This near miss has completed vessel review. Continue in Office Comments." },
+      });
+      return;
+    }
+    if (nearMissState !== "PENDING_VESSEL_REVIEW") {
+      setError("Vessel review is not available for the current near-miss state.");
       return;
     }
     setIsMutating(true);
@@ -506,7 +585,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
       setResultMessage(
         reviewDraft.decision === "SEND_BACK"
           ? "Near miss sent back for rework."
-          : "Near miss submitted to DPA triage.",
+          : "Near miss submitted to office comments.",
       );
     } catch (caught) {
       setError(getErrorMessage(caught));
@@ -515,9 +594,16 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     }
   }
 
-  async function submitRework(event: FormEvent) {
-    event.preventDefault();
+  async function submitRework(values: SafetyNearMissSubmitValues) {
     if (!id) {
+      return;
+    }
+    if (!canSubmitRework || nearMissState !== "REWORK_REQUIRED") {
+      setError("Rework submission is not available for the current near-miss state or login.");
+      return;
+    }
+    if (!reworkDraft.comment.trim()) {
+      setError("Enter the rework summary before submitting.");
       return;
     }
     setIsMutating(true);
@@ -525,6 +611,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     setResultMessage(null);
     try {
       const response = await safetyApi.resubmitNearMissRework(id, {
+        ...values,
         comment: reworkDraft.comment,
       });
       setPayload(response);
@@ -548,12 +635,18 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     try {
       const response = await safetyApi.triageNearMiss(id, {
         near_miss_priority: triage.near_miss_priority,
+        near_miss_shell_tag: reclassificationDraft.near_miss_shell_tag || undefined,
+        near_miss_mscat_subcode_id: reclassificationDraft.near_miss_mscat_subcode_id || null,
+        category_tag_change_reason: triage.category_tag_change_reason || undefined,
+        office_comment: triage.override_reason || undefined,
         override_reason: triage.override_reason || undefined,
+        priority_change_reason: triage.priority_change_reason || undefined,
+        reason: triage.override_reason || undefined,
         supersede_to_incident: triage.supersede_to_incident,
       });
       setPayload(response);
       await load();
-      setResultMessage("Near miss triage saved.");
+      setResultMessage("Office comments saved.");
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -561,53 +654,33 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     }
   }
 
-  async function createFact(event: FormEvent) {
-    event.preventDefault();
+  async function sendOfficeRework() {
     if (!id) {
       return;
     }
+    const officeComment = buildOfficeReworkSummary({
+      categoryChanged: officeCategoryChanged,
+      categoryReason: triage.category_tag_change_reason,
+      currentCategory: nearMiss?.near_miss_shell_tag,
+      currentPriority: nearMiss?.near_miss_priority,
+      immediateCause: officeImmediateCauseChanged ? reclassificationDraft.near_miss_mscat_subcode_id : null,
+      officeComment: triage.override_reason,
+      priorityChanged: officePriorityChanged,
+      priorityReason: triage.priority_change_reason,
+      suggestedCategory: reclassificationDraft.near_miss_shell_tag,
+      suggestedPriority: triage.near_miss_priority,
+    });
     setIsMutating(true);
     setError(null);
     setResultMessage(null);
     try {
-      await safetyApi.createNearMissAnalysisFact(id, {
-        confidence: factDraft.confidence,
-        fact_text: factDraft.fact_text,
-        fact_timestamp: factDraft.fact_timestamp || null,
-        hindsight_override_reason: factDraft.hindsight_override_reason || undefined,
-        sequence_index: factDraft.sequence_index,
-        source_evidence_id: factDraft.source_evidence_id,
-      });
-      setFactDraft((current) => ({ ...current, fact_text: "", sequence_index: current.sequence_index + 1, source_evidence_id: "" }));
-      await load();
-      setResultMessage("Analysis fact saved.");
-    } catch (caught) {
-      setError(getErrorMessage(caught));
-    } finally {
-      setIsMutating(false);
-    }
-  }
-
-  async function createEvidenceSource(event: FormEvent) {
-    event.preventDefault();
-    if (!id) {
-      return;
-    }
-    setIsMutating(true);
-    setError(null);
-    setResultMessage(null);
-    try {
-      const response = await safetyApi.createNearMissAnalysisEvidence(id, {
-        description: evidenceDraft.description,
-        evidence_type: evidenceDraft.evidence_type,
-        photo_file: evidenceDraft.photo_file || undefined,
-        source_label: evidenceDraft.source_label || undefined,
-        title: evidenceDraft.title,
+      const response = await safetyApi.triageNearMiss(id, {
+        action: "SEND_BACK",
+        office_comment: officeComment,
       });
       setPayload(response);
-      setEvidenceDraft({ description: "", evidence_type: "PHOTO", photo_file: null, source_label: "", title: "" });
       await load();
-      setResultMessage("Evidence source saved.");
+      setResultMessage("Near miss sent back for rework.");
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -676,10 +749,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
         conflict_acknowledged: closureDraft.conflict_acknowledged,
         conflict_approver_role: closureDraft.conflict_approver_role || undefined,
         device_fingerprint: closureDraft.device_fingerprint,
-        near_miss_suggestion: closureDraft.near_miss_suggestion || undefined,
-        preventive_measure_due_date: closureDraft.preventive_measure_due_date || undefined,
-        preventive_measure_owner: closureDraft.preventive_measure_owner || undefined,
-        preventive_measure_status: closureDraft.preventive_measure_status || undefined,
         typed_name: closureDraft.typed_name,
       });
       setPayload(response);
@@ -717,7 +786,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">{modeTitle(mode)}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Lightweight near-miss workflow with protected reporter identity, DPA triage, optional HIGH-priority fact analysis, fleet alert, and closure.
+              Lightweight near-miss workflow with reporter details, vessel review, office comments, fleet alert, and closure.
             </p>
           </div>
           <button className="min-h-11 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white" onClick={() => void load()} type="button">
@@ -752,13 +821,18 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
               {!canReview ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Vessel review is restricted to Master, HOD, CO, or CE with review authority.</p> : null}
               {nearMiss && normalizeCode(nearMiss.state) !== "PENDING_VESSEL_REVIEW" ? (
                 <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  Current state is {nearMiss.state}; vessel review is available only while the near miss is pending vessel review.
+                  Current state is {formatNearMissState(nearMiss.state)}; vessel review is available only while the near miss is pending vessel review.
+                  {nearMissState === READY_FOR_OFFICE_COMMENTS_STATE || nearMissState === OFFICE_COMMENTS_COMPLETED_STATE ? (
+                    <Link className="ml-2 font-semibold text-slate-900 underline" to={`/safety/near-miss/${id}/office-comments`}>
+                      Open Office Comments
+                    </Link>
+                  ) : null}
                 </p>
               ) : null}
               <label className="mt-4 block text-sm font-medium text-slate-700">
                 Decision
                 <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setReviewDraft((current) => ({ ...current, decision: event.target.value }))} value={reviewDraft.decision}>
-                  <option value="SUBMIT_TO_OFFICE">Submit to DPA triage</option>
+                  <option value="SUBMIT_TO_OFFICE">Submit to office comments</option>
                   <option value="SEND_BACK">Send back for rework</option>
                 </select>
               </label>
@@ -776,36 +850,68 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
                   <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" readOnly value={reviewDraft.device_fingerprint} />
                 </label>
               </div>
-              <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canReview || normalizeCode(nearMiss?.state) !== "PENDING_VESSEL_REVIEW" || (reviewDraft.decision === "SEND_BACK" && !reviewDraft.comment.trim()) || !reviewDraft.typed_name.trim() || !reviewDraft.device_fingerprint.trim()} type="submit">
+              <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canReview || nearMissState !== "PENDING_VESSEL_REVIEW" || (reviewDraft.decision === "SEND_BACK" && !reviewDraft.comment.trim()) || !reviewDraft.typed_name.trim() || !reviewDraft.device_fingerprint.trim()} type="submit">
                 {isMutating ? "Saving..." : "Save vessel review"}
               </button>
             </form>
           ) : null}
 
           {mode === "rework" ? (
-            <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={submitRework}>
-              <h2 className="text-xl font-semibold text-slate-900">Submit Rework</h2>
-              {!canSubmitRework ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Rework submission requires near-miss create permission.</p> : null}
+            <section className="space-y-5">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-semibold text-slate-900">Submit Rework</h2>
+              {!canSubmitRework ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Rework submission requires near-miss create permission. The Master can submit rework even when another authorized user originally reported it.</p> : null}
               {nearMiss && normalizeCode(nearMiss.state) !== "REWORK_REQUIRED" ? (
                 <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  Current state is {nearMiss.state}; rework is available only after vessel review sends the near miss back.
+                  Current state is {formatNearMissState(nearMiss.state)}; rework is available only after vessel review sends the near miss back.
                 </p>
               ) : null}
-              <label className="mt-4 block text-sm font-medium text-slate-700">
-                Rework note
-                <textarea className="mt-2 min-h-32 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setReworkDraft((current) => ({ ...current, comment: event.target.value }))} value={reworkDraft.comment} />
-              </label>
-              <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canSubmitRework || normalizeCode(nearMiss?.state) !== "REWORK_REQUIRED" || !reworkDraft.comment.trim()} type="submit">
-                {isMutating ? "Submitting..." : "Submit rework"}
-              </button>
-            </form>
+              {nearMiss?.rework_summary?.comment ? (
+                <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <h3 className="text-sm font-semibold text-amber-950">What office wants you to correct</h3>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">{nearMiss.rework_summary.comment}</p>
+                  <p className="mt-3 text-xs font-medium text-amber-900">
+                    Requested by {nearMiss.rework_summary.requested_by_role || "office"}
+                    {nearMiss.rework_summary.requested_at ? ` on ${formatDisplayDateTime(nearMiss.rework_summary.requested_at)}` : ""}
+                  </p>
+                </section>
+              ) : (
+                <p className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  No office rework summary is recorded yet. Check the History tab if you need older comments.
+                </p>
+              )}
+              </div>
+              {nearMiss ? (
+                <SafetyNearMissForm
+                  afterFields={(
+                    <label className="block space-y-2 text-sm text-slate-700">
+                      <span className="font-medium">What you changed</span>
+                      <textarea
+                        className="min-h-32 w-full rounded-2xl border border-slate-300 p-3"
+                        onChange={(event) => setReworkDraft((current) => ({ ...current, comment: event.target.value }))}
+                        value={reworkDraft.comment}
+                      />
+                    </label>
+                  )}
+                  description="Update the returned near-miss details before sending the report back for vessel review."
+                  initialValues={buildReworkInitialValues(nearMiss)}
+                  onSubmit={submitRework}
+                  showRateLimit={false}
+                  submitDisabled={isMutating || !canSubmitRework || normalizeCode(nearMiss.state) !== "REWORK_REQUIRED" || !reworkDraft.comment.trim()}
+                  submitLabel={isMutating ? "Submitting..." : "Submit corrected near miss"}
+                  title="Correct Near Miss"
+                />
+              ) : null}
+            </section>
           ) : null}
 
-          {mode === "triage" ? (
+          {mode === "office-comments" ? (
             <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={submitTriage}>
-              <h2 className="text-xl font-semibold text-slate-900">DPA Triage</h2>
-              {!canTriage ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Triage is available only for authorized DPA users.</p> : null}
-              {triageBlockedByReview ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Vessel-side review must submit this near miss to office before DPA triage.</p> : null}
+              <h2 className="text-xl font-semibold text-slate-900">Office Comments</h2>
+              {!canSendBackOfficeComment ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Office comments are available only for the assigned PIC or DPA authority.</p> : null}
+              {(triage.near_miss_priority === "LOW" || triage.near_miss_priority === "MEDIUM") && !canAcceptOfficeComment && canSendBackOfficeComment ? <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">LOW and MEDIUM near misses must be accepted by PIC. You can still send this report back for rework if required.</p> : null}
+              {triage.near_miss_priority === "HIGH" && !canAcceptOfficeComment && canSendBackOfficeComment ? <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">HIGH near misses must be accepted by DPA. You can still send this report back for rework if required.</p> : null}
+              {triageBlockedByReview ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Vessel-side review must submit this near miss to office before office comments can be saved.</p> : null}
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
                   Priority
@@ -820,121 +926,73 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
               </div>
               {triage.supersede_to_incident ? (
                 <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  Superseding will create an Incident record and stop this Near Miss from continuing in the lightweight workflow. Enter the DPA reason below.
+                  Superseding will create an Incident record and stop this Near Miss from continuing in the lightweight workflow. Enter the reason below.
                 </p>
               ) : null}
-              <label className="mt-4 block text-sm font-medium text-slate-700">
-                Override / triage reason
-                <textarea className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setTriage((current) => ({ ...current, override_reason: event.target.value }))} value={triage.override_reason} />
-              </label>
-              <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canTriage || triageBlockedByReview} type="submit">
-                {isMutating ? "Saving..." : "Submit triage"}
-              </button>
-            </form>
-          ) : null}
-
-          {mode === "analysis" ? (
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.8fr)]">
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-xl font-semibold text-slate-900">Fact Tree</h2>
-                <div className="mt-4 space-y-3">
-                  {(analysis?.facts ?? []).map((fact) => (
-                    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={fact.id}>
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="font-semibold text-slate-900">Fact {fact.sequence_index}</h3>
-                        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">{fact.confidence}</span>
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">{fact.fact_text}</p>
-                      <p className="mt-2 text-xs text-slate-500">{fact.evidence_summary ?? `Evidence #${fact.source_evidence_id}`}</p>
-                      {fact.evidence_preview?.preview_url ? (
-                        <EvidencePreviewImage preview={fact.evidence_preview} />
-                      ) : null}
-                    </article>
-                  ))}
-                  {(analysis?.facts ?? []).length === 0 ? <p className="text-sm text-slate-500">No analysis facts have been created.</p> : null}
-                </div>
-                <form className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" onSubmit={createEvidenceSource}>
-                  <h3 className="font-semibold text-slate-900">Add Evidence Source</h3>
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <label className="block text-sm font-medium text-slate-700">
-                      Evidence type
-                      <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setEvidenceDraft((current) => ({ ...current, evidence_type: event.target.value }))} value={evidenceDraft.evidence_type}>
-                        <option value="PHOTO">Photo</option>
-                        <option value="WITNESS_NOTE">Witness note</option>
-                        <option value="CHECKLIST_ENTRY">Checklist entry</option>
-                        <option value="DOCUMENT">Document</option>
-                        <option value="OTHER">Other</option>
-                      </select>
-                    </label>
-                    {evidenceDraft.evidence_type === "PHOTO" ? (
-                      <label className="block text-sm font-medium text-slate-700">
-                        Attach image
-                        <input
-                          accept="image/png,image/jpeg"
-                          className="mt-2 block min-h-11 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                          onChange={(event) => setEvidenceDraft((current) => ({ ...current, photo_file: event.target.files?.[0] ?? null }))}
-                          type="file"
-                        />
-                      </label>
-                    ) : null}
-                    <label className="block text-sm font-medium text-slate-700">
-                      Title
-                      <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setEvidenceDraft((current) => ({ ...current, title: event.target.value }))} value={evidenceDraft.title} />
-                    </label>
-                  </div>
-                  <label className="mt-4 block text-sm font-medium text-slate-700">
-                    Source label
-                    <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setEvidenceDraft((current) => ({ ...current, source_label: event.target.value }))} value={evidenceDraft.source_label} />
-                  </label>
-                  <label className="mt-4 block text-sm font-medium text-slate-700">
-                    Description
-                    <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setEvidenceDraft((current) => ({ ...current, description: event.target.value }))} value={evidenceDraft.description} />
-                  </label>
-                  <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canAnalyze || !evidenceDraft.title.trim() || !evidenceDraft.description.trim() || (evidenceDraft.evidence_type === "PHOTO" && !evidenceDraft.photo_file)} type="submit">
-                    {isMutating ? "Saving..." : "Save evidence source"}
-                  </button>
-                </form>
-              </section>
-              <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={createFact}>
-                <h2 className="text-xl font-semibold text-slate-900">Add Fact</h2>
-                {!canAnalyze ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Fact edits are not available for your login.</p> : null}
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Sequence
-                    <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" min={1} onChange={(event) => setFactDraft((current) => ({ ...current, sequence_index: Number(event.target.value) }))} type="number" value={factDraft.sequence_index} />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Confidence
-                    <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setFactDraft((current) => ({ ...current, confidence: event.target.value }))} value={factDraft.confidence}>
-                      {CONFIDENCE.map((confidence) => <option key={confidence} value={confidence}>{confidence}</option>)}
-                    </select>
-                  </label>
-                </div>
-                <label className="mt-4 block text-sm font-medium text-slate-700">
-                  Source evidence
-                  <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setFactDraft((current) => ({ ...current, source_evidence_id: event.target.value }))} value={factDraft.source_evidence_id}>
-                    <option value="">Select evidence source</option>
-                    {evidenceSources.map((source) => (
-                      <option key={`${source.source_type}-${source.id}`} value={source.id}>
-                        {source.label}
-                      </option>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Category
+                  <select
+                    className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 bg-white px-3"
+                    onChange={(event) => setReclassificationDraft((current) => ({ ...current, near_miss_shell_tag: event.target.value }))}
+                    value={reclassificationDraft.near_miss_shell_tag}
+                  >
+                    <option value="">Select category</option>
+                    {SAFETY_NEAR_MISS_CATEGORY_TAGS.map((tag) => (
+                      <option key={tag} value={tag}>{tag}</option>
                     ))}
                   </select>
                 </label>
-                {evidenceSources.length === 0 ? (
-                  <p className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                    No evidence source is available yet. Refresh the analysis page so the near-miss report narrative can be registered as the default evidence source.
-                  </p>
-                ) : null}
-                <label className="mt-4 block text-sm font-medium text-slate-700">
-                  Fact
-                  <textarea className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setFactDraft((current) => ({ ...current, fact_text: event.target.value }))} value={factDraft.fact_text} />
+                <label className="block text-sm font-medium text-slate-700">
+                  Immediate cause
+                  <SafetyMscatPicker
+                    label="Immediate cause"
+                    onChange={(nextValue) => setReclassificationDraft((current) => ({
+                      ...current,
+                      near_miss_mscat_category_id: nextValue.categoryId,
+                      near_miss_mscat_subcode_id: nextValue.subcodeId,
+                    }))}
+                    value={{
+                      categoryId: reclassificationDraft.near_miss_mscat_category_id,
+                      subcodeId: reclassificationDraft.near_miss_mscat_subcode_id,
+                    }}
+                  />
                 </label>
-                <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canAnalyze || !factDraft.fact_text.trim() || !factDraft.source_evidence_id} type="submit">
-                  {isMutating ? "Saving..." : "Create fact"}
+              </div>
+              {officeCategoryChanged ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {officeCategoryChanged ? (
+                    <label className="block text-sm font-medium text-slate-700">
+                      Reason for changing category <span className="text-rose-600">*</span>
+                      <textarea
+                        className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3"
+                        onChange={(event) => setTriage((current) => ({ ...current, category_tag_change_reason: event.target.value }))}
+                        placeholder="Enter why the category was changed."
+                        value={triage.category_tag_change_reason}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+              <label className="mt-4 block text-sm font-medium text-slate-700">
+                {triage.supersede_to_incident ? "Supersede reason" : "Office comment / Send to Rework reason"}
+                {triage.supersede_to_incident ? <span className="text-rose-600"> *</span> : null}
+                <textarea
+                  className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 p-3"
+                  onChange={(event) => setTriage((current) => ({ ...current, override_reason: event.target.value }))}
+                  placeholder={triage.supersede_to_incident ? "Enter the reason for superseding this near miss." : "Add office comments, or enter a reason before using Send to Rework."}
+                  value={triage.override_reason}
+                />
+              </label>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button className="min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canAcceptOfficeComment || triageBlockedByReview || officeReasonMissing} type="submit">
+                  {isMutating ? "Saving..." : "Accept"}
                 </button>
-              </form>
-            </div>
+                <button className="min-h-11 rounded-full border border-amber-300 bg-amber-50 px-5 text-sm font-semibold text-amber-900 disabled:bg-slate-100 disabled:text-slate-400" disabled={isMutating || !canSendBackOfficeComment || triageBlockedByReview || officeReworkReasonMissing} onClick={() => void sendOfficeRework()} type="button">
+                  {isMutating ? "Sending..." : "Send to Rework"}
+                </button>
+              </div>
+            </form>
           ) : null}
 
           {mode === "fleet-alert" ? (
@@ -988,17 +1046,13 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
                 </label>
               ) : null}
               <label className="mt-4 block text-sm font-medium text-slate-700">
-                Alert text
-                <textarea className="mt-2 min-h-40 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setAlertDraft((current) => ({ ...current, alert_text: event.target.value }))} value={alertDraft.alert_text} />
-              </label>
-              <label className="mt-4 block text-sm font-medium text-slate-700">
                 Fleet learning / lessons
                 <textarea className="mt-2 min-h-32 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setAlertDraft((current) => ({ ...current, fleet_learning_text: event.target.value }))} value={alertDraft.fleet_learning_text} />
               </label>
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-900">Issue Circular/Alert</p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Prepare a Circular/Alert from the current alert text. Only title and body are filled; DPA completes the remaining Circular fields and publishes from the Circular page.
+                  Prepare a Circular/Alert from this near miss. DPA completes the remaining Circular fields and publishes from the Circular page.
                 </p>
                 <button className="mt-3 min-h-11 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-900 disabled:bg-slate-100 disabled:text-slate-400" disabled={!alertDraft.alert_text.trim()} onClick={openCircularWithFleetAlertDraft} type="button">
                   Issue Circular/Alert
@@ -1029,33 +1083,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
                   </ul>
                 </div>
               ) : null}
-              {isHigh ? <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">HIGH-priority closure requires preventive measures, completed fact analysis, and an issued fleet alert. The system enforces all three checks.</p> : null}
-              {isHigh ? (
-                <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Preventive measures
-                    <textarea className="mt-2 min-h-32 w-full rounded-2xl border border-slate-300 bg-white p-3" onChange={(event) => setClosureDraft((current) => ({ ...current, near_miss_suggestion: event.target.value }))} value={closureDraft.near_miss_suggestion} />
-                  </label>
-                  <div className="mt-4 grid gap-4 md:grid-cols-3">
-                    <label className="block text-sm font-medium text-slate-700">
-                      Owner
-                      <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 bg-white px-3" onChange={(event) => setClosureDraft((current) => ({ ...current, preventive_measure_owner: event.target.value }))} value={closureDraft.preventive_measure_owner} />
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                      Due date
-                      <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 bg-white px-3" onChange={(event) => setClosureDraft((current) => ({ ...current, preventive_measure_due_date: event.target.value }))} type="date" value={closureDraft.preventive_measure_due_date} />
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                      Status
-                      <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 bg-white px-3" onChange={(event) => setClosureDraft((current) => ({ ...current, preventive_measure_status: event.target.value }))} value={closureDraft.preventive_measure_status}>
-                        <option value="OPEN">Open</option>
-                        <option value="IN_PROGRESS">In progress</option>
-                        <option value="CLOSED">Closed</option>
-                      </select>
-                    </label>
-                  </div>
-                </section>
-              ) : null}
               <label className="mt-4 block text-sm font-medium text-slate-700">
                 Closure reason
                 <textarea className="mt-2 min-h-36 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setClosureDraft((current) => ({ ...current, closure_reason: event.target.value }))} value={closureDraft.closure_reason} />
@@ -1066,22 +1093,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
                   <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setClosureDraft((current) => ({ ...current, typed_name: event.target.value }))} value={closureDraft.typed_name} />
                 </label>
               </div>
-              <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <input checked={closureDraft.conflict_acknowledged} onChange={(event) => setClosureDraft((current) => ({ ...current, conflict_acknowledged: event.target.checked }))} type="checkbox" />
-                  Self-report conflict acknowledged
-                </label>
-                <label className="mt-3 block text-sm font-medium text-slate-700">
-                  Conflict approver role
-                  <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setClosureDraft((current) => ({ ...current, conflict_approver_role: event.target.value }))} value={closureDraft.conflict_approver_role}>
-                    {CONFLICT_APPROVER_ROLES.map((approverRole) => (
-                      <option key={approverRole || "blank"} value={approverRole}>
-                        {approverRole || "Not applicable"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </section>
               <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={closureDisabled} type="submit">
                 {isMutating ? "Closing..." : "Close near miss"}
               </button>
@@ -1104,56 +1115,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   );
 }
 
-function EvidencePreviewImage({ preview }: { preview: EvidencePreview }) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    let objectUrl: string | null = null;
-
-    async function loadImage() {
-      setFailed(false);
-      setImageUrl(null);
-      try {
-        const blob = await safetyApi.downloadNearMissEvidencePhoto(preview.preview_url);
-        objectUrl = URL.createObjectURL(blob);
-        if (isMounted) {
-          setImageUrl(objectUrl);
-        } else {
-          URL.revokeObjectURL(objectUrl);
-        }
-      } catch {
-        if (isMounted) {
-          setFailed(true);
-        }
-      }
-    }
-
-    void loadImage();
-    return () => {
-      isMounted = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [preview.preview_url]);
-
-  const label = preview.title || preview.file_name || "Photo evidence";
-  return (
-    <figure className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      {imageUrl ? (
-        <img alt={label} className="max-h-64 w-full object-contain" src={imageUrl} />
-      ) : (
-        <div className="flex min-h-28 items-center justify-center px-3 py-6 text-sm text-slate-500">
-          {failed ? "Photo preview unavailable." : "Loading photo preview..."}
-        </div>
-      )}
-      <figcaption className="border-t border-slate-200 px-3 py-2 text-xs text-slate-500">{label}</figcaption>
-    </figure>
-  );
-}
-
 function extractNearMiss(payload: unknown): NearMissRecord | null {
   if (!payload || typeof payload !== "object") {
     return null;
@@ -1173,8 +1134,8 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">{nearMiss.incident_number ?? `#${nearMiss.id}`}</span>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{nearMiss.state}</span>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{nearMiss.near_miss_priority ?? "Pending triage"}</span>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{formatNearMissState(nearMiss.state)}</span>
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{nearMiss.near_miss_priority ?? "Pending office comments"}</span>
       </div>
       <dl className="mt-4 grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1187,24 +1148,28 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Reporter</dt>
-          <dd className="mt-2 text-sm font-semibold text-slate-900">{nearMiss.reporter_name ?? "Masked"}</dd>
+          <dd className="mt-2 text-sm font-semibold text-slate-900">{nearMiss.reporter_name ?? "Reporter not recorded"}</dd>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Severity</dt>
           <dd className="mt-2 text-sm font-semibold text-slate-900">{nearMiss.near_miss_severity ?? "Not selected"}</dd>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">SHELL</dt>
-          <dd className="mt-2 text-sm font-semibold text-slate-900">{nearMiss.near_miss_shell_tag ?? "Not tagged"}</dd>
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Place</dt>
+          <dd className="mt-2 text-sm font-semibold text-slate-900">{formatNearMissPlace(nearMiss.near_miss_place)}</dd>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">M-SCAT</dt>
-          <dd className="mt-2 text-sm font-semibold text-slate-900">{nearMiss.near_miss_mscat_subcode_id ?? "Not selected"}</dd>
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Category</dt>
+          <dd className="mt-2 text-sm font-semibold text-slate-900">{formatList(nearMiss.near_miss_category_tags, nearMiss.near_miss_shell_tag, "Not tagged")}</dd>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Immediate cause</dt>
+          <dd className="mt-2 text-sm font-semibold text-slate-900">{formatList(nearMiss.near_miss_mscat_subcode_ids, nearMiss.near_miss_mscat_subcode_id, "Not selected")}</dd>
         </div>
       </dl>
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Narrative</p>
-        <p className="mt-2 text-sm leading-6 text-slate-700">{nearMiss.narrative ?? "No narrative available."}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">What happened</p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">{nearMiss.narrative ?? "No details available."}</p>
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1212,43 +1177,266 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
           <p className="mt-2 text-sm leading-6 text-slate-700">{nearMiss.near_miss_immediate_action ?? "Not recorded."}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Suggestion</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Preventive action / suggestion</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">{nearMiss.near_miss_suggestion ?? "Not recorded."}</p>
         </div>
+      </div>
+      {nearMiss.near_miss_root_cause_detail
+        || nearMiss.near_miss_corrective_action
+        || nearMiss.near_miss_weather_voyage_details
+        || nearMiss.near_miss_equipment_details
+        || nearMiss.near_miss_lessons_learned ? (
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <HighRiskDetail label="Immediate cause detail" value={nearMiss.near_miss_root_cause_detail} />
+          <HighRiskDetail label="Corrective action" value={nearMiss.near_miss_corrective_action} />
+          <HighRiskDetail label="Weather / voyage details" value={nearMiss.near_miss_weather_voyage_details} />
+          <HighRiskDetail label="Equipment details" value={nearMiss.near_miss_equipment_details} />
+          <HighRiskDetail label="Lessons learned" value={nearMiss.near_miss_lessons_learned} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function HighRiskDetail({ label, value }: { label: string; value?: string | null }) {
+  if (!value?.trim()) {
+    return null;
+  }
+  return (
+    <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function formatList(values: string[] | undefined, fallback?: string | null, emptyLabel = "Not selected") {
+  const cleaned = (Array.isArray(values) ? values : [])
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  if (cleaned.length) {
+    return cleaned.join(", ");
+  }
+  return fallback?.trim() || emptyLabel;
+}
+
+function formatNearMissPlace(value?: string | null) {
+  switch (value) {
+    case "AT_ANCHOR":
+      return "At Anchor";
+    case "AT_SEA":
+      return "At Sea";
+    case "AT_PORT":
+      return "At Port";
+    default:
+      return "Not selected";
+  }
+}
+
+function formatDisplayDateTime(value?: string | null) {
+  if (!value) {
+    return "not recorded";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function NearMissAudit({ audit }: { audit: AuditPayload | null }) {
+  const phaseRows = audit?.phase_log ?? [];
+  const historyRows = audit?.field_history ?? [];
+  return (
+    <section className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Workflow Steps</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{phaseRows.length}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Record Changes</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{historyRows.length}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-900">Workflow History</h2>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{phaseRows.length} item{phaseRows.length === 1 ? "" : "s"}</span>
+          </div>
+          {phaseRows.length ? (
+            <ol className="mt-5 space-y-0 border-l border-slate-200">
+              {phaseRows.map((row) => (
+                <li className="relative pb-5 pl-5 last:pb-0" key={row.id}>
+                  <span className="absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full bg-slate-900 ring-4 ring-white" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{formatAuditLabel(row.transition_type)}</p>
+                      <time className="text-xs font-medium text-slate-500">{formatDisplayDateTime(row.occurred_at)}</time>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{formatAuditActor(row.actor_role_code, row.actor_user_id)}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Phase {row.phase_from ?? "-"} to {row.phase_to ?? "-"}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <EmptyHistoryBlock message="No workflow history is available yet." />
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-900">Changes Made</h2>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{historyRows.length} item{historyRows.length === 1 ? "" : "s"}</span>
+          </div>
+          {historyRows.length ? (
+            <div className="mt-5 space-y-3">
+              {historyRows.map((row) => (
+                <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={row.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{fieldHistoryLabel(row.field_name)}</p>
+                      <p className="mt-1 text-sm text-slate-600">{formatAuditActor(row.actor_role_code, row.actor_user_id)}</p>
+                    </div>
+                    <time className="shrink-0 text-xs font-medium text-slate-500">{formatDisplayDateTime(row.changed_at)}</time>
+                  </div>
+                  {row.change_reason ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-sm leading-6 text-slate-700">{row.change_reason}</p> : null}
+                  <dl className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="min-w-0 border-l-2 border-slate-300 pl-3">
+                      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Before</dt>
+                      <dd className="mt-1 break-words text-sm leading-6 text-slate-700">{formatAuditValue(row.old_value)}</dd>
+                    </div>
+                    <div className="min-w-0 border-l-2 border-emerald-400 pl-3">
+                      <dt className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">After</dt>
+                      <dd className="mt-1 break-words text-sm font-medium leading-6 text-slate-900">{formatAuditValue(row.new_value)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyHistoryBlock message="No record changes are available yet." />
+          )}
+        </section>
       </div>
     </section>
   );
 }
 
-function NearMissAudit({ audit }: { audit: AuditPayload | null }) {
+function EmptyHistoryBlock({ message }: { message: string }) {
   return (
-    <section className="grid gap-6 xl:grid-cols-2">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-900">Phase Log</h2>
-        <div className="mt-4 space-y-3">
-          {(audit?.phase_log ?? []).map((row) => (
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={row.id}>
-              <p className="font-semibold text-slate-900">{row.transition_type}</p>
-              <p className="mt-2 text-sm text-slate-600">{row.actor_role_code} / {row.actor_user_id} / {row.occurred_at}</p>
-            </article>
-          ))}
-          {(audit?.phase_log ?? []).length === 0 ? <p className="text-sm text-slate-500">No phase-log rows available.</p> : null}
-        </div>
-      </div>
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-900">Field History</h2>
-        <div className="mt-4 space-y-3">
-          {(audit?.field_history ?? []).map((row) => (
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4" key={row.id}>
-              <p className="font-semibold text-slate-900">{row.field_name}</p>
-              <p className="mt-2 text-sm text-slate-600">{row.actor_role_code} / {row.actor_user_id} / {row.changed_at}</p>
-            </article>
-          ))}
-          {(audit?.field_history ?? []).length === 0 ? <p className="text-sm text-slate-500">No field-history rows available.</p> : null}
-        </div>
-      </div>
-    </section>
+    <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+      {message}
+    </div>
   );
+}
+
+const nearMissHistoryFieldLabels: Record<string, string> = {
+  category_tag_change_reason: "Category change reason",
+  closure_reason: "Closure reason",
+  near_miss_priority: "Priority",
+  near_miss_shell_tag: "Category",
+  near_miss_mscat_subcode_id: "Immediate cause",
+  state: "Status",
+  updated_by: "Updated by",
+  updated_date: "Updated date",
+};
+
+function formatAuditLabel(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function fieldHistoryLabel(value: string) {
+  return nearMissHistoryFieldLabels[value] ?? formatAuditLabel(value);
+}
+
+function formatAuditActor(role?: string | null, userId?: string | null) {
+  const cleanRole = role?.trim() || "Unknown role";
+  const cleanUser = userId?.trim();
+  return cleanUser ? `${cleanRole} (${cleanUser})` : cleanRole;
+}
+
+function parseAuditValue(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
+    return value;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return value;
+  }
+}
+
+function unwrapAuditValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    const parsed = parseAuditValue(value);
+    return parsed === value ? value : unwrapAuditValue(parsed);
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    if ("__history_scalar__" in record) {
+      return unwrapAuditValue(record.__history_scalar__);
+    }
+  }
+  return value;
+}
+
+function formatAuditValue(value: unknown) {
+  const unwrapped = unwrapAuditValue(value);
+  if (unwrapped === null || unwrapped === undefined || unwrapped === "") {
+    return "Not recorded";
+  }
+  if (typeof unwrapped === "boolean") {
+    return unwrapped ? "Yes" : "No";
+  }
+  if (typeof unwrapped === "number") {
+    return String(unwrapped);
+  }
+  if (typeof unwrapped === "string") {
+    return formatAuditStringValue(unwrapped);
+  }
+  if (Array.isArray(unwrapped)) {
+    return unwrapped.map(formatAuditValue).join(", ");
+  }
+  try {
+    return Object.entries(unwrapped as Record<string, unknown>)
+      .filter(([, entryValue]) => entryValue !== null && entryValue !== undefined && entryValue !== "")
+      .map(([key, entryValue]) => `${formatAuditLabel(key)}: ${formatAuditValue(entryValue)}`)
+      .join(" / ") || "Recorded";
+  } catch {
+    return "Recorded value";
+  }
+}
+
+function formatAuditStringValue(value: string) {
+  const state = normalizeCode(value);
+  switch (state) {
+    case READY_FOR_OFFICE_COMMENTS_STATE:
+    case OFFICE_COMMENTS_COMPLETED_STATE:
+    case "PENDING_VESSEL_REVIEW":
+    case "REWORK_REQUIRED":
+    case "CLOSED":
+    case "SUPERSEDED":
+    case "DRAFT":
+    case "SUBMITTED":
+      return formatNearMissState(state);
+    default:
+      return value;
+  }
 }
 
 export default SafetyNearMissWorkspace;

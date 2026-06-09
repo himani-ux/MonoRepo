@@ -36,12 +36,11 @@ class DashboardCorrectiveActionAgingService:
     def build_panel(self, *, vessel_id: str | None = None) -> dict[str, object]:
         normalized_vessel_id = str(vessel_id).strip() if vessel_id not in (None, "") else ""
         actions = list(self._query_actions(vessel_id=normalized_vessel_id).order_by("created_date", "id"))
-        self.aging_service.sync_actions(actions)
 
         counts = {bucket: 0 for bucket in self.BUCKET_ORDER}
         oldest_age_days = 0
         for action in actions:
-            bucket = action.aging_bucket or self.aging_service.sync_bucket(action)
+            bucket = self.aging_service.aging_bucket(action)
             if bucket not in counts:
                 counts[bucket] = 0
             counts[bucket] += 1

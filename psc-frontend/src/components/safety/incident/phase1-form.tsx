@@ -677,9 +677,7 @@ export function SafetyIncidentPhase1Form({
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-900">Phase action</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Draft saves remain local-first in this handover scaffold with a
-                30-second browser auto-save seam. Server mutation wiring belongs
-                to the real monorepo integration pass.
+                Save a draft if you need to return later, or continue once the required details are complete.
               </p>
               <div className="mt-5 flex flex-col gap-3">
                 <button

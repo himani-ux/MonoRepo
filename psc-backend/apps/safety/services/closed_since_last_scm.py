@@ -4,6 +4,7 @@ from datetime import datetime
 
 from django.db import DatabaseError, OperationalError, ProgrammingError
 from django.db.models import Q
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.safety.models import CorrectiveAction, Incident, SCMAgendaItem, SCMMeeting
@@ -30,7 +31,7 @@ class ClosedSinceLastSCMService:
 
     def fetch_for_meeting(self, meeting: SCMMeeting) -> dict[str, object]:
         cutoff_meeting = self._resolve_prior_cutoff_meeting(meeting)
-        upper_bound_at = meeting.master_signed_off_at or self.now_func()
+        upper_bound_at = self._meeting_closed_at(meeting) or self.now_func()
         return self._build_payload(
             vessel_id=str(meeting.vessel_id),
             meeting_id=meeting.id,
@@ -52,19 +53,21 @@ class ClosedSinceLastSCMService:
             self.meeting_model.objects.filter(
                 is_deleted=False,
                 vessel_id=str(meeting.vessel_id),
-                master_signed_off_at__isnull=False,
             )
+            .filter(Q(office_comment_at__isnull=False) | Q(master_signed_off_at__isnull=False))
+            .annotate(closed_at_value=Coalesce("office_comment_at", "master_signed_off_at"))
             .defer("occasion", "ship_position", "ship_pos_from", "ship_pos_to", "comm_time", "comp_time")
             .exclude(pk=meeting.pk)
         )
 
-        if meeting.master_signed_off_at is not None:
-            queryset = queryset.filter(master_signed_off_at__lt=meeting.master_signed_off_at)
+        closed_at = self._meeting_closed_at(meeting)
+        if closed_at is not None:
+            queryset = queryset.filter(closed_at_value__lt=closed_at)
         else:
             queryset = queryset.filter(meeting_date__lte=meeting.meeting_date)
 
         try:
-            return queryset.order_by("-master_signed_off_at", "-meeting_date", "-id").first()
+            return queryset.order_by("-closed_at_value", "-meeting_date", "-id").first()
         except (DatabaseError, OperationalError, ProgrammingError):
             return None
 
@@ -74,10 +77,11 @@ class ClosedSinceLastSCMService:
                 self.meeting_model.objects.filter(
                     is_deleted=False,
                     vessel_id=str(vessel_id),
-                    master_signed_off_at__isnull=False,
                 )
+                .filter(Q(office_comment_at__isnull=False) | Q(master_signed_off_at__isnull=False))
+                .annotate(closed_at_value=Coalesce("office_comment_at", "master_signed_off_at"))
                 .defer("occasion", "ship_position", "ship_pos_from", "ship_pos_to", "comm_time", "comp_time")
-                .order_by("-master_signed_off_at", "-meeting_date", "-id")
+                .order_by("-closed_at_value", "-meeting_date", "-id")
                 .first()
             )
         except (DatabaseError, OperationalError, ProgrammingError):
@@ -92,8 +96,8 @@ class ClosedSinceLastSCMService:
         upper_bound_at,
     ) -> dict[str, object]:
         items: list[dict[str, object]] = []
-        if cutoff_meeting is not None and cutoff_meeting.master_signed_off_at is not None:
-            cutoff_at = cutoff_meeting.master_signed_off_at
+        cutoff_at = self._meeting_closed_at(cutoff_meeting)
+        if cutoff_at is not None:
             items.extend(self._fetch_incident_items(vessel_id=vessel_id, cutoff_at=cutoff_at, upper_bound_at=upper_bound_at))
             items.extend(self._fetch_near_miss_items(vessel_id=vessel_id, cutoff_at=cutoff_at, upper_bound_at=upper_bound_at))
             items.extend(self._fetch_soi_finding_items(vessel_id=vessel_id, cutoff_at=cutoff_at, upper_bound_at=upper_bound_at))
@@ -300,14 +304,20 @@ class ClosedSinceLastSCMService:
         ]
 
     def _serialize_cutoff(self, meeting: SCMMeeting | None) -> dict[str, object] | None:
-        if meeting is None or meeting.master_signed_off_at is None:
+        closed_at = self._meeting_closed_at(meeting)
+        if meeting is None or closed_at is None:
             return None
         return {
             "meeting_id": meeting.id,
             "scm_number": meeting.scm_number,
             "meeting_type": meeting.meeting_type,
-            "closed_at": self._serialize_datetime(meeting.master_signed_off_at),
+            "closed_at": self._serialize_datetime(closed_at),
         }
+
+    def _meeting_closed_at(self, meeting: SCMMeeting | None):
+        if meeting is None:
+            return None
+        return meeting.office_comment_at or meeting.master_signed_off_at
 
     def _serialize_datetime(self, value) -> str | None:
         if value is None:

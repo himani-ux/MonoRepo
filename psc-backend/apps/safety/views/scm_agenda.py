@@ -29,7 +29,13 @@ class SCMAgendaView(SCMViewMixin, generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         meeting = self.get_meeting()
-        payload = self.get_scm_repository().build_agenda_payload(meeting=meeting)
+        include_carried_forward = str(
+            request.query_params.get("include_carried_forward") or ""
+        ).strip().lower() in {"1", "true", "yes"}
+        payload = self.get_scm_repository().build_agenda_payload(
+            meeting=meeting,
+            include_carried_forward=include_carried_forward,
+        )
         return Response(payload, status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):

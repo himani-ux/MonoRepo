@@ -57,7 +57,7 @@ class FleetAlertEndToEndTests(unittest.TestCase):
             incident_number="NM/2026/041",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="HIGH",
             narrative="A mooring-station near miss exposed a sister-vessel control weakness, so the report requires a fleet alert and follow-up before the next parallel operation.",

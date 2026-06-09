@@ -20,6 +20,7 @@ from apps.accounts.models import RoleCodes
 from apps.inspection.deficiency_models import CAR
 from core.db_utils import car_vessel_name_annotation
 from .evidence_links import attach_report_evidence_urls
+from .follow_up_reports import attach_follow_up_reports
 from .serializers import CARDetailSerializer
 from .reports import generate_car_pdf
 
@@ -127,6 +128,7 @@ class CARExportPDFView(APIView):
             car_id=car.id,
             car_data=serializer.data,
         )
+        car_data = attach_follow_up_reports(car_data, request=request)
         vessel_name = (getattr(car, 'vessel_name', '') or '').strip()
         if not vessel_name:
             vessel_name = _lookup_vessel_name(

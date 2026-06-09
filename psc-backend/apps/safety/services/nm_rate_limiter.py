@@ -23,10 +23,10 @@ class NearMissRateLimitStatus:
 
 
 class NearMissRateLimiter:
-    """Server-side near-miss submission throttling for Step 2.4."""
+    """Compatibility shim for the old near-miss submission throttling endpoint."""
 
-    limit = 5
-    guidance_message = "Rate-limit reached. Next submission allowed after 00:00 LT."
+    limit = 0
+    guidance_message = None
 
     def get_status(
         self,
@@ -35,24 +35,16 @@ class NearMissRateLimiter:
         vessel_id: str | None = None,
         now=None,
     ) -> NearMissRateLimitStatus:
-        current_time = now or timezone.now()
-        queryset = Incident.objects.filter(
-            is_deleted=False,
-            record_type=Incident.RecordType.NEAR_MISS,
-            created_by=str(actor_id),
+        return NearMissRateLimitStatus(
+            allowed=True,
+            guidance_message=None,
+            limit=self.limit,
+            remaining=self.limit,
+            reset_at=None,
+            retry_after_seconds=0,
+            scope="unlimited",
+            used=0,
         )
-
-        timezone_offset_minutes = self._fetch_timezone_offset_minutes(
-            vessel_id,
-            as_of_date=current_time.date(),
-        )
-        if timezone_offset_minutes is not None:
-            return self._build_vessel_local_day_status(
-                queryset=queryset,
-                current_time=current_time,
-                timezone_offset_minutes=timezone_offset_minutes,
-            )
-        return self._build_rolling_24h_status(queryset=queryset, current_time=current_time)
 
     def check_allowed(
         self,
@@ -112,7 +104,7 @@ class NearMissRateLimiter:
 
         return NearMissRateLimitStatus(
             allowed=allowed,
-            guidance_message=None if allowed else "Near-miss submission limit reached (5 in 24h). Try again later or contact DPA.",
+            guidance_message=None,
             limit=self.limit,
             remaining=max(0, self.limit - used),
             reset_at=reset_at,

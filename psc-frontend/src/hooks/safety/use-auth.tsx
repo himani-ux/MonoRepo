@@ -8,6 +8,7 @@ export interface SafetyAuthUser {
   fullName?: string | null;
   id?: number | string;
   login_id?: string | null;
+  profileId?: string | null;
   role?: string | null;
   formIds?: string[];
   processIds?: string[];

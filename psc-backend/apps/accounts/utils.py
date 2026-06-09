@@ -338,6 +338,80 @@ def get_office_profile_bundle_by_mapping(
     return None, [], []
 
 
+def get_office_profile_id_by_mapping(
+    username: Optional[str],
+    employee_id: Optional[str],
+    profile_name: Optional[str] = None,
+) -> Optional[str]:
+    identifiers = [v for v in (username, employee_id) if v]
+    sql_server = """
+        SELECT TOP 1 COALESCE(CONVERT(varchar(36), p.profile_id), CONVERT(varchar(36), mru.role_id))
+        FROM mapping_role_user mru
+        LEFT JOIN master_role mr
+            ON mr.id = mru.role_id
+           AND mr.is_active = 1
+           AND mr.is_deleted = 0
+        LEFT JOIN msc_profiles p
+            ON (
+                p.profile_id = mru.role_id
+                OR p.profile_name = mr.role_name
+            )
+           AND p.work_side = 0
+           AND p.is_active = 1
+           AND p.is_deleted = 0
+        WHERE mru.is_active = 1
+          AND mru.is_deleted = 0
+          AND LOWER(mru.userid) = LOWER(%s)
+    """
+    sql_sqlite = """
+        SELECT COALESCE(CAST(p.profile_id AS TEXT), CAST(mru.role_id AS TEXT))
+        FROM mapping_role_user mru
+        LEFT JOIN master_role mr
+            ON mr.id = mru.role_id
+           AND mr.is_active = 1
+           AND mr.is_deleted = 0
+        LEFT JOIN msc_profiles p
+            ON (
+                p.profile_id = mru.role_id
+                OR p.profile_name = mr.role_name
+            )
+           AND p.work_side = 0
+           AND p.is_active = 1
+           AND p.is_deleted = 0
+        WHERE mru.is_active = 1
+          AND mru.is_deleted = 0
+          AND LOWER(mru.userid) = LOWER(%s)
+        LIMIT 1
+    """
+    sql = sql_sqlite if connection.vendor == 'sqlite' else sql_server
+
+    try:
+        for ident in identifiers:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, [str(ident)])
+                row = cursor.fetchone()
+            if row and row[0] not in (None, ""):
+                return str(row[0]).strip()
+    except Exception as exc:
+        logger.warning("Office profile id mapping lookup failed for %s: %s", identifiers, exc)
+
+    if profile_name:
+        profile = (
+            MscProfile.objects.filter(
+                profile_name__iexact=profile_name,
+                work_side=False,
+                is_active=True,
+                is_deleted=False,
+            )
+            .order_by('-created_on')
+            .first()
+        )
+        if profile:
+            return str(profile.profile_id)
+
+    return None
+
+
 def resolve_safety_role_name(
     *,
     user_type: Optional[str],
@@ -401,6 +475,11 @@ def resolve_current_office_permission_snapshot(
         employee_id=employee_id,
     )
     profile_name = mapped_profile_name or (office_user.employee_role if office_user and office_user.employee_role else None)
+    profile_id = get_office_profile_id_by_mapping(
+        username=login_id,
+        employee_id=employee_id,
+        profile_name=profile_name,
+    )
 
     if not form_ids and not process_ids and office_user and office_user.employee_role:
         form_ids, process_ids = get_profile_permissions(office_user.employee_role, work_side=False)
@@ -437,6 +516,7 @@ def resolve_current_office_permission_snapshot(
     return {
         'role': role,
         'role_name': profile_name or role,
+        'profile_id': profile_id,
         'safety_role_name': safety_role_name,
         'form_ids': form_ids,
         'process_ids': process_ids,

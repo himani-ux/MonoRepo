@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useSafetyAuth } from "../../../hooks/safety/use-auth";
 import { useSafetyScmMeetings } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
+import { formatScmState } from "../../../lib/safety/scm-status";
 
 function formatDate(value: string | null) {
   if (!value) {
@@ -83,9 +84,6 @@ export default function SafetyScmIndexRoute() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Meeting register</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Review Safety Committee Meeting records for your assigned vessel scope.
-              </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <select
@@ -105,10 +103,11 @@ export default function SafetyScmIndexRoute() {
                 value={state}
               >
                 <option value="">All states</option>
-                <option value="DRAFT">DRAFT</option>
-                <option value="SUBMITTED">SUBMITTED</option>
-                <option value="SIGNED_OFF">SIGNED_OFF</option>
-                <option value="REOPENED">REOPENED</option>
+                <option value="DRAFT">Draft</option>
+                <option value="SUBMITTED">Submitted to Office</option>
+                <option value="SIGNED_OFF">Signed Off</option>
+                <option value="REOPENED">Reopened</option>
+                <option value="CLOSED">Closed</option>
               </select>
             </div>
           </div>
@@ -156,7 +155,7 @@ export default function SafetyScmIndexRoute() {
                       </td>
                       <td className="px-4 py-4 text-slate-600">{formatDate(meeting.meeting_date)}</td>
                       <td className="px-4 py-4 text-slate-600">{meeting.chair_crew_id || "-"}</td>
-                      <td className="px-4 py-4 text-slate-600">{meeting.state}</td>
+                      <td className="px-4 py-4 text-slate-600">{formatScmState(meeting.state)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -170,14 +169,14 @@ export default function SafetyScmIndexRoute() {
         </article>
 
         <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Cadence snapshot</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Monthly Meeting Status</h2>
           <ul className="mt-4 space-y-3 text-sm text-slate-600">
             {(meetingsQuery.data ?? []).slice(0, 3).map((meeting) => (
               <li key={meeting.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div className="font-medium text-slate-900">
-                  {meeting.scm_number || `SCM #${meeting.id}`}
+                  Meeting on {formatDate(meeting.meeting_date)}
                 </div>
-                <div className="mt-1">{meeting.cadence_warning?.message || "No cadence warning."}</div>
+                <div className="mt-1">{meeting.cadence_warning?.message || "No monthly meeting warning."}</div>
               </li>
             ))}
             {!meetingsQuery.isLoading && !meetingsQuery.error && (meetingsQuery.data?.length ?? 0) === 0 ? (

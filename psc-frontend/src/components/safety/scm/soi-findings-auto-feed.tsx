@@ -110,20 +110,13 @@ function normalizeSoiRecordRoute(row: SafetyScmAutoFeedFinding) {
 export default function SafetyScmAutoFeed({ payload }: SafetyScmAutoFeedProps) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div>
         <div>
           <h2 className="text-lg font-semibold text-slate-900">SOI findings for this SCM</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Open SOI findings for this vessel are grouped for committee review. New
             findings are shown separately from items already carried forward.
           </p>
-        </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-            Section 7 auto-answer
-          </div>
-          <div className="mt-2 text-2xl font-semibold">{payload.section8.answer}</div>
-          <div className="mt-1 text-xs text-emerald-800">{payload.section8.summary_text}</div>
         </div>
       </div>
 

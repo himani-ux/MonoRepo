@@ -10,6 +10,21 @@ from apps.safety.models.field_history import SCALAR_ENVELOPE_KEY
 from apps.safety.models import SafetyFieldHistory
 from apps.safety.authentication.roles import normalized_authority_role
 
+MAX_ACTOR_ID_LENGTH = 64
+MAX_ACTOR_ROLE_CODE_LENGTH = 16
+
+ROLE_CODE_ALIASES = {
+    "FLEET MANAGER": "FM",
+    "VESSEL SUPERINTENDENT": "VESSEL_SUPT",
+    "PHYSICAL_VERIFIER": "PHYS_VERIFIER",
+    "OFFICE_REVIEWER": "OFFICE_REVIEW",
+    "VESSEL_REVIEWER": "VESSEL_REVIEW",
+}
+
+
+def _fit_char(value: object, max_length: int) -> str:
+    return str(value or "").strip()[:max_length]
+
 
 def resolve_actor_id(user) -> str:
     if user is None:
@@ -18,12 +33,14 @@ def resolve_actor_id(user) -> str:
     for attr_name in ("username", "employee_id", "crew_id", "user_id", "id"):
         value = getattr(user, attr_name, None)
         if value not in (None, ""):
-            return str(value)
+            return _fit_char(value, MAX_ACTOR_ID_LENGTH)
     return "system"
 
 
 def resolve_actor_role(user) -> str:
-    return normalized_authority_role(user) or "SYSTEM"
+    role = normalized_authority_role(user) or "SYSTEM"
+    role = ROLE_CODE_ALIASES.get(role, role)
+    return _fit_char(role, MAX_ACTOR_ROLE_CODE_LENGTH) or "SYSTEM"
 
 
 def normalize_history_value(value) -> Any:

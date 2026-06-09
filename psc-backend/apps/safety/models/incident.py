@@ -18,15 +18,16 @@ INCIDENT_ACTIVE_STATES = (
     "REOPENED",
     "CLOSED",
     "PENDING_VESSEL_REVIEW",
-    "READY_FOR_DPA_TRIAGE",
+    "READY_FOR_OFFICE_COMMENTS",
     "REWORK_REQUIRED",
-    "TRIAGED",
+    "OFFICE_COMMENTS_COMPLETED",
     "SUPERSEDED",
 )
 INCIDENT_RISK_BANDS = ("GREEN", "YELLOW", "RED")
 INCIDENT_IMO_CLASSIFIERS = ("SMC", "MC", "MI", "NOT_APPLICABLE")
 INCIDENT_INVESTIGATION_DEPTHS = ("SHALLOW", "MEDIUM", "DEEP")
 NEAR_MISS_SEVERITIES = ("HIGH", "MED", "LOW")
+NEAR_MISS_PLACES = ("AT_ANCHOR", "AT_SEA", "AT_PORT")
 
 
 class Incident(BaseSafetyRecord):
@@ -46,9 +47,9 @@ class Incident(BaseSafetyRecord):
         REOPENED = "REOPENED", "Reopened"
         CLOSED = "CLOSED", "Closed"
         PENDING_VESSEL_REVIEW = "PENDING_VESSEL_REVIEW", "Pending Vessel Review"
-        READY_FOR_DPA_TRIAGE = "READY_FOR_DPA_TRIAGE", "Ready for DPA Triage"
+        READY_FOR_OFFICE_COMMENTS = "READY_FOR_OFFICE_COMMENTS", "Ready for Office Comments"
         REWORK_REQUIRED = "REWORK_REQUIRED", "Rework Required"
-        TRIAGED = "TRIAGED", "Triaged"
+        OFFICE_COMMENTS_COMPLETED = "OFFICE_COMMENTS_COMPLETED", "Office Comments Completed"
         SUPERSEDED = "SUPERSEDED", "Superseded"
 
     class RiskBand(models.TextChoices):
@@ -122,11 +123,20 @@ class Incident(BaseSafetyRecord):
     office_notified_at = models.DateTimeField(null=True, blank=True)
     near_miss_priority = models.CharField(max_length=8, null=True, blank=True)
     near_miss_severity = models.CharField(max_length=8, null=True, blank=True)
+    near_miss_place = models.CharField(max_length=16, null=True, blank=True)
     near_miss_shell_tag = models.CharField(max_length=32, null=True, blank=True)
+    near_miss_category_tags = models.TextField(null=True, blank=True)
+    near_miss_incident_type_ids = models.TextField(null=True, blank=True)
     near_miss_mscat_category_id = models.IntegerField(null=True, blank=True)
     near_miss_mscat_subcode_id = models.CharField(max_length=16, null=True, blank=True)
+    near_miss_mscat_subcode_ids = models.TextField(null=True, blank=True)
     near_miss_immediate_action = models.TextField(null=True, blank=True)
     near_miss_suggestion = models.TextField(null=True, blank=True)
+    near_miss_root_cause_detail = models.TextField(null=True, blank=True)
+    near_miss_corrective_action = models.TextField(null=True, blank=True)
+    near_miss_weather_voyage_details = models.TextField(null=True, blank=True)
+    near_miss_equipment_details = models.TextField(null=True, blank=True)
+    near_miss_lessons_learned = models.TextField(null=True, blank=True)
     reporter_id = models.CharField(max_length=64, null=True, blank=True)
     reporter_name = models.CharField(max_length=128, null=True, blank=True)
     reporter_rank = models.CharField(max_length=64, null=True, blank=True)
@@ -198,6 +208,10 @@ class Incident(BaseSafetyRecord):
             models.CheckConstraint(
                 condition=Q(near_miss_severity__isnull=True) | Q(near_miss_severity__in=NEAR_MISS_SEVERITIES),
                 name="ck_vims_safety_incident_nm_severity",
+            ),
+            models.CheckConstraint(
+                condition=Q(near_miss_place__isnull=True) | Q(near_miss_place__in=NEAR_MISS_PLACES),
+                name="ck_vims_safety_incident_nm_place",
             ),
             models.CheckConstraint(
                 condition=(Q(is_archived=False) & Q(archived_at__isnull=True))

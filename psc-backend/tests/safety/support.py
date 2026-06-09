@@ -45,6 +45,8 @@ def recreate_incident_table() -> None:
         IncidentFact,
         IncidentPhase5Assessment,
         IncidentPhaseLog,
+        NearMissGuidancePrompt,
+        NearMissKpiTarget,
         IncidentSafeguardFailure,
         Recommendation,
         RecommendationVerification,
@@ -71,12 +73,16 @@ def recreate_incident_table() -> None:
         cursor.execute("DROP TABLE IF EXISTS vims_safety_field_history")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_incident_phase_log")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_external_party_injury")
+        cursor.execute("DROP TABLE IF EXISTS vims_safety_near_miss_guidance_prompt")
+        cursor.execute("DROP TABLE IF EXISTS vims_safety_near_miss_kpi_target")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_incident")
         cursor.execute("PRAGMA foreign_keys = ON")
 
     with connection.schema_editor() as schema_editor:
         schema_editor.create_model(Incident)
         schema_editor.create_model(IncidentPhaseLog)
+        schema_editor.create_model(NearMissGuidancePrompt)
+        schema_editor.create_model(NearMissKpiTarget)
         schema_editor.create_model(SafetyFieldHistory)
         schema_editor.create_model(ExternalPartyInjury)
         schema_editor.create_model(IncidentEvidence)
@@ -723,6 +729,20 @@ def recreate_near_miss_reference_tables() -> None:
         )
         cursor.execute(
             """
+            INSERT INTO master_safety_incident_type (
+                id, legacy_int_id, type_code, type_name, imo_reportable, description, active
+            ) VALUES ('00000000000000000000000000000004', 2, 'PROPERTY_NEAR_MISS', 'Property near miss', 0, 'Near miss fixture', 1)
+            """
+        )
+        cursor.execute(
+            """
+            INSERT INTO master_safety_incident_type (
+                id, legacy_int_id, type_code, type_name, imo_reportable, description, active
+            ) VALUES ('00000000000000000000000000000005', 3, 'ENV_NEAR_MISS', 'Environment near miss', 0, 'Near miss fixture', 1)
+            """
+        )
+        cursor.execute(
+            """
             INSERT INTO master_loss_types (
                 id, legacy_int_id, loss_type_id, loss_type_name, description, active, seeded_version
             ) VALUES ('00000000000000000000000000000002', 1, 1, 'People', 'People exposure', 1, 'v1.0')
@@ -740,5 +760,33 @@ def recreate_near_miss_reference_tables() -> None:
                 cause_type,
                 active
             ) VALUES ('00000000000000000000000000000003', 1, 10, 'Immediate Causes', '10.01', 'Unsafe condition observed', 'Immediate', 1)
+            """
+        )
+        cursor.execute(
+            """
+            INSERT INTO master_mscat_taxonomy (
+                id,
+                legacy_int_id,
+                category_id,
+                category_name,
+                subcode_id,
+                subcode_description,
+                cause_type,
+                active
+            ) VALUES ('00000000000000000000000000000006', 2, 10, 'Immediate Causes', '10.02', 'Unsafe act observed', 'Immediate', 1)
+            """
+        )
+        cursor.execute(
+            """
+            INSERT INTO master_mscat_taxonomy (
+                id,
+                legacy_int_id,
+                category_id,
+                category_name,
+                subcode_id,
+                subcode_description,
+                cause_type,
+                active
+            ) VALUES ('00000000000000000000000000000007', 3, 10, 'Immediate Causes', '10.03', 'Unsafe practice observed', 'Immediate', 1)
             """
         )

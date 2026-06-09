@@ -25,6 +25,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.platypus import (
     Paragraph,
+    KeepTogether,
     SimpleDocTemplate,
     Spacer,
     Table,
@@ -245,6 +246,23 @@ def _fmt_date(value) -> str:
     return str(value) if value else '—'
 
 
+def _fmt_uploaded_datetime(value) -> str:
+    """Format uploaded-at values for attachment tables."""
+    if not value:
+        return '—'
+    if isinstance(value, datetime):
+        return value.strftime('%d %b %Y, %H:%M')
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized.endswith('Z'):
+            normalized = f'{normalized[:-1]}+00:00'
+        try:
+            return datetime.fromisoformat(normalized).strftime('%d %b %Y, %H:%M')
+        except ValueError:
+            return _fmt_date(value)
+    return _fmt_date(value)
+
+
 def _safe(value, default: str = '—') -> str:
     """Return value or default if None/empty."""
     if value is None or value == '':
@@ -345,7 +363,11 @@ def _format_action_code_change_note(deficiency: dict[str, Any]) -> str:
 
     changed_at = _fmt_date(note.get('changed_at'))
     changed_by = str(note.get('changed_by') or '').strip() or 'Unknown'
-    return f'Changed from {from_code} to {to_code} on {changed_at} by {changed_by}'
+    message = f'Changed from {from_code} to {to_code} on {changed_at} by {changed_by}'
+    reason = str(note.get('reason') or '').strip()
+    if reason:
+        message = f'{message}. Reason: {reason}'
+    return message
 
 
 def _fetch_clc_item_names(clc_codes: list[str]) -> dict[str, str]:
@@ -655,6 +677,11 @@ def generate_car_pdf(car_data: dict, audience: str = AUDIENCE_INTERNAL) -> bytes
             elements, payload, styles, content_width, audience=audience_mode
         )
 
+    # ------------------------------------------------------------------
+    # 10. FOLLOW-UP REPORTS
+    # ------------------------------------------------------------------
+    _build_follow_up_reports(elements, payload, styles, content_width)
+
     # Build PDF with footer callback
     car_number = payload.get('car_number', '')
     doc.build(
@@ -852,6 +879,53 @@ def _build_root_cause_section(elements: list, car_data: dict, styles, content_wi
     elements.append(Paragraph('Root Cause Summary:', styles['BodyBold10']))
     elements.append(Spacer(1, 2 * mm))
     elements.append(Paragraph(summary, styles['BodyText10']))
+
+
+def _build_follow_up_reports(elements: list, car_data: dict, styles, content_width: float):
+    """Follow-up report metadata uploaded during PSC follow-up registration."""
+    follow_up_reports = car_data.get('follow_up_reports') or []
+    follow_up_summary = car_data.get('follow_up_summary') or {}
+    follow_up_action_updates = car_data.get('follow_up_action_updates') or []
+    if not follow_up_reports and not follow_up_summary and not follow_up_action_updates:
+        return
+
+    elements.append(Paragraph('Follow-up Details', styles['SectionHeading']))
+
+    cell = styles['CellText']
+    if follow_up_summary:
+        summary_rows = [
+            [_wrap('Reinspection Date', styles['CellBold']),
+             _wrap(_fmt_date(follow_up_summary.get('reinspection_date')), cell)],
+            [_wrap('General Notes', styles['CellBold']),
+             _wrap(_safe(follow_up_summary.get('notes')), cell)],
+            [_wrap('Recorded By', styles['CellBold']),
+             _wrap(_safe(follow_up_summary.get('recorded_by')), cell)],
+            [_wrap('Recorded At', styles['CellBold']),
+             _wrap(_fmt_uploaded_datetime(follow_up_summary.get('recorded_at')), cell)],
+        ]
+        summary_table = Table(summary_rows, colWidths=[40 * mm, content_width - 40 * mm])
+        summary_table.setStyle(TableStyle(_info_table_style()))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 3 * mm))
+
+    if follow_up_reports:
+        report_block: list[Any] = [Paragraph('Uploaded Follow-up Report:', styles['BodyBold10'])]
+        report_col_widths = [48 * mm, content_width - 118 * mm, 35 * mm, 35 * mm]
+        report_data: list[list[Any]] = [['File Name', 'Description', 'Uploaded', 'Uploaded By']]
+        for report in follow_up_reports:
+            report_data.append([
+                _wrap_link(_safe(report.get('file_name')), report.get('file_url'), cell),
+                _wrap(_safe(report.get('description')), cell),
+                _wrap(_fmt_uploaded_datetime(report.get('uploaded_at')), cell),
+                _wrap(_safe(report.get('uploaded_by')), cell),
+            ])
+
+        report_table = Table(report_data, colWidths=report_col_widths)
+        report_style_cmds = _base_table_style()
+        _add_alternating_rows(report_style_cmds, len(report_data))
+        report_table.setStyle(TableStyle(report_style_cmds))
+        report_block.append(report_table)
+        elements.append(KeepTogether(report_block))
 
 
 def _build_review_comments(

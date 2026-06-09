@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404
 
 from apps.accounts.models import RoleCodes
 from apps.car.evidence_links import attach_report_evidence_urls
+from apps.car.follow_up_reports import attach_follow_up_reports
 from apps.inspection.deficiency_models import CAR
 from apps.car.serializers import CARDetailSerializer
 from apps.car.reports import generate_car_pdf
@@ -270,6 +271,7 @@ class BulkCARExportView(APIView):
                 car_id=car.id,
                 car_data=serializer.data,
             )
+            car_data = attach_follow_up_reports(car_data, request=request)
             car_data = _attach_vessel_name_to_car_data(car_data, vessel_name)
             pdf_bytes = generate_car_pdf(car_data, audience=audience)
             car_number = car_data.get('car_number', 'CAR')
@@ -296,6 +298,7 @@ class BulkCARExportView(APIView):
                     car_id=car.id,
                     car_data=serializer.data,
                 )
+                car_data = attach_follow_up_reports(car_data, request=request)
                 car_data = _attach_vessel_name_to_car_data(car_data, vessel_name)
                 pdf_bytes = generate_car_pdf(car_data, audience=audience)
                 car_number = car_data.get('car_number', 'CAR')

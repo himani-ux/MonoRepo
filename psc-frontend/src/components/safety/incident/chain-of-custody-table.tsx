@@ -12,7 +12,7 @@ export function SafetyChainOfCustodyTable({
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-007
+            Evidence control
           </p>
           <h2 className="text-xl font-semibold text-slate-900">Chain of Custody</h2>
         </div>

@@ -347,6 +347,34 @@ export interface CARDetailInspection {
   vessel_name: string;
 }
 
+export interface CARFollowUpReport {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_size: number;
+  mime_type: string;
+  description: string | null;
+  uploaded_by: string;
+  uploaded_at: string;
+}
+
+export interface CARFollowUpSummary {
+  reinspection_date?: string;
+  notes?: string;
+  recorded_by?: string;
+  recorded_at?: string;
+}
+
+export interface CARFollowUpActionUpdate {
+  deficiency_code: string;
+  deficiency_description: string;
+  from_action_code: string | null;
+  to_action_code: string | null;
+  notes: string | null;
+  changed_by: string;
+  changed_at: string;
+}
+
 /** CLC code mapping for CAR (from CarClcMappingSerializer) */
 export interface CarClcMapping {
   id: number;
@@ -405,6 +433,9 @@ export interface CARDetail {
   activity_history: ActivityEvent[];
   audit_log: AuditLogEntry[];
   available_actions: AvailableAction[];
+  follow_up_reports: CARFollowUpReport[];
+  follow_up_summary: CARFollowUpSummary;
+  follow_up_action_updates: CARFollowUpActionUpdate[];
 }
 
 // ============================================================================

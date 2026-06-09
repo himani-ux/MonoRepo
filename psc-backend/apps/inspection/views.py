@@ -19,13 +19,15 @@ import uuid
 from django.conf import settings
 from django.db import transaction
 from django.db.models.expressions import RawSQL
+from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from apps.car.follow_up_reports import is_valid_follow_up_report_token
 from .models import Inspection, InspectionReport, InspectionStatus
 from .deficiency_models import Deficiency, CAR
 from .serializers import (
@@ -744,3 +746,66 @@ class InspectionUploadReportView(APIView):
             'data': InspectionReportSerializer(report).data,
             'message': 'Report uploaded successfully'
         }, status=status.HTTP_201_CREATED)
+
+
+class InspectionReportViewFileView(APIView):
+    """
+    GET /api/psc/inspections/reports/{report_id}/view/
+
+    Inline file view for inspection report attachments. Exported PDFs use a
+    signed report_token so the file link works outside an authenticated session.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, report_id, *args, **kwargs):
+        try:
+            report = InspectionReport.objects.select_related('inspection').get(
+                id=report_id,
+                is_deleted=False,
+            )
+        except InspectionReport.DoesNotExist:
+            return Response({
+                'error': 'NOT_FOUND',
+                'message': 'Inspection report not found.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        is_authenticated = bool(getattr(request.user, 'is_authenticated', False))
+        report_token = request.query_params.get('report_token')
+        has_valid_report_token = is_valid_follow_up_report_token(
+            report_token,
+            report_id=report.id,
+            inspection_id=report.inspection_id,
+        )
+        if not is_authenticated and not has_valid_report_token:
+            return Response({
+                'error': 'AUTHENTICATION_REQUIRED',
+                'message': 'Authentication or a valid report link is required.'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        file_path = report.file_path or ''
+        if not file_path:
+            return Response({
+                'error': 'NOT_FOUND',
+                'message': 'Inspection report file path is missing.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        if os.path.isabs(file_path):
+            absolute_path = file_path
+        else:
+            upload_base = (
+                getattr(settings, 'UPLOAD_BASE_PATH', None)
+                or getattr(settings, 'PSC_UPLOAD_PATH', None)
+                or (settings.BASE_DIR / 'uploads')
+            )
+            absolute_path = os.path.join(str(upload_base), file_path.lstrip('/'))
+
+        if not os.path.exists(absolute_path):
+            return Response({
+                'error': 'NOT_FOUND',
+                'message': 'Inspection report file not found on disk.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        content_type = report.mime_type or 'application/octet-stream'
+        response = FileResponse(open(absolute_path, 'rb'), content_type=content_type)
+        response['Content-Disposition'] = f'inline; filename="{os.path.basename(report.file_name)}"'
+        return response

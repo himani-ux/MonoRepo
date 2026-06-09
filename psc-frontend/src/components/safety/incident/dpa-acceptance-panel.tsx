@@ -6,7 +6,7 @@ interface SafetyDpaAcceptancePanelProps {
 }
 
 function formatBlockerLabel(value: string) {
-  return value.replace(/_/g, " ");
+  return value.replace(/_/g, " ").replace(/\bbias guards\b/i, "review checks").replace(/\balarp\b/i, "risk reduction");
 }
 
 export default function SafetyDpaAcceptancePanel({
@@ -26,7 +26,7 @@ export default function SafetyDpaAcceptancePanel({
               DPA Acceptance / Report Issued
             </h2>
             <p className="mt-3 max-w-3xl text-sm text-slate-600">
-              Workspace-safe Phase 7 preflight showing recommendation completeness, signature sequencing, and the current report-preview dependency.
+              Review recommendation completeness, required signatures, and report readiness before the report is issued.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -38,7 +38,7 @@ export default function SafetyDpaAcceptancePanel({
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-            Bias Guards
+            Review Checks
           </p>
           <p className="mt-2 text-lg font-semibold text-slate-900">
             {preflight.bias_guards_resolved ? "Resolved" : "Blocked"}
@@ -54,7 +54,7 @@ export default function SafetyDpaAcceptancePanel({
         </article>
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-            ALARP
+            Risk Reduction
           </p>
           <p className="mt-2 text-lg font-semibold text-slate-900">
             {preflight.alarp_complete ? "Complete" : "Incomplete"}
@@ -64,10 +64,10 @@ export default function SafetyDpaAcceptancePanel({
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900">Preflight Blockers</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Items Needing Attention</h3>
           {preflight.blockers.length === 0 ? (
             <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              This workspace preflight is clear. The formal PDF renderer is available for the Phase 7 to Phase 8 close path.
+              All checks are clear. The formal PDF is available for the next step.
             </p>
           ) : (
             <ul className="space-y-2 text-sm text-slate-700">
@@ -96,7 +96,7 @@ export default function SafetyDpaAcceptancePanel({
               mode="display"
               awaitingLabel={
                 status.present
-                  ? "Signature requirement satisfied in the current workspace."
+                  ? "Signature requirement satisfied."
                   : "Awaiting required signature before the closer can issue the report."
               }
             />

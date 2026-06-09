@@ -1,7 +1,7 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+﻿import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: "/api/orb/api",
+  baseUrl: "http://localhost:8000/api/orb/api",
 });
 
 export const orbApi = createApi({
@@ -9,7 +9,7 @@ export const orbApi = createApi({
   baseQuery,
   tagTypes: ["Operations", "Codes", "Vessels", "Tanks", "LatestEntry"],
   endpoints: (builder) => ({
-    // ── VESSELS ──────────────────────────────────────────────────────────────
+    // â”€â”€ VESSELS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     fetchVessels: builder.query({
       query: () => "/vessels/",
       transformResponse: (response) => {
@@ -17,7 +17,7 @@ export const orbApi = createApi({
       },
     }),
 
-    // ── CODES ────────────────────────────────────────────────────────────────
+    // â”€â”€ CODES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     fetchCodes: builder.query({
       query: () => "/codes/",
       transformResponse: (response) => {
@@ -26,7 +26,7 @@ export const orbApi = createApi({
       providesTags: ["Codes"],
     }),
 
-    // ── TANKS ────────────────────────────────────────────────────────────────
+    // â”€â”€ TANKS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     fetchTanksForOrb: builder.query({
       query: ({ vesselId, orbCode }) =>
         `/tanks-for-orb/?vessel_id=${vesselId}&orb_code=${orbCode}`,
@@ -36,7 +36,7 @@ export const orbApi = createApi({
       providesTags: ["Tanks"],
     }),
 
-    // ── OPERATIONS ───────────────────────────────────────────────────────────
+    // â”€â”€ OPERATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     fetchOperations: builder.query({
       query: ({ vesselId, status, isDeleted = false }) => {
         let url = `/operations/?vessel_id=${vesselId}&is_deleted=${isDeleted}`;
@@ -51,14 +51,14 @@ export const orbApi = createApi({
       providesTags: ["Operations"],
     }),
 
-    // ── LATEST ENTRY DATE ────────────────────────────────────────────────────
+    // â”€â”€ LATEST ENTRY DATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     fetchLatestEntryDate: builder.query({
       query: ({ vesselId }) => `/latest-entry-date/?vessel_id=${vesselId}`,
       transformResponse: (response) => response.latest_date || null,
       providesTags: ["LatestEntry"],
     }),
 
-    // ── CREATE OPERATION ─────────────────────────────────────────────────────
+    // â”€â”€ CREATE OPERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     createOperation: builder.mutation({
       query: (payload) => ({
         url: "/operations/",
@@ -68,7 +68,7 @@ export const orbApi = createApi({
       invalidatesTags: ["Operations"],
     }),
 
-    // ── UPDATE OPERATION (PATCH) ─────────────────────────────────────────────
+    // â”€â”€ UPDATE OPERATION (PATCH) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     updateOperation: builder.mutation({
       query: ({ id, payload }) => ({
         url: `/operations/${id}/update-group/`,
@@ -78,7 +78,7 @@ export const orbApi = createApi({
       invalidatesTags: ["Operations"],
     }),
 
-    // ── DELETE OPERATION (Soft Delete) ───────────────────────────────────────
+    // â”€â”€ DELETE OPERATION (Soft Delete) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     deleteOperation: builder.mutation({
       query: (id) => ({
         url: `/operations/${id}/`,
@@ -88,7 +88,7 @@ export const orbApi = createApi({
       invalidatesTags: ["Operations"],
     }),
 
-    // ── APPROVE OPERATION ────────────────────────────────────────────────────
+    // â”€â”€ APPROVE OPERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     approveOperation: builder.mutation({
       query: ({ id, approvedBy }) => ({
         url: `/operations/${id}/approve/`,
@@ -98,7 +98,7 @@ export const orbApi = createApi({
       invalidatesTags: ["Operations"],
     }),
 
-    // ── REJECT OPERATION ─────────────────────────────────────────────────────
+    // â”€â”€ REJECT OPERATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     rejectOperation: builder.mutation({
       query: ({ id, rejectedBy }) => ({
         url: `/operations/${id}/reject/`,
@@ -108,7 +108,7 @@ export const orbApi = createApi({
       invalidatesTags: ["Operations"],
     }),
 
-    // ── UPDATE PRINT STATUS ──────────────────────────────────────────────────
+    // â”€â”€ UPDATE PRINT STATUS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     updatePrintStatus: builder.mutation({
       query: (payload) => ({
         url: "/update-print-status/",
@@ -117,7 +117,7 @@ export const orbApi = createApi({
       }),
     }),
 
-    // ── SAVE PDF METADATA ────────────────────────────────────────────────────
+    // â”€â”€ SAVE PDF METADATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     savePDFMetadata: builder.mutation({
       query: (payload) => ({
         url: "/save-pdf-metadata/",
@@ -126,13 +126,13 @@ export const orbApi = createApi({
       }),
     }),
 
-    // ── GET INTERNAL IP ──────────────────────────────────────────────────────
+    // â”€â”€ GET INTERNAL IP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     getInternalIP: builder.query({
       query: () => "/get-internal-ip/",
       transformResponse: (response) => response.internal_ip || "Unknown IP",
     }),
 
-    // ── GET LAST PAGE NUMBER ─────────────────────────────────────────────────
+    // â”€â”€ GET LAST PAGE NUMBER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     getLastPageNumber: builder.query({
       query: ({ vesselId }) => `/get_last_page_number/?vessel_id=${vesselId}`,
       transformResponse: (response) => response.last_page || 0,

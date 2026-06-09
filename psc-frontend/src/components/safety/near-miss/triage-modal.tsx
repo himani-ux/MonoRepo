@@ -36,18 +36,18 @@ export function SafetyNearMissTriageModal({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Safety / Near Miss / DPA
+            Safety / Near Miss / Office
           </p>
-          <h1 className="text-3xl font-semibold text-slate-900">Near Miss Triage</h1>
+          <h1 className="text-3xl font-semibold text-slate-900">Near Miss Office Comments</h1>
           <p className="max-w-3xl text-sm leading-6 text-slate-600">
-            DPA confirms the LOW vs HIGH path, logs any override reason, and can
+            Office reviewer confirms the LOW vs HIGH path, logs any override reason, and can
             supersede HIGH-priority cases into the full incident workflow.
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <div>Ref: {incidentId}</div>
           <div>Suggested priority: {suggestedPriority}</div>
-          <div>DPA signature is captured on save.</div>
+          <div>Office decision is captured on save.</div>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export function SafetyNearMissTriageModal({
             <span>
               Supersede to incident now
               <span className="mt-1 block text-xs text-slate-500">
-                Enabled only for HIGH-priority triage decisions.
+                Enabled only for HIGH-priority decisions.
               </span>
             </span>
           </label>
@@ -113,7 +113,7 @@ export function SafetyNearMissTriageModal({
             }
             type="button"
           >
-            Save Triage
+            Save Office Comments
           </button>
         </section>
       </div>

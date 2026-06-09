@@ -29,6 +29,7 @@ from .views import (
     InspectionPICReviewView,
     InspectionDPACloseView,
     InspectionUploadReportView,
+    InspectionReportViewFileView,
 )
 from .deficiency_views import (
     DeficiencyCreateView,
@@ -57,6 +58,7 @@ urlpatterns = [
 
     # Inspection - Report upload
     path('<uuid:id>/upload-report/', InspectionUploadReportView.as_view(), name='upload-report'),
+    path('reports/<uuid:report_id>/view/', InspectionReportViewFileView.as_view(), name='report-view'),
 
     # Deficiency - Create (nested under inspection)
     path('<uuid:inspection_id>/deficiencies/', DeficiencyCreateView.as_view(), name='deficiency-create'),

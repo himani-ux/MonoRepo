@@ -84,6 +84,7 @@ def build_current_user_payload(user, token):
         'vessel_names': getattr(user, 'vessel_names', None) or token.get('vessel_names') or [],
         'display_name': getattr(user, 'display_name', None) or token.get('display_name'),
         'role_name': getattr(user, 'role_name', None) or token.get('role_name') or token.get('role'),
+        'profile_id': getattr(user, 'profile_id', None) or token.get('profile_id'),
         'safety_role_name': getattr(user, 'safety_role_name', None) or token.get('safety_role_name'),
         'username': getattr(user, 'username', None) or token.get('username'),
         'UserName': getattr(user, 'username', None) or token.get('UserName') or token.get('username'),

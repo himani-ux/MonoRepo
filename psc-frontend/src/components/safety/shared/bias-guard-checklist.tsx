@@ -22,9 +22,9 @@ export function SafetyBiasGuardChecklist({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-024
+            Review checks
           </p>
-          <h2 className="text-xl font-semibold text-slate-900">Bias Guards</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Review Checks</h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
           {guards.filter((guard) => guard.acknowledged).length}/{guards.length} acknowledged
@@ -39,7 +39,7 @@ export function SafetyBiasGuardChecklist({
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em]">
-                  Guard {guard.bit_position + 1}
+                  Check {guard.bit_position + 1}
                 </p>
                 <h3 className="mt-1 text-sm font-semibold">{guard.guard_name}</h3>
               </div>

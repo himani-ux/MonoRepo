@@ -1,9 +1,9 @@
 # VIMS Safety Module — Application Flow (APP_FLOW)
 
 > **Version:** 1.0
-> **Last Updated:** 2026-04-17
+> **Last Updated:** 2026-06-09
 > **Status:** Locked — ready for build
-> **Authority:** PRD.md (FEAT-SAF-* IDs) · VIMS-SAFETY-MODULE-SSOT.md §6 (D-* / D-GAP-* decisions) · DESIGN_SYSTEM.md (state pills, signature blocks, anonymity tokens) · VALIDATION_RULES.md (state-transition enforcement)
+> **Authority:** PRD.md (FEAT-SAF-* IDs) · VIMS-SAFETY-MODULE-SSOT.md §6 (D-* / D-GAP-* decisions) · DESIGN_SYSTEM.md (state pills, signature blocks, reporter identity display) · VALIDATION_RULES.md (state-transition enforcement)
 > **Pattern inherited from:** `VIMS-Reporting-Module/APP_FLOW.md` (layout / state / navigation contract only; every Safety screen authored fresh)
 
 This document is the **screen contract** for every route the Safety Module exposes. It is the only place where route paths, role gates, on-mount data loads, and loaded / loading / empty / error states are specified together. BACKEND_STRUCTURE.md owns table DDL; FRONTEND_GUIDELINES.md owns component code; this file owns **which screen does what for whom**.
@@ -22,7 +22,7 @@ This document is the **screen contract** for every route the Safety Module expos
 2. [Permission Model (SAF_F_* / SAF_P_*) & Sidebar Group](#2-permission-model)
 3. [Route Map Summary](#3-route-map-summary)
 4. [Incident Module — 9-Phase Screen Catalog](#4-incident-module--9-phase-screen-catalog)
-5. [Near Miss Module — Screens & Anonymity Boundary](#5-near-miss-module)
+5. [Near Miss Module — Screens & Reporter Identity](#5-near-miss-module)
 6. [SCM Module — Regular + Ad-Hoc Screens](#6-scm-module)
 7. [SOI Module — Paper-First 4-Step Journey](#7-soi-module)
 8. [Dashboards, Search, Exports](#8-dashboards-search-exports)
@@ -49,9 +49,10 @@ This is the canonical permission matrix for V1. "Y" = screen and primary actions
 | Incident — Phase-7 acceptance | YELLOW closer | RED closer | — | — |
 | Incident — re-open | GREEN/YELLOW | RED | — | — |
 | Blame-fixation override | GREEN/YELLOW | RED | — | — |
-| Near Miss — reporter identity visible (D-GAP-J1) | **Y** | **Y** | **No (masked)** | **No (masked)** |
+| Near Miss — reporter identity visible | **Y** | **Y** | **Y** | **Y** |
 | Near Miss — close (PIC role = VSU) | — | — | — | — |
 | SCM — read fleet-wide | All | All | R | R (own vessels) |
+| SCM — office comment + close | **Y** | **Y** | R | **Y (Marine Superintendent profile)** |
 | SOI — read fleet-wide | All | R (fleet) | R | R |
 | SOI — approve area-applicability false | **Y (D-GAP-M19)** | — | — | — |
 | SOI — maintain 13-area template | **Y (exclusive)** | — | — | — |
@@ -68,10 +69,10 @@ This is the canonical permission matrix for V1. "Y" = screen and primary actions
 | Incident — investigation lead GREEN | **Y** | assist | assist | — | assist | — |
 | Incident — joint investigation YELLOW | **Y** (+ PIC) | assist | assist | — | assist | — |
 | Near Miss — create | Y | Y | Y | Y | Y | **Y (any rank, D-RBAC-11)** |
-| Near Miss — see reporter identity (D-GAP-J1) | **No (masked)** | **No (masked)** | **No (masked)** | **No (masked)** | **No (masked)** | Self only |
+| Near Miss — see reporter identity | **Y** | **Y** | **Y** | **Y** | **Y** | **Y** |
 | SCM — create Regular | **Y (host)** | **Y (host)** | — | — | — | — |
 | SCM — create Ad-Hoc | **Y (host)** | **Y (host)** | — | — | — | — |
-| SCM — chair + sign-off (closure) | **Y** | — | — | — | — | — |
+| SCM — edit before office comment | **Y** | **Y** | — | — | — | — |
 | SOI — safety-officer lead | — | **Y (default, SSQE §4.5.1)** | — | Y (if CO on leave toggle → 2/E via D-SOI-02) | — | — |
 | SOI — area-applicability toggle → false (request) | **Y (Master requests; DPA approves)** | — | — | — | — | — |
 | SOI — finding creation | — | Y (as SO) | — | Y | — | — |
@@ -90,7 +91,8 @@ This is the canonical permission matrix for V1. "Y" = screen and primary actions
 | Create Near Miss | Any crew (D-RBAC-11, `SAF_P_001` scoped to `SAF_F_002`) |
 | Create SCM Regular | Master or CO (`SAF_P_001` on `SAF_F_003` + role in `{MASTER, CO}`) |
 | Create SCM Ad-Hoc | Master or CO (`SAF_P_001` on `SAF_F_003` + role in `{MASTER, CO}` + `meeting_type = 'AD_HOC'`) |
-| Sign-Off SCM (closure) | Master (`SAF_P_004` on `SAF_F_003`) |
+| Edit SCM before office comment | Master or CO |
+| Add SCM Office Comment and close meeting | DPA, FM, Shore HOD, or Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` |
 | Create SOI record | SO (CO or 2/E alternate, `SAF_P_001` on `SAF_F_004`) |
 | Approve SOI finding closure | Master (`SAF_P_004` on `SAF_F_004`) |
 | Approve area-applicability false | DPA (`SAF_P_010` on `SAF_F_004`) |
@@ -117,14 +119,14 @@ Safety (sidebar group — hidden if user has no SAF_F_* IDs)
 │   └── Export PDF / regulatory .... process_ids: SAF_P_007
 ├── Near Miss ...................... form_ids: SAF_F_002
 │   ├── Create near miss ........... process_ids: SAF_P_001
-│   ├── Triage override (LOW↔HIGH) . process_ids: SAF_P_008
+│   ├── Office Comments priority decision (LOW↔HIGH) . process_ids: SAF_P_002 / SAF_P_006
 │   ├── Issue fleet alert (HIGH) ... process_ids: SAF_P_024
 │   └── Close (PIC) ................ process_ids: SAF_P_004
 ├── SCM ............................ form_ids: SAF_F_003
 │   ├── Create Regular ............. process_ids: SAF_P_001
 │   ├── Create Ad-Hoc ............. process_ids: SAF_P_001
-│   ├── Edit agenda / decisions .... process_ids: SAF_P_002
-│   ├── Sign-off (close) ........... process_ids: SAF_P_004
+│   ├── Edit agenda / suggestions .. process_ids: SAF_P_002
+│   ├── Office Comment (close) ..... process_ids: SAF_P_004
 │   └── Export PDF ................. process_ids: SAF_P_007
 ├── SOI ............................ form_ids: SAF_F_004 (inherits standard Safety RBAC, D-SOI-15)
 │   ├── Schedule + generate paper .. process_ids: SAF_P_001
@@ -142,9 +144,9 @@ Safety (sidebar group — hidden if user has no SAF_F_* IDs)
     └── SOI template edit .......... process_ids: SAF_P_012
 ```
 
-### 2.2 Anonymity enforcement layer (D-GAP-J1)
+### 2.2 Reporter Identity
 
-Reporter identity on Near Miss records is enforced at the **serializer layer** (`apps/safety/authentication/anonymity.py`). The frontend does not decide — it displays whatever the API returns. For **Master / HOD / CO / CE / SO / TD** viewing a Near Miss record the `reporter_crew_id` and `reporter_name` fields return the literal string `"Anonymous Reporter"`; the `EyeOff` anonymity badge (DESIGN_SYSTEM §8) renders alongside. For **DPA / FM** the fields return the full name; the `Eye` badge (primary-500) renders alongside. For **the reporter themselves** viewing their own record, full identity returns. PDF exports use the same serializer path — Master/HOD-scoped PDFs print `Anonymous Reporter` literally; DPA/FM-scoped PDFs print the name (DESIGN_SYSTEM §8.4).
+Anonymous near-miss reporting is removed from V1. Reporter name, rank, and user reference are stored and shown to Master and authorized users according to vessel scope and Safety permissions. The frontend displays the reporter details returned by the API. PDF exports must not print any wording that says reporter identity is masked.
 
 ---
 
@@ -189,8 +191,8 @@ Reporter identity on Near Miss records is enforced at the **serializer layer** (
     :id/reopen/                              # Re-open flow
   near-miss/                                 # Near Miss list
     create/                                  # Create — one-screen form
-    :id/                                     # Near Miss detail (DPA/FM see identity)
-    :id/triage/                              # LOW/HIGH triage (DPA)
+    :id/                                     # Near Miss detail (authorized users see reporter identity)
+    :id/triage/                              # Office Comments: LOW/MEDIUM by PIC, HIGH by DPA
     :id/fleet-alert/                         # Issue fleet alert (HIGH)
     :id/pdf/                                 # 1-2 page lightweight PDF
   scm/                                       # Safety Committee Meeting list
@@ -200,7 +202,6 @@ Reporter identity on Near Miss records is enforced at the **serializer layer** (
     :id/attendance/                          # Attendance + WRH join
     :id/agenda/                              # Agenda + decisions
     :id/closed-since-last/                   # Closed-Since-Last-SCM block
-    :id/signoff/                             # Master sign-off (closure)
     :id/pdf/                                 # SCM PDF
   soi/                                       # SOI list + compliance tiles
     create/                                  # Step 1 — pick areas, SO + Assistant
@@ -516,89 +517,76 @@ Incident flow follows the DNV 8-state machine with a pre-Phase-1 "Intake / Scene
 
 ## 5. Near Miss Module
 
-Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss'` discriminator; UI surface is **lightweight** per FEAT-SAF-NM-004. Reporter anonymity (D-GAP-J1) is enforced at the **serializer layer** not the UI.
+Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss'` discriminator; UI surface is **lightweight** per FEAT-SAF-NM-004. Anonymous reporting is removed from V1; reporter details are visible to Master and authorized users.
 
 ### 5.1 Near Miss List — `/safety/near-miss/`
 
 **FEAT refs:** FEAT-SAF-NM-001.
 **Role gate:** `PermissionGate(SAF_F_002)` — all crew + shore office.
 **Data loaded on mount:**
-- `GET /api/safety/near-miss/?vessel_id={id}` — query key `['safety','nearMiss', vesselId]`. **Reporter field returned already masked** per viewer role (D-GAP-J1).
+- `GET /api/safety/near-miss/?vessel_id={id}` — query key `['safety','nearMiss', vesselId]`.
 **Signature transition:** n/a.
 **States:**
-- **Loaded:** Table `Ref | Vessel | Date | Priority (LOW/HIGH) | Reporter | State`. Reporter cell shows `Anonymous Reporter` + `EyeOff` badge for Master/HOD/CO/CE; full name + `Eye` badge for DPA/FM.
+- **Loaded:** Table `Ref | Vessel | Date | Priority (LOW/MEDIUM/HIGH) | Reporter | State`. Reporter cell shows the reporter name/rank where available.
 - **Loading:** Skeleton rows.
 - **Empty:** `"No near miss records. Any crew member may create one — click New Near Miss."`
 - **Error — network / auth:** standard.
 **Navigation:**
 - `[New Near Miss]` → `/safety/near-miss/create/`.
 - Row click → `/safety/near-miss/:id/`.
-**Decisions:** D-RBAC-11, D-GAP-J1.
+**Decisions:** D-RBAC-11, D-GAP-J1 revised 2026-06-09.
 
 ### 5.2 Create Near Miss — `/safety/near-miss/create/`
 
 **FEAT refs:** FEAT-SAF-NM-001, FEAT-SAF-NM-005.
 **Role gate:** `PermissionGate(SAF_F_002) + ActionGate(SAF_P_001) + role = any crew` (D-RBAC-11).
 **Data loaded on mount:**
-- `GET /api/safety/master/incident-types/`, `/loss-types/`, `/mscat/` (SHELL picklist only; no 7-domain for Near Miss).
-- `GET /api/safety/near-miss/rate-limit/?crew_id={id}` — server-side check (5/24h per FEAT-SAF-NM-005).
+- `GET /api/safety/master/loss-types/`, `/mscat/` for Category and immediate-cause selection.
 **Signature transition:**
-- On submit, **Reporter** digital signature captured (but hidden from Master/HOD display per D-GAP-J1); stored on record.
+- On submit, **Reporter** identity and device fingerprint are stored on record.
+**Field controls:** place is one of `At Anchor`, `At Sea`, `At Port`; Category combines the previous Category and Possible Loss Type dropdown options into a single flat dropdown; Near Miss Type is removed; Category allows up to 3 selections and has one custom option `Other - Specify`; Immediate cause uses M-SCAT selection and has `Other - Specify` inside the dropdown at the bottom.
 **States:**
-- **Loaded:** Single-page form — what happened (≥100 chars, D-GAP-M38) · severity · SHELL tag · Immediate Action (optional).
+- **Loaded:** Single-page form — what happened (≥100 chars, D-GAP-M38) · severity · place · category · immediate cause · Immediate Action · suggestion/preventive action.
 - **Loading:** Skeleton.
 - **Empty:** n/a.
-- **Error — validation:** `<100 chars` → red block. Rate-limit 5/24h exceeded → HTTP 429 banner `"Rate-limit reached. Next submission allowed after 00:00 LT."`
+- **Error — validation:** `<100 chars` → red block. There is no per-day near-miss submission cap in V1.
 - **Error — network:** Auto-save to IndexedDB; submit queues.
 - **Error — auth:** 403 (no `SAF_F_002`).
 **Navigation:**
 - `[Submit]` → `/safety/near-miss/:id/` with confirmation.
-**Decisions:** D-RBAC-11, D-GAP-M38 (rate-limit), D-GAP-M26 (LT reset), D-GAP-F1 (auto-save).
+**Decisions:** D-RBAC-11, D-GAP-M38 revised 2026-06-09, D-GAP-F1 (auto-save).
 
 ### 5.3 Near Miss Detail — `/safety/near-miss/:id/`
 
 **FEAT refs:** FEAT-SAF-NM-002, FEAT-SAF-NM-003, FEAT-SAF-NM-004.
-**Role gate:** `PermissionGate(SAF_F_002)` — all, but **reporter field returned per viewer role**.
+**Role gate:** `PermissionGate(SAF_F_002)` — all authorized Safety users within vessel scope.
 
-**Reporter-anonymity boundary matrix** (D-GAP-J1 — authoritative):
-
-| Viewer role | Reporter field rendering | Badge | PDF rendering |
-|-------------|---------------------------|-------|---------------|
-| **Reporter (self)** | Full name | `Eye` (primary-500) + tooltip "You can see this because you are the reporter. Name is hidden from Master and HOD." | Full name |
-| **Master (onboard)** | `Anonymous Reporter` literal | `EyeOff` (neutral-500) | `Anonymous Reporter` literal |
-| **HOD (onboard)** — CO or CE when not reporter | `Anonymous Reporter` literal | `EyeOff` | `Anonymous Reporter` literal |
-| **CE / 2/E (if not reporter)** | `Anonymous Reporter` literal | `EyeOff` | `Anonymous Reporter` literal |
-| **SO / any other crew** | `Anonymous Reporter` literal | `EyeOff` | `Anonymous Reporter` literal |
-| **DPA** | Full name | `Eye` + tooltip "You can see this because you are DPA." | Full name |
-| **FM** | Full name | `Eye` + tooltip "You can see this because you are FM." | Full name |
-| **TD / HOD (shore)** | `Anonymous Reporter` literal | `EyeOff` | `Anonymous Reporter` literal |
-
-The masking is **reporter-field-only** — all other signatures (Master, HOD, SO at verification) remain attributable. Field history for the reporter field is stored in full but only returned to DPA/FM queries (serializer filter).
+**Reporter identity:** reporter name, rank, and user reference are visible to Master and authorized users. The old `Anonymous Reporter` display and anonymous badge are not used.
 
 **Data loaded on mount:**
-- `GET /api/safety/near-miss/:id/` — reporter field pre-masked per viewer role.
-- `GET /api/safety/near-miss/:id/audit/` — field history (reporter field redacted for non-DPA/FM).
+- `GET /api/safety/near-miss/:id/`.
+- `GET /api/safety/near-miss/:id/audit/` — field history visible per Safety permissions and vessel scope.
 **Signature transition:**
-- Reporter signature (captured at submit, visible only to DPA/FM and self).
+- Reporter identity/signature data captured at submit.
 - LOW → PIC review → closure signature (DESIGN_SYSTEM §8.2 role-varied signature block).
-- HIGH → Master / HOD vessel-side review signature captured with typed name + device fingerprint before DPA triage / fleet-alert approval.
+- HIGH → Master / HOD vessel-side review signature captured with typed name + device fingerprint before Office Comments / fleet-alert approval.
 **States:**
 - **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3).
 - **Loading:** Skeleton card.
 - **Empty:** n/a.
 - **Error — network / auth:** standard.
 **Navigation:**
-- `[Triage]` → `/safety/near-miss/:id/triage/` (DPA only).
+- `[Office Comments]` → `/safety/near-miss/:id/triage/` (PIC accepts LOW/MEDIUM; DPA accepts HIGH; either can send back for rework when authorized; Master can submit rework regardless of original reporter).
 - `[Issue Fleet Alert]` → `/safety/near-miss/:id/fleet-alert/` (DPA if HIGH).
 - `[Close]` → PIC action.
-**Decisions:** D-GAP-J1 (masking), D-GAP-R22 (triage), §4.3 SSOT (lightweight).
+**Decisions:** D-GAP-J1 revised 2026-06-09, D-GAP-R22 (Office Comments), §4.3 SSOT (lightweight).
 
-### 5.4 Near Miss Triage — `/safety/near-miss/:id/triage/`
+### 5.4 Near Miss Office Comments — `/safety/near-miss/:id/triage/`
 
-**Role gate:** `PermissionGate(SAF_F_002) + ActionGate(SAF_P_008) + role = DPA`.
-**Data loaded on mount:** Existing record + auto-classifier suggestion.
-**Signature transition:** DPA signature captured on triage save.
-**States:** Standard loaded/loading; error if DPA override without reason.
+**Role gate:** `PermissionGate(SAF_F_002)` plus office action permission. PIC/office PIC accepts LOW and MEDIUM cases; DPA accepts HIGH cases.
+**Data loaded on mount:** Existing record + suggested priority + current category tag and immediate cause.
+**Actions:** `Accept` saves priority, category tag, immediate cause, and office comment. `Send to Rework` moves the record back to vessel rework with a required reason.
+**States:** Standard loaded/loading; error if priority override or rework send-back is missing a reason.
 **Navigation:** Back to detail.
 **Decisions:** D-GAP-R22.
 
@@ -620,11 +608,11 @@ The masking is **reporter-field-only** — all other signatures (Master, HOD, SO
 
 **FEAT refs:** FEAT-SAF-PDF-003.
 **Role gate:** `PermissionGate(SAF_F_002) + ActionGate(SAF_P_007)`.
-**Data loaded on mount:** `GET /api/safety/near-miss/:id/pdf/` — serializer-masked per viewer role.
+**Data loaded on mount:** `GET /api/safety/near-miss/:id/pdf/`.
 **Signature transition:** n/a (rendering).
 **States:** Loading spinner → Loaded inline viewer → Error "Generation failed — retry".
 **Navigation:** Download link.
-**Decisions:** D-PDF-03a, D-GAP-J1 (PDF-level masking).
+**Decisions:** D-PDF-03a, D-GAP-J1 revised 2026-06-09.
 
 ---
 
@@ -640,7 +628,7 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. Regular monthly + Ad-Hoc me
 - `GET /api/safety/scm/?vessel_id={id}` — list both types; cadence indicator (next due 30 days from last closure, D-GAP-M22).
 **Signature transition:** n/a.
 **States:**
-- **Loaded:** Rows `Meeting type (pill) | Date | Chair | State | Overdue flag`. Cadence card shows `"Next Regular SCM due: 12-May-2026 (25 days)"`.
+- **Loaded:** Rows `Meeting type (pill) | Date | Chair | State | Overdue flag`. State labels are user-friendly: `DRAFT` = Draft, `SUBMITTED` = Submitted to Office, `CLOSED` = Closed. Cadence card shows `"Next Regular SCM due: 12-May-2026 (25 days)"`.
 - **Loading:** Skeleton.
 - **Empty:** `"No SCM records. Master or CO can host the first SCM."`
 - **Error:** standard.
@@ -657,15 +645,15 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. Regular monthly + Ad-Hoc me
 - `GET /api/safety/scm/form-config/` — SCM section template derived from legacy `vw_GetSCM_Master`, with the old reserved Section 2 removed and later sections renumbered.
 - `GET /api/safety/scm/closed-since-last/?vessel_id={id}` — for auto-fill block (FEAT-SAF-SCM-006).
 - `GET /api/safety/soi/open-findings/?vessel_id={id}` — for Safety Observations auto-fill (FEAT-SAF-SOI-020).
-**Signature transition:** None yet — SCM host prepares; signatures at sign-off.
+**Signature transition:** None. SCM no longer captures digital signatures.
 **States:**
-- **Loaded:** SCM form with Section 7 auto-answering Yes if SOI events in period + count + coverage %.
+- **Loaded:** SCM form with Section 7 SOI summary count + coverage % where SOI data exists. If no SOI inspections exist, the form does not print the old "Section 7 auto-answer NO" text.
 - **Loading:** Skeleton.
 - **Empty:** New draft — pre-filled vessel + date; free-text sections blank (≥20 chars each).
 - **Error — validation:** Section free-text < 20 chars → red block on Submit (VALIDATION_RULES §6).
 - **Error — network:** Auto-save + queue.
 - **Error — auth:** non-Master/non-CO → read-only.
-**Navigation:** `[Save Draft]` / `[Finalise for Sign-Off]` → `/safety/scm/:id/signoff/`.
+**Navigation:** `[Submit to Office]` saves the meeting and submits it to office. Backend stores `state='SUBMITTED'`; UI displays `Submitted to Office`. PDF download is available immediately after creation/submission. `[Edit Meeting]` remains available to Master/CO until office comment is saved.
 **Decisions:** D-RBAC-06, D-PDF-03b, D-SOI-14.
 
 ### 6.3 Create Ad-Hoc SCM — `/safety/scm/create-adhoc/`
@@ -673,49 +661,49 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. Regular monthly + Ad-Hoc me
 **FEAT refs:** FEAT-SAF-SCM-002.
 **Role gate:** `PermissionGate(SAF_F_003) + ActionGate(SAF_P_001) + role ∈ {Master, CO}` (D-GAP-M-ADHOC).
 Same form as Regular except `meeting_type='AD_HOC'` and mandatory trigger reason. Cadence counter still anchors on last SCM closure regardless of type (D-GAP-M22).
-**States / Signatures / Navigation:** identical to 6.2 with meeting-type pill shown amber.
+**States / Navigation:** identical to 6.2 with meeting-type pill shown amber. Ad-Hoc SCM can be edited until office comment closes the meeting.
 **Decisions:** D-GAP-M-ADHOC, D-GAP-M22.
 
 ### 6.4 SCM Detail — `/safety/scm/:id/`
 
 **FEAT refs:** FEAT-SAF-SCM-003, FEAT-SAF-SCM-006, FEAT-SAF-SCM-008.
 **Role gate:** `PermissionGate(SAF_F_003)`.
-**Data loaded on mount:** `GET /api/safety/scm/:id/`, including agenda + decisions.
+**Data loaded on mount:** `GET /api/safety/scm/:id/`, including agenda + suggestions / recommendations, attendance + WRH snapshot, office comment, and PDF download state.
 **Signature transition:** None on read view.
 **States:**
-- **Loaded:** Meeting-type pill + date + chair + state; SCM sections as anchors; Closed-Since-Last block top.
+- **Loaded:** Meeting-type pill + date + chair + state; `SUBMITTED` is displayed as `Submitted to Office`; SCM sections as horizontal section tabs; Closed-Since-Last block top; Attendance + WRH snapshot visible to ship and office users.
 - **Loading:** Skeleton.
 - **Empty:** n/a.
 - **Error:** standard.
-**Navigation:** Sub-tab links listed below.
+**Navigation:** Sub-tab links listed below. `[Edit Meeting]` is shown only while the meeting is still editable. Editing a Draft meeting and clicking `[Submit to Office]` saves changes and submits it. Once office comment is saved, the meeting state is Closed and edit is stopped.
 **Decisions:** D-PDF-03b, D-SOI-14, D-GAP-M22.
 
 ### 6.5 SCM Attendance (WRH Join) — `/safety/scm/:id/attendance/`
 
 **FEAT refs:** FEAT-SAF-SCM-005, FEAT-SAF-XMOD-002.
-**Role gate:** `PermissionGate(SAF_F_003) + role ∈ {CO, Master}`.
+**Role gate:** `PermissionGate(SAF_F_003)` for read. Attendance write/edit is restricted to Master or Chief Officer while the meeting is not closed.
 **Data loaded on mount:**
-- `GET /api/safety/scm/:id/attendance/` — attendee list from `vims_safety_scm_attendance`.
+- `GET /api/safety/scm/:id/attendance/` — attendee list from `vims_safety_scm_attendance`; office users can read this WRH snapshot.
 - Live join: `GET /api/wrh/rest-hours/?crew_id={id}&window=prior-96h&timezone=via-wrh-ship-time-config` — per attendee (D-GAP-M11, D-GAP-M26).
 **Signature transition:** None.
 **States:**
-- **Loaded:** Table `Name | Rank | WRH Compliance` with badge per row — green tick (compliant) / amber "WRH data unavailable" (D-GAP-M11) / amber "Non-compliant: rest-hours breach".
+- **Loaded:** Table `Name | Rank | Present | WRH flag | Rest 24h | Rest 7d` with badge per row — green (compliant) / amber "WRH data unavailable" / red "Non-compliant".
 - **Loading:** Skeleton.
-- **Empty:** `"No attendees recorded yet. Add attendees before sign-off."`
-- **Error — validation:** **WARN-DON'T-BLOCK** — non-compliant or missing rows never block sign-off (D-GAP-M11). Banner `"WRH warnings for 2 attendees — Master acknowledge before Sign-Off"`; Master must tick acknowledgement.
-- **Error — network:** WRH unavailable → defaults to "WRH data unavailable" badge on all rows; sign-off remains possible.
+- **Empty:** `"No attendees recorded yet. Add attendees before closing the meeting."`
+- **Error — validation:** **WARN-DON'T-BLOCK** — non-compliant or missing rows never block meeting creation, PDF export, or office closure (D-GAP-M11).
+- **Error — network:** WRH unavailable → defaults to "WRH data unavailable" badge on all rows; meeting closure remains possible.
 - **Error — auth:** standard.
-**Navigation:** `[Back to SCM]`, `[Go to Sign-Off]`.
+**Navigation:** `[Back to SCM]`.
 **Cross-module join:** **WRH** module via `wrh_ship_time_config` (D-GAP-M26); **CMS** for attendee identity (D-GAP-I2).
 **Decisions:** D-GAP-M11, D-GAP-M26, D-GAP-I2.
 
-### 6.6 SCM Agenda / Decisions — `/safety/scm/:id/agenda/`
+### 6.6 SCM Agenda / Suggestions and Recommendations — `/safety/scm/:id/agenda/`
 
 **FEAT refs:** FEAT-SAF-SCM-008.
 **Role gate:** `PermissionGate(SAF_F_003) + ActionGate(SAF_P_002) + role ∈ {CO, Master}`.
 **Data loaded on mount:** `GET /api/safety/scm/:id/agenda/` — rows from `vims_safety_scm_agenda`.
-**Signature transition:** None (signatures at sign-off only).
-**States:** Loaded table `Agenda | Decision | Owner | Due | State`. Auto-carry-forward on open items per SSQE §4.5.2.
+**Signature transition:** None.
+**States:** Loaded table `Agenda | Suggestions / Recommendations | Owner | Due | State`. Auto-carry-forward on open items per SSQE §4.5.2. Agenda editing is restricted to Master or Chief Officer until office comment closes the meeting.
 **Navigation:** `[+ Add agenda item]`; row click → detail sub-drawer.
 **Decisions:** §5.4 SSOT.
 
@@ -723,37 +711,35 @@ Same form as Regular except `meeting_type='AD_HOC'` and mandatory trigger reason
 
 **FEAT refs:** FEAT-SAF-SCM-006, FEAT-SAF-SOI-020.
 **Role gate:** `PermissionGate(SAF_F_003)`.
-**Data loaded on mount:** `GET /api/safety/scm/:id/closed-since-last/` — SOI findings + Near Miss + Incident records closed since prior SCM's sign-off timestamp (D-GAP-M22 cutoff).
+**Data loaded on mount:** `GET /api/safety/scm/:id/closed-since-last/` — SOI findings + Near Miss + Incident records closed since the prior closed SCM timestamp. Closure is anchored by office comment closure for new records, with legacy Master sign-off timestamps used only for old records (D-GAP-M22 cutoff).
 **Signature transition:** None.
 **States:** Loaded table linking each item to source record via unique-ID (FEAT-SAF-SOI-008). Empty = `"Nothing closed since last SCM."`
 **Navigation:** Row click → source record (incident / near miss / SOI detail).
 **Decisions:** D-SOI-14, D-GAP-M22.
 
-### 6.8 SCM Sign-Off — `/safety/scm/:id/signoff/`
+### 6.8 SCM Office Comment and Closure — SCM detail Office Comment section
 
 **FEAT refs:** FEAT-SAF-SCM-004, FEAT-SAF-SCM-007.
-**Role gate:** `PermissionGate(SAF_F_003) + ActionGate(SAF_P_004) + role = Master`.
+**Role gate:** `PermissionGate(SAF_F_003)` plus office reviewer authority. DPA, FM, Shore HOD, and Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` can save Office Comment.
 **Data loaded on mount:**
-- `GET /api/safety/scm/:id/preflight/` — returns `{overdue_soi_areas, attendance_acknowledged, agenda_complete}`.
-**Signature transition:**
-- **Master** sign-off signature captured here (DESIGN_SYSTEM §8.2 `--safety-sig-master`); CO co-signature recorded in attendee list; each listed attendee also signs digitally (D-GAP-D1). Sign-off timestamp = meeting closure = `closed_at`; drives cadence counter + Closed-Since-Last-SCM snapshot cutoff (D-GAP-M22).
+- `GET /api/safety/scm/:id/` — includes `office_comment`, `office_comment_by`, `office_comment_at`, and `state`.
+**Signature transition:** None. SCM does not capture digital signatures in the UI.
 **States:**
-- **Loaded:** Preflight panel — `[ ] Overdue SOI areas: 0 · [ ] Attendance warnings acknowledged · [ ] Agenda complete`. If overdue SOI areas > 0 → **hard block** with list + guidance (FEAT-SAF-SCM-007, D-GAP-M20).
-- **Loading:** Spinner.
-- **Empty:** n/a.
-- **Error — validation:** Overdue SOI → red block `"Sign-off blocked until overdue SOI areas cleared"`; attendance warnings not acknowledged → red block.
+- **Loaded:** Office Comment text area for permitted office reviewers. The label is `Office Comment`.
+- **Closed:** Saving Office Comment sets `state='CLOSED'`, displays `Closed`, and stops further vessel-side editing.
+- **Error — validation:** Blank Office Comment cannot close the meeting.
 - **Error — network / auth:** standard.
 **Navigation:**
-- `[Sign & Close Meeting]` → `/safety/scm/:id/pdf/` + redirect to SCM detail (state = Closed).
-- Overdue SOI link → `/safety/soi/?vessel_id={id}&filter=overdue`.
-**Cross-module join:** **SOI** module (overdue areas live query).
-**Decisions:** D-RBAC-06, D-GAP-M20, D-SOI-04, D-GAP-M22, D-GAP-D1.
+- Office saves comment on SCM detail. No `/signoff/` route is used.
+- PDF remains downloadable before and after office closure.
+**Cross-module join:** SOI overdue and WRH data are shown as information/warnings only; they do not block office closure.
+**Decisions:** D-RBAC-06, D-GAP-M20, D-SOI-04, D-GAP-M22.
 
 ### 6.9 SCM PDF — `/safety/scm/:id/pdf/`
 
 **FEAT refs:** FEAT-SAF-PDF-004.
 **Role gate:** `PermissionGate(SAF_F_003) + ActionGate(SAF_P_007)`.
-**Data loaded on mount:** `GET /api/safety/scm/:id/pdf/` — SCM layout with Closed-Since-Last summary block at top; attendance + WRH badges inline; signatures (Master + CO + attendees).
+**Data loaded on mount:** `GET /api/safety/scm/:id/pdf/` — SCM layout with Closed-Since-Last summary block at top, attendance + WRH badges inline, Section 7 PSC findings retained once, and a plain signature box for Master Signature and Chief Officer Signature. No attendee digital signature status is printed.
 **States:** Loading → Loaded viewer → Error "Generation failed".
 **Decisions:** D-PDF-03b, D-GAP-M-ADHOC.
 
@@ -985,7 +971,7 @@ All cross-module joins use **same-DB live queries** — no ETL, no sync stalenes
 | **Incident → Reporting Daily Report (MSC-MEPC.3 PDF export)** | `/safety/incidents/:id/pdf/mscmepc3/` generator | `vims_reporting_daily_report` live join | Internal — user doesn't navigate; PDF pre-fills App 4 directly | **D-GAP-M09** · **D-DNV-12** · FEAT-SAF-PDF-002 |
 | **Incident → CMS crew roster (crew assignment / witness picker)** | `/safety/incidents/:id/phase-3/evidence/people/` | `Crew_Onboarding_History` + `Final_crew_list` live join | In-line picker dropdown returns crew; click opens CMS crew card in slide-over | **D-GAP-I2** · FEAT-SAF-XMOD-003 |
 | **Incident → CMS (qualifications snapshot at event time)** | Phase-3 People tab record display | Same live join, historical filter `active_on={incidentDate}` | Snapshot captured at Phase 1 submit; read-only thereafter | **D-GAP-I2** |
-| **SCM → WRH attendance (warn-don't-block)** | `/safety/scm/:id/attendance/` table badges | `vims_wrh_rest_hours` + `wrh_ship_time_config` live join | Per-row badge + tooltip to WRH record; "WRH data unavailable" does NOT block sign-off | **D-GAP-M11** · **D-GAP-M26** · FEAT-SAF-XMOD-002 |
+| **SCM → WRH attendance (warn-don't-block)** | `/safety/scm/:id/attendance/` table badges | `vims_wrh_rest_hours` + `wrh_ship_time_config` live join | Per-row badge + tooltip to WRH record; "WRH data unavailable" does NOT block meeting creation, PDF export, or Office Comment closure | **D-GAP-M11** · **D-GAP-M26** · FEAT-SAF-XMOD-002 |
 | **Corrective Action → Purchase Requisition (hard FK)** | `/safety/incidents/:id/phase-6/` CA row `[Link Purchase Req]` | `/purchase/requisitions/create?linked_safety_ca={caId}` or `/purchase/requisitions/:reqId` | Hard FK = Purchase Req cannot be archived while open CA linked; CA detail shows live Req status | **D-GAP-M12** · FEAT-SAF-XMOD-004 |
 | **SOI assistant picker → CMS** | `/safety/soi/create/` | `Crew_Onboarding_History` live join with cross-department filter | Picker enforces cross-dept (SSQE §4.5.2); no manual override | **D-GAP-I2** · **D-GAP-M18** · FEAT-SAF-XMOD-003 |
 | **Near Miss fleet alert → Circular module** | `/safety/near-miss/:id/fleet-alert/` `[Issue Circular/Alert]` | `/circular/office?safety_prefill=near_miss_fleet_alert` | Opens existing Circular create flow with title/body prefilled from the anonymised Near Miss alert; DPA completes all remaining Circular fields and publishes there. Safety does not direct-create the circular. | **D-CFG-04** · **D-GAP-M08** · FEAT-SAF-NM-006 |
@@ -1010,10 +996,10 @@ Per SSQE Manual Rev 01 Feb 2026 §11 and DESIGN_SYSTEM §8.2, the canonical sign
 | **Incident (GREEN)** | Reporter → Master → HOD → PIC | HOD signs department-level review at Phase 6; PIC is closer at Phase 7 (D-RBAC-01). PIC signature functionally occupies the "closer" slot. |
 | **Incident (YELLOW)** | Reporter → Master → HOD → DPA | DPA closer at Phase 7. |
 | **Incident (RED)** | Reporter → Master → HOD → DPA → FM | FM closer at Phase 7 with full-edit authority (D-GAP-M06). External expert signature stored as attachment, not in formal chain. |
-| **Near Miss (LOW)** | Reporter → PIC (closer) | Reporter identity masked to Master/HOD (D-GAP-J1); signature block itself still renders full chain at DPA/FM view. |
-| **Near Miss (HIGH)** | Reporter → Master → HOD → DPA (fleet alert issuer) | Same masking rules. |
-| **SCM Regular** | Master or CO (host/preparer) → Master (signs off) + attendees digital | No DPA signature for SCM closure (SSQE §9). |
-| **SCM Ad-Hoc** | Master or CO (host/preparer) → Master (signs off) + attendees digital | Uses same host authority; `meeting_type='AD_HOC'` requires trigger reason. |
+| **Near Miss (LOW)** | Reporter → PIC (closer) | Reporter details are visible to Master and authorized users within vessel scope. |
+| **Near Miss (HIGH)** | Reporter → Master → HOD → DPA (fleet alert issuer) | Reporter details remain visible to authorized users. |
+| **SCM Regular** | No digital signature capture | Master or CO creates/edits; office saves Office Comment to close. PDF has blank Master/CO signature lines only. |
+| **SCM Ad-Hoc** | No digital signature capture | Same host authority; `meeting_type='AD_HOC'` requires trigger reason. Office Comment closes the record. |
 | **SOI event** | SO (paper) + Assistant (paper) → Master (digital approval at closure) | Trainees do not sign (D-GAP-M15). Master's digital counter-signature is what closes the SOI event. |
 | **SOI finding** | SO → Master (approval) → DPA (safety-net re-open if needed) | Per D-SOI-07 / D-GAP-M21. |
 | **SOI area-applicability toggle** | Master (request) → DPA (approval) | D-GAP-M19. |
@@ -1091,17 +1077,17 @@ Every PRD V1 feature must map to ≥1 screen or route. `R` = referenced on scree
 | FEAT-SAF-INC-041 | R: Phase 1 position block + MSC-MEPC.3 PDF | — |
 | FEAT-SAF-NM-001 | P: `/safety/near-miss/create/` | R: list |
 | FEAT-SAF-NM-002 | P: detail (every near-miss screen) | R: PDF, list |
-| FEAT-SAF-NM-003 | P: `/safety/near-miss/:id/triage/` | R: detail |
+| FEAT-SAF-NM-003 | P: `/safety/near-miss/:id/triage/` (Office Comments) | R: detail |
 | FEAT-SAF-NM-004 | P: `/safety/near-miss/:id/` | — |
-| FEAT-SAF-NM-005 | R: create screen rate-limit banner | — |
+| FEAT-SAF-NM-005 | R: create screen minimum-detail validation | — |
 | FEAT-SAF-NM-006 | P: `/safety/near-miss/:id/fleet-alert/` | R: Circular module |
 | FEAT-SAF-SCM-001 | P: `/safety/scm/create-regular/` | R: list cadence |
 | FEAT-SAF-SCM-002 | P: `/safety/scm/create-adhoc/` | — |
 | FEAT-SAF-SCM-003 | P: create + detail | R: PDF |
-| FEAT-SAF-SCM-004 | P: `/signoff/` | R: attendance ack |
-| FEAT-SAF-SCM-005 | P: `/attendance/` | R: sign-off preflight |
+| FEAT-SAF-SCM-004 | P: SCM detail Office Comment | R: closed state/edit lock |
+| FEAT-SAF-SCM-005 | P: `/attendance/` | R: SCM detail WRH snapshot |
 | FEAT-SAF-SCM-006 | P: `/closed-since-last/` | R: detail top |
-| FEAT-SAF-SCM-007 | R: sign-off preflight block | SOI list link |
+| FEAT-SAF-SCM-007 | R: SCM detail warning | SOI list link |
 | FEAT-SAF-SCM-008 | P: `/agenda/` | — |
 | FEAT-SAF-SOI-001 | P: `/safety/soi/create/` + `/admin/soi-template/` | — |
 | FEAT-SAF-SOI-002 | P: `/applicability/request/` + `/approve/` | — |
@@ -1172,7 +1158,7 @@ Every PRD V1 feature must map to ≥1 screen or route. `R` = referenced on scree
 - [x] Every screen documents loaded / loading / empty / error states (§§4–8).
 - [x] Role-permission matrix present (§1) — 10 roles × module actions.
 - [x] Cross-module navigation paths explicit (§9) — Reporting / WRH / CMS / Purchase covered; PMS **explicitly excluded** with inline note.
-- [x] Near-miss anonymity boundary subsection present (§5.3 table).
+- [x] Near-miss reporter identity visibility subsection present (§5.3 table).
 - [x] Paper-first SOI 4-step journey present (§7.0 table).
 - [x] Signature sequencing Reporter → Master → HOD → DPA → FM referenced (§10.1 table).
 - [x] Zero bare `safety_*` prefixes — all use `vims_safety_*` (module) or `master_*` (reference).

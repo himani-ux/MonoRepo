@@ -10,7 +10,7 @@ from apps.safety.authentication.permissions import HasAnyProcessPermission, HasP
 from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
 from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import FieldHistorySerializer, NearMissListSerializer, NearMissSerializer, PhaseLogSerializer
-from apps.safety.services import FleetAlertIssuer, capture_model_state, record_field_changes
+from apps.safety.services import capture_model_state, record_field_changes
 from apps.safety.services.field_history_recorder import resolve_actor_id
 from apps.safety.services.self_report_guard import check_self_report_conflict
 from apps.safety.views.near_miss import NearMissViewMixin, _normalized_role
@@ -98,8 +98,8 @@ class NearMissClosureActionSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Superseded near-miss records must continue in the incident workflow instead of closing here."
             )
-        if incident.state != "TRIAGED":
-            raise serializers.ValidationError("Near-miss record must be triaged before closure.")
+        if incident.state != Incident.State.OFFICE_COMMENTS_COMPLETED:
+            raise serializers.ValidationError("Near-miss office comments must be completed before closure.")
 
         conflict = check_self_report_conflict(
             incident.reporter_id,
@@ -139,7 +139,6 @@ class NearMissClosureView(NearMissViewMixin, generics.GenericAPIView):
     queryset = Incident.objects.filter(is_deleted=False)
     serializer_class = NearMissClosureActionSerializer
     close_permission_class = HasAnyProcessPermission.requiring_any("SAF_P_004", "SAF_P_006")
-    fleet_alert_issuer_class = FleetAlertIssuer
 
     def get_permissions(self):
         permissions = [self.form_permission_class()]
@@ -177,7 +176,7 @@ class NearMissClosureView(NearMissViewMixin, generics.GenericAPIView):
                 ),
             },
             "visibility_rule": (
-                "Reporter identity remains masked for non-DPA/FM viewers across the near-miss summary and audit exits."
+                "Reporter details are visible to authorized near-miss users."
             ),
         }
 
@@ -188,53 +187,28 @@ class NearMissClosureView(NearMissViewMixin, generics.GenericAPIView):
     def _validate_close_contract(self, near_miss: Incident) -> None:
         actor_role = _normalized_role(self.request.user)
         if near_miss.near_miss_priority == "HIGH":
-            fleet_alert_issuer = self.fleet_alert_issuer_class()
-            fleet_alert_status = fleet_alert_issuer.build_status(near_miss, user=self.request.user)
             if actor_role not in HIGH_PRIORITY_CLOSE_ROLES:
                 raise PermissionDenied("HIGH-priority near-miss closure is restricted to DPA or FM.")
             if not self._has_process_permission("SAF_P_004"):
                 raise PermissionDenied("HIGH-priority near-miss closure requires SAF_P_004 approval authority.")
-            preventive_fields_complete = all(
-                (
-                    (self.request.data.get("preventive_measure_owner") or "").strip(),
-                    self.request.data.get("preventive_measure_due_date"),
-                    self.request.data.get("preventive_measure_status"),
-                )
-            )
-            if (
-                not (near_miss.near_miss_suggestion or "").strip()
-                or near_miss.facts.count() < 1
-                or not fleet_alert_status.issued
-                or fleet_alert_status.sla_status not in {"ISSUED_ON_TIME", "ISSUED_LATE_WITH_EXTENSION"}
-                or not fleet_alert_issuer.get_fleet_learning_text(near_miss)
-                or not preventive_fields_complete
-            ):
-                raise ValidationError(
-                    {
-                        "detail": (
-                            "HIGH-priority near-miss requires full investigation "
-                            "(causal analysis, preventive measures, fleet learning, fleet alert within 1 week) (D-GAP-R22)."
-                        )
-                    }
-                )
             return
 
-        if near_miss.near_miss_priority == "LOW":
+        if near_miss.near_miss_priority in {"LOW", "MEDIUM"}:
             if actor_role not in LOW_PRIORITY_CLOSE_ROLES:
-                raise PermissionDenied("LOW-priority near-miss closure is restricted to Master, PIC, DPA, or FM authority.")
+                raise PermissionDenied("LOW/MEDIUM-priority near-miss closure is restricted to Master, PIC, DPA, or FM authority.")
             if not (self._has_process_permission("SAF_P_004") or self._has_process_permission("SAF_P_006")):
-                raise PermissionDenied("LOW-priority near-miss closure requires SAF_P_004 or SAF_P_006 authority.")
+                raise PermissionDenied("LOW/MEDIUM-priority near-miss closure requires SAF_P_004 or SAF_P_006 authority.")
             if len((near_miss.closure_reason or "").strip()) == 0 and len((self.request.data.get("closure_reason") or "").strip()) == 0:
                 raise ValidationError(
                     {
                         "closure_reason": [
-                            "LOW-priority near-miss closure requires Master/DPA correspondence note (D-GAP-R22)."
+                            "LOW/MEDIUM-priority near-miss closure requires a closure note."
                         ]
                     }
                 )
             return
 
-        raise ValidationError("Near-miss priority must be LOW or HIGH before closure.")
+        raise ValidationError("Near-miss priority must be LOW, MEDIUM, or HIGH before closure.")
 
     def get(self, request, *args, **kwargs):
         near_miss = self.get_near_miss()
@@ -312,7 +286,14 @@ class NearMissClosureView(NearMissViewMixin, generics.GenericAPIView):
             actor_role_code=actor_role,
             schema_version=near_miss.schema_version or 1,
         )
-        if near_miss.near_miss_priority == "HIGH":
+        structured_preventive_fields_present = any(
+            (
+                serializer.validated_data.get("preventive_measure_due_date"),
+                (serializer.validated_data.get("preventive_measure_owner") or "").strip(),
+                serializer.validated_data.get("preventive_measure_status"),
+            )
+        )
+        if near_miss.near_miss_priority == "HIGH" and structured_preventive_fields_present:
             SafetyFieldHistory.objects.create(
                 parent_table=near_miss._meta.db_table,
                 parent_id=near_miss.pk,

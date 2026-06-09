@@ -78,10 +78,10 @@ export function SafetyRecommendationEditor({
       <header className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-027
+            Recommendations
           </p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">
-            Three-Tier Recommendation Editor
+            Recommendation Summary
           </h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-600">
@@ -123,7 +123,7 @@ export function SafetyRecommendationEditor({
                   ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-current/25 bg-white/70 p-4 text-sm leading-6">
-                    No rows scaffolded in this tier yet.
+                    No rows recorded in this tier yet.
                   </div>
                 )}
               </div>

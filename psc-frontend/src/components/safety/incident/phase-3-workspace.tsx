@@ -746,7 +746,7 @@ function SafetyEvidenceSourcePanel({
     <div className="space-y-5">
       <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          FEAT-SAF-INC-005
+          Evidence collection
         </p>
         <h2 className="mt-1 text-2xl font-semibold text-slate-900">{tabConfig?.label}</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">{tabConfig?.prompt}</p>

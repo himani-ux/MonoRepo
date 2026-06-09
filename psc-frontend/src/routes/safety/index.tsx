@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Navigate, useParams, type RouteObject } from "react-router-dom";
+import { Navigate, type RouteObject } from "react-router-dom";
 
 import { PermissionGate, ProcessGate, RoleGate } from "../../components/safety/shared/permission-gate";
 import { useSafetyAuth } from "../../hooks/safety/use-auth";
@@ -62,14 +62,13 @@ const SafetyIncidentReopenRoute = lazy(() => import("./incident/[id]/reopen"));
 const SafetyNearMissIndexRoute = lazy(() => import("./near-miss"));
 const SafetyNearMissCreateRoute = lazy(() => import("./near-miss/create"));
 const SafetyNearMissDetailRoute = lazy(() => import("./near-miss/[id]"));
-const SafetyNearMissAnalysisRoute = lazy(() => import("./near-miss/[id]/analysis"));
 const SafetyNearMissAuditRoute = lazy(() => import("./near-miss/[id]/audit"));
 const SafetyNearMissClosureRoute = lazy(() => import("./near-miss/[id]/closure"));
 const SafetyNearMissFleetAlertRoute = lazy(() => import("./near-miss/[id]/fleet-alert"));
 const SafetyNearMissPdfRoute = lazy(() => import("./near-miss/[id]/pdf/index"));
 const SafetyNearMissReviewRoute = lazy(() => import("./near-miss/[id]/review"));
 const SafetyNearMissReworkRoute = lazy(() => import("./near-miss/[id]/rework"));
-const SafetyNearMissTriageRoute = lazy(() => import("./near-miss/[id]/triage"));
+const SafetyNearMissOfficeCommentsRoute = lazy(() => import("./near-miss/[id]/office-comments"));
 const SafetyDashboardRoute = lazy(() => import("./dashboard/index"));
 const SafetySearchRoute = lazy(() => import("./search/index"));
 const SafetyScmCreateAdHocRoute = lazy(() => import("./scm/create-adhoc"));
@@ -81,7 +80,6 @@ const SafetyScmDetailRoute = lazy(() => import("./scm/[id]/index"));
 const SafetyScmEditRoute = lazy(() => import("./scm/[id]/edit"));
 const SafetyScmIndexRoute = lazy(() => import("./scm"));
 const SafetyScmPdfRoute = lazy(() => import("./scm/[id]/pdf/index"));
-const SafetyScmSignoffRoute = lazy(() => import("./scm/[id]/signoff"));
 const SafetySoiCreateRoute = lazy(() => import("./soi/create"));
 const SafetySoiApplicabilityApproveRoute = lazy(() => import("./soi/[id]/applicability/approve"));
 const SafetySoiApplicabilityRequestRoute = lazy(() => import("./soi/[id]/applicability/request"));
@@ -428,18 +426,6 @@ export const safetyRoutes: RouteObject[] = [
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.scm}>
-            <ProcessGate processId="SAF_P_004">
-              <RoleGate roles={["MASTER"]}>
-                <SafetyScmSignoffRoute />
-              </RoleGate>
-            </ProcessGate>
-          </PermissionGate>,
-        ),
-        path: "scm/:id/signoff",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.scm}>
             <ProcessGate processId="SAF_P_023">
               <SafetyScmPdfRoute />
             </ProcessGate>
@@ -516,22 +502,10 @@ export const safetyRoutes: RouteObject[] = [
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.nearMiss}>
-            <ProcessGate processId="SAF_P_002">
-              <RoleGate roles={["DPA"]}>
-                <SafetyNearMissTriageRoute />
-              </RoleGate>
-            </ProcessGate>
+            <SafetyNearMissOfficeCommentsRoute />
           </PermissionGate>,
         ),
-        path: "near-miss/:id/triage",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.nearMiss}>
-            <SafetyNearMissAnalysisRoute />
-          </PermissionGate>,
-        ),
-        path: "near-miss/:id/analysis",
+        path: "near-miss/:id/office-comments",
       },
       {
         element: renderWithSuspense(

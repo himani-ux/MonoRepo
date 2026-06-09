@@ -1,4 +1,4 @@
-// src/components/UserNotifications.jsx
+﻿// src/components/UserNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
@@ -39,7 +39,7 @@ const UserNotifications = ({ currentUser }) => {
                 sort_order: order,
             }).toString();
 
-            const response = await fetch(`/api/circular/api/user-notifications/?${queryParams}`);
+            const response = await fetch(`http://localhost:8000/api/circular/api/user-notifications/?${queryParams}`);
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn("User notifications endpoint not found (404).");
@@ -102,11 +102,11 @@ const UserNotifications = ({ currentUser }) => {
 
     // --- Handle Supersede Click (NEW) ---
     const handleSupersedeClick = (notificationId) => {
-        console.log("🚀 Supersede clicked for notification ID:", notificationId);
+        console.log("ðŸš€ Supersede clicked for notification ID:", notificationId);
 
         // 1. Store the notification ID in localStorage
         localStorage.setItem('supersedingNotificationId', notificationId);
-        console.log("✅ Stored supersedingNotificationId in localStorage:", notificationId);
+        console.log("âœ… Stored supersedingNotificationId in localStorage:", notificationId);
 
         // 2. Navigate to the main create page
         // This will reload the page and trigger the Officeuser/Admin component to check localStorage
@@ -209,7 +209,7 @@ const UserNotifications = ({ currentUser }) => {
                                             title={isDeleted ? "Notification deleted" : "Click to view full comment"}
                                         >
                                             <div className="line-clamp-2">
-                                                {notification.publish_comment || '—'}
+                                                {notification.publish_comment || 'â€”'}
                                             </div>
                                         </td>
 

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from types import SimpleNamespace
 import unittest
-
-from django.utils import timezone
 
 from tests.safety.support import (
     bootstrap_django,
@@ -17,8 +14,7 @@ bootstrap_django()
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.safety.models import Incident, IncidentFact, IncidentPhaseLog, SafetyFieldHistory
-from apps.safety.services.fleet_alert_issuer import FleetAlertIssuer
+from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
 from apps.safety.views.near_miss_closure import NearMissClosureView
 
 
@@ -69,7 +65,7 @@ class NearMissClosureApiTests(unittest.TestCase):
             incident_number="NM/2026/051",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="LOW",
             narrative="A loose ladder grating clip was spotted during rounds and secured before the watch changed over.",
@@ -120,7 +116,7 @@ class NearMissClosureApiTests(unittest.TestCase):
             incident_number="NM/2026/054",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="LOW",
             narrative="A pilot ladder setup deviation was corrected before use and recorded as a local near miss.",
@@ -155,7 +151,7 @@ class NearMissClosureApiTests(unittest.TestCase):
             incident_number="NM/2026/055",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="HIGH",
             narrative="A HIGH-priority near miss needs DPA or FM acceptance after fleet alert controls are completed.",
@@ -184,12 +180,12 @@ class NearMissClosureApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("HIGH-priority near-miss closure is restricted to DPA or FM", str(response.data))
 
-    def test_high_priority_close_requires_preventive_measures_fact_tree_and_fleet_alert(self) -> None:
+    def test_high_priority_close_does_not_require_fleet_alert_before_closure(self) -> None:
         near_miss = Incident.objects.create(
             incident_number="NM/2026/052",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="HIGH",
             narrative="A heavy-weather mooring near miss indicates a sister-vessel control gap that needs fleet learning before the next similar operation.",
@@ -204,57 +200,7 @@ class NearMissClosureApiTests(unittest.TestCase):
         response = self._post_close(
             near_miss.pk,
             {
-                "closure_reason": "Attempting to close without the required analysis and fleet alert.",
-                "typed_name": "DPA Reviewer",
-                "device_fingerprint": "office-close-1",
-            },
-            user=build_user(role_name="DPA", user_id="dpa-1", vessel_ids=[]),
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("preventive measures", str(response.data))
-
-        IncidentFact.objects.create(
-            incident=near_miss,
-            sequence_index=1,
-            fact_text="The mooring team stopped work before anyone entered the snap-back zone.",
-            fact_timestamp=timezone.now() - timedelta(minutes=20),
-            source_evidence_id=11,
-            confidence=IncidentFact.Confidence.HIGH,
-            created_by="dpa-1",
-            updated_by="dpa-1",
-            schema_version=1,
-        )
-        FleetAlertIssuer().issue_fleet_alert(
-            near_miss,
-            alert_text="Brief all vessels on the control gap before the next mooring operation.",
-            device_fingerprint="office-close-1",
-            fleet_learning_text="Mooring teams must re-brief snap-back controls before similar line-handling work.",
-            typed_name="DPA Reviewer",
-            user=build_user(role_name="DPA", user_id="dpa-1", vessel_ids=[]),
-        )
-
-        response = self._post_close(
-            near_miss.pk,
-            {
-                "closure_reason": "Fact-tree review and fleet alert are complete for the HIGH-priority near miss.",
-                "typed_name": "DPA Reviewer",
-                "device_fingerprint": "office-close-1",
-            },
-            user=build_user(role_name="DPA", user_id="dpa-1", vessel_ids=[]),
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("preventive measures", str(response.data))
-
-        response = self._post_close(
-            near_miss.pk,
-            {
-                "closure_reason": "Fact-tree review, preventive measures, and fleet alert are complete.",
-                "near_miss_suggestion": "Brief all deck teams and add snap-back zone checks to the next mooring toolbox talk.",
-                "preventive_measure_due_date": (timezone.now() + timedelta(days=7)).date().isoformat(),
-                "preventive_measure_owner": "Chief Officer",
-                "preventive_measure_status": "OPEN",
+                "closure_reason": "Closing the high-priority near miss before issuing the fleet alert.",
                 "typed_name": "DPA Reviewer",
                 "device_fingerprint": "office-close-1",
             },
@@ -264,20 +210,18 @@ class NearMissClosureApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         near_miss.refresh_from_db()
         self.assertEqual(near_miss.state, "CLOSED")
-        self.assertIn("snap-back zone checks", near_miss.near_miss_suggestion)
-        preventive_history = SafetyFieldHistory.objects.get(
+        self.assertFalse((near_miss.near_miss_suggestion or "").strip())
+        self.assertFalse(SafetyFieldHistory.objects.filter(
             parent_id=near_miss.pk,
             field_name="near_miss_preventive_measures",
-        )
-        self.assertEqual(preventive_history.new_value["owner"], "Chief Officer")
-        self.assertEqual(preventive_history.new_value["status"], "OPEN")
+        ).exists())
 
     def test_self_report_conflict_requires_acknowledgement_for_closing_actor(self) -> None:
         near_miss = Incident.objects.create(
             incident_number="NM/2026/053",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="LOW",
             narrative="Master self-reported a bridge equipment exposure before the watch handover completed.",

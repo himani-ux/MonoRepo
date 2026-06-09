@@ -147,7 +147,7 @@ class HeinrichRatioServiceTests(unittest.TestCase):
             incident_number=incident_number,
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             occurred_at=occurred_at,
             created_by="crew-7",

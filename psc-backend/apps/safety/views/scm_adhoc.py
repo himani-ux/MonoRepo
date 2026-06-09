@@ -22,5 +22,8 @@ class SCMCreateAdHocView(SCMViewMixin, generics.GenericAPIView):
             meeting_type=SCMMeeting.MeetingType.AD_HOC,
             actor_id=_resolve_actor_id(request.user),
             user=request.user,
+            include_feeds=True,
+            include_rollups=False,
+            include_wrh_preview=True,
         )
         return Response(payload)

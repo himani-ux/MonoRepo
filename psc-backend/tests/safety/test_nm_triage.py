@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
 import unittest
 
@@ -47,7 +48,7 @@ class NearMissTriageTests(unittest.TestCase):
             incident_number="DRAFT-ABC/2026/T014",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state=Incident.State.READY_FOR_DPA_TRIAGE,
+            state=Incident.State.READY_FOR_OFFICE_COMMENTS,
             current_phase=1,
             occurred_at=timezone.now(),
             reported_at=timezone.now(),
@@ -65,36 +66,36 @@ class NearMissTriageTests(unittest.TestCase):
             schema_version=1,
         )
 
-    def test_dpa_can_triage_low_priority_and_audit_rows_are_written(self) -> None:
+    def test_pic_can_accept_low_priority_office_comments_and_audit_rows_are_written(self) -> None:
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
-            {"near_miss_priority": "LOW"},
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {"near_miss_priority": "LOW", "office_comment": "PIC reviewed and accepts the report."},
             format="json",
         )
-        force_authenticate(request, user=build_user(role_name="DPA"))
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"], user_id="pic-1"))
 
         response = self.view(request, id=self.near_miss.pk)
 
         self.assertEqual(response.status_code, 200)
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.near_miss_priority, "LOW")
-        self.assertEqual(self.near_miss.state, "TRIAGED")
+        self.assertEqual(self.near_miss.state, "OFFICE_COMMENTS_COMPLETED")
         self.assertEqual(response.data["suggested_priority"], "LOW")
 
         phase_log = IncidentPhaseLog.objects.get(incident_id=self.near_miss.pk)
         self.assertEqual(phase_log.phase_from, 1)
         self.assertEqual(phase_log.phase_to, 1)
         self.assertEqual(phase_log.transition_type, IncidentPhaseLog.TransitionType.FORWARD)
-        self.assertEqual(phase_log.actor_role_code, "DPA")
+        self.assertEqual(phase_log.actor_role_code, "PIC")
 
         history_fields = list(
             SafetyFieldHistory.objects.filter(parent_id=self.near_miss.pk).values_list("field_name", flat=True)
         )
         self.assertIn("state", history_fields)
 
-    def test_non_dpa_is_rejected_even_with_process_permission(self) -> None:
+    def test_non_office_reviewer_is_rejected_even_with_process_permission(self) -> None:
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {"near_miss_priority": "LOW"},
             format="json",
         )
@@ -104,33 +105,87 @@ class NearMissTriageTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_dpa_triage_waits_for_vessel_side_review(self) -> None:
+    def test_office_comments_wait_for_vessel_side_review(self) -> None:
         self.near_miss.state = Incident.State.PENDING_VESSEL_REVIEW
         self.near_miss.save(update_fields=("state",))
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {"near_miss_priority": "LOW"},
             format="json",
         )
-        force_authenticate(request, user=build_user(role_name="DPA"))
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"], user_id="pic-1"))
 
         response = self.view(request, id=self.near_miss.pk)
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("vessel-side", str(response.data).lower())
 
+    def test_office_send_back_returns_vessel_rework_summary(self) -> None:
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {
+                "action": "SEND_BACK",
+                "office_comment": (
+                    "Office comment: Please add what was corrected onboard.\n"
+                    "Suggested priority: LOW -> MEDIUM\n"
+                    "Reason for priority change: More checks are needed."
+                ),
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"], user_id="pic-1"))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.near_miss.refresh_from_db()
+        self.assertEqual(self.near_miss.state, Incident.State.REWORK_REQUIRED)
+        self.assertIn("Please add what was corrected onboard", response.data["rework_summary"]["comment"])
+        self.assertIn("Suggested priority: LOW -> MEDIUM", response.data["rework_summary"]["comment"])
+
     def test_override_without_reason_is_rejected(self) -> None:
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {"near_miss_priority": "HIGH"},
             format="json",
         )
-        force_authenticate(request, user=build_user(role_name="DPA"))
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
 
         response = self.view(request, id=self.near_miss.pk)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("override_reason", response.data)
+        self.assertIn("priority_change_reason", response.data)
+
+    def test_category_tag_change_without_reason_is_rejected(self) -> None:
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {"near_miss_priority": "LOW", "near_miss_shell_tag": "Safety"},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("category_tag_change_reason", response.data)
+
+    def test_category_tag_change_with_reason_is_saved(self) -> None:
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {
+                "near_miss_priority": "LOW",
+                "near_miss_shell_tag": "Safety",
+                "category_tag_change_reason": "Category corrected after office review.",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.near_miss.refresh_from_db()
+        self.assertEqual(self.near_miss.near_miss_shell_tag, "Safety")
 
     def test_repeated_near_miss_must_be_triaged_high(self) -> None:
         self.near_miss.incident_type_id = 1
@@ -143,8 +198,8 @@ class NearMissTriageTests(unittest.TestCase):
             record_type=Incident.RecordType.NEAR_MISS,
             state=Incident.State.CLOSED,
             current_phase=1,
-            occurred_at=timezone.now(),
-            reported_at=timezone.now(),
+            occurred_at=self.near_miss.occurred_at - timedelta(minutes=1),
+            reported_at=self.near_miss.reported_at - timedelta(minutes=1),
             narrative="Previous near miss with the same SHELL tag and event type.",
             incident_type_id=self.near_miss.incident_type_id,
             loss_type_primary_id=self.near_miss.loss_type_primary_id,
@@ -155,7 +210,64 @@ class NearMissTriageTests(unittest.TestCase):
             schema_version=1,
         )
         request = self.factory.patch(
-            f"/api/safety/near-miss/{self.near_miss.pk}/triage/",
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {"near_miss_priority": "LOW"},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("must be reviewed as high priority", str(response.data))
+        self.assertIn("similar near miss", str(response.data))
+        self.assertNotIn("SSOT", str(response.data))
+        self.assertNotIn("D-GAP-R22", str(response.data))
+
+    def test_repeat_outside_90_days_does_not_force_high(self) -> None:
+        self.near_miss.incident_type_id = 1
+        self.near_miss.loss_type_primary_id = 1
+        self.near_miss.near_miss_shell_tag = "Hardware"
+        self.near_miss.save(update_fields=("incident_type_id", "loss_type_primary_id", "near_miss_shell_tag"))
+        old_date = timezone.now() - timedelta(days=120)
+        Incident.objects.create(
+            incident_number="NM/2026/012",
+            vessel_id="7",
+            record_type=Incident.RecordType.NEAR_MISS,
+            state=Incident.State.CLOSED,
+            current_phase=1,
+            occurred_at=old_date,
+            reported_at=old_date,
+            narrative="Older near miss with the same root cause and event type.",
+            incident_type_id=self.near_miss.incident_type_id,
+            loss_type_primary_id=self.near_miss.loss_type_primary_id,
+            near_miss_shell_tag=self.near_miss.near_miss_shell_tag,
+            reporter_id="crew-old",
+            created_by="crew-old",
+            updated_by="crew-old",
+            schema_version=1,
+        )
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {"near_miss_priority": "LOW"},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"], user_id="pic-1"))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.near_miss.refresh_from_db()
+        self.assertEqual(self.near_miss.near_miss_priority, "LOW")
+
+    def test_auto_high_marker_must_be_high(self) -> None:
+        self.near_miss.narrative = (
+            "Crew stopped the task after noticing oil spill risk near the deck drain "
+            "before pollution reached overboard discharge."
+        )
+        self.near_miss.save(update_fields=("narrative",))
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {"near_miss_priority": "LOW"},
             format="json",
         )
@@ -164,4 +276,8 @@ class NearMissTriageTests(unittest.TestCase):
         response = self.view(request, id=self.near_miss.pk)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Repeated near misses must be triaged HIGH", str(response.data))
+        self.assertIn("risk", str(response.data))
+        self.assertIn("must be reviewed as high priority", str(response.data))
+        self.assertNotIn("similar near miss exists", str(response.data))
+        self.assertNotIn("SSOT", str(response.data))
+        self.assertNotIn("D-GAP-R22", str(response.data))

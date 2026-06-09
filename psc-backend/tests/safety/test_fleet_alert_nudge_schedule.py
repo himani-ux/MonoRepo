@@ -33,7 +33,7 @@ class FleetAlertNudgeScheduleTests(unittest.TestCase):
             incident_number="NM/2026/031",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="HIGH",
             narrative="A heavy-weather access control gap was intercepted before injury, requiring fleet-wide preventive reinforcement and a documented follow-up alert.",

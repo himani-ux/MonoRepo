@@ -98,6 +98,11 @@ from apps.safety.views.near_miss_analysis import (
     NearMissAnalysisWorkspaceView,
 )
 from apps.safety.views.near_miss_closure import NearMissAuditView, NearMissClosureView
+from apps.safety.views.near_miss_config import (
+    NearMissCategoryReclassifyView,
+    NearMissGuidancePromptView,
+    NearMissKpiTargetView,
+)
 from apps.safety.views.near_miss_pdf import NearMissPDFDownloadView
 from apps.safety.views.near_miss_review import NearMissReviewView, NearMissReworkSubmitView
 from apps.safety.views.near_miss_triage import NearMissTriageView
@@ -111,8 +116,6 @@ from apps.safety.views.scm_attendance import SCMAttendanceAcknowledgeView, SCMAt
 from apps.safety.views.scm_closed_since import SCMClosedSinceLastMeetingView, SCMClosedSinceLastVesselView
 from apps.safety.views.scm_office_comment import SCMOfficeCommentView
 from apps.safety.views.scm_pdf import SCMPDFDownloadView
-from apps.safety.views.scm_signoff import SCMSignOffPreflightView, SCMSignOffView
-from apps.safety.views.scm_signature import SCMSignatureView
 from apps.safety.views.scm_soi_feed import SCMSoIAutoFeedMeetingView, SOIOpenFindingsVesselView
 from apps.safety.views.soi import SOIApplicabilityView, SOIDetailView, SOIListCreateView
 from apps.safety.views.soi_applicability_approve import SOIApplicabilityApproveView
@@ -221,17 +224,14 @@ urlpatterns = [
     path("scm/create-regular/", SCMCreateRegularView.as_view(), name="scm-create-regular"),
     path("scm/create-adhoc/", SCMCreateAdHocView.as_view(), name="scm-create-adhoc"),
     path("scm/<str:id>/", SCMDetailView.as_view(), name="scm-detail"),
+    path("scm/<str:id>/submit/", SCMSubmitView.as_view(), name="scm-submit"),
     path("scm/<str:id>/auto-feed/", SCMSoIAutoFeedMeetingView.as_view(), name="scm-auto-feed"),
     path("scm/<str:id>/agenda/", SCMAgendaView.as_view(), name="scm-agenda"),
     path("scm/<str:id>/attendance/", SCMAttendanceListCreateView.as_view(), name="scm-attendance"),
     path("scm/<str:id>/attendance/acknowledge/", SCMAttendanceAcknowledgeView.as_view(), name="scm-attendance-ack"),
     path("scm/<str:id>/closed-since-last/", SCMClosedSinceLastMeetingView.as_view(), name="scm-closed-since-last"),
-    path("scm/<str:id>/preflight/", SCMSignOffPreflightView.as_view(), name="scm-preflight"),
     path("scm/<str:id>/office-comment/", SCMOfficeCommentView.as_view(), name="scm-office-comment"),
     path("scm/<str:id>/pdf/", SCMPDFDownloadView.as_view(), name="scm-pdf"),
-    path("scm/<str:id>/sign-off/", SCMSignOffView.as_view(), name="scm-signoff"),
-    path("scm/<str:id>/signatures/", SCMSignatureView.as_view(), name="scm-signatures"),
-    path("scm/<str:id>/submit/", SCMSubmitView.as_view(), name="scm-submit"),
     path("soi/", SOIListCreateView.as_view(), name="soi-list"),
     path("soi/compliance/", SOIComplianceView.as_view(), name="soi-compliance"),
     path("soi/create/", SOICreateConfigView.as_view(), name="soi-create-config"),
@@ -282,11 +282,14 @@ urlpatterns = [
     path("soi/<str:id>/pdf/summary/", SOISummaryPDFDownloadView.as_view(), name="soi-pdf-summary"),
     path("soi/<str:id>/trainees/", SOITraineeView.as_view(), name="soi-trainees"),
     path("near-miss/", NearMissListCreateView.as_view(), name="near-miss-list"),
+    path("near-miss/guidance-prompts/", NearMissGuidancePromptView.as_view(), name="near-miss-guidance-prompts"),
+    path("near-miss/kpi-target/", NearMissKpiTargetView.as_view(), name="near-miss-kpi-target"),
     path("near-miss/rate-limit/", NearMissRateLimitView.as_view(), name="near-miss-rate-limit"),
     path("near-miss/<str:id>/", NearMissDetailView.as_view(), name="near-miss-detail"),
+    path("near-miss/<str:id>/reclassify/", NearMissCategoryReclassifyView.as_view(), name="near-miss-reclassify"),
     path("near-miss/<str:id>/review/", NearMissReviewView.as_view(), name="near-miss-review"),
     path("near-miss/<str:id>/rework/", NearMissReworkSubmitView.as_view(), name="near-miss-rework-submit"),
-    path("near-miss/<str:id>/triage/", NearMissTriageView.as_view(), name="near-miss-triage"),
+    path("near-miss/<str:id>/office-comments/", NearMissTriageView.as_view(), name="near-miss-office-comments"),
     path("near-miss/<str:id>/fleet-alert/", FleetAlertIssueView.as_view(), name="near-miss-fleet-alert"),
     path("near-miss/<str:id>/pdf/", NearMissPDFDownloadView.as_view(), name="near-miss-pdf"),
     path("near-miss/<str:id>/closure/", NearMissClosureView.as_view(), name="near-miss-closure"),

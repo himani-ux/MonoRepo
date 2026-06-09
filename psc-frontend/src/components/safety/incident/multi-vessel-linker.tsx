@@ -10,7 +10,7 @@ export function SafetyMultiVesselLinker({
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-032
+            Related incident
           </p>
           <h2 className="text-xl font-semibold text-slate-900">Multi-vessel link</h2>
         </div>
@@ -19,11 +19,10 @@ export function SafetyMultiVesselLinker({
         </div>
       </div>
       <p className="mt-3 text-sm text-slate-600">
-        Each vessel retains its own investigation. This Phase 4 scaffold only shows the cross-link contract for the
-        handover workspace.
+        Each vessel keeps its own incident record. Link records only when they describe the same event.
       </p>
       <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-        Link prompt shape: <span className="font-medium text-slate-900">Link to existing incident? [Yes / No - separate events]</span>
+        Link decision: <span className="font-medium text-slate-900">Link to existing incident, or keep as a separate event.</span>
       </div>
     </section>
   );

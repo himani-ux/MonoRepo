@@ -16,9 +16,9 @@ export function SafetyMScatPicker({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-017
+            Root cause
           </p>
-          <h2 className="text-xl font-semibold text-slate-900">M-SCAT Picker</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Cause Picker</h2>
         </div>
         <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
           Search: {query}

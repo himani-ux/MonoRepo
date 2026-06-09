@@ -157,13 +157,13 @@ export function SafetyIncidentPhase6() {
       hints.push(`Add missing tier(s): ${workspace.missing_tiers.map(tierLabel).join(", ")}.`);
     }
     if (alarpBlockingRows > 0) {
-      hints.push("Complete ALARP effort, likelihood reduction, residual risk, and attestation for preventive system actions.");
+      hints.push("Complete effort, likelihood reduction, residual risk, and confirmation for preventive system actions.");
     }
     if (workspace.gate_blockers.includes("bias_guards")) {
-      hints.push("Complete all Phase 5 bias guards before Phase 7.");
+      hints.push("Complete all Phase 5 review checks before Phase 7.");
     }
     if (workspace.gate_blockers.includes("blame_override")) {
-      hints.push("DPA blame-fixation override is required before Phase 7.");
+      hints.push("DPA analysis review approval is required before Phase 7.");
     }
     return hints;
   }, [alarpBlockingRows, workspace.gate_blockers, workspace.missing_tiers]);
@@ -261,9 +261,9 @@ export function SafetyIncidentPhase6() {
         </p>
         <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Recommendations and ALARP</h1>
+            <h1 className="text-3xl font-semibold text-slate-900">Recommendations and Risk Reduction</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Create corrective, preventive, and lessons-learnt actions, link corrective action ownership, and complete ALARP where required.
+              Create corrective, preventive, and lessons-learnt actions, link corrective action ownership, and complete risk-reduction details where required.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 text-sm">
@@ -293,9 +293,9 @@ export function SafetyIncidentPhase6() {
             <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 shadow-sm">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Blame-fixation gate</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Analysis review</p>
                   <h2 className="mt-2 text-lg font-semibold text-slate-950">
-                    {workspace.blame_evaluation.override_by ? "Override recorded" : "DPA override required"}
+                    {workspace.blame_evaluation.override_by ? "Approval recorded" : "DPA approval required"}
                   </h2>
                   <p className="mt-2 leading-6">
                     {workspace.blame_evaluation.all_root_personal_factors && !workspace.blame_evaluation.has_lack_of_control
@@ -303,7 +303,7 @@ export function SafetyIncidentPhase6() {
                       : "The investigation text contains blame-focused language."}
                   </p>
                   {workspace.blame_evaluation.trigger_terms.length > 0 ? (
-                    <p className="mt-2 text-amber-800">Terms: {workspace.blame_evaluation.trigger_terms.join(", ")}</p>
+                    <p className="mt-2 text-amber-800">Words to review: {workspace.blame_evaluation.trigger_terms.join(", ")}</p>
                   ) : null}
                   {workspace.blame_evaluation.override_by ? (
                     <p className="mt-2 font-semibold">Approved by {workspace.blame_evaluation.override_by}</p>
@@ -313,7 +313,7 @@ export function SafetyIncidentPhase6() {
               {!workspace.blame_evaluation.override_by ? (
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-slate-800">
-                    DPA override justification
+                    DPA approval reason
                     <textarea
                       className="mt-2 min-h-28 w-full rounded-2xl border border-amber-300 bg-white p-3 text-slate-900"
                       onChange={(event) => setBlameOverrideJustification(event.target.value)}
@@ -326,7 +326,7 @@ export function SafetyIncidentPhase6() {
                     onClick={submitBlameOverride}
                     type="button"
                   >
-                    {isMutating ? "Saving override..." : "Record DPA override"}
+                    {isMutating ? "Saving approval..." : "Record DPA approval"}
                   </button>
                 </div>
               ) : null}
@@ -405,7 +405,7 @@ export function SafetyIncidentPhase6() {
 
             {draft.tier === "PREVENTIVE" ? (
               <section className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <h3 className="text-sm font-semibold text-slate-900">System Action / ALARP</h3>
+                <h3 className="text-sm font-semibold text-slate-900">System Action / Risk Reduction</h3>
                 <div className="mt-3 grid gap-4 lg:grid-cols-2">
                   <label className="block text-sm font-medium text-slate-700">
                     Theme
@@ -436,7 +436,7 @@ export function SafetyIncidentPhase6() {
                 </div>
                 <label className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
                   <input checked={draft.alarp_attested} onChange={(event) => setDraft((current) => ({ ...current, alarp_attested: event.target.checked }))} type="checkbox" />
-                  ALARP attested
+                  Risk reduction confirmed
                 </label>
               </section>
             ) : null}

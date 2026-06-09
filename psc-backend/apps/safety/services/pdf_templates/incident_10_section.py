@@ -46,13 +46,13 @@ class IncidentPdfContext:
 
 class IncidentTenSectionTemplate:
     SECTION_TITLES = [
-        "1. Cover + Classification",
+        "1. Cover and Classification",
         "2. Investigator / Team Credentials",
         "3. Evidence Collected",
-        "4. Root-Cause Analysis",
-        "5. Causal-Factor Enumeration",
-        "6. Actions + Timeline",
-        "7. Lessons Learnt Narrative",
+        "4. Causes Identified",
+        "5. Contributing Factors",
+        "6. Actions and Timeline",
+        "7. Lessons Learned",
         "8. Fleet Notification Plan",
         "9. Signatures",
         "10. Appendices",
@@ -140,7 +140,7 @@ class IncidentTenSectionTemplate:
             Paragraph(self.SECTION_TITLES[0], self.section_style),
             Paragraph("Formal Incident Report", self.title_style),
             Paragraph(
-                "This export follows the Step 6.1 internal 10-section contract for Safety incident filing and management review.",
+                "This report summarizes the incident classification, investigation evidence, causes, actions, lessons, notifications, and signatures for Safety recordkeeping.",
                 self.body_style,
             ),
             Spacer(1, 4),

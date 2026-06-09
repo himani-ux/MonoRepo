@@ -74,15 +74,25 @@ function buildVesselOptionLabel(vessel: SafetyDashboardVesselOption) {
   return name || code || vessel.id;
 }
 
-function DashboardLoadingState() {
+function DashboardPanelLoadingState({ className = "h-36" }: { className?: string }) {
   return (
-    <section className="space-y-4" role="status">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-36 animate-pulse rounded-[1.75rem] border border-slate-200 bg-slate-100"
-        />
-      ))}
+    <section aria-label="Loading dashboard panel" className="space-y-3" role="status">
+      <div className={`${className} animate-pulse rounded-[1.75rem] border border-slate-200 bg-slate-100`} />
+    </section>
+  );
+}
+
+function DashboardPanelError({
+  error,
+  title,
+}: {
+  error: unknown;
+  title: string;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-rose-900">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-rose-700">{getErrorMessage(error)}</p>
     </section>
   );
 }
@@ -136,22 +146,6 @@ export default function SafetyDashboardRoute() {
       setSelectedVesselId("");
     }
   }, [auth.isGlobal, availableVessels, selectedVesselId]);
-
-  const isLoading =
-    compositeQuery.isLoading ||
-    heinrichQuery.isLoading ||
-    repeatRootQuery.isLoading ||
-    paretoQuery.isLoading ||
-    soiComplianceQuery.isLoading ||
-    caAgingQuery.isLoading;
-
-  const firstError =
-    compositeQuery.error ||
-    heinrichQuery.error ||
-    repeatRootQuery.error ||
-    paretoQuery.error ||
-    soiComplianceQuery.error ||
-    caAgingQuery.error;
 
   const scopeSummary = compositeQuery.data
     ? buildScopeLabel(compositeQuery.data.scope_type, compositeQuery.data.scope_id, selectedVessel)
@@ -312,24 +306,11 @@ export default function SafetyDashboardRoute() {
         </div>
       </section>
 
-      {isLoading ? <DashboardLoadingState /> : null}
-
-      {firstError ? (
-        <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-rose-900">Dashboard unavailable</h2>
-          <p className="mt-2 text-sm leading-6 text-rose-700">{getErrorMessage(firstError)}</p>
-        </section>
+      {compositeQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+      {compositeQuery.error ? (
+        <DashboardPanelError error={compositeQuery.error} title="Safety score unavailable" />
       ) : null}
-
-      {!isLoading &&
-      !firstError &&
-      compositeQuery.data &&
-      heinrichQuery.data &&
-      repeatRootQuery.data &&
-      paretoQuery.data &&
-      soiComplianceQuery.data &&
-      caAgingQuery.data ? (
-        <>
+      {compositeQuery.data ? (
           <SafetyCompositeScoreCard
             componentScores={compositeQuery.data.component_scores}
             compositeScore={compositeQuery.data.composite_score}
@@ -350,7 +331,13 @@ export default function SafetyDashboardRoute() {
             }}
             scoreStatus={compositeQuery.data.score_status}
           />
+      ) : null}
 
+      {heinrichQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+      {heinrichQuery.error ? (
+        <DashboardPanelError error={heinrichQuery.error} title="Heinrich ratio unavailable" />
+      ) : null}
+      {heinrichQuery.data ? (
           <SafetyHeinrichRatioPanel
             confidence={{
               incidentCount12m: heinrichQuery.data.confidence.incident_count_12m,
@@ -365,31 +352,61 @@ export default function SafetyDashboardRoute() {
               message: heinrichQuery.data.reporting_culture_gap.message,
             }}
           />
+      ) : null}
 
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <SafetySoiCompliancePanel
-              currentVessel={currentVesselCard}
-              fleetAverage={{
-                displayValue: soiComplianceQuery.data.fleet_average.display_value,
-                note: soiComplianceQuery.data.fleet_average.note,
-                vesselCount: soiComplianceQuery.data.fleet_average.vessel_count,
-              }}
-              label={soiComplianceQuery.data.label}
-            />
+            {soiComplianceQuery.isLoading ? <DashboardPanelLoadingState className="h-64" /> : null}
+            {soiComplianceQuery.error ? (
+              <DashboardPanelError error={soiComplianceQuery.error} title="SOI compliance unavailable" />
+            ) : null}
+            {soiComplianceQuery.data ? (
+              <SafetySoiCompliancePanel
+                currentVessel={currentVesselCard}
+                fleetAverage={{
+                  displayValue: soiComplianceQuery.data.fleet_average.display_value,
+                  note: soiComplianceQuery.data.fleet_average.note,
+                  vesselCount: soiComplianceQuery.data.fleet_average.vessel_count,
+                }}
+                label={soiComplianceQuery.data.label}
+              />
+            ) : null}
             <aside className="rounded-[1.75rem] border border-slate-200 bg-slate-900 p-5 text-slate-100 shadow-sm">
               <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
                 Rollup Window
               </h2>
               <ul className="mt-4 space-y-3 text-sm leading-6">
-                <li>Composite score window: {compositeQuery.data.window_start} to {compositeQuery.data.window_end}.</li>
-                <li>Heinrich view: {heinrichQuery.data.window_start} to {heinrichQuery.data.window_end}.</li>
-                <li>Repeat-root radar threshold: {repeatRootQuery.data.minimum_repeat_count}+ repeats.</li>
-                <li>Pareto total recurring events: {paretoQuery.data.total_occurrences}.</li>
-                <li>Oldest open corrective action age: {caAgingQuery.data.oldest_age_days} day(s).</li>
+                <li>
+                  Composite score window:{" "}
+                  {compositeQuery.data
+                    ? `${compositeQuery.data.window_start} to ${compositeQuery.data.window_end}`
+                    : "Loading"}.
+                </li>
+                <li>
+                  Heinrich view:{" "}
+                  {heinrichQuery.data
+                    ? `${heinrichQuery.data.window_start} to ${heinrichQuery.data.window_end}`
+                    : "Loading"}.
+                </li>
+                <li>
+                  Repeat-root radar threshold:{" "}
+                  {repeatRootQuery.data ? `${repeatRootQuery.data.minimum_repeat_count}+ repeats` : "Loading"}.
+                </li>
+                <li>
+                  Pareto total recurring events: {paretoQuery.data ? paretoQuery.data.total_occurrences : "Loading"}.
+                </li>
+                <li>
+                  Oldest open corrective action age:{" "}
+                  {caAgingQuery.data ? `${caAgingQuery.data.oldest_age_days} day(s)` : "Loading"}.
+                </li>
               </ul>
             </aside>
           </section>
 
+      {repeatRootQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+      {repeatRootQuery.error ? (
+        <DashboardPanelError error={repeatRootQuery.error} title="Repeat root-cause radar unavailable" />
+      ) : null}
+      {repeatRootQuery.data ? (
           <SafetyRepeatRootRadar
             fleet={repeatRootQuery.data.fleet.map((item) => ({
               categoryName: item.category_name,
@@ -409,7 +426,13 @@ export default function SafetyDashboardRoute() {
               vesselCount: item.vessel_count,
             }))}
           />
+      ) : null}
 
+      {paretoQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+      {paretoQuery.error ? (
+        <DashboardPanelError error={paretoQuery.error} title="Pareto panel unavailable" />
+      ) : null}
+      {paretoQuery.data ? (
           <SafetyParetoPanel
             entries={paretoQuery.data.entries.map((entry) => ({
               categoryName: entry.category_name,
@@ -428,7 +451,13 @@ export default function SafetyDashboardRoute() {
             topN={paretoQuery.data.top_n}
             totalOccurrences={paretoQuery.data.total_occurrences}
           />
+      ) : null}
 
+      {caAgingQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+      {caAgingQuery.error ? (
+        <DashboardPanelError error={caAgingQuery.error} title="Corrective-action aging unavailable" />
+      ) : null}
+      {caAgingQuery.data ? (
           <SafetyCaAgingPipeline
             buckets={caAgingQuery.data.buckets}
             label={caAgingQuery.data.label}
@@ -436,6 +465,7 @@ export default function SafetyDashboardRoute() {
             oldestAgeDays={caAgingQuery.data.oldest_age_days}
             openActionCount={caAgingQuery.data.open_action_count}
           />
+      ) : null}
 
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -494,8 +524,6 @@ export default function SafetyDashboardRoute() {
               </p>
             ) : null}
           </section>
-        </>
-      ) : null}
     </section>
   );
 }

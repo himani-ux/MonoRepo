@@ -34,7 +34,7 @@ export function SafetyClosureSummary({
           Closed Incident Summary
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Read-only closure surface for Phase 9 handoff review, vessel learning,
+          Read-only closure summary for Phase 9 handoff review, vessel learning,
           and audit readiness. Rank persists, and the closure record stays tied
           to the current role-holder rather than any Acting-role variant.
         </p>
@@ -97,7 +97,7 @@ export function SafetyClosureSummary({
           <h2 className="text-lg font-semibold text-slate-900">Visibility Rule</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">{visibilityRule}</p>
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-            DPA-only taxonomy maintenance remains separate from this closure
+            Office classification maintenance remains separate from this closure
             view. Closed-record review is read-only here.
           </div>
         </aside>

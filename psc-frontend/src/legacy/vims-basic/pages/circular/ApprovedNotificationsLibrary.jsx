@@ -1,4 +1,4 @@
-// src/components/ApprovedNotificationsLibrary.jsx
+﻿// src/components/ApprovedNotificationsLibrary.jsx
 import React, { useState, useEffect } from "react";
 import {
     RefreshCcw,
@@ -186,7 +186,7 @@ const ApprovedNotificationsLibrary = () => {
             // console.log("ApprovedNotificationsLibrary: Fetching lookup maps (type, priority)...");
             try {
                 // Fetch Document Types
-                const typeRes = await fetch('/api/circular/api/document-types/');
+                const typeRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
                 if (!typeRes.ok) {
                     throw new Error(`Failed to fetch document types: ${typeRes.status} ${typeRes.statusText}`);
                 }
@@ -211,7 +211,7 @@ const ApprovedNotificationsLibrary = () => {
                 // console.log("ApprovedNotificationsLibrary: Built type UUID to name map:", typeMap);
 
                 // Fetch Priorities
-                const priorityRes = await fetch('/api/circular/api/priorities/');
+                const priorityRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
                 if (!priorityRes.ok) {
                     throw new Error(`Failed to fetch priorities: ${priorityRes.status} ${priorityRes.statusText}`);
                 }
@@ -254,7 +254,7 @@ const ApprovedNotificationsLibrary = () => {
         try {
             setLoading(true);
             const response = await fetch(
-                "/api/circular/api/approved-notifications/"
+                "http://localhost:8000/api/circular/api/approved-notifications/"
             );
             if (!response.ok) {
                 throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
@@ -445,8 +445,8 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             const [vesselsResponse, ranksResponse] = await Promise.all([
-                fetch("/api/circular/api/vessels/"),
-                fetch("/api/circular/api/ranks/"),
+                fetch("http://localhost:8000/api/circular/api/vessels/"),
+                fetch("http://localhost:8000/api/circular/api/ranks/"),
             ]);
 
             if (!vesselsResponse.ok) {
@@ -553,7 +553,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             const approvalResponse = await fetch(
-                `/api/circular/api/notifications/${resendNotification.sr_no}/update-status/`,
+                `http://localhost:8000/api/circular/api/notifications/${resendNotification.sr_no}/update-status/`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -574,7 +574,7 @@ const ApprovedNotificationsLibrary = () => {
 
             if (selectedVesselIds.length > 0) {
                 const vesselResponse = await fetch(
-                    "/api/circular/api/notifications/send-emails/",
+                    "http://localhost:8000/api/circular/api/notifications/send-emails/",
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -592,7 +592,7 @@ const ApprovedNotificationsLibrary = () => {
 
             if (selectedRankIds.length > 0) {
                 const rankResponse = await fetch(
-                    `/api/circular/api/notifications/${resendNotification.sr_no}/link-ranks/`,
+                    `http://localhost:8000/api/circular/api/notifications/${resendNotification.sr_no}/link-ranks/`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -623,12 +623,12 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for View Seen Crews Button ---
     const handleViewSeenCrews = async (notificationSrNo) => { // Accept the SR No string
-        console.log("🚀 handleViewSeenCrews: Fetching seen crews for notification SR No:", notificationSrNo);
+        console.log("ðŸš€ handleViewSeenCrews: Fetching seen crews for notification SR No:", notificationSrNo);
         setViewingSeenCrews(notificationSrNo); // Set the SR No to view
         setLoadingSeenCrews(true); // Start loading
 
         try {
-            const response = await fetch(`/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -638,7 +638,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("✅ handleViewSeenCrews: Successfully fetched delivery records for notification", notificationSrNo);
+                console.log("âœ… handleViewSeenCrews: Successfully fetched delivery records for notification", notificationSrNo);
                 setSeenCrewsData(result.delivery_records || []); // Store the data (ensure it's an array)
                 setLoadingSeenCrews(false); // Stop loading
             } else {
@@ -662,7 +662,7 @@ const ApprovedNotificationsLibrary = () => {
     // --- NEW: Handler for Send Individual Reminder Button ---
     const handleSendIndividualReminder = async (notificationSrNo, crewId, crewLabel = null) => {
         const targetCrewLabel = crewLabel || crewId;
-        console.log(`🔔 handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
+        console.log(`ðŸ”” handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
         const confirmed = window.confirm(`Are you sure you want to send a reminder to ${targetCrewLabel} for notification ${notificationSrNo}?`);
         if (!confirmed) {
             console.log("handleSendIndividualReminder: User cancelled individual reminder.");
@@ -674,7 +674,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             // Call the backend endpoint to update the reminder_sent_at field for this specific crew and notification
-            const response = await fetch(`/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -687,7 +687,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("✅ handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
+                console.log("âœ… handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
                 alert(`Reminder sent successfully to ${targetCrewLabel}.`);
                 setSeenCrewsData((prev) =>
                     prev.map((record) =>
@@ -716,7 +716,7 @@ const ApprovedNotificationsLibrary = () => {
     // --- NEW: Handler for Delete Button (with Role-Based Check) ---
 
      const handleDelete = async (srNoToDelete) => {
-        console.log(`🚀 handleDelete: Attempting to delete notification ${srNoToDelete}`);
+        console.log(`ðŸš€ handleDelete: Attempting to delete notification ${srNoToDelete}`);
 
         // --- REMOVED: Admin Role Check ---
         // Any user can now attempt to delete
@@ -729,7 +729,7 @@ const ApprovedNotificationsLibrary = () => {
         }
 
         try {
-            const response = await fetch(`/api/circular/api/notifications/${srNoToDelete}/delete/`, {
+            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoToDelete}/delete/`, {
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -742,7 +742,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log(`✅ handleDelete: Successfully deleted notification ${srNoToDelete}`);
+                console.log(`âœ… handleDelete: Successfully deleted notification ${srNoToDelete}`);
                 alert(result.message || 'Notification deleted successfully.');
 
                 // Update the local state to remove the deleted notification
@@ -754,11 +754,11 @@ const ApprovedNotificationsLibrary = () => {
                 );
 
             } else {
-                console.error(`❌ handleDelete: Failed to delete notification ${srNoToDelete}`, result.error);
+                console.error(`âŒ handleDelete: Failed to delete notification ${srNoToDelete}`, result.error);
                 alert(`Error deleting notification: ${result.error || 'Unknown error'}`);
             }
         } catch (err) {
-            console.error(`💥 handleDelete: Network error deleting notification ${srNoToDelete}`, err);
+            console.error(`ðŸ’¥ handleDelete: Network error deleting notification ${srNoToDelete}`, err);
             alert('Network error occurred while deleting notification.');
         }
     };
@@ -787,7 +787,7 @@ const ApprovedNotificationsLibrary = () => {
         console.log("handleDownloadCSV: Query parameters for CSV download:", params.toString());
 
         // Construct the full URL for the CSV endpoint
-        const csvDownloadUrl = `/api/circular/api/approved-notifications/download-csv/?${params}`;
+        const csvDownloadUrl = `http://localhost:8000/api/circular/api/approved-notifications/download-csv/?${params}`;
 
         // Trigger the download by setting window.location.href
         // This is the standard way to trigger a file download from a link via JavaScript
@@ -814,11 +814,11 @@ const ApprovedNotificationsLibrary = () => {
                 ? '/circular/admin'
                 : '/circular/office')
             : '/login';
-        console.log(`🚀 handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
+        console.log(`ðŸš€ handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
 
         try {
             localStorage.setItem('supersedingNotificationId', srNoToSupersede);
-            console.log(`✅ handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
+            console.log(`âœ… handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
 
             localStorage.setItem('oldNotificationType', notificationToSupersede.msc_type || '');
             localStorage.setItem(
@@ -833,10 +833,10 @@ const ApprovedNotificationsLibrary = () => {
             localStorage.setItem('oldNotificationSubCatNames', JSON.stringify(oldSubCatNames));
             localStorage.setItem('oldNotificationSecondSubCatNames', JSON.stringify(oldSecondSubCatNames));
 
-            console.log('✅ handleSupersede: Stored old notification details in localStorage for pre-filling.');
+            console.log('âœ… handleSupersede: Stored old notification details in localStorage for pre-filling.');
             window.location.href = redirectPath;
         } catch (storageError) {
-            console.error(`❌ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
+            console.error(`âŒ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
             localStorage.setItem('supersedingNotificationId', srNoToSupersede);
             window.location.href = redirectPath;
         }
@@ -897,7 +897,7 @@ const ApprovedNotificationsLibrary = () => {
             <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-md">
                 <div className="flex flex-wrap items-center justify-between gap-4">
 
-                    {/* Left Section – Search + Filters */}
+                    {/* Left Section â€“ Search + Filters */}
                     <div className="flex flex-wrap items-center gap-4">
 
                         {/* Search */}
@@ -938,7 +938,7 @@ const ApprovedNotificationsLibrary = () => {
                         </select>
                     </div>
 
-                    {/* Right Section – Sort & Buttons */}
+                    {/* Right Section â€“ Sort & Buttons */}
                     <div className="flex items-center gap-3">
 
                         {/* Sort */}
@@ -995,7 +995,7 @@ const ApprovedNotificationsLibrary = () => {
                         )}
                     </span>{" "}
                     of {filteredNotifications.length} approved notifications
-                    {totalPages > 1 ? ` · Page ${safeCurrentPage} of ${totalPages}` : ""}
+                    {totalPages > 1 ? ` Â· Page ${safeCurrentPage} of ${totalPages}` : ""}
                 </p>
 
                 {filteredNotifications.length === 0 ? (
@@ -1012,13 +1012,13 @@ const ApprovedNotificationsLibrary = () => {
                                 <CardContent className="p-4">
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="min-w-0">
-                                            <div className="font-medium text-neutral-900">{n.sr_no || '—'}</div>
+                                            <div className="font-medium text-neutral-900">{n.sr_no || 'â€”'}</div>
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <WithPermission id="PSC_P_020">
                                                 {n.attachment_url ? (
                                                     <a
-                                                        href={`${n.attachment_url}`}
+                                                        href={/^https?:\/\//i.test(n.attachment_url) ? n.attachment_url : "http://localhost:8000" + n.attachment_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         process-id="PSC_P_020"

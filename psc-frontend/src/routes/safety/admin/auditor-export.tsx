@@ -9,7 +9,6 @@ const RECORD_TYPES = [
   { label: "Near misses", value: "NEAR_MISS" },
   { label: "SOI", value: "SOI" },
   { label: "SCM", value: "SCM" },
-  { label: "Corrective actions", value: "CORRECTIVE_ACTION" },
 ] as const;
 
 function formatDate(date: Date): string {

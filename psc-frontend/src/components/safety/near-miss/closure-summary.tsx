@@ -1,5 +1,3 @@
-import { SafetyAnonymityBadge } from "../shared/anonymity-badge";
-
 export interface SafetyNearMissClosureSummaryPayload {
   auditSummary: {
     fieldHistoryCount: number;
@@ -22,7 +20,6 @@ export function SafetyNearMissClosureSummary({
   closureReason,
   incidentNumber,
   priority,
-  reporterVisible,
   state,
   vesselId,
   vesselName,
@@ -39,8 +36,7 @@ export function SafetyNearMissClosureSummary({
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
           Read-only closure surface for the lightweight near-miss path. Reporter
-          masking remains server-owned and must survive every exit, including the
-          audit trail and future PDF/search seams.
+          details are available to authorized users.
         </p>
       </header>
 
@@ -105,8 +101,7 @@ export function SafetyNearMissClosureSummary({
 
         <aside className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold text-slate-900">Reporter Visibility</h2>
-            <SafetyAnonymityBadge masked={!reporterVisible} />
+            <h2 className="text-lg font-semibold text-slate-900">Reporter Details</h2>
           </div>
           <p className="text-sm leading-6 text-slate-600">{visibilityRule}</p>
           <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">

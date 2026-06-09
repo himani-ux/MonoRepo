@@ -246,6 +246,13 @@ function formatRestHours(value: number | string | null | undefined) {
   return Number.isFinite(normalized) ? `${normalized.toFixed(1)} h` : "Unavailable";
 }
 
+function nullableCoordinate(value: string | number | null | undefined) {
+  if (value === null || value === undefined || String(value).trim() === "") {
+    return null;
+  }
+  return value;
+}
+
 function rankShortCode(rankName: string | null | undefined) {
   const normalized = String(rankName ?? "")
     .trim()
@@ -471,6 +478,8 @@ export function SafetyScmTenSectionForm({
 
     onSubmit?.({
       ...validationResult.data,
+      latitude: nullableCoordinate(validationResult.data.latitude),
+      longitude: nullableCoordinate(validationResult.data.longitude),
       attendance_rows: values.attendance_rows.map((row) => ({
         absence_reason: row.present ? null : row.absence_reason?.trim() || null,
         crew_id: row.crew_id,
@@ -545,9 +554,9 @@ export function SafetyScmTenSectionForm({
         <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Cadence status</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Monthly Meeting Status</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Monthly cadence stays warning-only at CO preparation stage. Master sign-off still enforces the overdue SOI hard block later.
+                This shows if the monthly meeting is on time or late.
               </p>
             </div>
             <span
@@ -555,22 +564,22 @@ export function SafetyScmTenSectionForm({
                 config.cadence_status.is_overdue ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
               }`}
             >
-              {config.cadence_status.is_overdue ? "Overdue" : "On cycle"}
+              {config.cadence_status.is_overdue ? "Late" : "On time"}
             </span>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <DetailCard
-              label="Last regular closure"
+              label="Last meeting closed"
               value={formatDateTime(config.cadence_status.last_regular_closed_at)}
             />
             <DetailCard
-              label="Next due date"
+              label="Next meeting due"
               value={formatShortDate(config.cadence_status.next_due_date)}
             />
             <DetailCard
-              label="Days since closure"
-              value={config.cadence_status.days_since_last_regular_closure?.toString() ?? "First cycle"}
+              label="Days since last meeting"
+              value={config.cadence_status.days_since_last_regular_closure?.toString() ?? "First meeting"}
             />
           </div>
 
@@ -610,7 +619,7 @@ export function SafetyScmTenSectionForm({
             <div>
               <h2 className="text-lg font-semibold text-rose-950">Overdue SOI warning</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-rose-900">
-                This does not block CO meeting creation, but it will block Master sign-off until the overdue SOI areas are cleared.
+                Review these overdue SOI areas before office comments close the meeting.
               </p>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-rose-700">
@@ -625,7 +634,7 @@ export function SafetyScmTenSectionForm({
         </section>
       ) : null}
 
-      <SafetyClosedSinceLastBlock payload={config.closed_since_last} title="Closed since previous SCM sign-off" />
+      <SafetyClosedSinceLastBlock payload={config.closed_since_last} title="Closed since previous SCM" />
 
       {autoFeedPayload ? <SafetyScmAutoFeed payload={autoFeedPayload} /> : null}
 
@@ -1034,7 +1043,7 @@ export function SafetyScmTenSectionForm({
           </p>
           <h2 className="mt-1 text-xl font-semibold text-slate-900">Office Review</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            OFFICECOMMENTS and IsReviewed are completed by shore office review after vessel submission. They are not required during vessel SCM creation.
+            OFFICE COMMENTS are Restricted to Office users only.
           </p>
         </article>
       </section>
@@ -1066,11 +1075,7 @@ export function SafetyScmTenSectionForm({
           >
             {isSubmitting
               ? (submittingLabel ?? (formMode === "edit" ? "Updating..." : "Creating..."))
-              : (submitLabel ?? (formMode === "edit"
-                ? "Update Meeting"
-                : isAdHoc
-                  ? "Create Ad-Hoc Meeting"
-                  : "Create Regular Meeting"))}
+              : (submitLabel ?? "Submit to office")}
           </button>
         </div>
       </section>

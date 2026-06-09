@@ -24,7 +24,7 @@ The Incident section is not part of this deployment. If a serious accident, inju
 | Corrective action | The action needed to correct a finding. |
 | DPA | Designated Person Ashore. Shore-side safety authority. |
 | FM | Fleet Manager. Shore-side fleet authority. |
-| Master | Vessel Master. Final onboard sign-off authority. |
+| Master | Vessel Master. Can create/edit SCM before Office Comment closure. |
 | CO | Chief Officer. Usually prepares or hosts vessel safety work. |
 | SO | Safety Officer. Usually the CO, or another assigned officer when allowed. |
 
@@ -37,7 +37,7 @@ The Incident section is not part of this deployment. If a serious accident, inju
 | CO / Safety Officer | Prepare SCM records and carry out SOI work. |
 | DPA | Review Near Misses, issue circular/alert for high-priority learning, approve SOI applicability changes, review fleet safety status. |
 | FM | Review fleet safety status and high-priority Near Miss closure where required. |
-| Office reviewer | Review signed SCM records and add office comments. |
+| Office reviewer | Add Office Comment to SCM. Saving Office Comment closes the meeting. |
 
 ## Safety Module Home
 
@@ -221,7 +221,7 @@ The form includes:
 - circular or safety alert review
 - SOI observations
 - findings and corrective measures
-- minutes and decisions
+- minutes and Suggestions / Recommendations
 
 ### Step 2: Complete Sections 1 to 9
 
@@ -240,58 +240,45 @@ Important sections include:
 
 For repeatable fields such as Q&S topics or findings, only filled rows are printed in the PDF.
 
-### Step 3: Attendance and Signatures
+### Step 3: Attendance and WRH
 
 The meeting records:
 
 - who attended
 - work/rest-hour warning status where available
-- attendee signatures
-- CO signature where required
-- Master final sign-off
+- absent reason where needed
 
-WRH warnings must be acknowledged, but they do not stop meeting creation.
+WRH warnings do not stop meeting creation, PDF download, or Office Comment closure.
 
-### Step 4: Master Sign-Off
+### Step 4: Office Comment and Closure
 
-The Master performs final onboard sign-off.
+The office reviewer enters Office Comment.
 
-Before sign-off, the system checks:
+Before office closes the meeting, Master or CO should check:
 
 - required sections are complete
-- required decisions/actions are filled
-- attendance warnings are acknowledged
-- required signatures are captured
-- overdue SOI blockers are cleared where applicable
+- suggestions / recommendations are filled where action is needed
+- attendance is correct
+- findings and corrective measures are clear
 
-After Master sign-off, the vessel-side meeting is closed.
+After Office Comment is saved, the meeting is closed and vessel-side editing stops.
 
-### Step 5: Office Review
+### Step 5: PDF / Print
 
-After the meeting is signed by the Master, office users review it.
-
-Office review includes:
-
-- office comments
-- review status
-
-The office review appears as Section 10 in the SCM PDF.
-
-### Step 6: PDF / Print
-
-The SCM PDF is the meeting minutes record.
+The SCM PDF is the meeting minutes record and is available after the meeting is created.
 
 It includes:
 
 - meeting details
 - attendance
 - closed items since last SCM
-- sections 1 to 10
+- sections 1 to 9
 - SOI observations
 - findings and corrective measures
 - meeting minutes
-- decisions/actions
-- signatures
+- suggestions / recommendations
+- Office Comment when saved
+- blank Master Signature and Chief Officer Signature lines
 
 The PDF should not show developer notes, internal project notes, or document-control text.
 
@@ -439,7 +426,7 @@ Notifications may appear for:
 - Near Miss review
 - Near Miss triage
 - SOI finding closure
-- SCM sign-off
+- SCM Office Comment
 - office review
 - overdue safety actions
 
@@ -488,11 +475,10 @@ PDFs should not show:
 
 - Attendance is correct.
 - Required sections are complete.
-- Decisions/actions are entered.
+- Suggestions / recommendations are entered where action is needed.
 - Findings have corrective measures.
-- Attendees and CO have signed where required.
-- Master sign-off is complete.
-- Office comments are added after vessel sign-off.
+- Office Comment is added when office is ready to close.
+- Latest PDF is downloaded after final changes.
 
 ### SOI
 
@@ -518,9 +504,9 @@ Crew reports Near Miss
 
 Master/CO creates meeting
 -> sections and attendance completed
--> attendees/CO sign
--> Master signs off
--> office adds Section 10 review
+-> PDF can be downloaded
+-> office adds Office Comment
+-> meeting closes
 -> PDF minutes generated
 
 ### Safety Officer Inspection
@@ -539,6 +525,6 @@ Safety Officer creates SOI
 - Reporter identity in Near Miss is protected.
 - SOI remains paper-first.
 - SCM Regular and Ad-Hoc meetings can be hosted by Master or CO.
-- Master final sign-off is required for SCM.
-- Office review is added after vessel-side SCM sign-off.
+- SCM closes when office saves Office Comment.
+- SCM PDF has blank Master and CO signature lines, but the system does not capture SCM digital signatures.
 - PDFs are official records and should be printed or shared as required by company procedure.

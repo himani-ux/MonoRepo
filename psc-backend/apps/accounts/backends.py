@@ -55,6 +55,7 @@ class AuthenticatedUser:
         safety_role_name: Optional[str] = None,
         vessel_ids: Optional[list[str]] = None,
         vessel_names: Optional[list[str]] = None,
+        profile_id: Optional[str] = None,
     ):
         # 🔐 Primary UUID (DB relations should use this)
         self.user_id = str(user_id)
@@ -81,6 +82,7 @@ class AuthenticatedUser:
         self.has_global_vessel_access = has_global_vessel_access
         self.role_name = role_name or role
         self.safety_role_name = safety_role_name or self.role_name
+        self.profile_id = str(profile_id) if profile_id not in (None, "") else None
         self.vessel_ids = vessel_ids or ([str(vessel_id)] if vessel_id else [])
         self.vessel_names = vessel_names or ([str(vessel_name)] if vessel_name else [])
 
@@ -168,6 +170,7 @@ class AuthenticatedUser:
             "display_name": self.display_name,
             "role_name": self.role_name,
             "safety_role_name": self.safety_role_name,
+            "profile_id": self.profile_id,
             "username": self.username,
             "UserName": self.username,
             "work_side": self.work_side,
@@ -269,6 +272,7 @@ class PSCJWTAuthentication(JWTAuthentication):
             rank = validated_token.get("rank")
             role_name = validated_token.get("role_name")
             safety_role_name = validated_token.get("safety_role_name")
+            profile_id = validated_token.get("profile_id")
             form_ids = validated_token.get("form_ids") or []
             process_ids = validated_token.get("process_ids") or []
             has_global_vessel_access = validated_token.get("has_global_vessel_access")
@@ -288,6 +292,7 @@ class PSCJWTAuthentication(JWTAuthentication):
                     role = snapshot.get("role") or role
                     role_name = snapshot.get("role_name") or role_name
                     safety_role_name = snapshot.get("safety_role_name") or safety_role_name
+                    profile_id = snapshot.get("profile_id") or profile_id
                     full_name = snapshot.get("full_name") or full_name
                     email = snapshot.get("email") or email
                     employee_id = snapshot.get("employee_id") or employee_id
@@ -335,6 +340,7 @@ class PSCJWTAuthentication(JWTAuthentication):
                 has_global_vessel_access=has_global_vessel_access,
                 role_name=role_name,
                 safety_role_name=safety_role_name,
+                profile_id=profile_id,
                 vessel_ids=validated_token.get("vessel_ids") or None,
                 vessel_names=validated_token.get("vessel_names") or None,
             )
@@ -565,7 +571,7 @@ class PSCAuthenticationBackend(BaseBackend):
                 profile_name=user.employee_role,
             )
 
-            from .utils import get_profile_permissions, get_office_permissions_by_mapping
+            from .utils import get_profile_permissions, get_office_permissions_by_mapping, get_office_profile_id_by_mapping
             form_ids, process_ids = get_office_permissions_by_mapping(
                 username=username,
                 employee_id=user.employee_id,
@@ -575,6 +581,11 @@ class PSCAuthenticationBackend(BaseBackend):
             if not form_ids and not process_ids:
                 # Fallback: some profiles are keyed by role codes (OFFICE_PIC, DPA, etc.)
                 form_ids, process_ids = get_profile_permissions(role, work_side=False)
+            profile_id = get_office_profile_id_by_mapping(
+                username=normalized_username,
+                employee_id=user.employee_id,
+                profile_name=user.employee_role,
+            )
 
             authenticated_user = AuthenticatedUser(
                 user_id=str(user.employee_id),
@@ -590,6 +601,7 @@ class PSCAuthenticationBackend(BaseBackend):
                 has_global_vessel_access=has_global_vessel_access,
                 role_name=user.employee_role or role,
                 safety_role_name=safety_role_name,
+                profile_id=profile_id,
             )
             authenticated_user.vessel_ids = _assigned_office_vessel_ids(authenticated_user)
             authenticated_user.vessel_names = _assigned_office_vessel_names(authenticated_user)

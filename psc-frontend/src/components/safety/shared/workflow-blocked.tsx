@@ -56,7 +56,7 @@ export default function SafetyWorkflowBlocked({
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-            SSOT guarantees before release
+            Required checks before release
           </h2>
           <ul className="mt-4 space-y-3 text-sm text-slate-700">
             {requiredGuarantees.map((item) => (

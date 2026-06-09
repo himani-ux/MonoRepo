@@ -17,10 +17,12 @@ from apps.safety.models import SCMLegacyField, SCMMeeting, SafetyFieldHistory
 from apps.safety.views.scm_office_comment import SCMOfficeCommentView
 
 
-def build_user(*, role_name: str, user_id: str):
+def build_user(*, role_name: str, user_id: str, profile_id: str | None = None):
     return SimpleNamespace(
         id=user_id,
         is_authenticated=True,
+        login_id=user_id,
+        profile_id=profile_id,
         username=user_id,
         role_name=role_name,
         safety_role_name=role_name,
@@ -50,13 +52,11 @@ class SCMOfficeCommentTests(unittest.TestCase):
             location="Singapore Anchorage",
             chair_crew_id="master-7",
             prepared_by_crew_id="co-7",
-            state=SCMMeeting.State.SIGNED_OFF,
-            master_signed_off_at=timezone.now(),
-            master_signed_off_by="master-7",
+            state=SCMMeeting.State.DRAFT,
             created_by="co-7",
         )
 
-    def test_dpa_can_add_audited_office_comment_without_changing_scm_state(self) -> None:
+    def test_dpa_can_add_audited_office_comment_and_close_meeting(self) -> None:
         request = self.factory.post(
             f"/api/safety/scm/{self.meeting.id}/office-comment/",
             {"office_comment": "Follow up trend with vessel team."},
@@ -68,7 +68,7 @@ class SCMOfficeCommentTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.meeting.refresh_from_db()
-        self.assertEqual(self.meeting.state, SCMMeeting.State.SIGNED_OFF)
+        self.assertEqual(self.meeting.state, SCMMeeting.State.CLOSED)
         self.assertEqual(self.meeting.office_comment, "Follow up trend with vessel team.")
         self.assertEqual(self.meeting.office_comment_by, "dpa-1")
         self.assertTrue(
@@ -95,6 +95,29 @@ class SCMOfficeCommentTests(unittest.TestCase):
             "true",
         )
 
+    def test_marine_superintendent_profile_can_add_office_comment(self) -> None:
+        request = self.factory.post(
+            f"/api/safety/scm/{self.meeting.id}/office-comment/",
+            {"office_comment": "Marine superintendent review completed."},
+            format="json",
+        )
+        force_authenticate(
+            request,
+            user=build_user(
+                role_name="MARINE SUPERINTENDENT",
+                user_id="marine-supt-1",
+                profile_id="407EF017-0F1C-EF11-A9F1-F348983BAE6B",
+            ),
+        )
+
+        response = self.view(request, id=self.meeting.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.meeting.refresh_from_db()
+        self.assertEqual(self.meeting.state, SCMMeeting.State.CLOSED)
+        self.assertEqual(self.meeting.office_comment, "Marine superintendent review completed.")
+        self.assertEqual(self.meeting.office_comment_by, "marine-supt-1")
+
     def test_ship_user_cannot_add_office_comment(self) -> None:
         request = self.factory.post(
             f"/api/safety/scm/{self.meeting.id}/office-comment/",
@@ -107,28 +130,21 @@ class SCMOfficeCommentTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_office_comment_requires_master_signoff(self) -> None:
-        unsigned_meeting = SCMMeeting.objects.create(
-            vessel_id="7",
-            scm_number="ABC-29-Apr-2026",
-            meeting_type=SCMMeeting.MeetingType.REGULAR,
-            meeting_date=date(2026, 4, 29),
-            meeting_time_local="10:00:00",
-            location="Singapore Anchorage",
-            chair_crew_id="master-7",
-            prepared_by_crew_id="co-7",
-            state=SCMMeeting.State.SUBMITTED,
-            created_by="co-7",
-        )
+    def test_office_comment_cannot_be_added_twice_after_closure(self) -> None:
+        self.meeting.office_comment = "Already reviewed."
+        self.meeting.office_comment_at = timezone.now()
+        self.meeting.office_comment_by = "dpa-1"
+        self.meeting.state = SCMMeeting.State.CLOSED
+        self.meeting.save(update_fields=("office_comment", "office_comment_at", "office_comment_by", "state"))
         request = self.factory.post(
-            f"/api/safety/scm/{unsigned_meeting.id}/office-comment/",
-            {"office_comment": "Office review before sign-off."},
+            f"/api/safety/scm/{self.meeting.id}/office-comment/",
+            {"office_comment": "Second office review."},
             format="json",
         )
         force_authenticate(request, user=build_user(role_name="DPA", user_id="dpa-1"))
 
-        response = self.view(request, id=unsigned_meeting.id)
+        response = self.view(request, id=self.meeting.id)
 
         self.assertEqual(response.status_code, 400)
-        unsigned_meeting.refresh_from_db()
-        self.assertIsNone(unsigned_meeting.office_comment)
+        self.meeting.refresh_from_db()
+        self.assertEqual(self.meeting.office_comment, "Already reviewed.")

@@ -46,16 +46,6 @@ class SCMLegacyAttendanceRow:
 
 
 @dataclass(frozen=True)
-class SCMLegacySignatureRow:
-    label: str
-    status: str
-    signed_by: str | None = None
-    signed_at: str | None = None
-    typed_name: str | None = None
-    note: str | None = None
-
-
-@dataclass(frozen=True)
 class SCMLegacySectionRow:
     agenda_item_number: int
     section_label: str
@@ -95,7 +85,6 @@ class SCMLegacyPdfContext:
     soi_auto_feed_summary: dict[str, object] = field(default_factory=dict)
     soi_observation_rows: list[SCMLegacySoiObservationRow] = field(default_factory=list)
     attendance_rows: list[SCMLegacyAttendanceRow] = field(default_factory=list)
-    signature_rows: list[SCMLegacySignatureRow] = field(default_factory=list)
     section_rows: list[SCMLegacySectionRow] = field(default_factory=list)
 
 
@@ -213,17 +202,9 @@ class SCMTenSectionLegacyTemplate:
                 f"Meeting Type: {context.meeting_type}",
             ),
             self._build_meta_grid(context),
-            self._build_note(
-                "This template is used for Regular and Ad-Hoc SCM. For Ad-Hoc, the monthly Regular SCM cadence still anchors on the last SCM closure timestamp."
-            ),
-            Paragraph("Attendance and WRH Snapshot", self.section_style),
             *self._build_attendance_block(context),
-            self._build_warning_note(
-                "WRH gaps are amber warnings only. They must be acknowledged by the Master, but they do not block creation, conduct, or closure of SCM minutes."
-            ),
             Paragraph("Closed Items Since Last SCM", self.section_style),
             *self._build_closed_since_last_block(context),
-            *self._build_soi_feed_block(section_7, context),
             Spacer(1, 10),
         ]
 
@@ -232,13 +213,12 @@ class SCMTenSectionLegacyTemplate:
             "",
             f"SCM No: {context.scm_number}",
         )
+        story.append(record_header)
+        story.extend(self._build_soi_feed_block(section_7, context))
         section_1 = sections.get(1)
         if section_1 is not None:
             section_1_block = self._build_section_box(section_1, self._section_subtitle(1))
-            story.append(KeepTogether([record_header, *section_1_block[:2]]))
-            story.extend(section_1_block[2:])
-        else:
-            story.append(record_header)
+            story.extend(section_1_block)
 
         for index in range(2, 7):
             section = sections.get(index)
@@ -257,15 +237,7 @@ class SCMTenSectionLegacyTemplate:
             story.extend(self._build_minutes_box(section_8))
         if section_9 is not None:
             story.extend(self._build_office_review_box(section_9, context))
-        story.extend(
-            [
-                Paragraph("Digital Signatures", self.section_style),
-                *self._build_signature_block(context),
-                self._build_note(
-                    "Near-miss discussion is printed without exposing restricted reporter identity. SOI remains paper-first; this PDF references records and does not introduce scan upload flow."
-                ),
-            ]
-        )
+        story.extend(self._build_signature_box())
 
         document.build(story, onFirstPage=self._draw_footer, onLaterPages=self._draw_footer)
         return buffer.getvalue()
@@ -275,10 +247,9 @@ class SCMTenSectionLegacyTemplate:
             return []
         return [
             Spacer(1, 8),
-            Paragraph("SOI Feed, Actions, Comments, Signatures", self.section_style),
             *self._build_custom_section_box(
-                "Safety Observations for the Month",
-                "SOI Auto-Feed",
+                "SOI Feed, Actions, Comments, Signatures",
+                "",
                 self._build_soi_observation_block(
                     section,
                     context.soi_auto_feed_summary,
@@ -438,10 +409,10 @@ class SCMTenSectionLegacyTemplate:
 
     def _build_attendance_block(self, context: SCMLegacyPdfContext) -> list[object]:
         if not context.attendance_rows:
-            rows = [["Rank", "Name", "Attendance", "WRH Status", "Digital Signature Status"], ["-", "No attendance rows recorded.", "-", "-", "-"]]
+            rows = [["Rank", "Name", "Attendance", "WRH Status", "Remarks"], ["-", "No attendance rows recorded.", "-", "-", "-"]]
         else:
             rows = [
-                ["Rank", "Name", "Attendance", "WRH Status", "Digital Signature Status"],
+                ["Rank", "Name", "Attendance", "WRH Status", "Remarks"],
                 *[
                     [
                         row.rank_name,
@@ -453,55 +424,36 @@ class SCMTenSectionLegacyTemplate:
                     for row in context.attendance_rows
                 ],
             ]
-        return [self._styled_table(rows, repeatRows=1, colWidths=[27 * mm, 40 * mm, 28 * mm, 34 * mm, 41 * mm])]
+        return [
+            self._titled_styled_table(
+                "Attendance and WRH Snapshot",
+                rows,
+                repeatRows=1,
+                colWidths=[27 * mm, 40 * mm, 28 * mm, 34 * mm, 41 * mm],
+            )
+        ]
 
     @staticmethod
     def _absent_status(row: SCMLegacyAttendanceRow) -> str:
         reason = str(row.absence_reason or "").strip()
         return f"Absent - Reason: {reason}" if reason else "Absent"
 
-    def _build_signature_block(self, context: SCMLegacyPdfContext) -> list[object]:
-        rows = context.signature_rows or [SCMLegacySignatureRow(label="Master signature", status="Awaiting signature")]
-        master = next((row for row in rows if "master" in row.label.lower()), None)
-        co = next((row for row in rows if "co" in row.label.lower()), None)
-        attendees = [row for row in rows if row.label.lower().startswith("attendee")]
-        signed_attendees = [row for row in attendees if row.signed_at or row.status.lower() == "signed"]
-        cards = [
-            self._signature_card("Master", master),
-            self._signature_card("Chief Officer", co),
+    def _build_signature_box(self) -> list[object]:
+        return self._build_custom_section_box(
+            "Signatures",
+            "",
             [
-                Paragraph("Attendee Signatures", self.header_style),
-                Paragraph(f"{len(signed_attendees)} of {len(attendees)} captured", self.small_style),
-                Paragraph("Per attendance list", self.meta_style),
+                self._styled_table(
+                    [
+                        ["Master Signature", "Chief Officer Signature"],
+                        ["____________________________", "____________________________"],
+                        ["Name / Date", "Name / Date"],
+                    ],
+                    repeatRows=1,
+                    colWidths=[85 * mm, 85 * mm],
+                )
             ],
-        ]
-        table = Table([cards], colWidths=[54 * mm, 54 * mm, 54 * mm], hAlign="LEFT")
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BOX", (0, 0), (-1, -1), 0.6, self.line),
-                    ("INNERGRID", (0, 0), (-1, -1), 0.6, self.line),
-                    ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-                    ("TOPPADDING", (0, 0), (-1, -1), 7),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ]
-            )
         )
-        return [table]
-
-    def _signature_card(self, title: str, row: SCMLegacySignatureRow | None) -> list[object]:
-        return [
-            Paragraph("________________________", self.meta_style),
-            Paragraph(escape(title), self.header_style),
-            Paragraph(escape(row.typed_name or row.signed_by or "-" if row else "-"), self.small_style),
-            Paragraph(
-                escape(f"Signed: {row.signed_at}" if row and row.signed_at else (row.status if row else "Awaiting signature")),
-                self.meta_style,
-            ),
-        ]
 
     def _section_subtitle(self, index: int) -> str:
         return {
@@ -604,8 +556,8 @@ class SCMTenSectionLegacyTemplate:
 
     def _build_custom_section_box(self, title: str, subtitle: str, body: list[object]) -> list[object]:
         title_table = Table(
-            [[Paragraph(escape(title), self.header_style), Paragraph(escape(subtitle), self.header_style)]],
-            colWidths=[118 * mm, 52 * mm],
+            [[Paragraph(escape(title), self.header_style)]],
+            colWidths=[170 * mm],
             hAlign="LEFT",
         )
         title_table.setStyle(
@@ -622,12 +574,14 @@ class SCMTenSectionLegacyTemplate:
         )
         if body:
             first_body, remaining_body = body[0], body[1:]
-            return [
-                Spacer(1, 6),
-                KeepTogether([title_table, first_body]),
-                *remaining_body,
-                Spacer(1, 2),
-            ]
+            if self._can_keep_with_section_title(first_body):
+                return [
+                    Spacer(1, 6),
+                    KeepTogether([title_table, first_body]),
+                    *remaining_body,
+                    Spacer(1, 2),
+                ]
+            return [Spacer(1, 6), title_table, *body, Spacer(1, 2)]
         return [Spacer(1, 6), title_table, Spacer(1, 2)]
 
     def _build_soi_observation_block(
@@ -643,38 +597,11 @@ class SCMTenSectionLegacyTemplate:
                     "Inspection Count and Coverage",
                     str(summary.get("summary_text") or section.decision or "Recorded in SCM agenda."),
                 ],
-                ["Open SOI Findings", self._format_open_soi_findings(observations)],
-                ["Minimum Narrative", "Open observations were reviewed by the committee and action owners were assigned where applicable."],
+                ["Minimum Narrative", "SOI feed summary was reviewed by the committee. Findings and corrective measures are recorded in Section 7."],
             ],
             colWidths=[50 * mm, 120 * mm],
         )
-        if not observations:
-            return [
-                summary_table,
-                Spacer(1, 4),
-                self._styled_table(
-                    [["Open SOI Findings", section.content or "No open SOI findings recorded in the meeting narrative."]],
-                    colWidths=[50 * mm, 120 * mm],
-                ),
-            ]
-        rows = [
-            ["SOI Ref", "Finding", "Severity", "Status", "Corrective / Proposed Action"],
-            *[
-                [
-                    row.reference,
-                    row.title,
-                    row.severity,
-                    self._format_observation_status(row),
-                    row.corrective_measure or "-",
-                ]
-                for row in observations
-            ],
-        ]
-        return [
-            summary_table,
-            Spacer(1, 4),
-            self._styled_table(rows, repeatRows=1, colWidths=[28 * mm, 56 * mm, 22 * mm, 28 * mm, 36 * mm]),
-        ]
+        return [summary_table]
 
     @staticmethod
     def _format_open_soi_findings(observations: list[SCMLegacySoiObservationRow]) -> str:
@@ -724,12 +651,26 @@ class SCMTenSectionLegacyTemplate:
         if near_miss_rows:
             if story:
                 story.append(Spacer(1, 4))
-            story.append(self._styled_table(near_miss_rows, repeatRows=1, colWidths=[30 * mm, 58 * mm, 30 * mm, 52 * mm]))
+            story.append(
+                self._titled_styled_table(
+                    "Near Miss Discussion",
+                    near_miss_rows,
+                    repeatRows=1,
+                    colWidths=[30 * mm, 58 * mm, 30 * mm, 52 * mm],
+                )
+            )
         circular_rows = self._build_circular_discussion_rows(section)
         if circular_rows:
             if story:
                 story.append(Spacer(1, 4))
-            story.append(self._styled_table(circular_rows, repeatRows=1, colWidths=[48 * mm, 54 * mm, 26 * mm, 42 * mm]))
+            story.append(
+                self._titled_styled_table(
+                    "Circular / Safety Alert Discussion",
+                    circular_rows,
+                    repeatRows=1,
+                    colWidths=[48 * mm, 54 * mm, 26 * mm, 42 * mm],
+                )
+            )
         return story
 
     def _build_near_miss_discussion_rows(self, section: SCMLegacySectionRow) -> list[list[object]]:
@@ -831,6 +772,32 @@ class SCMTenSectionLegacyTemplate:
         table = Table(wrapped_rows, hAlign="LEFT", **kwargs)
         table.setStyle(self._table_style(header=repeat_rows > 0))
         return table
+
+    def _titled_styled_table(self, title: str, rows: list[list[object]], **kwargs) -> Table:
+        if not rows:
+            return self._styled_table(rows, **kwargs)
+        col_count = max(len(rows[0]), 1)
+        repeat_rows = int(kwargs.pop("repeatRows", 0)) + 1
+        titled_rows = [[title, *([""] * (col_count - 1))], *rows]
+        wrapped_rows = [
+            [self._cell(value, header=row_index < repeat_rows) for value in row]
+            for row_index, row in enumerate(titled_rows)
+        ]
+        table = Table(wrapped_rows, hAlign="LEFT", repeatRows=repeat_rows, **kwargs)
+        style = self._table_style(header=True)
+        style.add("SPAN", (0, 0), (-1, 0))
+        style.add("BACKGROUND", (0, 0), (-1, 0), self.soft)
+        if repeat_rows > 1:
+            style.add("BACKGROUND", (0, 1), (-1, repeat_rows - 1), colors.HexColor("#EDF2F7"))
+        table.setStyle(style)
+        return table
+
+    @staticmethod
+    def _can_keep_with_section_title(flowable: object) -> bool:
+        if not isinstance(flowable, Table):
+            return True
+        row_count = len(getattr(flowable, "_cellvalues", []) or [])
+        return row_count <= 8
 
     def _cell(self, value: object, *, header: bool = False) -> Paragraph:
         style = self.header_style if header else self.small_style

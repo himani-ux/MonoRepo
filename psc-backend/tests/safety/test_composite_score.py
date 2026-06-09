@@ -83,7 +83,7 @@ class CompositeScoreServiceTests(unittest.TestCase):
             incident_number="NM/2026/073",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             created_by="crew-7",
             updated_by="dpa-1",

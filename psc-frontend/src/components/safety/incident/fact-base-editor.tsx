@@ -25,9 +25,9 @@ export function SafetyFactBaseEditor({ facts }: SafetyFactBaseEditorProps) {
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-015
+            Investigation facts
           </p>
-          <h2 className="text-xl font-semibold text-slate-900">Fact Base Editor</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Fact List</h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
           {facts.length} facts
@@ -60,7 +60,7 @@ export function SafetyFactBaseEditor({ facts }: SafetyFactBaseEditorProps) {
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-            No facts systemized yet. Add your first fact - each must cite evidence.
+            No facts recorded yet. Add your first fact - each must cite evidence.
           </div>
         )}
       </div>

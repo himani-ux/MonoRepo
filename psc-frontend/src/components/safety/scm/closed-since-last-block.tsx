@@ -126,10 +126,6 @@ export default function SafetyClosedSinceLastBlock({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <p className="max-w-3xl text-sm leading-6 text-slate-600">
-            For-record visibility only. The snapshot anchors on the prior SCM Master
-            sign-off, including Ad-Hoc meetings in the same cadence chain.
-          </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <div className="font-medium text-slate-900">Cutoff anchor</div>
@@ -137,7 +133,7 @@ export default function SafetyClosedSinceLastBlock({
             <>
               <div className="mt-1">{payload.cutoff.scm_number}</div>
               <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                {payload.cutoff.meeting_type} sign-off
+                {payload.cutoff.meeting_type} closure
               </div>
               <div className="mt-2 text-xs text-slate-500">{payload.cutoff.closed_at}</div>
             </>

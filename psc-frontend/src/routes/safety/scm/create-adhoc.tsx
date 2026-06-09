@@ -9,6 +9,7 @@ import {
 } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
 import { safetyApi } from "../../../lib/api/safety";
+import { getSafetyDeviceFingerprint, resolveSignatureTypedName } from "../../../lib/safety/digital-signature";
 
 export default function SafetyScmCreateAdHocRoute() {
   const navigate = useNavigate();
@@ -17,11 +18,17 @@ export default function SafetyScmCreateAdHocRoute() {
   const configQuery = useSafetyScmCreateAdhocConfig(vesselId);
   const autoFeedQuery = useSafetyScmOpenFindings(vesselId);
   const createMutation = useMutation({
-    mutationFn: safetyApi.createScmMeeting,
+    mutationFn: async (values: Parameters<typeof safetyApi.createScmMeeting>[0]) => {
+      const meeting = await safetyApi.createScmMeeting(values);
+      return safetyApi.submitScmMeeting(meeting.id, {
+        device_fingerprint: getSafetyDeviceFingerprint(),
+        typed_name: resolveSignatureTypedName(auth.user),
+      });
+    },
     onSuccess: (meeting) => navigate(`/safety/scm/${meeting.id}`),
   });
 
-  if (configQuery.isLoading || autoFeedQuery.isLoading) {
+  if (configQuery.isLoading) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
         Loading Ad-Hoc SCM create form...
@@ -29,11 +36,10 @@ export default function SafetyScmCreateAdHocRoute() {
     );
   }
 
-  if (configQuery.isError || autoFeedQuery.isError) {
-    const error = configQuery.error ?? autoFeedQuery.error;
+  if (configQuery.isError) {
     return (
       <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
-        {getErrorMessage(error)}
+        {getErrorMessage(configQuery.error)}
       </section>
     );
   }
@@ -43,7 +49,7 @@ export default function SafetyScmCreateAdHocRoute() {
   return (
     <>
       <SafetyScmTenSectionForm
-        autoFeedPayload={autoFeedQuery.data}
+        autoFeedPayload={autoFeedQuery.data ?? null}
         config={config}
         isSubmitting={createMutation.isPending}
         mode="adhoc"
@@ -52,10 +58,16 @@ export default function SafetyScmCreateAdHocRoute() {
             createMutation.mutate(values);
           }
         }}
+        submittingLabel="Submitting to office..."
       />
       {createMutation.isError ? (
         <section className="mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900 shadow-sm">
           {getErrorMessage(createMutation.error)}
+        </section>
+      ) : null}
+      {autoFeedQuery.isError ? (
+        <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
+          SOI findings could not be loaded: {getErrorMessage(autoFeedQuery.error)}
         </section>
       ) : null}
     </>

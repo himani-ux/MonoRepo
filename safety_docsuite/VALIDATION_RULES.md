@@ -39,7 +39,7 @@ Per `master_role` identity from the SimpleJWT `sub` claim. Enforced at DRF `thro
 
 | Rule ID | Endpoint | Method | Limit | Scope | Error message | Decision ref |
 |---------|----------|--------|-------|-------|---------------|--------------|
-| V-GBL-010 | `/api/safety/near-miss/` | POST | 5 per 24h | per crew user | "Near-miss submission limit reached (5 in 24h). Try again tomorrow or contact DPA." | D-GAP-M38 |
+| V-GBL-010 | `/api/safety/near-miss/` | POST | No daily cap | per crew user | n/a | D-GAP-M38 revised 2026-06-09 |
 | V-GBL-011 | `/api/safety/incidents/` | POST | 10 per 24h | per crew user | "Incident creation limit reached (10 in 24h)." | D-GAP-M38 (analogous extension) |
 | V-GBL-012 | `/api/safety/incidents/{id}/phase-transition/` | POST | 20 per 10 min | per user | "Too many phase transitions on this incident; wait 10 minutes." | Round 20 anti-thrash |
 | V-GBL-013 | `/api/safety/incidents/{id}/attachments/` | POST | 30 per hour | per incident | "Attachment upload limit reached for this incident (30/hour)." | Round 20 anti-thrash |
@@ -188,22 +188,26 @@ Sequencing is **Reporter → Master → HOD → DPA → FM**. Each next signatur
 
 ## 3. Near Miss Validation
 
-Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. Reporter anonymity is enforced in the serializer layer (`apps/safety/authentication/anonymity.py`).
+Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. Anonymous reporting is removed from V1; reporter details are stored and visible to Master and authorized users within vessel scope.
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
 | V-NM-001 | `description` < 100 characters at submit | client + server | "Near-miss description must be at least 100 characters (D-GAP-M38)." | D-GAP-M38 |
 | V-NM-002 | `severity` not selected | client + server | "Select a severity level before submitting." | D-GAP-M38 |
-| V-NM-003 | Submission rate exceeded: user has ≥5 near-miss creations in trailing 24h | server (throttle) | "Near-miss submission limit reached (5 in 24h). Try again later or contact DPA." | D-GAP-M38 |
-| V-NM-004 | `priority` not in {`LOW`, `HIGH`} at creation | server | "Near-miss priority must be LOW or HIGH (D-GAP-R22)." | D-GAP-R22 |
-| V-NM-005 | Safety Officer overrides auto-classifier without reason text | client + server | "Priority override requires a reason (D-GAP-R22)." | D-GAP-R22 |
+| V-NM-002A | `place` outside {`AT_ANCHOR`, `AT_SEA`, `AT_PORT`} | client + server | "Select a valid place." | FEAT-SAF-NM-001 |
+| V-NM-002B | Category or immediate cause has more than 3 selected values | client + server | "Select up to 3 values only." | FEAT-SAF-NM-001 |
+| V-NM-002C | Category value outside the approved combined Category/Possible Loss list and not saved through `Other - Specify` | client + server | "Select a valid category." | FEAT-SAF-NM-001 |
+| V-NM-003 | Near Miss Type submitted from the UI | client + server | "Near Miss Type is not used. Select Category instead." | D-GAP-M38 revised 2026-06-09 |
+| V-NM-004 | Office Comments priority not in {`LOW`, `MEDIUM`, `HIGH`} on Accept | server | "Near-miss priority must be LOW, MEDIUM, or HIGH." | D-GAP-R22 |
+| V-NM-005 | Office reviewer changes priority without `priority_change_reason`, changes category tag without `category_tag_change_reason`, or sends to rework without reason text | client + server | "Please enter the reason before saving this office decision." | D-GAP-R22 |
 | V-NM-006 | `priority='HIGH'`: fleet-alert target date > 7 days from submission | server | "HIGH-priority near-miss requires fleet alert within 1 week (D-GAP-R22)." | D-GAP-R22 |
-| V-NM-007 | Serializer output includes reporter identity fields (`reporter_name`, `reporter_id`, `reporter_rank`, `reporter_crew_id`) for a user whose role ∉ {DPA, FM, self} | server (anonymity.py stripping) | (silent field omission; not exposed to client) | D-GAP-J1 |
-| V-NM-008 | PDF output includes reporter identity for Master / HOD distribution list | server (PDF renderer) | (renderer anonymises) | D-GAP-J1 |
-| V-NM-009 | Reporter identity visible in audit log (`vims_safety_field_history`) — always retained; never stripped at storage | server | N/A — audit retention is mandatory | D-GAP-J1 (stores; masks only on UI/PDF for non-DPA/FM) |
-| V-NM-010 | Non-DPA/FM user attempts to query reporter identity via API filter (`?reporter_id=`) | server (reject 403) | "Forbidden — reporter identity is restricted to DPA and FM (D-GAP-J1)." | D-GAP-J1 |
-| V-NM-011 | `priority='LOW'` close without Master/DPA correspondence note | server | "LOW-priority near-miss closure requires Master/DPA correspondence note (D-GAP-R22)." | D-GAP-R22 |
-| V-NM-012 | `priority='HIGH'` close without causal analysis + preventive measures + fleet alert | server | "HIGH-priority near-miss requires full investigation (causal analysis, preventive measures, fleet alert within 1 week) (D-GAP-R22)." | D-GAP-R22 |
+| V-NM-007 | Reporter identity missing from a submitted near-miss record | client + server | "Reporter details are required from login/session." | D-GAP-J1 revised 2026-06-09 |
+| V-NM-008 | PDF output prints "Reporter identity is masked" or `Anonymous Reporter` text | server (PDF renderer) | "Near-miss PDF must show reporter details for authorized users and must not print masking text." | D-GAP-J1 revised 2026-06-09 |
+| V-NM-009 | Reporter identity absent from audit log (`vims_safety_field_history`) | server | N/A — audit retention is mandatory | D-GAP-J1 revised 2026-06-09 |
+| V-NM-010 | Master attempts rework on a near miss originally reported by another authorized user | server | Allowed; no error | D-GAP-J1 revised 2026-06-09 |
+| V-NM-011 | `priority='LOW'` or `priority='MEDIUM'` close without closure note | server | "LOW/MEDIUM-priority near-miss closure requires a closure note." | D-GAP-R22 |
+| V-NM-012 | `priority='HIGH'` close without preventive measures + fleet learning + fleet alert | server | "HIGH-priority near miss can be closed only after preventive measures, fleet learning, and the fleet alert are completed." | D-GAP-R22 |
+| V-NM-013 | Immediate cause custom value entered outside the `Other - Specify` dropdown path | client | "Select Other - Specify from Immediate cause before typing a custom cause." | FEAT-SAF-NM-001 |
 
 ---
 
@@ -211,21 +215,30 @@ Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. R
 
 SCM records live in `vims_safety_scm_meeting` with `meeting_type IN ('REGULAR','AD_HOC')`. Attendance joins to WRH via `wrh_ship_time_config` (D-GAP-M26).
 
+Active SCM state display:
+- `DRAFT` displays as `Draft`.
+- `SUBMITTED` displays as `Submitted to Office`.
+- `CLOSED` displays as `Closed`.
+
 ### 4.1 Cadence and Type
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
 | V-SCM-001 | Days since vessel's last `meeting_type='REGULAR'` CLOSURE timestamp > 35 days, and new Regular not yet scheduled | server (dashboard warn) | "Regular SCM overdue: >35 days since last monthly meeting. Schedule immediately (SSQE Manual Rev 01 Feb 2026 §9)." | D-GAP-M-ADHOC cadence counter anchors on last SCM closure regardless of type |
-| V-SCM-002 | SCM create/finalize attempted by role outside `{Master, CO}` | server | "SCM hosting is restricted to the Chief Officer or Master." | D-RBAC-06, D-GAP-M-ADHOC |
+| V-SCM-002 | SCM create/edit attempted by role outside `{Master, CO}` | server | "Only Chief Officer or Master can create or edit this SCM meeting." | D-RBAC-06, D-GAP-M-ADHOC |
 | V-SCM-003 | `meeting_type='AD_HOC'` missing `trigger_reason` text | client + server | "Ad-Hoc SCM requires a trigger reason." | D-GAP-M-ADHOC |
 | V-SCM-004 | Ad-Hoc SCM attempt to replace / skip monthly Regular cadence | server | "Ad-Hoc meetings do NOT replace the monthly Regular meeting (D-GAP-M-ADHOC)." | D-GAP-M-ADHOC |
-| V-SCM-005 | Vessel has overdue SOI area at Master sign-off attempt | server (hard block on sign-off only; meeting itself runs) | "Master sign-off blocked — vessel has overdue SOI area(s). Meeting may continue; SCM compliance artefact cannot be signed (D-GAP-M20)." | D-GAP-M20 |
+| V-SCM-005 | Vessel has overdue SOI area during SCM creation, edit, PDF export, or Office Comment closure | server (warn only) | "Warning: vessel has overdue SOI area(s). Meeting may continue and may be closed with Office Comment." | D-GAP-M20 |
+| V-SCM-006 | Office Comment save attempted by a user outside DPA, FM, Shore HOD, or Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` | server | "Only authorized office reviewers can save Office Comment." | D-RBAC-06 |
+| V-SCM-007 | Office Comment save attempted with blank comment | client + server | "Office Comment is required before closing the SCM meeting." | D-RBAC-06 |
+| V-SCM-008 | Vessel-side edit attempted after `office_comment_at` is set or state is `CLOSED` | server | "SCM meeting is closed after Office Comment. Editing is stopped." | D-GAP-M22 |
+| V-SCM-009 | Submit to Office clicked but meeting remains `DRAFT` after save | client + server | "SCM meeting must be submitted to office." | D-RBAC-06 revised 2026-06-09 |
 
 ### 4.2 Attendance (WRH Join)
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
-| V-SCM-010 | Attendee row WRH rest-hour non-compliant in trailing 24h window | server (warn, never block) | "Warning: attendee '{name}' had WRH non-compliance in the trailing 24h. Meeting may proceed (D-GAP-M11)." | D-GAP-M11 |
+| V-SCM-010 | Attendee row WRH rest-hour non-compliant in trailing 24h window | server (warn, never block) | "Warning: attendee '{name}' had WRH non-compliance in the trailing 24h. Meeting may proceed and office may close (D-GAP-M11)." | D-GAP-M11 |
 | V-SCM-011 | WRH data unavailable for attendee at meeting timestamp | server (warn) | "Warning: WRH data unavailable for '{name}'. Row flagged; submission proceeds (D-GAP-M11)." | D-GAP-M11 |
 | V-SCM-012 | Timestamp resolution for attendee attempts direct local-time input | server (reject) | "Attendance timestamps are stored UTC and resolved via `wrh_ship_time_config` (D-GAP-M26)." | D-GAP-M26 |
 | V-SCM-013 | Dateline event (vessel crosses IDL during meeting) without Master override in `wrh_ship_time_config` | server | "Dateline event requires Master-set time configuration in `wrh_ship_time_config` (D-GAP-M26)." | D-GAP-M26 |
@@ -234,8 +247,9 @@ SCM records live in `vims_safety_scm_meeting` with `meeting_type IN ('REGULAR','
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
-| V-SCM-020 | Agenda item close attempted with `decision_outcome` empty | client + server | "Agenda items require a decision outcome before closure." | SSQE §9 |
-| V-SCM-021 | Closed-Since-Last snapshot cutoff requested from a non-SCM-closure timestamp | server | "Cutoff must anchor on prior SCM CLOSURE (Master sign-off) timestamp (D-GAP-M22)." | D-GAP-M22 |
+| V-SCM-020 | Agenda item close attempted with `suggestions_recommendations` empty where action is needed | client + server | "Agenda items that need action require Suggestions / Recommendations." | SSQE §9 |
+| V-SCM-021 | Closed-Since-Last snapshot cutoff requested from a non-SCM-closure timestamp | server | "Cutoff must anchor on prior closed SCM timestamp. New SCM uses Office Comment closure; legacy records may use Master sign-off timestamp (D-GAP-M22)." | D-GAP-M22 |
+| V-SCM-022 | SCM PDF attempts to print attendee digital signature status, device fingerprint, or capture status | server/PDF renderer | "SCM PDF must use plain Master Signature and Chief Officer Signature lines only." | D-PDF-03b |
 
 ---
 
@@ -424,7 +438,7 @@ Every regulatory-driven validation cites its code edition on first use. Re-verif
 | Regulatory validations cite code edition | PASS — §1.4 + §9 |
 | ALARP gate present on System-Actions | PASS — V-INC-060..062 |
 | No artificial cap on root causes | PASS — V-INC-052 explicitly rejects caps |
-| Reporter anonymity stripping present | PASS — V-NM-007..010 |
+| Reporter identity visibility rules present | PASS — V-NM-007..010 |
 | No "Acting-*" / deputy concepts anywhere | PASS — V-INC-077, V-EXT-010..014, V-ROLE-001..004 |
 | Paper-first SOI: scan-upload rejection rule present | PASS — V-SOI-012 |
 | "SOI Compliance %" label used (never "Inspection Compliance %") | PASS — §5.5 + V-SOI-040 |

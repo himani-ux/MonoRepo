@@ -1,4 +1,4 @@
-// src/components/dashboardlayout/KsmLibrary.jsx
+﻿// src/components/dashboardlayout/KsmLibrary.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -169,7 +169,7 @@ const KsmLibrary = ({
     setExpandedTitle(null);
   };
 
-  // 📥 Fetch notifications
+  // ðŸ“¥ Fetch notifications
   useEffect(() => {
     if (!canViewList || !user) {
       setLoading(false);
@@ -178,16 +178,16 @@ const KsmLibrary = ({
 
     const fetchNotifications = async () => {
     try {
-      // ✅ DETERMINE ENDPOINT BASED ON ROLE
+      // âœ… DETERMINE ENDPOINT BASED ON ROLE
       const isMaster = isCircularMasterUser(user);
       console.log('User role:', user.role, 'rank:', user.rank, 'role_name:', user.role_name, 'isMaster:', isMaster);
 
       const endpoint = isMaster
-        ? '/api/circular/api/ship/notifications/'
-        : '/api/circular/api/crew/notifications/';
+        ? 'http://localhost:8000/api/circular/api/ship/notifications/'
+        : 'http://localhost:8000/api/circular/api/crew/notifications/';
       const crewId = user.crew_id || user.username;
       console.log('Fetching from:', endpoint);
-      console.log("✅ Fetching notifications from:", endpoint, "with crew_id:", crewId);
+      console.log("âœ… Fetching notifications from:", endpoint, "with crew_id:", crewId);
       const res = await fetch(`${endpoint}?crew_id=${encodeURIComponent(crewId)}`);
 
       if (!res.ok) {
@@ -212,7 +212,7 @@ const KsmLibrary = ({
           type: item.type || 'Alert',
           criticality: item.criticality || 'Medium',
           hashtags,
-          publishedDate: item.publishedDate ? item.publishedDate.replace("T", " ").split(".")[0] : "—",
+          publishedDate: item.publishedDate ? item.publishedDate.replace("T", " ").split(".")[0] : "â€”",
           scope: scopeLabel,
           attachment_url: item.attachment_url || null,
           isReminded,
@@ -247,14 +247,14 @@ const KsmLibrary = ({
   fetchNotifications();
 }, [user, canViewList]);
 
-  // 👥 Fetch crew list
+  // ðŸ‘¥ Fetch crew list
   useEffect(() => {
     if (!showCrewList || !canViewCrewStatus || !selectedId) return;
 
     const fetchCrewList = async () => {
       setCrewLoading(true);
       try {
-        const res = await fetch(`/api/circular/api/crew/list/?notification_id=${selectedId}&crew_id=${user.crew_id || user.username}`);
+        const res = await fetch(`http://localhost:8000/api/circular/api/crew/list/?notification_id=${selectedId}&crew_id=${user.crew_id || user.username}`);
         if (!res.ok) throw new Error('Failed to load crew status');
         const data = await res.json();
         const localReminderState = remindedCrewByNotification[selectedId] || {};
@@ -311,7 +311,7 @@ const KsmLibrary = ({
     setSendingCrewReminder(null);
   }, [selectedId]);
 
-  // 🛎️ Remind crew
+  // ðŸ›Žï¸ Remind crew
   const handleRemindIndividualCrew = async (employeeId) => {
     if (!canRemindCrew) return;
     if (sendingCrewReminder) return;
@@ -319,7 +319,7 @@ const KsmLibrary = ({
     setSendingCrewReminder(employeeId);
 
     try {
-      const res = await fetch('/api/circular/api/msc/remind-crew/', {
+      const res = await fetch('http://localhost:8000/api/circular/api/msc/remind-crew/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -360,12 +360,12 @@ const KsmLibrary = ({
     }
   };
 
-  // ✅ Acknowledge notification
+  // âœ… Acknowledge notification
   const handleAcknowledge = async (notification) => {
     if (!canAcknowledge) return;
     
     try {
-      const res = await fetch('/api/circular/api/msc/read-ack/', {
+      const res = await fetch('http://localhost:8000/api/circular/api/msc/read-ack/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -391,7 +391,7 @@ const KsmLibrary = ({
     try {
       const crewId = user?.crew_id || user?.username;
       const res = await fetch(
-        `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${encodeURIComponent(crewId)}`
+        `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${encodeURIComponent(crewId)}`
       );
 
       if (!res.ok) {
@@ -415,7 +415,7 @@ const KsmLibrary = ({
     }
   };
 
-  // 🔍 Filter notifications - ONLY DECLARATION
+  // ðŸ” Filter notifications - ONLY DECLARATION
   const filteredNotifications = notifications.filter((n) => {
     const matchesSearch =
       n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -448,7 +448,7 @@ const KsmLibrary = ({
         }
     : { total: 0, read: 0 };
 
-  // 🖼️ Render helpers
+  // ðŸ–¼ï¸ Render helpers
   const getStatusColor = (isAck) => isAck ? 'border-blue-400' : 'border-red-400';
   const getCritColor = (criticality) => {
     switch (criticality) {
@@ -507,7 +507,7 @@ const KsmLibrary = ({
           <div className="text-xs text-neutral-500">
             {loading
               ? 'Loading...'
-              : `${filteredNotifications.length} results · Page ${safeCurrentPage} of ${totalPages}`}
+              : `${filteredNotifications.length} results Â· Page ${safeCurrentPage} of ${totalPages}`}
           </div>
         </div>
 
@@ -534,7 +534,7 @@ const KsmLibrary = ({
                 <CardContent className="p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <div className="font-medium text-neutral-900">{notification.id || "—"}</div>
+                      <div className="font-medium text-neutral-900">{notification.id || "â€”"}</div>
                       {notification.isRankTargeted && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm">
                           <AlertTriangle className="h-3 w-3" />

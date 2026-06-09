@@ -38,10 +38,10 @@ export function SafetyEvidenceDeadlineTasks({
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-011
+            Evidence deadlines
           </p>
           <h2 className="text-xl font-semibold text-slate-900">
-            Evidence-Preservation Deadlines
+            Evidence Preservation Deadlines
           </h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">

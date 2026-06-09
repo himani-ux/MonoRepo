@@ -27,10 +27,10 @@ export function SafetyWitnessReadback({
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-        FEAT-SAF-INC-014
+        Witness confirmation
       </p>
       <h2 className="mt-1 text-xl font-semibold text-slate-900">
-        Witness Read-Back + Sign-Off
+        Witness Read-Back and Sign-Off
       </h2>
       <div className="mt-4 grid gap-3">
         {rows.map((row) => (

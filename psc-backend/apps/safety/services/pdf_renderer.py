@@ -14,10 +14,12 @@ from apps.safety.models import (
     CorrectiveAction,
     Incident,
     IncidentPhaseLog,
+    MasterLossType,
+    MasterMscatTaxonomy,
+    MasterSafetyIncidentType,
     Recommendation,
     SafetyFieldHistory,
     SCMMeeting,
-    SCMSignature,
     SOIFinding,
     SOIInspection,
 )
@@ -48,7 +50,6 @@ from apps.safety.services.pdf_templates.scm_10_section_legacy import (
     SCMLegacyClosedItem,
     SCMLegacyPdfContext,
     SCMLegacySectionRow,
-    SCMLegacySignatureRow,
     SCMLegacySoiObservationRow,
     SCMTenSectionLegacyTemplate,
 )
@@ -161,10 +162,10 @@ class IncidentPdfRenderer:
             current_phase=incident.current_phase,
             risk_band=incident.risk_band,
             imo_classifier=incident.imo_classifier,
-            occurred_at=self._serialize_datetime(incident.occurred_at),
-            reported_at=self._serialize_datetime(incident.reported_at),
+            occurred_at=self._format_pdf_datetime(incident.occurred_at),
+            reported_at=self._format_pdf_datetime(incident.reported_at),
             narrative=incident.narrative or "Narrative not recorded.",
-            generated_at=timezone.now().isoformat(),
+            generated_at=self._format_pdf_datetime(timezone.now()) or "",
             cover_band_hex=self._cover_band_hex(incident.risk_band),
             investigator_rows=self._build_investigator_rows(incident),
             evidence_rows=self._build_evidence_rows(incident),
@@ -182,7 +183,7 @@ class IncidentPdfRenderer:
         phase_log_roles = {(row.actor_role_code or "").upper(): row for row in incident.phase_logs.all()}
         rows = [
             ("Reporter", self._nonblank(incident.reporter_name, incident.reporter_id, default="Not recorded")),
-            ("Narrative owner", self._nonblank(incident.created_by, default="Not recorded")),
+            ("Prepared by", self._nonblank(incident.created_by, default="Not recorded")),
             ("PIC", self._nonblank(incident.pic_user_id, default="Not assigned")),
             ("Master chain evidence", "Present" if "MASTER" in phase_log_roles else "Awaiting phase-log evidence"),
             ("HOD chain evidence", "Present" if "HOD" in phase_log_roles else "Awaiting phase-log evidence"),
@@ -256,9 +257,9 @@ class IncidentPdfRenderer:
 
     def _build_notification_rows(self, incident: Incident) -> list[tuple[str, str, str]]:
         rows = [
-            ("DPA", "Notified" if incident.dpa_notified_at else "Pending", self._serialize_datetime(incident.dpa_notified_at) or "N/A"),
-            ("FM", "Notified" if incident.fm_notified_at else "Pending", self._serialize_datetime(incident.fm_notified_at) or "N/A"),
-            ("Office", "Notified" if incident.office_notified_at else "Pending", self._serialize_datetime(incident.office_notified_at) or "N/A"),
+            ("DPA", "Notified" if incident.dpa_notified_at else "Pending", self._format_pdf_datetime(incident.dpa_notified_at) or "N/A"),
+            ("FM", "Notified" if incident.fm_notified_at else "Pending", self._format_pdf_datetime(incident.fm_notified_at) or "N/A"),
+            ("Office", "Notified" if incident.office_notified_at else "Pending", self._format_pdf_datetime(incident.office_notified_at) or "N/A"),
         ]
         circular_rows = SafetyFieldHistory.objects.filter(
             parent_table=incident._meta.db_table,
@@ -266,7 +267,7 @@ class IncidentPdfRenderer:
             field_name="incident_circular_publish",
         ).order_by("-changed_at", "-id")
         if circular_rows.exists():
-            rows.append(("Fleet Circular", "Published", self._serialize_datetime(circular_rows.first().changed_at) or "N/A"))
+            rows.append(("Fleet Circular", "Published", self._format_pdf_datetime(circular_rows.first().changed_at) or "N/A"))
         return rows
 
     def _build_signature_rows(self, incident: Incident) -> list[IncidentPdfSignatureRow]:
@@ -306,7 +307,7 @@ class IncidentPdfRenderer:
         return IncidentPdfSignatureRow(
             label="Reporter signature",
             signed_by=self._nonblank(incident.reporter_id, incident.created_by, default="Awaiting signature"),
-            signed_at=self._serialize_datetime(incident.reported_at) or "Awaiting signature",
+            signed_at=self._format_pdf_datetime(incident.reported_at) or "Awaiting signature",
             typed_name=self._nonblank(incident.reporter_name, incident.reporter_id, default="Awaiting signature"),
         )
 
@@ -359,6 +360,16 @@ class IncidentPdfRenderer:
         return str(value)
 
     @staticmethod
+    def _format_pdf_datetime(value) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            if timezone.is_aware(value):
+                value = timezone.localtime(value)
+            return value.strftime("%d %b %Y, %H:%M")
+        return str(value)
+
+    @staticmethod
     def _nonblank(*values: str | None, default: str) -> str:
         for value in values:
             if value is not None and str(value).strip():
@@ -392,7 +403,7 @@ class IncidentPdfRenderer:
         if isinstance(row, IncidentPhaseLog):
             return IncidentPdfSignatureRow(
                 label=label,
-                signed_at=self._serialize_datetime(row.occurred_at),
+                signed_at=self._format_pdf_datetime(row.occurred_at),
                 signed_by=row.actor_user_id,
                 typed_name=row.actor_user_id,
             )
@@ -404,7 +415,7 @@ class IncidentPdfRenderer:
                 payload = parsed
         return IncidentPdfSignatureRow(
             label=label,
-            signed_at=str(payload.get("signed_at") or self._serialize_datetime(getattr(row, "changed_at", None)) or "Awaiting signature"),
+            signed_at=str(payload.get("signed_at") or self._format_pdf_datetime(getattr(row, "changed_at", None)) or "Awaiting signature"),
             signed_by=str(payload.get("signed_by") or getattr(row, "actor_user_id", "") or "Awaiting signature"),
             typed_name=str(payload.get("typed_name") or payload.get("signed_by") or "Awaiting signature"),
         )
@@ -487,7 +498,7 @@ class NearMissLightweightPdfRenderer:
     def _build_context(self, near_miss: Incident, *, viewer_user) -> NearMissLightweightPdfContext:
         serialized = NearMissSerializer(near_miss, context={"user": viewer_user}).data
         suggestion = build_near_miss_priority_hint(near_miss)
-        viewer_visible = serialized.get("reporter_name") != "Anonymous Reporter"
+        viewer_visible = True
         vessel_display = resolve_vessel_display(near_miss.vessel_id, user=viewer_user)
         vessel_name = vessel_display["vessel_display_name"] or str(near_miss.vessel_id)
         fleet_alert = FleetAlertIssuer()
@@ -504,23 +515,35 @@ class NearMissLightweightPdfRenderer:
             state=near_miss.state or "DRAFT",
             priority=(near_miss.near_miss_priority or "UNSET").upper(),
             severity=(near_miss.near_miss_severity or "UNSET").upper(),
-            occurred_at=self._serialize_datetime(near_miss.occurred_at),
-            reported_at=self._serialize_datetime(near_miss.reported_at),
-            reporter_name=self._nonblank(serialized.get("reporter_name"), default="Anonymous Reporter"),
-            reporter_rank=self._nonblank(serialized.get("reporter_rank"), default="Masked"),
+            place=self._format_near_miss_place(near_miss.near_miss_place),
+            categories=self._format_list(serialized.get("near_miss_category_tags"), near_miss.near_miss_shell_tag, default="Not selected"),
+            near_miss_types=self._build_near_miss_type_text(near_miss, serialized=serialized),
+            possible_loss_type=self._build_loss_type_text(near_miss),
+            immediate_causes=self._build_immediate_cause_text(near_miss, serialized=serialized),
+            occurred_at=self._format_pdf_datetime(near_miss.occurred_at),
+            reported_at=self._format_pdf_datetime(near_miss.reported_at),
+            reporter_name=self._nonblank(serialized.get("reporter_name"), default="Not recorded"),
+            reporter_rank=self._nonblank(serialized.get("reporter_rank"), default="Not recorded"),
             what_happened=self._nonblank(serialized.get("narrative"), default="Narrative not recorded."),
             suggestion_text=self._build_suggestion_text(near_miss, suggestion),
             immediate_action_text=self._build_immediate_action_text(near_miss),
+            root_cause_detail=self._nonblank(near_miss.near_miss_root_cause_detail, default="Not recorded."),
+            corrective_action=self._nonblank(near_miss.near_miss_corrective_action, default="Not recorded."),
+            weather_voyage_details=self._nonblank(near_miss.near_miss_weather_voyage_details, default="Not recorded."),
+            equipment_details=self._nonblank(near_miss.near_miss_equipment_details, default="Not recorded."),
+            lessons_learned=self._nonblank(near_miss.near_miss_lessons_learned, default="Not recorded."),
+            office_comments=self._build_office_comment_text(near_miss),
+            rework_summary=self._build_rework_summary_text(near_miss, serialized=serialized),
             closure_reason=self._nonblank(near_miss.closure_reason, default="Closure reason is not recorded."),
-            fleet_alert_due_by=self._serialize_datetime(getattr(fleet_status, "due_by", None)),
-            fleet_alert_issued_at=self._serialize_datetime(getattr(fleet_status, "issued_at", None)),
+            fleet_alert_due_by=self._format_pdf_datetime(getattr(fleet_status, "due_by", None)),
+            fleet_alert_issued_at=self._format_pdf_datetime(getattr(fleet_status, "issued_at", None)),
             fleet_alert_status=getattr(fleet_status, "sla_status", "Not required"),
             fleet_learning_text=self._nonblank(fleet_learning, default="Fleet learning / lessons are not recorded."),
-            generated_at=timezone.now().isoformat(),
+            generated_at=self._format_pdf_datetime(timezone.now()) or "",
             visibility_note=(
-                "Reporter identity is visible to authorized office reviewers and the reporter."
+                "Reporter details are visible to authorized users."
                 if viewer_visible
-                else "Reporter identity is masked for this viewer."
+                else ""
             ),
             signature_rows=self._build_signature_rows(near_miss),
         )
@@ -538,6 +561,156 @@ class NearMissLightweightPdfRenderer:
         if (near_miss.near_miss_suggestion or "").strip():
             return near_miss.near_miss_suggestion.strip()
         return f"Priority suggestion {suggestion['priority']}: {suggestion['rationale']}"
+
+    @staticmethod
+    def _format_near_miss_place(value: str | None) -> str:
+        labels = {
+            "AT_ANCHOR": "At Anchor",
+            "AT_SEA": "At Sea",
+            "AT_PORT": "At Port",
+        }
+        return labels.get(str(value or "").strip().upper(), "Not selected")
+
+    @staticmethod
+    def _format_list(values, fallback: object | None = None, *, default: str = "Not selected") -> str:
+        cleaned: list[str] = []
+        if isinstance(values, list):
+            cleaned = [str(value).strip() for value in values if str(value or "").strip()]
+        fallback_text = str(fallback or "").strip()
+        if fallback_text and fallback_text not in cleaned:
+            cleaned.append(fallback_text)
+        return ", ".join(cleaned) if cleaned else default
+
+    def _build_near_miss_type_text(self, near_miss: Incident, *, serialized: dict) -> str:
+        type_ids = self._coerce_int_list(serialized.get("near_miss_incident_type_ids"))
+        if near_miss.incident_type_id and near_miss.incident_type_id not in type_ids:
+            type_ids.insert(0, int(near_miss.incident_type_id))
+        if not type_ids:
+            return "Not selected"
+
+        label_by_id: dict[int, str] = {}
+        try:
+            rows = MasterSafetyIncidentType.objects.filter(legacy_int_id__in=type_ids)
+            label_by_id = {int(row.legacy_int_id): row.type_name for row in rows}
+        except Exception:
+            label_by_id = {}
+        return ", ".join(label_by_id.get(type_id, f"Type {type_id}") for type_id in type_ids)
+
+    @staticmethod
+    def _build_loss_type_text(near_miss: Incident) -> str:
+        if not near_miss.loss_type_primary_id:
+            return "Not selected"
+        try:
+            row = MasterLossType.objects.filter(loss_type_id=near_miss.loss_type_primary_id).first()
+        except Exception:
+            row = None
+        return row.loss_type_name if row is not None else f"Loss type {near_miss.loss_type_primary_id}"
+
+    def _build_immediate_cause_text(self, near_miss: Incident, *, serialized: dict) -> str:
+        subcodes = self._coerce_text_list(serialized.get("near_miss_mscat_subcode_ids"))
+        fallback = str(near_miss.near_miss_mscat_subcode_id or "").strip()
+        if fallback and fallback not in subcodes:
+            subcodes.insert(0, fallback)
+        if not subcodes:
+            other_detail = str(near_miss.near_miss_root_cause_detail or "").strip()
+            return other_detail or "Not selected"
+
+        label_by_subcode: dict[str, str] = {}
+        try:
+            rows = MasterMscatTaxonomy.objects.filter(subcode_id__in=subcodes)
+            label_by_subcode = {
+                row.subcode_id: f"{row.subcode_id} - {row.subcode_description}"
+                for row in rows
+            }
+        except Exception:
+            label_by_subcode = {}
+        return "; ".join(label_by_subcode.get(subcode, subcode) for subcode in subcodes)
+
+    @staticmethod
+    def _build_office_comment_text(near_miss: Incident) -> str:
+        row = (
+            near_miss.phase_logs.filter(
+                transition_type=IncidentPhaseLog.TransitionType.FORWARD,
+                actor_role_code__in=["DPA", "PIC", "OFFICE_PIC", "OFFICE_SSQE", "OFFICE_SUPT", "VESSEL SUPERINTENDENT"],
+            )
+            .order_by("-occurred_at", "-id")
+            .first()
+        )
+        if row and str(row.loop_back_reason or "").strip():
+            return NearMissLightweightPdfRenderer._strip_office_comment_prefix(str(row.loop_back_reason).strip())
+        return "Not recorded."
+
+    @staticmethod
+    def _strip_office_comment_prefix(value: str) -> str:
+        prefixes = ("Office comment:", "Office comments:")
+        for prefix in prefixes:
+            if value.lower().startswith(prefix.lower()):
+                return value[len(prefix):].strip() or value
+        return value
+
+    @staticmethod
+    def _build_rework_summary_text(near_miss: Incident, *, serialized: dict) -> str:
+        rework_summary = serialized.get("rework_summary")
+        if isinstance(rework_summary, dict) and str(rework_summary.get("comment") or "").strip():
+            return str(rework_summary["comment"]).strip()
+
+        row = (
+            SafetyFieldHistory.objects.filter(
+                parent_table=near_miss._meta.db_table,
+                parent_id=near_miss.pk,
+                field_name="near_miss_rework_resubmission",
+            )
+            .order_by("-changed_at", "-id")
+            .first()
+        )
+        if row is not None:
+            payload = parse_history_value(row.new_value)
+            if isinstance(payload, dict) and str(payload.get("comment") or "").strip():
+                return str(payload["comment"]).strip()
+            if str(row.change_reason or "").strip():
+                return str(row.change_reason).strip()
+        return "Not recorded."
+
+    @staticmethod
+    def _coerce_text_list(values) -> list[str]:
+        if not isinstance(values, list):
+            return []
+        cleaned: list[str] = []
+        for value in values:
+            text = str(value or "").strip()
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned[:3]
+
+    def _coerce_int_list(self, values) -> list[int]:
+        cleaned: list[int] = []
+        for value in self._coerce_text_list(values):
+            try:
+                numeric = int(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric not in cleaned:
+                cleaned.append(numeric)
+        return cleaned[:3]
+
+    @staticmethod
+    def _format_pdf_datetime(value) -> str | None:
+        if value is None:
+            return None
+        parsed = value
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if not cleaned:
+                return None
+            try:
+                parsed = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+            except ValueError:
+                return cleaned
+        if isinstance(parsed, datetime):
+            if timezone.is_aware(parsed):
+                parsed = timezone.localtime(parsed)
+            return parsed.strftime("%d %b %Y, %H:%M")
+        return str(parsed)
 
     def _build_signature_rows(self, near_miss: Incident) -> list[NearMissPdfSignatureRow]:
         rows: list[NearMissPdfSignatureRow] = []
@@ -562,8 +735,8 @@ class NearMissLightweightPdfRenderer:
         if triage_log is not None:
             rows.append(
                 NearMissPdfSignatureRow(
-                    label="Triage signature",
-                    signed_at=self._serialize_datetime(triage_log.occurred_at),
+                    label="Office review signature",
+                    signed_at=self._format_pdf_datetime(triage_log.occurred_at),
                     signed_by=triage_log.actor_user_id,
                     typed_name=triage_log.actor_user_id,
                 )
@@ -582,7 +755,7 @@ class NearMissLightweightPdfRenderer:
             rows.append(self._field_history_signature_row("Closure signature", row=closure_signature))
         elif near_miss.state == "CLOSED":
             rows.append(NearMissPdfSignatureRow(label="Closure signature"))
-        return rows or [NearMissPdfSignatureRow(label="Triage signature")]
+        return rows or [NearMissPdfSignatureRow(label="Office review signature")]
 
     def _field_history_signature_row(self, label: str, *, row) -> NearMissPdfSignatureRow:
         payload = {}
@@ -593,7 +766,7 @@ class NearMissLightweightPdfRenderer:
 
         return NearMissPdfSignatureRow(
             label=label,
-            signed_at=str(payload.get("signed_at") or self._serialize_datetime(getattr(row, "changed_at", None)) or "Awaiting signature"),
+            signed_at=self._format_pdf_datetime(payload.get("signed_at") or getattr(row, "changed_at", None)) or "Awaiting signature",
             signed_by=str(payload.get("signed_by") or getattr(row, "actor_user_id", "") or "Awaiting signature"),
             typed_name=str(payload.get("typed_name") or payload.get("signed_by") or "Awaiting signature"),
         )
@@ -705,8 +878,8 @@ class SCMLegacyPdfRenderer:
 
     @staticmethod
     def _validate_exportable(meeting: SCMMeeting) -> None:
-        if meeting.state != SCMMeeting.State.SIGNED_OFF or meeting.master_signed_off_at is None:
-            raise ValidationError("SCM PDF export is available after Master sign-off.")
+        if meeting.is_deleted:
+            raise ValidationError("Deleted SCM meetings cannot be exported.")
 
     def _build_context(self, meeting: SCMMeeting) -> SCMLegacyPdfContext:
         section_rows = self._build_section_rows(meeting)
@@ -744,7 +917,6 @@ class SCMLegacyPdfRenderer:
             soi_auto_feed_summary=dict(soi_auto_feed.get("section8") or {}),
             soi_observation_rows=self._build_soi_observation_rows(soi_auto_feed),
             attendance_rows=attendance_rows,
-            signature_rows=self._build_signature_rows(meeting, attendance_rows=attendance_rows),
             section_rows=section_rows,
         )
 
@@ -940,109 +1112,6 @@ class SCMLegacyPdfRenderer:
                 )
             )
         return rows
-
-    def _build_signature_rows(
-        self,
-        meeting: SCMMeeting,
-        *,
-        attendance_rows: list[SCMLegacyAttendanceRow],
-    ) -> list[SCMLegacySignatureRow]:
-        rows: list[SCMLegacySignatureRow] = []
-        signature_rows = list(
-            SCMSignature.objects.filter(meeting_id=meeting.id).order_by("signer_role", "signed_at", "id")
-        )
-        if signature_rows:
-            role_labels = {
-                SCMSignature.SignerRole.MASTER: "Master signature",
-                SCMSignature.SignerRole.CO: "CO co-signature",
-                SCMSignature.SignerRole.ATTENDEE: "Attendee signature",
-            }
-            return [
-                SCMLegacySignatureRow(
-                    label=(
-                        f"Attendee - {row.display_name}"
-                        if row.signer_role == SCMSignature.SignerRole.ATTENDEE
-                        else role_labels.get(row.signer_role, row.signer_role)
-                    ),
-                    status="Signed",
-                    signed_by=row.signer_crew_id,
-                    signed_at=self._serialize_datetime(row.signed_at),
-                    typed_name=row.typed_name,
-                    note=f"Device fingerprint: {row.device_fingerprint}",
-                )
-                for row in signature_rows
-            ]
-        master_signature = (
-            SafetyFieldHistory.objects.filter(
-                parent_table=meeting._meta.db_table,
-                parent_id=meeting.pk,
-                field_name="scm_signoff_signature",
-            )
-            .order_by("-changed_at", "-id")
-            .first()
-        )
-        if master_signature is not None:
-            rows.append(self._field_history_signature_row("Master signature", row=master_signature))
-        else:
-            rows.append(
-                SCMLegacySignatureRow(
-                    label="Master signature",
-                    status="Awaiting signature",
-                    note="Master hybrid digital signature has not been recorded yet.",
-                )
-            )
-
-        if meeting.meeting_type == SCMMeeting.MeetingType.REGULAR:
-            rows.append(
-                SCMLegacySignatureRow(
-                    label="CO co-signature",
-                    status="Not captured",
-                    signed_by=meeting.prepared_by_crew_id,
-                    typed_name=meeting.prepared_by_crew_id,
-                    note="CO digital signature is not captured for this historical SCM record.",
-                )
-            )
-        else:
-            rows.append(
-                SCMLegacySignatureRow(
-                    label="Ad-Hoc preparer",
-                    status="Captured via Master sign-off",
-                    signed_by=meeting.prepared_by_crew_id,
-                    typed_name=meeting.prepared_by_crew_id,
-                    note="Ad-Hoc SCM is prepared and signed by the Master in the current contract.",
-                )
-            )
-
-        for attendee in attendance_rows:
-            rows.append(
-                SCMLegacySignatureRow(
-                    label=f"Attendee - {attendee.display_name}",
-                    status="Attendance recorded" if attendee.present else "Absent",
-                    signed_by=attendee.display_name,
-                    typed_name=attendee.display_name if attendee.present else None,
-                    note=(
-                        "Attendance is persisted, but attendee digital signature was not captured for this historical SCM record."
-                        if attendee.present
-                        else "Absent attendee; no digital signature recorded."
-                    ),
-                )
-            )
-        return rows
-
-    def _field_history_signature_row(self, label: str, *, row) -> SCMLegacySignatureRow:
-        payload = {}
-        if getattr(row, "new_value", None):
-            parsed = parse_history_value(row.new_value)
-            if isinstance(parsed, dict):
-                payload = parsed
-        return SCMLegacySignatureRow(
-            label=label,
-            status="Signed",
-            signed_by=str(payload.get("signed_by") or getattr(row, "actor_user_id", "") or "-"),
-            signed_at=str(payload.get("signed_at") or self._serialize_datetime(getattr(row, "changed_at", None)) or "-"),
-            typed_name=str(payload.get("typed_name") or payload.get("signed_by") or "-"),
-            note=f"Device fingerprint: {payload.get('device_fingerprint')}" if payload.get("device_fingerprint") else None,
-        )
 
     def _persist_content(self, meeting: SCMMeeting, content: bytes) -> str:
         export_dir = self.export_root / str(meeting.vessel_id) / "exports"

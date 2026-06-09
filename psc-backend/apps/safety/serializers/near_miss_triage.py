@@ -1,115 +1,107 @@
 from __future__ import annotations
 
+import json
+
 from rest_framework import serializers
 
-from apps.safety.models import Incident
+from apps.safety.models import Incident, MasterMscatTaxonomy
+from apps.safety.serializers.near_miss import NEAR_MISS_CATEGORY_TAGS
 
 
-HIGH_PRIORITY_KEYWORDS = (
-    "collision",
-    "electrical",
-    "explosion",
-    "fall",
-    "fire",
-    "flood",
-    "grounding",
-    "injury",
-    "leak",
-    "machinery",
-    "oil",
-    "pollution",
-)
-
-
-def build_near_miss_priority_hint(incident: Incident) -> dict[str, str]:
-    repeated = _has_repeat_near_miss(incident)
-    if repeated:
+def build_near_miss_priority_hint(incident: Incident) -> dict[str, object]:
+    if str(incident.near_miss_severity or "").strip().upper() == "HIGH":
         return {
             "priority": "HIGH",
-            "rationale": "A similar near miss already exists for this vessel, so SSOT repeat logic forces HIGH priority.",
-        }
-
-    if incident.loss_type_primary_id:
-        return {
-            "priority": "HIGH",
-            "rationale": "Type-of-loss metadata indicates elevated harm potential and requires full investigation.",
-        }
-
-    if incident.incident_type_id:
-        return {
-            "priority": "HIGH",
-            "rationale": "Incident-type metadata indicates a higher-risk near miss and suggests supersede-to-incident review.",
-        }
-
-    narrative = (incident.narrative or "").strip().lower()
-    matched_keywords = [keyword for keyword in HIGH_PRIORITY_KEYWORDS if keyword in narrative]
-    if matched_keywords:
-        return {
-            "priority": "HIGH",
-            "rationale": "Narrative includes SHELL-style risk markers: " + ", ".join(sorted(set(matched_keywords))) + ".",
+            "forced": False,
+            "reason_type": "reporter_high",
+            "rationale": "Reporter selected HIGH severity, so this should be reviewed as HIGH unless there is a recorded override reason.",
+            "user_message": "The reporter marked this near miss as high severity.",
         }
 
     return {
         "priority": "LOW",
-        "rationale": "No incident-type, loss-type, or narrative markers currently push this near miss above LOW triage.",
+        "forced": False,
+        "reason_type": "low",
+        "rationale": "No priority was selected yet. Office reviewer may choose LOW, MEDIUM, or HIGH.",
+        "user_message": "Select the priority based on office review.",
     }
 
 
-def _has_repeat_near_miss(incident: Incident) -> bool:
-    queryset = Incident.objects.filter(
-        is_deleted=False,
-        record_type=Incident.RecordType.NEAR_MISS,
-        vessel_id=str(incident.vessel_id),
-    ).exclude(pk=incident.pk)
-
-    if incident.near_miss_mscat_subcode_id:
-        if queryset.filter(near_miss_mscat_subcode_id=incident.near_miss_mscat_subcode_id).exists():
-            return True
-    if incident.incident_type_id and incident.loss_type_primary_id:
-        if queryset.filter(
-            incident_type_id=incident.incident_type_id,
-            loss_type_primary_id=incident.loss_type_primary_id,
-        ).exists():
-            return True
-    if incident.near_miss_shell_tag:
-        return queryset.filter(near_miss_shell_tag=incident.near_miss_shell_tag).exists()
-    return False
-
-
 class NearMissTriageSerializer(serializers.Serializer):
-    near_miss_priority = serializers.CharField()
-    override_reason = serializers.CharField(required=False, allow_blank=False, trim_whitespace=True)
+    action = serializers.ChoiceField(choices=("ACCEPT", "SEND_BACK"), required=False, default="ACCEPT")
+    near_miss_priority = serializers.CharField(required=False)
+    near_miss_shell_tag = serializers.ChoiceField(choices=tuple(sorted(NEAR_MISS_CATEGORY_TAGS)), required=False)
+    near_miss_mscat_subcode_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    office_comment = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    override_reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    priority_change_reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    category_tag_change_reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
+    reason = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
     supersede_to_incident = serializers.BooleanField(required=False, default=False)
 
     def validate_near_miss_priority(self, value: str) -> str:
         normalized = str(value).strip().upper()
-        if normalized not in {"LOW", "HIGH"}:
+        if normalized not in {"LOW", "MEDIUM", "HIGH"}:
             raise serializers.ValidationError(
-                "Near-miss priority must be LOW or HIGH (D-GAP-R22)."
+                "Near-miss priority must be LOW, MEDIUM, or HIGH."
             )
         return normalized
 
     def validate(self, attrs):
+        action = str(attrs.get("action") or "ACCEPT").strip().upper()
+        attrs["action"] = action
+        comment = (
+            str(attrs.get("office_comment") or "").strip()
+            or str(attrs.get("override_reason") or "").strip()
+            or str(attrs.get("reason") or "").strip()
+        )
+        priority_change_reason = str(attrs.get("priority_change_reason") or "").strip()
+        category_tag_change_reason = str(attrs.get("category_tag_change_reason") or "").strip()
+        attrs["office_comment"] = comment
+        attrs["priority_change_reason"] = priority_change_reason
+        attrs["category_tag_change_reason"] = category_tag_change_reason
+
+        if action == "SEND_BACK":
+            if not comment:
+                raise serializers.ValidationError({"office_comment": "Please enter the reason before sending this back."})
+            return attrs
+
+        if not attrs.get("near_miss_priority"):
+            raise serializers.ValidationError({"near_miss_priority": "Select LOW, MEDIUM, or HIGH before accepting."})
+
         incident: Incident = self.context["incident"]
         suggestion = build_near_miss_priority_hint(incident)
-        if suggestion["priority"] == "HIGH" and "repeat logic" in suggestion["rationale"] and attrs["near_miss_priority"] != "HIGH":
-            raise serializers.ValidationError(
-                {"near_miss_priority": "Repeated near misses must be triaged HIGH (D-GAP-R22)."}
-            )
-
-        if attrs["near_miss_priority"] != suggestion["priority"] and not attrs.get("override_reason"):
-            raise serializers.ValidationError(
-                {"override_reason": "Priority override requires a reason (D-GAP-R22)."}
-            )
 
         if attrs.get("supersede_to_incident") and attrs["near_miss_priority"] != "HIGH":
             raise serializers.ValidationError(
                 {"supersede_to_incident": "Only HIGH-priority near misses can be superseded into incidents."}
             )
-        if attrs.get("supersede_to_incident") and not attrs.get("override_reason"):
+        if attrs.get("supersede_to_incident") and not comment:
             raise serializers.ValidationError(
-                {"override_reason": "Supersede-to-incident requires a DPA reason for the audit trail."}
+                {"office_comment": "Please enter the reason before superseding this near miss into an incident."}
             )
+
+        subcode = str(attrs.get("near_miss_mscat_subcode_id") or "").strip()
+        if subcode:
+            mscat = MasterMscatTaxonomy.objects.filter(subcode_id=subcode, active=True).first()
+            if mscat is None:
+                raise serializers.ValidationError({"near_miss_mscat_subcode_id": "Select a valid immediate cause."})
+            attrs["near_miss_mscat_subcode_id"] = mscat.subcode_id
+            attrs["near_miss_mscat_category_id"] = mscat.category_id
+            attrs["near_miss_mscat_subcode_ids"] = json.dumps([mscat.subcode_id])
+        elif "near_miss_mscat_subcode_id" in attrs:
+            attrs["near_miss_mscat_subcode_id"] = None
+            attrs["near_miss_mscat_category_id"] = None
+            attrs["near_miss_mscat_subcode_ids"] = json.dumps([])
+
+        if "near_miss_shell_tag" in attrs:
+            current_shell_tag = str(incident.near_miss_shell_tag or "").strip()
+            next_shell_tag = str(attrs["near_miss_shell_tag"] or "").strip()
+            if next_shell_tag != current_shell_tag and not category_tag_change_reason:
+                raise serializers.ValidationError(
+                    {"category_tag_change_reason": "Please enter the reason for changing the category."}
+                )
+            attrs["near_miss_category_tags"] = json.dumps([attrs["near_miss_shell_tag"]])
 
         attrs["suggestion"] = suggestion
         return attrs

@@ -77,22 +77,24 @@ function ReportRow({ report }: { report: InspectionDetailType['reports'][number]
       : `${baseUrl}/uploads/${normalizedPath.replace(/^\/+/, '')}`;
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-md bg-gray-50 p-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <FileText className="h-5 w-5 flex-shrink-0 text-gray-400" />
-        <div className="min-w-0">
-          <p className="truncate font-medium text-gray-700">
+    <div className="flex items-start justify-between gap-4 rounded-md bg-gray-50 p-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <FileText className="mt-0.5 h-5 w-5 flex-shrink-0 text-gray-400" />
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-medium text-gray-700">
             {report.file_name}
           </p>
-          <p className="text-xs text-gray-500">
-            {report.description && (
-              <span className="mr-2">{report.description}</span>
-            )}
+          {report.description && (
+            <p className="mt-1 whitespace-normal break-words text-xs leading-5 text-gray-600">
+              {report.description}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-gray-500">
             Uploaded: {formatDateTime(report.uploaded_at)}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex flex-shrink-0 items-center gap-2">
         <a
           href={reportUrl}
           target="_blank"

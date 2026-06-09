@@ -70,7 +70,34 @@ class SCMAgendaViewTests(unittest.TestCase):
         self.factory = APIRequestFactory()
         self.view = SCMAgendaView.as_view()
 
-    def test_get_returns_rows_and_carried_forward_open_actions(self) -> None:
+    def test_get_skips_carried_forward_open_actions_by_default(self) -> None:
+        prior_meeting = self._create_meeting(scm_number="ABC-01-Apr-2026", meeting_date=date(2026, 4, 1))
+        prior_row = SCMAgendaItem.objects.get(meeting_id=prior_meeting.id, agenda_item_number=2)
+        CorrectiveAction.objects.create(
+            source_table="vims_safety_scm_agenda",
+            source_id=prior_row.id,
+            title="Outstanding lifeboat release gear follow-up",
+            description="Open action item carried forward from the previous SCM.",
+            assigned_crew_id="chief-officer-7",
+            due_date=date(2026, 5, 10),
+            status=CorrectiveAction.Status.OPEN,
+            created_by="co-7",
+            updated_by="co-7",
+        )
+        current_meeting = self._create_meeting(scm_number="ABC-28-Apr-2026", meeting_date=date(2026, 4, 28))
+
+        request = self.factory.get(f"/api/safety/scm/{current_meeting.id}/agenda/")
+        force_authenticate(request, user=build_user(role_name="CO", process_ids=[]))
+
+        response = self.view(request, id=current_meeting.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["meeting_id"], current_meeting.id)
+        self.assertEqual(len(response.data["rows"]), 9)
+        self.assertEqual(response.data["summary"]["carried_forward_count"], 0)
+        self.assertEqual(response.data["carried_forward_items"], [])
+
+    def test_get_returns_rows_and_carried_forward_open_actions_when_requested(self) -> None:
         prior_meeting = self._create_meeting(scm_number="ABC-01-Apr-2026", meeting_date=date(2026, 4, 1))
         prior_row = SCMAgendaItem.objects.get(meeting_id=prior_meeting.id, agenda_item_number=2)
         CorrectiveAction.objects.create(
@@ -87,7 +114,7 @@ class SCMAgendaViewTests(unittest.TestCase):
 
         current_meeting = self._create_meeting(scm_number="ABC-28-Apr-2026", meeting_date=date(2026, 4, 28))
 
-        request = self.factory.get(f"/api/safety/scm/{current_meeting.id}/agenda/")
+        request = self.factory.get(f"/api/safety/scm/{current_meeting.id}/agenda/?include_carried_forward=1")
         force_authenticate(request, user=build_user(role_name="CO", process_ids=[]))
 
         response = self.view(request, id=current_meeting.id)

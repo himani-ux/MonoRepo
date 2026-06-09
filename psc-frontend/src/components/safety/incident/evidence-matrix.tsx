@@ -10,7 +10,7 @@ export function SafetyEvidenceMatrix({ rows }: SafetyEvidenceMatrixProps) {
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-006
+            Evidence review
           </p>
           <h2 className="text-xl font-semibold text-slate-900">Evidence Matrix</h2>
         </div>

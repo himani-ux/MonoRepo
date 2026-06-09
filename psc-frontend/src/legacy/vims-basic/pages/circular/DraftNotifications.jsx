@@ -1,4 +1,4 @@
-// src/components/DraftNotifications.jsx
+﻿// src/components/DraftNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
@@ -62,7 +62,7 @@ const DraftNotifications = ({ currentUser }) => {
 
             console.log("fetchUserDrafts: Query params:", queryParams);
 
-            const response = await fetch(`/api/circular/api/user-drafts/?${queryParams}`);
+            const response = await fetch(`http://localhost:8000/api/circular/api/user-drafts/?${queryParams}`);
             console.log("fetchUserDrafts: Response status:", response.status);
 
             if (!response.ok) {
@@ -106,7 +106,7 @@ const DraftNotifications = ({ currentUser }) => {
         const fetchOptions = async () => {
             try {
                 // Fetch document types
-                const docRes = await fetch('/api/circular/api/document-types/');
+                const docRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
                 const docData = await docRes.json();
                 const docTypeMap = {};
                 const docIdToNameMap = {};
@@ -122,7 +122,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToTypeMap(docIdToNameMap); // Populate idToTypeMap here
 
                 // Fetch priorities
-                const prioRes = await fetch('/api/circular/api/priorities/');
+                const prioRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
                 const prioData = await prioRes.json();
                 const prioMap = {};
                 const prioIdToNameMap = {};
@@ -138,7 +138,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToPriorityMap(prioIdToNameMap); //  Populate idToPriorityMap here
 
                 // Fetch departments
-                const deptRes = await fetch('/api/circular/api/departments/');
+                const deptRes = await fetch('http://localhost:8000/api/circular/api/departments/');
                 const deptData = await deptRes.json();
                 const deptMap = {};
                 const deptIdToNameMap = {};
@@ -154,7 +154,7 @@ const DraftNotifications = ({ currentUser }) => {
                 setIdToDeptMap(deptIdToNameMap); //  Populate idToDeptMap here
 
                 // Fetch sub-categories
-                const subCatRes = await fetch('/api/circular/api/sub-categories/');
+                const subCatRes = await fetch('http://localhost:8000/api/circular/api/sub-categories/');
                 const subCatData = await subCatRes.json();
                 const subCatIdToNameMap = {};
                 if (Array.isArray(subCatData)) {
@@ -165,10 +165,10 @@ const DraftNotifications = ({ currentUser }) => {
                     });
                 }
                 setSubCategories(subCatData);
-                setIdToSubCatMap(subCatIdToNameMap); // ✅ Populate idToSubCatMap here
+                setIdToSubCatMap(subCatIdToNameMap); // âœ… Populate idToSubCatMap here
 
                 // Fetch second sub-categories (example - adjust as needed)
-                const secondSubCatRes = await fetch('/api/circular/api/second-sub-categories/');
+                const secondSubCatRes = await fetch('http://localhost:8000/api/circular/api/second-sub-categories/');
                 const secondSubCatData = await secondSubCatRes.json();
                 const secondSubCatIdToNameMap = {};
                 if (Array.isArray(secondSubCatData)) {
@@ -213,7 +213,7 @@ const DraftNotifications = ({ currentUser }) => {
     // --- NEW: Define handleEditClick INSIDE the component ---
 
     const handleEditClick = async (notificationId) => {
-        console.log("🚀 handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
+        console.log("ðŸš€ handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
 
         try {
             const primaryDashboardPath = isAdmin ? '/circular/admin' : '/circular/office';
@@ -231,7 +231,7 @@ const DraftNotifications = ({ currentUser }) => {
 
     // --- Handle Delete Click ---
     const handleDeleteClick = async (draftId, srNo, displaySrNo) => {
-        console.log("🚀 handleDeleteClick: Delete clicked for draft ID:", draftId, "SR No:", srNo, "Display SR No:", displaySrNo);
+        console.log("ðŸš€ handleDeleteClick: Delete clicked for draft ID:", draftId, "SR No:", srNo, "Display SR No:", displaySrNo);
 
         const confirmed = window.confirm(`Are you sure you want to delete draft notification ${displaySrNo}?`);
         console.log("handleDeleteClick: User confirmed:", confirmed);
@@ -243,7 +243,7 @@ const DraftNotifications = ({ currentUser }) => {
 
         try {
             console.log("handleDeleteClick: Sending delete request for draft ID:", draftId);
-            const response = await fetch(`/api/circular/api/drafts/${draftId}/delete/`, {
+            const response = await fetch(`http://localhost:8000/api/circular/api/drafts/${draftId}/delete/`, {
                 method: 'POST', // Using POST to avoid browser compatibility issues
                 headers: {
                     'Content-Type': 'application/json',
@@ -395,7 +395,7 @@ const DraftNotifications = ({ currentUser }) => {
                                         title="Click to view full comment"
                                     >
                                         <div className="line-clamp-2">
-                                            {notification.publish_comment || '—'}
+                                            {notification.publish_comment || 'â€”'}
                                         </div>
                                     </td>
 

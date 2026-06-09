@@ -154,6 +154,8 @@ class PSCRefreshToken(RefreshToken):
             token['vessel_name'] = user.vessel_name
         token['display_name'] = user.display_name
         token['role_name'] = user.role_name
+        if getattr(user, 'profile_id', None):
+            token['profile_id'] = user.profile_id
         token['safety_role_name'] = user.safety_role_name
         token['username'] = user.username
         token['UserName'] = user.username

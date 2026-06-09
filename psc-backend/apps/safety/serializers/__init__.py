@@ -57,12 +57,21 @@ from .incident_phase8 import (
     RecommendationVerificationSerializer,
     build_phase8_workspace_payload,
 )
-from .near_miss import NearMissCreateSerializer, NearMissListSerializer, NearMissSerializer
+from .near_miss import (
+    NearMissCategoryReclassifySerializer,
+    NearMissCreateSerializer,
+    NearMissGuidancePromptSerializer,
+    NearMissKpiTargetSerializer,
+    NearMissListSerializer,
+    NearMissSerializer,
+)
 from .near_miss_analysis import NearMissAnalysisFactSerializer, build_near_miss_analysis_payload
 from .near_miss_triage import NearMissTriageSerializer, build_near_miss_priority_hint
 from .scm import (
     SCMAttendanceAcknowledgementSerializer,
     SCMMeetingCreateSerializer,
+    SCMMeetingDetailSerializer,
+    SCMMeetingListSerializer,
     SCMMeetingSerializer,
     SCMOfficeCommentSerializer,
     SCMSignatureSerializer,
@@ -161,6 +170,9 @@ __all__ = [
     "IncidentBiasGuardResponseSerializer",
     "IncidentBlameOverrideSerializer",
     "NearMissCreateSerializer",
+    "NearMissCategoryReclassifySerializer",
+    "NearMissGuidancePromptSerializer",
+    "NearMissKpiTargetSerializer",
     "NearMissListSerializer",
     "NearMissAnalysisFactSerializer",
     "NearMissSerializer",
@@ -168,6 +180,8 @@ __all__ = [
     "RecommendationSerializer",
     "RecommendationVerificationSerializer",
     "SCMMeetingCreateSerializer",
+    "SCMMeetingDetailSerializer",
+    "SCMMeetingListSerializer",
     "SCMMeetingSerializer",
     "SCMOfficeCommentSerializer",
     "SCMSubmitSerializer",

@@ -47,6 +47,9 @@ export interface AuthUser {
   has_global_vessel_access?: boolean | null;
   display_name?: string;
   role_name?: string;
+  profile_id?: string | null;
+  profileId?: string | null;
+  office_profile_id?: string | null;
   safety_role_name?: string | null;
   username?: string;
   UserName?: string;

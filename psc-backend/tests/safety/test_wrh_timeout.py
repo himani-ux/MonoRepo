@@ -59,6 +59,9 @@ class TimeoutWRHRepository:
     def get_latest_rest_snapshot(self, *, crew_id: str, vessel_id: str, meeting_date):
         raise SPTimeoutError("Timed out while querying WRH.")
 
+    def list_latest_rest_snapshots(self, *, crew_ids, vessel_id: str, meeting_date):
+        raise SPTimeoutError("Timed out while querying WRH.")
+
 
 class TimeoutSnapshotFetcher:
     def fetch_24h_and_7d(self, *, crew_id: str, meeting_date, vessel_id: str) -> dict[str, object]:
@@ -116,6 +119,21 @@ class WRHTimeoutTests(unittest.TestCase):
         self.assertEqual(result["timezone_offset_minutes"], 330)
         self.assertIn("lookup_timeout", result["warning_codes"])
         self.assertIn("WRH lookup timed out. Continue with manual review (D-GAP-M11).", result["warnings"])
+
+    def test_batch_snapshot_fetcher_marks_timeout_for_each_crew(self) -> None:
+        fetcher = WRHSnapshotFetcher(wrh_repository=TimeoutWRHRepository())
+
+        result = fetcher.fetch_many_24h_and_7d(
+            crew_ids=["crew-1", "crew-2"],
+            meeting_date="2026-04-28",
+            vessel_id="7",
+        )
+
+        self.assertEqual(set(result), {"crew-1", "crew-2"})
+        self.assertFalse(result["crew-1"]["wrh_data_available"])
+        self.assertEqual(result["crew-1"]["wrh_flag"], "RED")
+        self.assertEqual(result["crew-2"]["timezone_offset_minutes"], 330)
+        self.assertIn("lookup_timeout", result["crew-2"]["warning_codes"])
 
     def test_scm_attendance_save_proceeds_when_wrh_lookup_times_out(self) -> None:
         recreate_scm_tables()

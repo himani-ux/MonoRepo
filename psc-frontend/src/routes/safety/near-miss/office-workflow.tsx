@@ -4,8 +4,8 @@ export function NearMissDetailRoute() {
   return <SafetyNearMissWorkspace mode="detail" />;
 }
 
-export function NearMissTriageRoute() {
-  return <SafetyNearMissWorkspace mode="triage" />;
+export function NearMissOfficeCommentsRoute() {
+  return <SafetyNearMissWorkspace mode="office-comments" />;
 }
 
 export function NearMissReviewRoute() {
@@ -14,10 +14,6 @@ export function NearMissReviewRoute() {
 
 export function NearMissReworkRoute() {
   return <SafetyNearMissWorkspace mode="rework" />;
-}
-
-export function NearMissAnalysisRoute() {
-  return <SafetyNearMissWorkspace mode="analysis" />;
 }
 
 export function NearMissFleetAlertRoute() {

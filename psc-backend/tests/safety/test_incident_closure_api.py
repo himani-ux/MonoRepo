@@ -75,7 +75,7 @@ class IncidentClosureApiTests(unittest.TestCase):
         response = self.view(request, id=incident.pk)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["incident"]["id"], incident.pk)
+        self.assertEqual(response.data["incident"]["id"], str(incident.pk))
         self.assertEqual(response.data["audit_summary"]["phase_log_count"], 1)
         self.assertEqual(response.data["audit_summary"]["field_history_count"], 1)
         self.assertEqual(response.data["audit_summary"]["latest_phase_log"]["phase_to"], 9)

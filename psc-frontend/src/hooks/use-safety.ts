@@ -64,14 +64,14 @@ export const safetyKeys = {
     [...safetyKeys.all, 'scm', 'create-regular', { vesselId }] as const,
   scmCreateAdhoc: (vesselId?: string | null) =>
     [...safetyKeys.all, 'scm', 'create-adhoc', { vesselId }] as const,
-  scmAgenda: (id: number | string) => [...safetyKeys.all, 'scm', 'agenda', id] as const,
+  scmAgenda: (id: number | string, includeCarriedForward = false) =>
+    [...safetyKeys.all, 'scm', 'agenda', id, { includeCarriedForward }] as const,
   scmClosedSinceLast: (id: number | string) =>
     [...safetyKeys.all, 'scm', 'closed-since-last', id] as const,
   scmAutoFeed: (id: number | string) => [...safetyKeys.all, 'scm', 'auto-feed', id] as const,
   scmOpenFindings: (vesselId?: string | null) =>
     [...safetyKeys.all, 'scm', 'open-findings', { vesselId }] as const,
   scmAttendance: (id: number | string) => [...safetyKeys.all, 'scm', 'attendance', id] as const,
-  scmSignoffPreflight: (id: number | string) => [...safetyKeys.all, 'scm', 'preflight', id] as const,
   soiCompliance: (vesselId?: string | null) =>
     [...safetyKeys.all, 'soi-compliance', { vesselId }] as const,
   soiInspections: (filters: SafetySoiFilters) =>
@@ -321,10 +321,14 @@ export function useSafetyScmCreateAdhocConfig(vesselId?: string | null, enabled 
   });
 }
 
-export function useSafetyScmAgenda(id: number | string, enabled = true) {
+export function useSafetyScmAgenda(
+  id: number | string,
+  enabled = true,
+  includeCarriedForward = false,
+) {
   return useQuery({
-    queryKey: safetyKeys.scmAgenda(id),
-    queryFn: () => safetyApi.getScmAgenda(id),
+    queryKey: safetyKeys.scmAgenda(id, includeCarriedForward),
+    queryFn: () => safetyApi.getScmAgenda(id, { includeCarriedForward }),
     enabled,
     staleTime: STALE_TIME.INSPECTIONS,
   });
@@ -361,15 +365,6 @@ export function useSafetyScmAttendance(id: number | string, enabled = true) {
   return useQuery({
     queryKey: safetyKeys.scmAttendance(id),
     queryFn: () => safetyApi.getScmAttendance(id),
-    enabled,
-    staleTime: STALE_TIME.INSPECTIONS,
-  });
-}
-
-export function useSafetyScmSignoffPreflight(id: number | string, enabled = true) {
-  return useQuery({
-    queryKey: safetyKeys.scmSignoffPreflight(id),
-    queryFn: () => safetyApi.getScmSignoffPreflight(id),
     enabled,
     staleTime: STALE_TIME.INSPECTIONS,
   });

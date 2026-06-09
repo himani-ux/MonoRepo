@@ -44,7 +44,7 @@ class NearMissPdfAnonymityTests(unittest.TestCase):
             incident_number="NM/2026/061",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="HIGH",
             occurred_at=datetime.fromisoformat("2026-04-28T06:10:00+00:00"),
@@ -90,6 +90,7 @@ class NearMissPdfAnonymityTests(unittest.TestCase):
 
         self.assertIn("Anonymous Reporter", text)
         self.assertNotIn("Crew Reporter", text)
+        self.assertNotIn("Reporter identity is masked for this viewer.", text)
 
     def test_dpa_viewer_receives_visible_reporter_identity_in_pdf(self) -> None:
         text = self._render_text(role_name="DPA", user_id="dpa-1")

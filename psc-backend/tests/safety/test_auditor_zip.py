@@ -23,6 +23,7 @@ from apps.safety.models import (
     SCMAgendaItem,
     SCMAttendance,
     SCMMeeting,
+    SCMSignature,
     SOIFinding,
     SOIInspection,
     SOIInspectionArea,
@@ -314,6 +315,7 @@ class AuditorZipExportTests(unittest.TestCase):
         with connection.cursor() as cursor:
             cursor.execute("PRAGMA foreign_keys = OFF")
             cursor.execute("DROP TABLE IF EXISTS vims_safety_scm_agenda")
+            cursor.execute("DROP TABLE IF EXISTS vims_safety_scm_signature")
             cursor.execute("DROP TABLE IF EXISTS vims_safety_scm_attendance")
             cursor.execute("DROP TABLE IF EXISTS vims_safety_scm_meeting")
             cursor.execute("DROP TABLE IF EXISTS vims_safety_soi_finding")
@@ -339,6 +341,7 @@ class AuditorZipExportTests(unittest.TestCase):
         with connection.schema_editor() as schema_editor:
             schema_editor.create_model(SCMMeeting)
             schema_editor.create_model(SCMAttendance)
+            schema_editor.create_model(SCMSignature)
             schema_editor.create_model(SCMAgendaItem)
             schema_editor.create_model(SOIInspection)
             schema_editor.create_model(SOIInspectionArea)

@@ -28,7 +28,6 @@ class SCMAttendanceListCreateView(SCMViewMixin, generics.GenericAPIView):
         return get_by_id_or_pk(queryset, self.kwargs["id"])
 
     def get(self, request, *args, **kwargs):
-        self._ensure_agenda_editor_gate()
         payload = self.get_scm_repository().build_attendance_payload(meeting=self.get_meeting())
         return Response(payload)
 

@@ -269,7 +269,7 @@ export function SafetyIncidentPhase5() {
     }
     const acknowledged = workspace.bias_guards.filter((guard) => guard.acknowledged).length;
     if (acknowledged < workspace.bias_guards.length) {
-      hints.push("Acknowledge all active bias guards.");
+      hints.push("Acknowledge all active review checks.");
     }
     return hints;
   }, [
@@ -433,7 +433,7 @@ export function SafetyIncidentPhase5() {
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">Causal Analysis</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Build cause tags from facts, complete People / Process / Plant analysis, map safeguards, and close the bias guards.
+              Build cause tags from facts, complete People / Process / Plant analysis, map safeguards, and close the review checks.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3 text-sm">
@@ -677,7 +677,7 @@ export function SafetyIncidentPhase5() {
 
           <SafetyBiasGuardChecklist guards={workspace.bias_guards} />
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900">Complete Bias Guards</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Complete Review Checks</h2>
             <div className="mt-4 grid gap-3">
               {workspace.bias_guards.map((guard) => {
                 const draft = biasDraft[guard.guard_code] ?? guard;
@@ -702,7 +702,7 @@ export function SafetyIncidentPhase5() {
               })}
             </div>
             <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating} onClick={() => void saveBiasGuards()} type="button">
-              Save bias guards
+              Save review checks
             </button>
           </section>
         </>
@@ -710,7 +710,7 @@ export function SafetyIncidentPhase5() {
 
       {workspace.blame_evaluation.blocked ? (
         <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-          Blame-fixation guard is blocking Phase 6. Trigger terms: {workspace.blame_evaluation.trigger_terms.join(", ") || "review required"}.
+          Analysis review is blocking Phase 6. Words to review: {workspace.blame_evaluation.trigger_terms.join(", ") || "review required"}.
         </section>
       ) : null}
       {phase5GateHints.length > 0 ? (

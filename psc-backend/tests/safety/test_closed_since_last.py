@@ -89,9 +89,9 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
             near_miss_priority="LOW",
         )
         self._create_incident(
-            incident_number="NM-TRIAGED",
+            incident_number="NM-OFFICE-COMMENTS-COMPLETED",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             closed_at=None,
             near_miss_priority="HIGH",
         )
@@ -146,7 +146,7 @@ class ClosedSinceLastSCMTests(unittest.TestCase):
         self.assertIn("NM-001", references)
         self.assertIn("SOI/ABC/26/01", references)
         self.assertNotIn("INC-000", references)
-        self.assertNotIn("NM-TRIAGED", references)
+        self.assertNotIn("NM-OFFICE-COMMENTS-COMPLETED", references)
         self.assertTrue(all(item["status"] == "CLOSED" for item in response.data["items"]))
         self.assertIsNone(response.data["empty_message"])
         self.assertEqual(

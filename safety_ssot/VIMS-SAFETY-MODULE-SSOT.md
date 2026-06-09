@@ -2,7 +2,7 @@
 
 > **Status:** REQUIREMENTS COMPLETE — ready for docsuite generation
 > **Created:** 2026-04-08
-> **Last Updated:** 2026-04-16
+> **Last Updated:** 2026-06-09
 > **Module Owner:** Prince (PO)
 > **Reference wikis:** `VIMS-SAFETY-JIBE-ANALYSIS.md` (UI patterns) · `VIMS-SAFETY-DNV-MSCAT-ANALYSIS.md` (M-SCAT taxonomy + DNV methodology — added 2026-04-16, all 14 diff items adopted)
 > **Interrogation:** COMPLETE — ~89 Q&A across 16 rounds, **61 decisions locked**:
@@ -1336,61 +1336,93 @@ Full permission matrix is in `VIMS-SAFETY-REQUIREMENTS-INTERROGATION.md` Round 1
 
 ## 4. Near Miss Reporting
 
-> **Status:** Spec partially locked. Uses lightweight version of §2B framework.
+> **Status:** Implemented V1 behavior, revised 2026-06-09.
 
 ### 4.1 Scope & Definitions
-A **near miss** is the incident chain (§2B.1) where the outcome did **not** cross the loss threshold. Same M-SCAT taxonomy, same evidence concepts, but lighter capture and shorter workflow. Observations are folded into Near Miss (decision prior).
+A **near miss** is the incident chain (§2B.1) where the outcome did **not** cross the loss threshold. It uses a lightweight capture flow and the shared Safety M-SCAT reference data.
 
 ### 4.2 Workflow
-Per Round 12 decision, the lifecycle remains:
 
 ```
-Open → Submitted (HOD chain) → Rework ↔ Resubmitted → Accepted → Closed
+Submitted by vessel → Office Comments / Rework → Accepted → Closed
 ```
 
-Structurally equivalent to a GREEN-band incident: Master leads, 30-day default closure, no Phase-7 DPA acceptance required (PIC accepts).
+- Any authorized vessel user can submit a near miss.
+- If Office sends a near miss back for rework, the **Master can perform the rework regardless of who originally reported it**.
+- HIGH priority requires the stronger office/fleet-learning path before closure; LOW/MEDIUM follow the lighter closure path.
 
-### 4.3 Data Model
-Reuses the incident schema with a `record_type` discriminator on `safety_incident` (`type IN ('incident','near_miss')`) — same tables, near-miss-specific fields nullable for incidents and vice versa. Cause picker uses the **same** M-SCAT lookup tables (§2B.2).
+### 4.3 Create Form Rules
+- **Near Miss Type is removed** from the create form.
+- **Category** is the single user-facing field. It combines the old Category options and Possible Loss Type options into one dropdown. This is a UI merge only; existing DB fields remain for compatibility.
+- Category supports up to 3 selected values.
+- Category dropdown has one custom option only: **Other - Specify**.
+- **Immediate cause** uses M-SCAT subcodes and includes **Other - Specify** at the bottom of the dropdown.
+- Place is one of `At Anchor`, `At Sea`, `At Port`.
+- Description must be at least 100 characters.
+- Severity must be selected.
+- The previous 5-per-day near-miss submission cap is removed; users may submit as many near misses as required.
 
-Near-miss-specific:
-- No Phase-7 DPA acceptance requirement (PIC closes)
-- No mandatory 5-tool analysis — Fact Tree alone is sufficient
-- No 7-domain IMO A.884(21) checklist — SHELL tag only (per §2B.10)
-- No formal CA/PA — Lessons Learned + Immediate Action only (System Action optional)
-- No physical verification mandatory
+### 4.4 Reporter Identity
+- The anonymous reporting concept is removed.
+- Reporter name, rank, and user reference are stored and shown to Master and authorized office users according to vessel scope and safety permissions.
+- PDFs do not print any "Reporter identity is masked" wording.
 
-### 4.4 Anonymity & Reporting Culture
-- Submission is **named** by default (CrewId tracked) — anonymous submission deferred to V2
-- No-blame policy enforced via bias-fixation guard #5 (§2B.12) — investigations stopping at "individual error" without a Lack-of-Control entry are blocked
-- Guidance library (decision prior) — admin-configurable pick-and-choose prompts per incident type — surfaces during creation to lower friction
+### 4.5 Data Model
+Reuses the incident schema with `record_type='NEAR_MISS'` on `vims_safety_incident`. Existing fields such as category tags, loss type, immediate cause, high-risk details, and office comments remain in place; the current change is a workflow/UI contract and does not require a new table.
 
-### 4.5 Trend Analysis & KPIs
-- Per-vessel near-miss target tracked monthly (legacy KPI continues)
-- Heinrich Ratio panel (§2B.14) is the primary near-miss-vs-incident health indicator
-- Repeat root-cause radar (3+ in 6 months = systemic) — decision prior — uses M-SCAT basic-cause codes for matching
+### 4.6 PDF Rules
+- Near miss PDF is a lightweight report: event, category, immediate cause, immediate action, suggestion/preventive action, reporter details, office comments/rework history, and closure where available.
+- High-risk / learning sections are printed only when recorded.
+- Duplicate Office Comment blocks must not be printed.
+
+### 4.7 Trend Analysis & KPIs
+- Heinrich Ratio panel (§2B.14) remains the primary near-miss-vs-incident health indicator.
+- Repeat root-cause radar uses selected category / M-SCAT codes where available.
 
 ---
 
 ## 5. Safety Committee Meeting Minutes
 
-> **Status:** Research Pending
-> _This section will be populated through interrogation_
+> **Status:** Implemented V1 behavior, revised 2026-06-09.
 
 ### 5.1 Scope & Frequency
-<!-- Monthly meetings as per ISM Code, attendees, agenda structure -->
+SCM covers Regular monthly meetings and Ad-Hoc meetings. Master and Chief Officer can host either meeting type. Ad-Hoc meetings do not replace the monthly Regular SCM cadence.
 
 ### 5.2 Workflow
-<!-- Agenda creation → meeting → minutes capture → action items → follow-up -->
+
+```
+Draft → Submitted to Office → Closed
+```
+
+- Master/CO completes the meeting form and clicks **Submit to Office**.
+- Database state is stored as `SUBMITTED`; UI displays this as **Submitted to Office**.
+- Authorized office users enter **Office Comment**.
+- Saving Office Comment changes the meeting to `CLOSED` and stops vessel-side editing.
 
 ### 5.3 Data Model
-<!-- Fields, tables, relationships -->
+- Main table: `vims_safety_scm_meeting`.
+- Child tables: attendance, agenda, signatures/legacy compatibility, and legacy fields where applicable.
+- Active state values used by V1 are `DRAFT`, `SUBMITTED`, and `CLOSED`. `SIGNED_OFF` / `REOPENED` may remain for legacy compatibility.
 
-### 5.4 Action Item Tracking
-<!-- Assignment, deadlines, status tracking, overdue alerts -->
+### 5.4 Auto-Fetch Inputs
+SCM must continue to fetch:
+- WRH attendance/rest-hour status,
+- latest circulars / safety alerts / work instructions,
+- recent near misses,
+- PSC/SOI findings and closed-since-last items.
 
-### 5.5 Shore-Side Visibility
-<!-- DPA review, fleet-wide action item dashboard -->
+These feeds must be optimized by query batching and bounded result sets. Missing WRH data is a warning only and must not block submission or closure.
+
+### 5.5 Action Item Tracking
+SCM agenda sections record discussion, decisions, suggestions/recommendations, and carried-forward findings. Open SOI/PSC items continue to carry forward until closed.
+
+### 5.6 Shore-Side Visibility and Closure
+DPA, FM, Shore HOD, and Marine Superintendent profile users can enter Office Comment. Office Comment is restricted to office users only. Once saved, the meeting is closed.
+
+### 5.7 PDF Rules
+- SCM PDF follows the 10-section legacy-aligned format, with current simplified wording.
+- The removed explanatory lines about Regular/Ad-Hoc cadence, WRH warnings, and near-miss reporter masking must not be printed.
+- PDF includes attendance + WRH snapshot, circular/near-miss/PSC/SOI discussion, Office Comment, and plain Master/Chief Officer signature lines.
 
 ---
 
@@ -1419,7 +1451,7 @@ Near-miss-specific:
 | D-RBAC-03 | SSQE = DPA team label, no separate RBAC entry | 2026-04-16 | Q47.2 Option A — simplifies matrix |
 | D-RBAC-04 | Fleet Manager baseline = read+flag+comment outside formal record | 2026-04-16 | Q47.3 Option C — keeps ISM audit trail pure |
 | D-RBAC-05 | FM sole authority for RED closure + RED blame-fixation override | 2026-04-16 | Q47.1 + Q47.5 — highest-band elevation |
-| D-RBAC-06 | CO and Master can host either Regular or Ad-Hoc SCM; user selects `meeting_type` at creation; Master remains final sign-off authority | 2026-04-16; revised 2026-05-18 | Operational update: both senior shipboard roles may host either SCM type while preserving Master closure/sign-off accountability |
+| D-RBAC-06 | CO and Master can host either Regular or Ad-Hoc SCM; user selects `meeting_type` at creation; submitting moves the meeting to Office; Office Comment closes it | 2026-04-16; revised 2026-06-09 | Operational update: both senior shipboard roles may host either SCM type; active closure is by authorized office comment |
 | D-RBAC-07 | Blame-fixation override: DPA for GREEN/YELLOW, FM for RED | 2026-04-16 | Q47.5 Option B — band-tiered |
 | D-RBAC-08 | PIC read-only non-managed + can borrow lessons into own circulars | 2026-04-16 | Q47.6.1 Option C — supports cross-fleet learning |
 | D-RBAC-09 | Master read-only on closed incidents fleet-wide | 2026-04-16 | Q47.6.2 Option B — supports in-crew learning culture |
@@ -1495,7 +1527,7 @@ Near-miss-specific:
 | D-GAP-H2 | **Two repeat-root-cause radars on Safety Intelligence Dashboard:** (a) fleet-level — same M-SCAT leaf code appearing 3+ times across the fleet in rolling 6 months; (b) vessel-level — same leaf 3+ times on same vessel in rolling 6 months. Both flagged independently. **Superseded / reclassified incidents do NOT count** toward the total (no inflation) | 2026-04-17 | Session 5 Round 19 Cluster H — dual-axis radar preserves both fleet and vessel insight |
 | D-GAP-I1 | **PMS is an independent system accessed by separate login.** M-SCAT cause 12 "Inadequate Maintenance" does NOT trigger any in-VIMS PMS work-order lookup. Investigator cross-references PMS manually. **Removes the Safety↔PMS cross-module dependency previously noted in §2 for M-SCAT cause 12.** Equipment defect linkage from SOI findings to PMS also remains manual (no FK) | 2026-04-17 | Session 5 Round 19 Cluster I — user clarification: PMS is standalone; simplifies integration surface |
 | D-GAP-I2 | **No CMS staleness concern.** Crew Management System and Safety module share the same database (`ksm_cms_live`); cross-functional assistant lookup for SOI is a live table join with no sync lag. Residual operational case (new joiner physically onboard but not yet entered in CMS roster by HR) is an HR process issue; V1 handles via D-SOI-08's hard-enforcement — Master may defer inspection or select a different assistant. No manual override added | 2026-04-17 | Session 5 Round 19 Cluster I — user clarification: same-DB = no staleness |
-| D-GAP-J1 | **Near-miss reporter identity hidden from Master and HOD** on the incident screen and in PDFs. Visible only to DPA and FM (and reporter themselves). System stores the name; UI masks it outside the DPA/FM view. Reporting-culture-protective | 2026-04-17 | Session 5 Round 19 Cluster J — resolves fear-of-retaliation concern without losing audit trail |
+| D-GAP-J1 | **Near-miss reporter identity is visible to authorized users.** Anonymous reporting and reporter masking are removed from V1. Reporter name/rank/user reference are stored and shown according to vessel scope and safety permissions | 2026-04-17; revised 2026-06-09 | User priority: Master and authorized users must see reporter details; no anonymous concept |
 | D-GAP-M01 | **Orphaned attachment cleanup:** hard-delete immediately from cloud storage when its parent draft/record is deleted. No grace period. `safety_field_history` logs the delink | 2026-04-17 | Session 5 Round 20 — simplicity; no cloud-bloat |
 | D-GAP-M02 | **Re-upload with same filename = replace in place.** `safety_field_history` captures old→new filename, uploader, timestamp. No auto-versioned copies | 2026-04-17 | Session 5 Round 20 — single source of truth per file |
 | D-GAP-M03 | **CA may close with its Physical Verification still Open.** PV runs on its own track; incident closure also allowed. Matches PSC CAR pattern already in use | 2026-04-17 | Session 5 Round 20 — operational reality (drydock slots); consistent with cross-module precedent |
@@ -1515,9 +1547,9 @@ Near-miss-specific:
 | D-GAP-M17 | **Repeat findings: both visual badge + dashboard metric.** Badge on record ("Repeat — Nth occurrence") + dashboard tile ("Top 5 repeat findings per vessel") | 2026-04-17 | Session 5 Round 20 — dual visibility at discovery + review layers |
 | D-GAP-M18 | **No single-department exception required.** Vessels always have Deck and Engine departments — D-SOI-08 cross-functional rule is always satisfiable. No override mechanism added | 2026-04-17 | Session 5 Round 20 — user clarified operational assumption |
 | D-GAP-M19 | **`applicable=false` workflow for an SOI area:** Master requests, DPA approves; both signatures + reason captured in dedicated `safety_soi_applicability_log` | 2026-04-17 | Session 5 Round 20 — strong audit defence for vetting / class queries |
-| D-GAP-M20 | **SCM hard-block on overdue SOI** = block Master's SIGN-OFF only (not meeting creation / running). Meeting happens; the compliance artefact cannot be signed until the overdue area(s) cleared | 2026-04-17 | Session 5 Round 20 — preserves regulatory force without preventing discussion |
+| D-GAP-M20 | **SCM overdue SOI handling** = warning only during SCM creation, edit, PDF export, and Office Comment closure. Meeting and closure may continue while the warning remains visible | 2026-04-17; revised 2026-06-09 | Operational update: SCM must not become slow or blocked by SOI checks; overdue items remain visible for office/vessel action |
 | D-GAP-M21 | **Master rejection of SO's `pending_closure`:** mandatory written reason; finding returns to "Open" state; reason appended to finding notes | 2026-04-17 | Session 5 Round 20 — audit trail for ISM/class |
-| D-GAP-M22 | **Closed-Since-Last-SCM snapshot cutoff = prior SCM's CLOSURE timestamp** (Master sign-off moment). Unambiguous through reschedules and Ad-Hoc meetings | 2026-04-17 | Session 5 Round 20 — crisp temporal anchor |
+| D-GAP-M22 | **Closed-Since-Last-SCM snapshot cutoff = prior SCM closure timestamp.** New SCM records close when Office Comment is saved; legacy records may use Master sign-off timestamp | 2026-04-17; revised 2026-06-09 | Aligns with active Draft to Submitted to Office to Closed workflow |
 | D-GAP-M23 | **Section 12 "Cross-cutting Safety & Culture" evaluated once per 3-month cycle** (not every individual SOI event). Safety Officer decides which SOI event in the cycle carries Section 12 | 2026-04-17 | Session 5 Round 20 — avoids duplicate cross-cutting responses |
 | D-GAP-M-ADHOC | **SCM supports Ad-Hoc / Additional meetings** (beyond monthly cadence) called by Master or CO for major incidents or important information. Same form, PDF, and shared SCM host RBAC; tagged `meeting_type = 'AD_HOC'`. Does NOT replace the monthly Regular meeting. Cadence counter + Closed-Since-Last snapshot anchor on last SCM closure timestamp regardless of type. Aligns with SSQE Manual §9 provisions | 2026-04-17; revised 2026-05-18 | Session 5 Round 20 plus operational update: Master and CO both have SCM host authority |
 | D-GAP-M24 | **Photo evidence on SOI findings: HIGH severity requires ≥1 photo** (mandatory). MED / LOW = optional. Enforced at finding-save | 2026-04-17 | Session 5 Round 20 — evidence-chain defensible at audit |
@@ -1534,7 +1566,7 @@ Near-miss-specific:
 | D-GAP-M35 | **Accessibility target: WCAG 2.1 Level AA.** All color-coded indicators include text labels; forms have ARIA labels; full keyboard navigation parity; screen-reader support on dashboard + forms | 2026-04-17 | Session 5 Round 20 — maritime SaaS baseline; protects against vetting failures |
 | D-GAP-M36 | **Localization V1: English-only UI.** Date rendering = DD-MMM-YYYY (e.g. 17-Apr-2026) to avoid US/EU ambiguity. Units = metric always. Timestamps per D-GAP-M26. Multilingual and translated M-SCAT codes are V2 | 2026-04-17 | Session 5 Round 20 — ambiguity-free dates; V2 scope for translation |
 | D-GAP-M37 | **No crew-name redaction in auditor export bundle** (D-PDF-02). Full context preserved; auditor sees names as recorded | 2026-04-17 | Session 5 Round 20 — full context serves auditor better than partial privacy |
-| D-GAP-M38 | **Near-miss submission controls: rate-limit + minimum-detail combined.** Max 5 near-miss submissions per crew member per 24 hours; each submission requires description ≥ 100 characters + severity selected | 2026-04-17 | Session 5 Round 20 — light friction against spam, preserves honest reporting |
+| D-GAP-M38 | **Near-miss submission controls:** no daily submission cap; each submission requires description >= 100 characters and severity selected | 2026-04-17; revised 2026-06-09 | User priority: crew must be able to report as many near misses as needed in a day |
 | D-GAP-DESIGN-01 | **Dashboard metric rename: "Inspection Compliance %" (on Safety dashboard) is renamed to "SOI Compliance %"** to avoid clash with the existing PSC Inspection-module metric of the same name. Applies to all UI labels and exports | 2026-04-17 | Session 5 Round 20 — DESIGN clarity; no name collision across modules |
 | D-GAP-R01 | **Causal-layer tagging on top of M-SCAT (ABS scaffolding).** Every cause entered on an incident must also be tagged as Immediate / Intermediate / Root. Investigator cannot close Phase 5 with Immediate-only codes — at least one Root-level cause required. Extends D-DNV-01 | 2026-04-17 | Session 5 Round 21 — ABS Guidance Notes 2005 §6 + RightShip 2023; prevents premature closure at intermediate level |
 | D-GAP-R02 | **ALARP cost-benefit gate on System-Action recommendations.** Each System Action (per D-DNV-06 tier 3) must include: estimated effort, estimated likelihood reduction, residual-risk acceptability statement. Mandatory for RED and YELLOW bands; optional-but-prompted for GREEN | 2026-04-17 | Session 5 Round 21 — VMTC-RAII (Veritas) + IMO/ISM baseline; adds regulatory defensibility |

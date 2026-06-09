@@ -60,7 +60,7 @@ class NearMissFactTreeTests(unittest.TestCase):
             incident_number="NM/2026/023",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             occurred_at=timezone.now() - timedelta(hours=1),
             near_miss_priority="HIGH",

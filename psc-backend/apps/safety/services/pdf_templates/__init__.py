@@ -10,7 +10,6 @@ from .scm_10_section_legacy import (
     SCMLegacyClosedItem,
     SCMLegacyPdfContext,
     SCMLegacySectionRow,
-    SCMLegacySignatureRow,
     SCMTenSectionLegacyTemplate,
 )
 from .soi_summary import (
@@ -35,7 +34,6 @@ __all__ = [
     "SCMLegacyClosedItem",
     "SCMLegacyPdfContext",
     "SCMLegacySectionRow",
-    "SCMLegacySignatureRow",
     "SCMTenSectionLegacyTemplate",
     "SOISummaryAreaRow",
     "SOISummaryFindingRow",

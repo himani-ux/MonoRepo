@@ -8,10 +8,10 @@ export function SafetyCargoSpecificOverlay({
   return (
     <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
-        FEAT-SAF-INC-009
+        Cargo evidence
       </p>
       <h2 className="mt-1 text-xl font-semibold text-amber-950">
-        Cargo-Specific Evidence Overlay
+        Cargo-Specific Evidence
       </h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {items.length > 0 ? (
@@ -25,7 +25,7 @@ export function SafetyCargoSpecificOverlay({
             </div>
           ))
         ) : (
-          <p className="text-sm text-amber-800">No cargo overlay prompts are active.</p>
+          <p className="text-sm text-amber-800">No cargo evidence prompts are active.</p>
         )}
       </div>
     </section>

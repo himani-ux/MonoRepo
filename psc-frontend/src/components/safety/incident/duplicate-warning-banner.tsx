@@ -17,7 +17,7 @@ export function SafetyDuplicateWarningBanner({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
-            FEAT-SAF-INC-032
+            Possible duplicate
           </p>
           <h2 className="text-lg font-semibold text-amber-900">
             Possible duplicate incidents detected

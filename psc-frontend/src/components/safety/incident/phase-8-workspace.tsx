@@ -263,7 +263,7 @@ export function SafetyIncidentPhase8() {
               <p className="mt-2 text-2xl font-semibold text-slate-900">
                 {workspace.physical_verification.done}/{workspace.physical_verification.done + workspace.physical_verification.pending}
               </p>
-              <p className="mt-1 text-sm text-slate-600">Separate track retained from the SSOT.</p>
+              <p className="mt-1 text-sm text-slate-600">Tracked separately from incident closure.</p>
             </article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">PIC Retention</p>

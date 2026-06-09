@@ -1,16 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { SafetyAnonymityBadge } from "../../../components/safety/shared/anonymity-badge";
 import { useSafetyAuth } from "../../../hooks/safety/use-auth";
 import { useSafetyNearMisses } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
 import { formatVesselName } from "../../../lib/safety/vessel-display";
-
-function canSeeReporter(role: string | null) {
-  const normalizedRole = (role ?? "").trim().toUpperCase();
-  return normalizedRole === "DPA" || normalizedRole === "FM";
-}
 
 function formatDateTime(value: string | null) {
   if (!value) {
@@ -29,9 +23,24 @@ function formatDateTime(value: string | null) {
   });
 }
 
+function formatNearMissState(value: unknown) {
+  const state = String(value ?? "").trim().toUpperCase();
+  switch (state) {
+    case "READY_FOR_OFFICE_COMMENTS":
+      return "Ready for Office Comments";
+    case "OFFICE_COMMENTS_COMPLETED":
+      return "Office Comments Completed";
+    case "PENDING_VESSEL_REVIEW":
+      return "Pending Vessel Review";
+    case "REWORK_REQUIRED":
+      return "Rework Required";
+    default:
+      return state ? state.replace(/_/g, " ") : "Not recorded";
+  }
+}
+
 export default function SafetyNearMissIndexRoute() {
   const auth = useSafetyAuth();
-  const reporterVisible = canSeeReporter(auth.role);
   const canCreate = auth.hasProcess("SAF_P_001");
   const [priority, setPriority] = useState("");
   const [state, setState] = useState("");
@@ -93,7 +102,8 @@ export default function SafetyNearMissIndexRoute() {
               <option value="">All states</option>
               <option value="DRAFT">Draft</option>
               <option value="SUBMITTED">Submitted</option>
-              <option value="TRIAGED">Triaged</option>
+              <option value="READY_FOR_OFFICE_COMMENTS">Ready for office comments</option>
+              <option value="OFFICE_COMMENTS_COMPLETED">Office comments completed</option>
               <option value="SUPERSEDED">Superseded</option>
               <option value="CLOSED">Closed</option>
             </select>
@@ -138,18 +148,17 @@ export default function SafetyNearMissIndexRoute() {
                     <td className="px-4 py-4 text-slate-600">{formatDateTime(nearMiss.occurred_at || nearMiss.reported_at)}</td>
                     <td className="px-4 py-4">
                       <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                        {nearMiss.near_miss_priority || "Pending triage"}
+                        {nearMiss.near_miss_priority || "Pending office comments"}
                       </span>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-slate-700">
-                          {nearMiss.reporter_name || (reporterVisible ? "Reporter hidden by source data" : "Anonymous Reporter")}
+                          {nearMiss.reporter_name || "Reporter not recorded"}
                         </span>
-                        <SafetyAnonymityBadge masked={!reporterVisible} />
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-slate-600">{nearMiss.state}</td>
+                    <td className="px-4 py-4 text-slate-600">{formatNearMissState(nearMiss.state)}</td>
                   </tr>
                 ))}
               </tbody>

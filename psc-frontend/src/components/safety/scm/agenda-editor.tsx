@@ -103,9 +103,9 @@ export default function SafetyScmAgendaEditor({
       setSaveAttempted(false);
       setMessage("Agenda recommendations and action items saved.");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: safetyKeys.scmAgenda(payload.meeting_id) }),
+        queryClient.invalidateQueries({ queryKey: safetyKeys.scmAgenda(payload.meeting_id, false) }),
+        queryClient.invalidateQueries({ queryKey: safetyKeys.scmAgenda(payload.meeting_id, true) }),
         queryClient.invalidateQueries({ queryKey: safetyKeys.scmMeeting(payload.meeting_id) }),
-        queryClient.invalidateQueries({ queryKey: safetyKeys.scmSignoffPreflight(payload.meeting_id) }),
       ]);
     },
   });

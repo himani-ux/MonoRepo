@@ -4,14 +4,20 @@ from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework import status
+from django.db.models import Count
 from django.utils import timezone
 
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
 from apps.safety.authentication.vessel_scope import filter_by_vessel_scope, get_scoped_vessel_ids, user_has_vessel_access
-from apps.safety.models import SCMMeeting
+from apps.safety.models import SCMAgendaItem, SCMMeeting
 from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import SCMRepository
-from apps.safety.serializers import SCMMeetingCreateSerializer, SCMMeetingSerializer, SCMSubmitSerializer
+from apps.safety.serializers import (
+    SCMMeetingCreateSerializer,
+    SCMMeetingDetailSerializer,
+    SCMMeetingListSerializer,
+    SCMSubmitSerializer,
+)
 from apps.safety.services.scm_state_machine import SCMStateMachine
 
 
@@ -83,18 +89,16 @@ class SCMViewMixin:
 
     def _ensure_scm_host_gate(self) -> None:
         if _normalized_role(getattr(self.request, "user", None)) not in {"CO", "MASTER"}:
-            raise PermissionDenied("SCM hosting is restricted to the Chief Officer or Master.")
+            raise PermissionDenied("Only Chief Officer or Master can create SCM meetings.")
 
     def _ensure_agenda_editor_gate(self) -> None:
         if _normalized_role(getattr(self.request, "user", None)) not in {"CO", "MASTER"}:
-            raise PermissionDenied(
-                "SCM agenda editing is restricted to the Chief Officer or Master in Step 3.5 (FEAT-SAF-SCM-008)."
-            )
+            raise PermissionDenied("Only Chief Officer or Master can edit this SCM meeting.")
 
     def _ensure_submit_gate(self, meeting: SCMMeeting) -> None:
         role = _normalized_role(getattr(self.request, "user", None))
         if role not in {"CO", "MASTER"}:
-            raise PermissionDenied("SCM finalisation is restricted to the Chief Officer or Master.")
+            raise PermissionDenied("Only Chief Officer or Master can finalize this SCM meeting.")
 
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
@@ -117,14 +121,33 @@ class SCMListCreateView(SCMViewMixin, generics.ListCreateAPIView):
     def get_serializer_class(self):
         if self.request.method == "POST":
             return SCMMeetingCreateSerializer
-        return SCMMeetingSerializer
+        return SCMMeetingListSerializer
 
     def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
+        try:
+            page_size = int(request.query_params.get("page_size") or 50)
+        except (TypeError, ValueError):
+            page_size = 50
+        page_size = max(1, min(page_size, 100))
+        queryset = list(self.get_queryset()[:page_size])
         repository = self.get_scm_repository()
+        meeting_ids = [meeting.id for meeting in queryset]
+        section_counts = {
+            str(row["meeting_id"]): row["count"]
+            for row in SCMAgendaItem.objects.filter(meeting_id__in=meeting_ids)
+            .order_by()
+            .values("meeting_id")
+            .annotate(count=Count("id"))
+        }
         for meeting in queryset:
-            meeting._agenda_rows = list(repository.list_sections(meeting.id))
-            meeting._legacy_fields = list(repository.list_legacy_fields(meeting.id))
+            meeting.section_count = int(section_counts.get(str(meeting.id), 0) or 0)
+            meeting._cadence_warning = None
+        for meeting in queryset[:3]:
+            if meeting.meeting_type == SCMMeeting.MeetingType.REGULAR:
+                meeting._cadence_warning = repository.build_cadence_warning(
+                    vessel_id=str(meeting.vessel_id),
+                    meeting_date=meeting.meeting_date,
+                )
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -161,18 +184,25 @@ class SCMListCreateView(SCMViewMixin, generics.ListCreateAPIView):
             chair_crew_id=chair_crew_id,
             prepared_by_crew_id=prepared_by_crew_id,
         )
-        response_serializer = SCMMeetingSerializer(
-            meeting,
-            context=self.get_serializer_context(),
+        return Response(
+            {
+                "id": meeting.id,
+                "scm_number": meeting.scm_number,
+                "state": meeting.state,
+                "updated_date": meeting.updated_date,
+            },
+            status=201,
         )
-        headers = self.get_success_headers(response_serializer.data)
-        return Response(response_serializer.data, status=201, headers=headers)
 
 
 class SCMDetailView(SCMViewMixin, generics.RetrieveAPIView):
     lookup_url_kwarg = "id"
     queryset = SCMMeeting.objects.filter(is_deleted=False)
-    serializer_class = SCMMeetingSerializer
+
+    def get_serializer_class(self):
+        if self.request.method in {"PATCH", "PUT"}:
+            return SCMMeetingCreateSerializer
+        return SCMMeetingDetailSerializer
 
     def get_permissions(self):
         permissions = [self.form_permission_class()]
@@ -184,11 +214,7 @@ class SCMDetailView(SCMViewMixin, generics.RetrieveAPIView):
         return self._apply_filters(super().get_queryset())
 
     def get_object(self):
-        meeting = super().get_object()
-        repository = self.get_scm_repository()
-        meeting._agenda_rows = list(repository.list_sections(meeting.id))
-        meeting._legacy_fields = list(repository.list_legacy_fields(meeting.id))
-        return meeting
+        return super().get_object()
 
     def patch(self, request, *args, **kwargs):
         self._ensure_agenda_editor_gate()
@@ -201,8 +227,15 @@ class SCMDetailView(SCMViewMixin, generics.RetrieveAPIView):
         )
         serializer.is_valid(raise_exception=True)
         updated = serializer.save()
-        response_serializer = SCMMeetingSerializer(updated, context=self.get_serializer_context())
-        return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "id": updated.id,
+                "scm_number": updated.scm_number,
+                "state": updated.state,
+                "updated_date": updated.updated_date,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SCMSubmitView(SCMViewMixin, generics.GenericAPIView):
@@ -253,8 +286,15 @@ class SCMSubmitView(SCMViewMixin, generics.GenericAPIView):
                 user=request.user,
             )
 
-        response_serializer = SCMMeetingSerializer(updated, context=self.get_serializer_context())
-        return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "id": updated.id,
+                "scm_number": updated.scm_number,
+                "state": updated.state,
+                "updated_date": updated.updated_date,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SCMCreateRegularView(SCMViewMixin, generics.GenericAPIView):
@@ -273,5 +313,8 @@ class SCMCreateRegularView(SCMViewMixin, generics.GenericAPIView):
             vessel_id=str(vessel_id),
             actor_id=_resolve_actor_id(request.user),
             user=request.user,
+            include_feeds=True,
+            include_rollups=False,
+            include_wrh_preview=True,
         )
         return Response(payload)

@@ -786,16 +786,16 @@ Purpose: Build Near Miss reporting on top of the shared `vims_safety_incident` t
 
 ## Phase 3 — SCM Regular + Ad-Hoc
 
-Purpose: Safety Committee Meeting module — both Regular monthly and Ad-Hoc meetings can be hosted by Master or CO; Master signs off. Shared form shape (FEAT-SAF-SCM-003 — 10-section legacy `vw_GetSCM_Master` structure preserved); `meeting_type` differentiates the record. WRH attendance live join (warn-don't-block, D-GAP-M11). Hard-block sign-off on overdue SOI (FEAT-SAF-SCM-007). Aligns with KSM SSQE Manual Rev 01 Feb 2026 §9.
+Purpose: Safety Committee Meeting module — both Regular monthly and Ad-Hoc meetings can be hosted by Master or CO. Office Comment closes the meeting. Shared form shape (FEAT-SAF-SCM-003 — legacy `vw_GetSCM_Master` structure preserved); `meeting_type` differentiates the record. WRH attendance live join is warn-don't-block (D-GAP-M11). Overdue SOI is warning/visibility only in SCM. Aligns with KSM SSQE Manual Rev 01 Feb 2026 §9.
 
 ---
 
 ### Step 3.1 — `vims_safety_scm_meeting` CRUD + Regular SCM
 
-**Description:** Core SCM table. `record_type` ∈ {REGULAR, AD_HOC}. Regular SCM must run monthly (cadence enforcement warn-only, not block). Master or CO hosts; Master signs off. 10-section form structure frozen to match legacy `vw_GetSCM_Master` view (FEAT-SAF-SCM-003).
+**Description:** Core SCM table. `record_type` ∈ {REGULAR, AD_HOC}. Regular SCM must run monthly (cadence enforcement warn-only, not block). Master or CO hosts and can edit until Office Comment closes the record. 10-section form structure frozen to match legacy `vw_GetSCM_Master` view (FEAT-SAF-SCM-003).
 
 **Files to create:**
-- `apps/safety/models/scm.py` — `SCMMeeting` (vessel_id, record_type, meeting_date, scheduled_date, state, created_by, signed_off_by_master, master_signoff_date, ten_section_fields...). Table `vims_safety_scm_meeting`.
+- `apps/safety/models/scm.py` — `SCMMeeting` (vessel_id, record_type, meeting_date, scheduled_date, state, created_by, office_comment, office_comment_by, office_comment_at, ten_section_fields...). Table `vims_safety_scm_meeting`.
 - `apps/safety/repositories/scm_repo.py`.
 - `apps/safety/serializers/scm.py`.
 - `apps/safety/views/scm.py` — `SCMListCreateView` (POST gates on `SAF_P_001` + `SAF_F_003`), `SCMDetailView`, `SCMCreateRegularView`.
@@ -806,7 +806,7 @@ Purpose: Safety Committee Meeting module — both Regular monthly and Ad-Hoc mee
 - `src/components/safety/scm/scm-10-section-form.tsx` — 10-section form.
 - `src/schemas/safety/scm.ts`.
 
-**PRD features delivered:** `FEAT-SAF-SCM-001` (SCM Regular monthly cadence), `FEAT-SAF-SCM-003` (10-section legacy structure), `FEAT-SAF-SCM-004` (creation by Master/CO, sign-off by Master).
+**PRD features delivered:** `FEAT-SAF-SCM-001` (SCM Regular monthly cadence), `FEAT-SAF-SCM-003` (legacy structure), `FEAT-SAF-SCM-004` (creation/edit by Master/CO, Office Comment closure).
 
 **Tests to write:**
 - Unit: `tests/safety/test_scm_model.py`.
@@ -890,10 +890,10 @@ Purpose: Safety Committee Meeting module — both Regular monthly and Ad-Hoc mee
 
 ### Step 3.5 — SCM Agenda + Action-Item Tracking
 
-**Description:** `vims_safety_scm_agenda` captures agenda items and decisions. Action items from SCM flow into `vims_safety_corrective_action` if flagged as such (reuse Step 1.11 model). Each item: owner, target date, status. Outcome logged at next SCM (Closed-Since-Last-SCM block picks up).
+**Description:** `vims_safety_scm_agenda` captures agenda items and Suggestions / Recommendations. Action items from SCM flow into `vims_safety_corrective_action` if flagged as such (reuse Step 1.11 model). Each item: owner, target date, status. Outcome logged at next SCM (Closed-Since-Last-SCM block picks up).
 
 **Files to create:**
-- `apps/safety/models/scm_agenda.py` — `SCMAgendaItem(scm_id, section, text, decision, owner, target_date, status)`.
+- `apps/safety/models/scm_agenda.py` — `SCMAgendaItem(scm_id, section, text, decision, owner, target_date, status)` where the legacy `decision` field is labelled Suggestions / Recommendations in the UI and PDF.
 - `apps/safety/serializers/scm_agenda.py`.
 - `apps/safety/views/scm_agenda.py`.
 - `src/routes/safety/scm/[id]/agenda.tsx`.
@@ -910,20 +910,19 @@ Purpose: Safety Committee Meeting module — both Regular monthly and Ad-Hoc mee
 
 ---
 
-### Step 3.6 — SCM Hard-Block on Overdue SOI (Sign-Off Only)
+### Step 3.6 — SCM Overdue SOI Visibility (Warning Only)
 
-**Description:** SCM can be **created and edited** with overdue SOI, but **sign-off is hard-blocked** if any SOI on the vessel is past the 90-day ceiling (D-GAP-SOI-05, FEAT-SAF-SCM-007). Enforcement at `SCMSignOffView`. Unblocking requires SO to complete overdue SOI first.
+**Description:** SCM can be **created, edited, exported to PDF, and closed by Office Comment** with overdue SOI. If any SOI on the vessel is past the 90-day ceiling (D-GAP-SOI-05, FEAT-SAF-SCM-007), SCM shows the overdue areas as warning/visibility only. It does not block the SCM workflow.
 
 **Files to create:**
 - `apps/safety/services/overdue_soi_blocker.py` — `check_overdue_soi(vessel_id) -> list[overdue_inspections]`.
-- `apps/safety/views/scm_signoff.py` — `SCMSignOffView` with overdue-SOI hard-block.
-- `src/routes/safety/scm/[id]/signoff.tsx`.
-- `src/components/safety/scm/overdue-soi-block-banner.tsx`.
+- `apps/safety/services/overdue_soi_blocker.py` — `check_overdue_soi(vessel_id) -> list[overdue_inspections]`.
+- SCM detail warning block / SOI link.
 
-**PRD features delivered:** `FEAT-SAF-SCM-007` (SCM hard-block on overdue SOI at sign-off).
+**PRD features delivered:** `FEAT-SAF-SCM-007` (SCM overdue SOI visibility).
 
 **Tests to write:**
-- Integration: `tests/safety/test_scm_overdue_soi_block.py` — overdue SOI blocks sign-off; completing SOI unblocks.
+- Integration: SCM warning test — overdue SOI appears but does not block Office Comment closure.
 - Unit: `tests/safety/test_overdue_soi_detector.py`.
 
 **Dependencies:** 3.1, 4.4 (SOI 90-day ceiling + overdue detection).
@@ -932,24 +931,24 @@ Purpose: Safety Committee Meeting module — both Regular monthly and Ad-Hoc mee
 
 ---
 
-### Step 3.7 — SCM Sign-Off (Master Signature)
+### Step 3.7 — SCM Office Comment Closure
 
-**Description:** Master sign-off transitions SCM from `IN_PROGRESS` → `SIGNED_OFF`. Triggers PDF generation (Step 6.4). Applies Hybrid Digital Signature Model (FEAT-SAF-AUDIT-003). Once signed, form is read-only for all roles.
+**Description:** Office Comment transitions SCM from `DRAFT` to `CLOSED`. DPA, FM, Shore HOD, and Marine Superintendent profile `407EF017-0F1C-EF11-A9F1-F348983BAE6B` can save Office Comment. Once Office Comment is saved, vessel-side meeting, attendance, and agenda edits are read-only. SCM does not capture digital signatures.
 
 **Files to create:**
-- `apps/safety/views/scm_signoff.py` (extend from 3.6).
 - `apps/safety/services/scm_state_machine.py`.
-- `src/components/safety/scm/signoff-signature-block.tsx`.
+- `apps/safety/views/scm_office_comment.py`.
+- SCM detail Office Comment block.
 
-**PRD features delivered:** `FEAT-SAF-SCM-004` (sign-off by Master — completes this feature started in 3.1).
+**PRD features delivered:** `FEAT-SAF-SCM-004` (Office Comment closure — completes this feature started in 3.1).
 
 **Tests to write:**
-- Integration: `tests/safety/test_scm_signoff.py` — Master signs → state=SIGNED_OFF → PDF generated.
-- Unit: `tests/safety/test_scm_state_immutable.py` — signed SCM cannot be PATCHed.
+- Integration: `tests/safety/test_scm_office_comment.py` — authorized office reviewer saves Office Comment → state=CLOSED.
+- Unit: `tests/safety/test_scm_state_immutable.py` — closed SCM cannot be PATCHed by vessel users.
 
 **Dependencies:** 3.6; 6.4 (SCM PDF).
 
-**Decisions:** FEAT-SAF-SCM-004 (sign-off), FEAT-SAF-AUDIT-003.
+**Decisions:** FEAT-SAF-SCM-004, D-RBAC-06.
 
 ---
 
@@ -1058,7 +1057,7 @@ Purpose: Paper-first 13-area SOI workflow per D-GAP-E4, using the 329-item maste
 
 ### Step 4.4 — 90-Day Hard Ceiling + 80-Day Amber + SOI Compliance %
 
-**Description:** Per area per vessel, compute `due_by_date = last_inspected_at + 90 days`. At 80 days (or 10 days before due) surface an **amber** warning per D-GAP-SOI-05 / FEAT-SAF-SOI-005. At 90 days **hard ceiling** — overdue flag used by SCM sign-off block (Step 3.6). Dashboard pill labelled **"SOI Compliance %"** per D-GAP-DESIGN-01 (NEVER "Inspection Compliance %"). Celery-beat nightly rollup.
+**Description:** Per area per vessel, compute `due_by_date = last_inspected_at + 90 days`. At 80 days (or 10 days before due) surface an **amber** warning per D-GAP-SOI-05 / FEAT-SAF-SOI-005. At 90 days **hard ceiling** — overdue flag is shown in SCM as warning-only visibility (Step 3.6) and does not block meeting creation, PDF download, or Office Comment closure. Dashboard pill labelled **"SOI Compliance %"** per D-GAP-DESIGN-01 (NEVER "Inspection Compliance %"). Celery-beat nightly rollup.
 
 **Files to create:**
 - `apps/safety/services/soi_compliance_calculator.py` — `compliance_percent(vessel_id, at_date)`; 90/80 day logic.
@@ -1465,7 +1464,7 @@ Purpose: Render the authoritative PDFs per D-PDF-01 / D-PDF-02 / D-PDF-03a / D-P
 
 ### Step 6.4 — SCM PDF (10-Section Legacy Structure)
 
-**Description:** D-PDF-03b legacy `vw_GetSCM_Master` 10-section template preserved verbatim. Generated on Master sign-off (Step 3.7). Master signature block.
+**Description:** D-PDF-03b legacy `vw_GetSCM_Master` 10-section template preserved in the active 9-section display. Available immediately after meeting creation. Includes Attendance + WRH snapshot, Closed-Since-Last, SOI summary without duplicate finding details, Section 7 findings/corrective measures, Office Comment, and plain Master Signature / Chief Officer Signature lines. SCM does not capture digital signatures.
 
 **Files to create:**
 - `apps/safety/services/pdf_templates/scm_10_section_legacy.py`.
@@ -1834,7 +1833,7 @@ Purpose: Resolve the 12 build-time deferrals from BACKEND_STRUCTURE §8. Each de
 
 ### Step 8.7 — Deferral #7: WRH Lookback Window / Query Timeout
 
-**Description:** Backend + WRH lead finalizes 24h + 7d snapshot on save (interim Option A) vs streaming query at render vs env-configurable. Impacts SCM submit latency (D-GAP-M11 warn-don't-block).
+**Description:** Backend + WRH lead finalizes 24h + 7d snapshot on save (interim Option A) vs streaming query at render vs env-configurable. Impacts SCM attendance save/display latency (D-GAP-M11 warn-don't-block).
 
 **Files to create:**
 - `apps/safety/services/wrh_snapshot_fetcher.py` (update with final policy).

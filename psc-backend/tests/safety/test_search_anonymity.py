@@ -44,7 +44,7 @@ class CrossRecordSearchAnonymityTests(unittest.TestCase):
             incident_number="NM/2026/051",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
-            state="TRIAGED",
+            state="OFFICE_COMMENTS_COMPLETED",
             current_phase=1,
             near_miss_priority="LOW",
             occurred_at=timezone.now(),

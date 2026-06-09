@@ -1,4 +1,4 @@
-// src/components/dashboardlayout/PdfViewer.jsx
+﻿// src/components/dashboardlayout/PdfViewer.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -27,7 +27,7 @@ const PdfViewer = ({
 
   const pdfContainerRef = useRef(null);
 
-  // 🔹 Fetch PDF URL
+  // ðŸ”¹ Fetch PDF URL
   console.log('PdfViewer notification', notification);
   useEffect(() => {
     const fetchPdfUrl = async () => {
@@ -35,7 +35,7 @@ const PdfViewer = ({
         console.log('notification.id', notification.id);
         console.log('user.crew_id', user.crew_id);
         const res = await fetch(
-          `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${user.crew_id}`
+          `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${user.crew_id}`
         );
 
         if (!res.ok) {
@@ -60,7 +60,7 @@ const PdfViewer = ({
     }
   }, [notification?.id, user?.crew_id]);
 
-  // 🔹 Render PDF with PDF.js
+  // ðŸ”¹ Render PDF with PDF.js
   useEffect(() => {
     if (!pdfUrl || !pdfContainerRef.current) return;
 
@@ -98,7 +98,7 @@ const PdfViewer = ({
           container.appendChild(pageDiv);
         }
 
-        // 🔹 Scroll listener for bottom detection
+        // ðŸ”¹ Scroll listener for bottom detection
         const handleScroll = () => {
           const el = container;
           const isBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
@@ -116,12 +116,12 @@ const PdfViewer = ({
     renderPdf();
   }, [pdfUrl]);
 
-  // 🔹 Handle Acknowledgment
+  // ðŸ”¹ Handle Acknowledgment
   const handleAcknowledgeClick = async () => {
     if (hasAcknowledged) return;
 console.log('Acknowledging notification:', notification.id,user.crew_id,user.role);
     try {
-      const res = await fetch('/api/circular/api/msc/read-ack/', {
+      const res = await fetch('http://localhost:8000/api/circular/api/msc/read-ack/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -146,7 +146,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
     }
   };
 
-  // 🔹 Handle Download
+  // ðŸ”¹ Handle Download
   const handleDownloadPdf = () => {
     if (pdfUrl) {
       const link = document.createElement('a');
@@ -156,7 +156,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
     }
   };
 
-  // 🟡 Loading / Error states
+  // ðŸŸ¡ Loading / Error states
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -175,7 +175,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* 🔸 Header */}
+      {/* ðŸ”¸ Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -205,7 +205,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
 
       
 
-      {/* 🔸 PDF Container */}
+      {/* ðŸ”¸ PDF Container */}
       <div
         ref={pdfContainerRef}
         className="max-w-7xl mx-auto px-4 pb-24 overflow-y-auto"
@@ -214,7 +214,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
         {/* PDF pages rendered by PDF.js */}
       </div>
 
-      {/* 🔸 Scroll-to-bottom Ack Button */}
+      {/* ðŸ”¸ Scroll-to-bottom Ack Button */}
       {canAcknowledge && !hasAcknowledged && isScrolledToBottom && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg">
           <div className="max-w-7xl mx-auto flex justify-center">

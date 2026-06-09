@@ -144,6 +144,57 @@ class NearMissCreateAnyRankTests(unittest.TestCase):
         self.assertEqual(response.data["vessel_id"], "EF9029C2-A192-EF11-A9F2-933342524037")
         self.assertTrue(str(response.data["incident_number"]).startswith("DRAFT-MVX/"))
 
+    def test_create_accepts_place_and_up_to_three_near_miss_classifiers(self) -> None:
+        payload = build_payload(
+            narrative=(
+                "Crew member observed loose securing around a portable pump and reported "
+                "the exposure before the item could shift into the access path during sea passage."
+            )
+        )
+        payload.update(
+            {
+                "near_miss_place": "AT_SEA",
+                "near_miss_category_tags": ["Safety", "Operational", "Environment"],
+                "near_miss_incident_type_ids": [1, 2, 3],
+                "near_miss_mscat_subcode_ids": ["10.01", "10.02", "10.03"],
+            }
+        )
+        request = self.factory.post("/api/safety/near-miss/", payload, format="json")
+        force_authenticate(
+            request,
+            user=build_user(role_name="WIPER", process_ids=["SAF_P_001"], user_id="wiper-7"),
+        )
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["near_miss_place"], "AT_SEA")
+        self.assertEqual(response.data["near_miss_shell_tag"], "Safety")
+        self.assertEqual(response.data["near_miss_category_tags"], ["Safety", "Operational", "Environment"])
+        self.assertEqual(str(response.data["incident_type_id"]), "1")
+        self.assertEqual(response.data["near_miss_incident_type_ids"], [1, 2, 3])
+        self.assertEqual(response.data["near_miss_mscat_subcode_id"], "10.01")
+        self.assertEqual(response.data["near_miss_mscat_subcode_ids"], ["10.01", "10.02", "10.03"])
+
+    def test_create_rejects_more_than_three_near_miss_classifiers(self) -> None:
+        payload = build_payload(
+            narrative=(
+                "Crew member observed loose securing around a portable pump and reported "
+                "the exposure before the item could shift into the access path during sea passage."
+            )
+        )
+        payload["near_miss_category_tags"] = ["Safety", "Operational", "Environment", "Training"]
+        request = self.factory.post("/api/safety/near-miss/", payload, format="json")
+        force_authenticate(
+            request,
+            user=build_user(role_name="WIPER", process_ids=["SAF_P_001"], user_id="wiper-7"),
+        )
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("near_miss_category_tags", response.data)
+
     def test_missing_create_permission_is_rejected(self) -> None:
         request = self.factory.post(
             "/api/safety/near-miss/",

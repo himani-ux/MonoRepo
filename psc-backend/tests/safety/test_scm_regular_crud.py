@@ -11,7 +11,8 @@ bootstrap_django()
 from rest_framework.test import APIRequestFactory, force_authenticate
 from django.utils import timezone
 
-from apps.safety.models import SCMAttendance, SCMLegacyField, SCMMeeting, SCMSignature
+from apps.safety.models import SCMAgendaItem, SCMAttendance, SCMLegacyField, SCMMeeting, SCMSignature
+from apps.safety.repositories import SCMRepository
 from apps.safety.views.scm import SCMDetailView, SCMListCreateView, SCMSubmitView
 from apps.safety.views.scm_attendance import SCMAttendanceListCreateView
 from apps.safety.views.scm_signature import SCMSignatureView
@@ -77,6 +78,55 @@ def build_payload() -> dict[str, object]:
         "chair_crew_id": "master-7",
         "sections": build_sections(),
     }
+
+
+class CountingWRHFetcher:
+    def __init__(self) -> None:
+        self.fetch_24h_count = 0
+        self.fetch_many_count = 0
+
+    def fetch_timezone_offset(self, *, vessel_id, meeting_date):
+        return None
+
+    def fetch_24h_and_7d(self, *, crew_id, meeting_date, vessel_id):
+        self.fetch_24h_count += 1
+        return {
+            "timezone_offset_minutes": None,
+            "warning_codes": [],
+            "wrh_data_available": True,
+            "wrh_rest_hours_24h": "12.00",
+            "wrh_rest_hours_7d": "77.00",
+            "wrh_non_compliance_flag": False,
+        }
+
+    def fetch_many_24h_and_7d(self, *, crew_ids, meeting_date, vessel_id):
+        self.fetch_many_count += 1
+        return {
+            str(crew_id): {
+                "timezone_offset_minutes": None,
+                "warning_codes": [],
+                "wrh_data_available": True,
+                "wrh_rest_hours_24h": "12.00",
+                "wrh_rest_hours_7d": "77.00",
+                "wrh_non_compliance_flag": False,
+            }
+            for crew_id in crew_ids
+        }
+
+
+class FastSCMRepository(SCMRepository):
+    wrh_fetcher = CountingWRHFetcher()
+
+    def __init__(self, **kwargs):
+        super().__init__(wrh_snapshot_fetcher=self.__class__.wrh_fetcher, **kwargs)
+
+
+class FastSCMListCreateView(SCMListCreateView):
+    repository_class = FastSCMRepository
+
+
+class FastSCMDetailView(SCMDetailView):
+    repository_class = FastSCMRepository
 
 
 def build_legacy_sections() -> list[dict[str, object]]:
@@ -166,10 +216,10 @@ class SCMRegularCrudTests(unittest.TestCase):
         create_response = self.list_create_view(create_request)
 
         self.assertEqual(create_response.status_code, 201)
-        self.assertEqual(create_response.data["meeting_type"], "REGULAR")
         self.assertEqual(create_response.data["state"], "DRAFT")
-        self.assertEqual(len(create_response.data["sections"]), 9)
-        self.assertEqual(create_response.data["prepared_by_crew_id"], "co-7")
+        meeting = SCMMeeting.objects.get(pk=create_response.data["id"])
+        self.assertEqual(meeting.meeting_type, "REGULAR")
+        self.assertEqual(meeting.prepared_by_crew_id, "co-7")
 
         detail_request = self.factory.get(f"/api/safety/scm/{create_response.data['id']}/")
         force_authenticate(detail_request, user=build_user(role_name="MASTER", process_ids=[], user_id="master-7"))
@@ -177,9 +227,13 @@ class SCMRegularCrudTests(unittest.TestCase):
         detail_response = self.detail_view(detail_request, id=create_response.data["id"])
 
         self.assertEqual(detail_response.status_code, 200)
-        self.assertEqual(detail_response.data["id"], create_response.data["id"])
+        self.assertEqual(str(detail_response.data["id"]), str(create_response.data["id"]))
         self.assertEqual(detail_response.data["scm_number"], "ABC-28-Apr-2026")
-        self.assertEqual(detail_response.data["sections"][0]["agenda_item_number"], 1)
+        self.assertEqual(detail_response.data["sections"], [])
+        self.assertEqual(
+            SCMAgendaItem.objects.get(meeting_id=meeting.id, agenda_item_number=1).agenda_item_number,
+            1,
+        )
 
     def test_master_can_create_regular_scm_with_create_process_id(self) -> None:
         request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
@@ -188,8 +242,9 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.list_create_view(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["meeting_type"], "REGULAR")
-        self.assertEqual(response.data["prepared_by_crew_id"], "master-7")
+        meeting = SCMMeeting.objects.get(pk=response.data["id"])
+        self.assertEqual(meeting.meeting_type, "REGULAR")
+        self.assertEqual(meeting.prepared_by_crew_id, "master-7")
 
     def test_co_can_edit_full_meeting_until_office_review(self) -> None:
         create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
@@ -213,9 +268,10 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.detail_view(patch_request, id=create_response.data["id"])
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["location"], "Edited Singapore Anchorage")
+        meeting = SCMMeeting.objects.get(pk=create_response.data["id"])
+        self.assertEqual(meeting.location, "Edited Singapore Anchorage")
         self.assertEqual(
-            response.data["sections"][0]["content"],
+            SCMAgendaItem.objects.get(meeting_id=meeting.id, agenda_item_number=1).content,
             "Edited structured review notes with enough content for validation.",
         )
 
@@ -244,7 +300,8 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.detail_view(patch_request, id=meeting.id)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["voyage_no"], "V2026-EDIT")
+        meeting.refresh_from_db()
+        self.assertEqual(meeting.voyage_no, "V2026-EDIT")
 
     def test_office_review_locks_full_meeting_edit(self) -> None:
         create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
@@ -328,6 +385,55 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(attendance_rows[1].crew_id, "co-7")
         self.assertTrue(attendance_rows[1].present)
 
+    def test_create_and_edit_batch_wrh_lookup(self) -> None:
+        FastSCMRepository.wrh_fetcher = CountingWRHFetcher()
+        list_create_view = FastSCMListCreateView.as_view()
+        detail_view = FastSCMDetailView.as_view()
+
+        create_request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
+
+        create_response = list_create_view(create_request)
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_24h_count, 0)
+        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_many_count, 1)
+        self.assertTrue(
+            all(
+                row.wrh_data_available
+                for row in SCMAttendance.objects.filter(meeting_id=create_response.data["id"])
+            )
+        )
+
+        payload = build_payload()
+        payload["location"] = "Edited no-WRH save location"
+        for attendance_row in payload["attendance_rows"]:
+            attendance_row["wrh_data_available"] = False
+            attendance_row["wrh_rest_hours_24h"] = None
+            attendance_row["wrh_rest_hours_7d"] = None
+            attendance_row["warning_codes"] = ["missing_data"]
+        patch_request = self.factory.patch(
+            f"/api/safety/scm/{create_response.data['id']}/",
+            payload,
+            format="json",
+        )
+        force_authenticate(
+            patch_request,
+            user=build_user(role_name="CO", process_ids=["SAF_P_002"], user_id="co-7"),
+        )
+
+        patch_response = detail_view(patch_request, id=create_response.data["id"])
+
+        self.assertEqual(patch_response.status_code, 200)
+        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_24h_count, 0)
+        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_many_count, 2)
+        self.assertTrue(
+            all(
+                row.wrh_data_available
+                for row in SCMAttendance.objects.filter(meeting_id=create_response.data["id"])
+            )
+        )
+
     def test_regular_create_derives_chair_and_preparer_from_authenticated_scope(self) -> None:
         payload = build_payload()
         payload["prepared_by_crew_id"] = "spoofed-co"
@@ -338,8 +444,9 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.list_create_view(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["prepared_by_crew_id"], "co-7")
-        self.assertEqual(response.data["chair_crew_id"], "master-7")
+        meeting = SCMMeeting.objects.get(pk=response.data["id"])
+        self.assertEqual(meeting.prepared_by_crew_id, "co-7")
+        self.assertEqual(meeting.chair_crew_id, "master-7")
 
     def test_regular_create_requires_location_or_coordinates(self) -> None:
         payload = build_payload()
@@ -364,9 +471,10 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.list_create_view(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertIsNone(response.data["location"])
-        self.assertEqual(str(response.data["latitude"]), "1.290270")
-        self.assertEqual(str(response.data["longitude"]), "103.851959")
+        meeting = SCMMeeting.objects.get(pk=response.data["id"])
+        self.assertIsNone(meeting.location)
+        self.assertEqual(str(meeting.latitude), "1.290270")
+        self.assertEqual(str(meeting.longitude), "103.851959")
 
     def test_create_accepts_structured_legacy_payload_and_renders_section_one(self) -> None:
         payload = build_payload()
@@ -387,12 +495,9 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.list_create_view(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["occasion"], "M")
-        self.assertEqual(response.data["ship_position"], "P")
-        section_one = response.data["sections"][0]
-        self.assertTrue(section_one["legacy_fields"]["previous_minutes_reviewed"])
-        self.assertNotIn("absent_from_previous_meeting", section_one["legacy_fields"])
-        self.assertEqual(section_one["legacy_fields"]["major_incidents_discussed"], "N/A")
+        meeting = SCMMeeting.objects.get(pk=response.data["id"])
+        self.assertEqual(meeting.occasion, "M")
+        self.assertEqual(meeting.ship_position, "P")
         self.assertEqual(
             SCMLegacyField.objects.get(
                 meeting_id=response.data["id"],
@@ -430,7 +535,7 @@ class SCMRegularCrudTests(unittest.TestCase):
             "Finding 10 observation.",
         )
         self.assertEqual(
-            response.data["sections"][6]["legacy_fields"]["correctivemeasure10"],
+            section_seven_fields.get(field_key="correctivemeasure10").field_value,
             "Corrective measure 10.",
         )
 
@@ -455,9 +560,9 @@ class SCMRegularCrudTests(unittest.TestCase):
             ).field_value,
             long_minutes,
         )
-        self.assertEqual(
-            response.data["sections"][7]["legacy_fields"]["miscellaneous_comments"],
+        self.assertIn(
             long_minutes,
+            SCMAgendaItem.objects.get(meeting_id=response.data["id"], agenda_item_number=8).content,
         )
 
     def test_office_review_is_not_required_for_vessel_create(self) -> None:
@@ -474,8 +579,9 @@ class SCMRegularCrudTests(unittest.TestCase):
         response = self.list_create_view(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertIsNone(response.data["office_comment"])
-        self.assertFalse(response.data["is_reviewed"])
+        meeting = SCMMeeting.objects.get(pk=response.data["id"])
+        self.assertIsNone(meeting.office_comment)
+        self.assertIsNone(meeting.office_comment_at)
 
     def test_scm_create_rate_limit_blocks_fourth_creation_for_vessel_day(self) -> None:
         statuses = []

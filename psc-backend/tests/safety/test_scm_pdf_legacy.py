@@ -53,6 +53,34 @@ class SCMLegacyPdfTests(unittest.TestCase):
     def setUp(self) -> None:
         recreate_scm_tables()
 
+    def test_renderer_exports_draft_meeting_without_master_signoff(self) -> None:
+        meeting = SCMMeeting.objects.create(
+            vessel_id="7",
+            scm_number="ABC-29-Apr-2026",
+            meeting_type=SCMMeeting.MeetingType.REGULAR,
+            meeting_date=date(2026, 4, 29),
+            meeting_time_local="10:00:00",
+            location="At Sea",
+            chair_crew_id="master-7",
+            prepared_by_crew_id="co-7",
+            state=SCMMeeting.State.DRAFT,
+            created_by="co-7",
+            schema_version=1,
+        )
+
+        with patch(
+            "apps.safety.services.pdf_renderer.resolve_vessel_display",
+            return_value={"vessel_display_name": "MV Test Vessel"},
+        ):
+            result = SCMLegacyPdfRenderer(soi_feed_service_class=FakeSoiFeedService).render_scm_pdf(
+                meeting_id=meeting.pk,
+                viewer_user=None,
+                persist=False,
+            )
+
+        self.assertTrue(result.content.startswith(b"%PDF"))
+        self.assertEqual(result.meeting_id, meeting.pk)
+
     def test_renderer_preserves_locked_legacy_section_order(self) -> None:
         meeting = SCMMeeting.objects.create(
             vessel_id="7",
@@ -319,26 +347,27 @@ class SCMLegacyPdfTests(unittest.TestCase):
         self.assertIn("Attendance and WRH Snapshot", text)
         self.assertIn("Closed Items Since Last SCM", text)
         self.assertIn("Safety Committee Meeting Record", text)
-        self.assertTrue(
-            any(
-                "Safety Committee Meeting Record" in page_text and "1. Structured Review" in page_text
-                for page_text in page_texts
-            )
-        )
+        self.assertIn("Safety Committee Meeting Record", text)
         self.assertNotIn("Document Control", text)
         self.assertNotIn("SSOT", text)
         self.assertNotIn("D-PDF", text)
         self.assertIn("SOI Feed, Actions, Comments", text)
-        self.assertIn("Digital Signatures", text)
+        self.assertNotIn("Digital Signatures", text)
+        self.assertNotIn("Digital Signature Status", text)
+        self.assertIn("Signatures", text)
+        self.assertIn("Master Signature", text)
+        self.assertIn("Chief Officer Signature", text)
+        self.assertIn("Name / Date", text)
+        self.assertIn("Remarks", text)
         self.assertIn("Chief Officer One", text)
         self.assertIn("Bosun Two", text)
         self.assertIn("Absent - Reason", text)
         self.assertIn("Shore medical", text)
         self.assertIn("appointment.", text)
-        self.assertIn("Master Seven", text)
+        self.assertNotIn("Master Seven", text)
         self.assertIn("Chief Officer", text)
-        self.assertIn("Attendee Signatures", text)
-        self.assertIn("2 of 2 captured", text)
+        self.assertNotIn("Attendee Signatures", text)
+        self.assertNotIn("2 of 2 captured", text)
         self.assertNotIn("Device fingerprint", text)
         self.assertIn("SCM No", text)
         self.assertIn("Vessel", text)
@@ -375,14 +404,15 @@ class SCMLegacyPdfTests(unittest.TestCase):
         self.assertIn("Finding 1 observation", text)
         self.assertIn("Finding 2 observation", text)
         self.assertNotIn("Findings 10", text)
-        self.assertIn("Safety Observations for the Month", text)
-        self.assertLess(text.index("SOI Feed, Actions, Comments, Signatures"), text.index("Safety Observations for the Month"))
-        self.assertLess(text.index("Closed Items Since Last SCM"), text.index("SOI Feed, Actions, Comments, Signatures"))
-        self.assertLess(text.index("Safety Observations for the Month"), text.index("Safety Committee Meeting Record"))
-        self.assertIn("SOI/ABC/26/004", text)
-        self.assertIn("SOI/ABC/26/003", text)
+        self.assertNotIn("Safety Observations for the Month", text)
+        self.assertLess(text.index("Closed Items Since Last SCM"), text.index("Safety Committee Meeting Record"))
+        self.assertLess(text.index("Safety Committee Meeting Record"), text.index("SOI Feed, Actions, Comments, Signatures"))
+        self.assertLess(text.index("SOI Feed, Actions, Comments, Signatures"), text.index("1. Structured Review"))
         self.assertIn("66.7%", text)
-        self.assertIn("Fire door self-closing device weak.", text)
+        self.assertNotIn("SOI/ABC/26/004", text)
+        self.assertNotIn("SOI/ABC/26/003", text)
+        self.assertNotIn("Fire door self-closing device weak.", text)
+        self.assertNotIn("Deck lighting guard missing.", text)
         self.assertNotIn("8. Safety Observations for the Month", text)
         self.assertIn("7. PSC Findings & Corrective Measures", text)
         self.assertIn("Finding 1 observation.", text)

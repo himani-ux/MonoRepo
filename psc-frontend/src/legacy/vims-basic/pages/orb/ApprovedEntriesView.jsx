@@ -1,4 +1,4 @@
-// src/components/ApprovedEntriesView.jsx
+﻿// src/components/ApprovedEntriesView.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Card } from "../../components/orb/OrbUI";
 import { formatDate } from '../../utils/orb/orbUtils'; // Import your date formatting helper
@@ -24,7 +24,7 @@ const ApprovedEntriesView = () => {
     setError(null);
     try {
       // Call the NEW independent backend endpoint for approved entries
-      const response = await fetch(`/api/orb/api/approved-entries/?vessel_id=${vesselId}`, {
+      const response = await fetch(`http://localhost:8000/api/orb/api/approved-entries/?vessel_id=${vesselId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ const ApprovedEntriesView = () => {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch("/api/orb/api/vessels/")
+    fetch("http://localhost:8000/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -181,7 +181,7 @@ const ApprovedEntriesView = () => {
                             if (line.startsWith('TANK(S) BALLASTED')) itemNo = '1';
 
                             // 2. Cleaned Since Last Oil
-                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) itemNo = '2';
+                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) itemNo = '2';
 
                             // 4.1 Ballast Start/End
                             if (line.startsWith('START BALLAST')) itemNo = '4.1';
@@ -215,7 +215,7 @@ const ApprovedEntriesView = () => {
                               }
                             }
                             // Quantity is always 10, regardless of index
-                            else if (line.includes('M³')) {
+                            else if (line.includes('MÂ³')) {
                               itemNo = '10';
                             }
                             break;
@@ -225,10 +225,10 @@ const ApprovedEntriesView = () => {
                               itemNo = entry.item_no || '';
                             }
                             // 11.1 handled on first line
-                            if (line.includes('M³') && !line.includes('COLLECTED') && !line.includes('RETAINED')) {
+                            if (line.includes('MÂ³') && !line.includes('COLLECTED') && !line.includes('RETAINED')) {
                               itemNo = '11.2';
                             }
-                            if ((lineIndex === 2) && line.includes('M³')) {
+                            if ((lineIndex === 2) && line.includes('MÂ³')) {
                               itemNo = '11.3';
                             }
                             if (lineIndex === 3) {
@@ -295,7 +295,7 @@ const ApprovedEntriesView = () => {
                             if (line.startsWith('START:')) itemNo = '26.2';
                             else if (line.includes('BUNKERED IN TANKS')) itemNo = line.includes('FUEL') ? '26.3' : '26.4';
                             else if (line.includes('TANK(S) BALLASTED')) itemNo = '1';
-                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) itemNo = '2';
+                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) itemNo = '2';
                             else if (line.includes('START BALLAST')) itemNo = '4.1';
                             else if (line.includes('START') && !line.includes('BALLAST')) itemNo = '3.1';
                             else if (line.startsWith('METHOD USED')) itemNo = '3.2';
@@ -303,7 +303,7 @@ const ApprovedEntriesView = () => {
                             else if (line.includes('BALLAST QUANTITY')) itemNo = '4.2';
                             else if (line.includes('THROUGH 15 PPM EQUIPMENT')) itemNo = '9.1';
                             else if (line.includes('RECEPTION')) itemNo = '9.2';
-                            else if (line.includes('m³') || line.includes('M³')) itemNo = '10';
+                            else if (line.includes('mÂ³') || line.includes('MÂ³')) itemNo = '10';
                             break;
                         }
 

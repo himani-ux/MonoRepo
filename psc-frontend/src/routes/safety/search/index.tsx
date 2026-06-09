@@ -13,7 +13,7 @@ type SearchRecordTypeFilter = "ALL" | SafetySearchGroupKey;
 const searchTypeOptions: Array<{ description: string; value: SearchRecordTypeFilter; label: string }> = [
   { value: "ALL", label: "All", description: "Cross-record full-text scan across every Step 8.8 source." },
   { value: "INCIDENT", label: "Incident", description: "Formal incident records only." },
-  { value: "NEAR_MISS", label: "Near Miss", description: "Reporter-masked near-miss hits where required." },
+  { value: "NEAR_MISS", label: "Near Miss", description: "Near-miss records with reporter details for authorized users." },
   { value: "SCM", label: "SCM", description: "Safety committee meeting records." },
   { value: "SOI_FINDING", label: "SOI", description: "SOI finding title and description hits." },
 ];

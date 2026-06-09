@@ -1,8 +1,8 @@
-import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+﻿import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { useAuthStore } from "@/stores/auth-store";
 
 const baseQuery = fetchBaseQuery({
-  baseUrl: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseUrl: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api",
   prepareHeaders: (headers) => {
     const token = useAuthStore.getState().tokens?.access;
     if (token) {

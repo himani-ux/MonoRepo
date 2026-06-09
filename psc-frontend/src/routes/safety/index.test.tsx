@@ -321,8 +321,8 @@ describe("safety routes", () => {
       id: 99,
       incident_number: "NM-BACKEND-0099",
       near_miss_priority: "HIGH",
-      state: "TRIAGED",
-      triage_phase_log: {
+      state: "OFFICE_COMMENTS_COMPLETED",
+      office_comments_phase_log: {
         transition_type: "FORWARD",
       },
     });
@@ -1106,8 +1106,8 @@ describe("safety routes", () => {
 
     expect(await screen.findByRole("heading", { name: "Acceptance and Report Issue" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "DPA Acceptance / Report Issued" })).toBeInTheDocument();
-    expect(screen.getByText("Required process:")).toBeInTheDocument();
-    expect(screen.getAllByText("SAF_P_004").length).toBeGreaterThan(0);
+    expect(screen.getByText("Required closer:")).toBeInTheDocument();
+    expect(screen.getAllByText("DPA").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "PDF Preview" })).toHaveAttribute(
       "href",
       "/api/safety/export/incident/42/pdf/",
@@ -1160,8 +1160,8 @@ describe("safety routes", () => {
     expect(document.querySelector("pre")).not.toBeInTheDocument();
   });
 
-  it("loads_live_near_miss_triage_route_from_backend", async () => {
-    renderSafetyRoute("/safety/near-miss/99/triage", {
+  it("loads_live_near_miss_office_comments_route_from_backend", async () => {
+    renderSafetyRoute("/safety/near-miss/99/office-comments", {
       formIds: ["SAF_F_002"],
       id: "dpa-2",
       isGlobal: true,
@@ -1170,9 +1170,9 @@ describe("safety routes", () => {
       vesselIds: [],
     });
 
-    expect(await screen.findByText("Near Miss Triage")).toBeInTheDocument();
-    expect(screen.getByText(/NM-BACKEND-0099/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Submit triage" })).toBeInTheDocument();
+    expect(await screen.findByText("Near Miss Office Comments")).toBeInTheDocument();
+    expect(await screen.findByText(/NM-BACKEND-0099/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Accept" })).toBeInTheDocument();
     expect(safetyApiMocks.getNearMiss).toHaveBeenCalledWith("99");
     expect(screen.queryByText("DRAFT-ABC/2026/T014")).not.toBeInTheDocument();
   });
@@ -1188,9 +1188,7 @@ describe("safety routes", () => {
     });
 
     expect(await screen.findByText("Near Miss PDF Export")).toBeInTheDocument();
-    expect(
-      screen.getByText(/reporter masking applied by serializer policy/),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download near-miss PDF" })).toBeInTheDocument();
     expect(safetyApiMocks.getNearMiss).toHaveBeenCalledWith("99");
     expect(screen.queryByText("Reporter visible")).not.toBeInTheDocument();
   });

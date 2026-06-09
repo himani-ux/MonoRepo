@@ -270,11 +270,20 @@ export interface SafetyNearMissListItem {
   loss_type_primary_id?: number | null;
   near_miss_priority: string | null;
   near_miss_severity?: 'HIGH' | 'MED' | 'LOW' | null;
+  near_miss_place?: 'AT_ANCHOR' | 'AT_SEA' | 'AT_PORT' | null;
   near_miss_shell_tag?: string | null;
+  near_miss_category_tags?: string[];
+  near_miss_incident_type_ids?: number[];
   near_miss_mscat_category_id?: number | null;
   near_miss_mscat_subcode_id?: string | null;
+  near_miss_mscat_subcode_ids?: string[];
   near_miss_immediate_action?: string | null;
   near_miss_suggestion?: string | null;
+  near_miss_root_cause_detail?: string | null;
+  near_miss_corrective_action?: string | null;
+  near_miss_weather_voyage_details?: string | null;
+  near_miss_equipment_details?: string | null;
+  near_miss_lessons_learned?: string | null;
   occurred_at: string | null;
   record_type: 'NEAR_MISS';
   reported_at: string | null;
@@ -374,8 +383,11 @@ export interface SafetyScmAgendaRow {
   content: string;
   decision: string | null;
   id: string;
+  legacy_field_meta?: SafetyScmLegacyFieldMeta[];
+  legacy_fields?: Record<string, string | number | boolean | null>;
   linked_finding_ids: string[];
   linked_incident_ids: string[];
+  schema_version?: number;
   section_label: string;
 }
 
@@ -596,30 +608,6 @@ export interface SafetyScmOverdueSoiArea {
   overdue_days: number;
 }
 
-export interface SafetyScmPreflightResponse {
-  agenda_complete: boolean;
-  agenda_errors?: string[];
-  attendance_acknowledged: boolean;
-  attendance_warnings_present?: boolean;
-  meeting_id: string;
-  meeting_state: string;
-  overdue_soi_areas: SafetyScmOverdueSoiArea[];
-  signature_errors?: string[];
-  signature_summary?: {
-    co_signature_present: boolean;
-    co_signature_required: boolean;
-    missing_attendee_signatures: string[];
-    present_attendee_count: number;
-    signed_attendee_count: number;
-  };
-  signatures_complete?: boolean;
-}
-
-export interface SafetyScmSignoffPayload {
-  device_fingerprint: string;
-  typed_name: string;
-}
-
 export interface SafetyScmSubmitPayload {
   device_fingerprint?: string;
   typed_name?: string;
@@ -638,38 +626,6 @@ export interface SafetyScmSignatureStatus {
   signer_role: 'CO' | 'ATTENDEE' | 'MASTER';
   status: 'SIGNED' | 'NOT_SIGNED' | 'NOT_REQUIRED';
   typed_name: string | null;
-}
-
-export interface SafetyScmSignaturePayload {
-  device_fingerprint: string;
-  signer_crew_id: string;
-  signer_role: 'CO' | 'ATTENDEE';
-  typed_name: string;
-}
-
-export interface SafetyScmSignatureResponse {
-  display_name: string;
-  id: string;
-  meeting_id: string;
-  signed_at: string;
-  signer_crew_id: string;
-  signer_role: 'CO' | 'ATTENDEE' | 'MASTER';
-  typed_name: string;
-}
-
-export interface SafetyScmSignoffResponse extends SafetyScmMeeting {
-  pdf: {
-    download_path: string;
-    export_path: string;
-    file_name: string;
-    section_titles: string[];
-    status: string;
-  };
-  signature: {
-    device_fingerprint: string;
-    signed_at: string;
-    typed_name: string;
-  };
 }
 
 export interface SafetyScmFormConfig {
@@ -1314,9 +1270,9 @@ export interface SafetyNearMissFilters {
 
 export interface SafetyNearMissRateLimitStatus {
   allowed: boolean;
-  guidance_message: string;
-  limit: number;
-  remaining: number;
+  guidance_message: string | null;
+  limit: number | null;
+  remaining: number | null;
   reset_at: string | null;
   retry_after_seconds: number;
   scope: string;
@@ -1328,11 +1284,20 @@ export interface SafetyNearMissCreatePayload {
   loss_type_primary_id: number;
   narrative: string;
   near_miss_immediate_action: string;
+  near_miss_place?: 'AT_ANCHOR' | 'AT_SEA' | 'AT_PORT' | null;
+  near_miss_category_tags?: string[];
+  near_miss_incident_type_ids?: number[];
   near_miss_mscat_category_id?: number | null;
   near_miss_mscat_subcode_id?: string | null;
+  near_miss_mscat_subcode_ids?: string[];
   near_miss_severity: 'HIGH' | 'MED' | 'LOW';
   near_miss_shell_tag?: string | null;
   near_miss_suggestion?: string;
+  near_miss_root_cause_detail?: string;
+  near_miss_corrective_action?: string;
+  near_miss_weather_voyage_details?: string;
+  near_miss_equipment_details?: string;
+  near_miss_lessons_learned?: string;
   occurred_at?: string | null;
   reported_at?: string | null;
   reporter_device_fingerprint?: string;
@@ -1342,6 +1307,26 @@ export interface SafetyNearMissCreatePayload {
   schema_version?: number;
   vessel_code?: string;
   vessel_id?: string;
+}
+
+export interface SafetyNearMissGuidancePrompt {
+  id: string;
+  category_tag: string | null;
+  incident_type_id: number | null;
+  prompt_text: string;
+  display_order: number;
+  active: boolean;
+}
+
+export interface SafetyNearMissKpiTarget {
+  id: string | null;
+  vessel_id: string;
+  year: number;
+  month: number;
+  target_count: number;
+  actual_count: number;
+  variance: number;
+  active: boolean;
 }
 
 export interface SafetyScmFilters {
@@ -2018,6 +2003,34 @@ export const safetyApi = {
     return response.data;
   },
 
+  async getNearMissGuidancePrompts(filters: { category_tag?: string | null; incident_type_id?: number | null } = {}) {
+    const response = await apiClient.get<SafetyNearMissGuidancePrompt[] | PaginatedResponse<SafetyNearMissGuidancePrompt>>(
+      buildSafetyApiUrl('/near-miss/guidance-prompts/'),
+      {
+        params: buildParams(filters as Record<string, string | number | boolean | null | undefined>),
+      },
+    );
+    return unwrapPaginatedResults(response.data);
+  },
+
+  async getNearMissKpiTarget(filters: { vessel_id: string; year?: number; month?: number }) {
+    const response = await apiClient.get<SafetyNearMissKpiTarget>(
+      buildSafetyApiUrl('/near-miss/kpi-target/'),
+      {
+        params: buildParams(filters),
+      },
+    );
+    return response.data;
+  },
+
+  async saveNearMissKpiTarget(payload: { vessel_id: string; year: number; month: number; target_count: number }) {
+    const response = await apiClient.post<SafetyNearMissKpiTarget>(
+      buildSafetyApiUrl('/near-miss/kpi-target/'),
+      payload,
+    );
+    return response.data;
+  },
+
   async createNearMiss(payload: SafetyNearMissCreatePayload) {
     const response = await apiClient.post<SafetyNearMissListItem>(
       buildSafetyApiUrl('/near-miss/'),
@@ -2035,7 +2048,15 @@ export const safetyApi = {
 
   async triageNearMiss(id: number | string, payload: SafetyOfficeWorkflowPayload) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/near-miss/${id}/triage/`),
+      buildSafetyApiUrl(`/near-miss/${id}/office-comments/`),
+      payload,
+    );
+    return response.data;
+  },
+
+  async reclassifyNearMiss(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+    const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
+      buildSafetyApiUrl(`/near-miss/${id}/reclassify/`),
       payload,
     );
     return response.data;
@@ -2248,9 +2269,13 @@ export const safetyApi = {
     return response.data;
   },
 
-  async getScmAgenda(id: number | string) {
+  async getScmAgenda(
+    id: number | string,
+    options: { includeCarriedForward?: boolean } = {},
+  ) {
+    const suffix = options.includeCarriedForward ? "?include_carried_forward=1" : "";
     const response = await apiClient.get<SafetyScmAgendaPayload>(
-      buildSafetyApiUrl(`/scm/${id}/agenda/`),
+      buildSafetyApiUrl(`/scm/${id}/agenda/${suffix}`),
     );
     return response.data;
   },
@@ -2300,29 +2325,6 @@ export const safetyApi = {
       { acknowledged: true },
     );
     return response.data as { acknowledged: boolean; acknowledged_at?: string; acknowledged_by?: string };
-  },
-
-  async recordScmSignature(id: number | string, payload: SafetyScmSignaturePayload) {
-    const response = await apiClient.post<SafetyScmSignatureResponse>(
-      buildSafetyApiUrl(`/scm/${id}/signatures/`),
-      payload,
-    );
-    return response.data;
-  },
-
-  async getScmSignoffPreflight(id: number | string) {
-    const response = await apiClient.get<SafetyScmPreflightResponse>(
-      buildSafetyApiUrl(`/scm/${id}/preflight/`),
-    );
-    return response.data;
-  },
-
-  async signoffScm(id: number | string, payload: SafetyScmSignoffPayload) {
-    const response = await apiClient.post<SafetyScmSignoffResponse>(
-      buildSafetyApiUrl(`/scm/${id}/sign-off/`),
-      payload,
-    );
-    return response.data;
   },
 
   async downloadScmPdf(id: number | string): Promise<SafetyDownloadResult> {

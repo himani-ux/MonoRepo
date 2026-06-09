@@ -26,6 +26,9 @@ if TYPE_CHECKING:
 
 
 class SCMRepository(BaseRepository):
+    _legacy_columns_available_cache: bool | None = None
+    _legacy_field_table_available_cache: bool | None = None
+
     def __init__(
         self,
         *,
@@ -42,6 +45,7 @@ class SCMRepository(BaseRepository):
     ) -> None:
         from apps.safety.services.closed_since_last_scm import ClosedSinceLastSCMService
         from apps.safety.services.overdue_soi_blocker import OverdueSOIBlocker
+        from apps.safety.repositories.wrh_repo import WRHRepository
         from apps.safety.services.wrh_snapshot_fetcher import WRHSnapshotFetcher
 
         super().__init__(**kwargs)
@@ -53,7 +57,9 @@ class SCMRepository(BaseRepository):
         self.cms_repository = cms_repository or CMSRepository()
         self.closed_since_last_service = closed_since_last_service or ClosedSinceLastSCMService()
         self.overdue_soi_blocker = overdue_soi_blocker or OverdueSOIBlocker(repository=self)
-        self.wrh_snapshot_fetcher = wrh_snapshot_fetcher or WRHSnapshotFetcher()
+        self.wrh_snapshot_fetcher = wrh_snapshot_fetcher or WRHSnapshotFetcher(
+            wrh_repository=WRHRepository(timeout_ms=3000)
+        )
 
     def create(self, payload: Mapping[str, object]) -> SCMMeeting:
         from apps.safety.serializers.scm import normalize_scm_sections
@@ -85,9 +91,9 @@ class SCMRepository(BaseRepository):
             self._replace_sections(meeting.id, sections)
             if isinstance(attendance_rows, list) and attendance_rows:
                 meeting = self.read(meeting.id)
-                self.save_attendance(meeting=meeting, rows=attendance_rows)
+                self.save_attendance(meeting=meeting, rows=attendance_rows, build_payload=False)
 
-        return self.read(meeting.id)
+        return meeting
 
     def update_meeting(
         self,
@@ -146,9 +152,9 @@ class SCMRepository(BaseRepository):
 
             self.update_agenda(meeting=meeting, rows=sections, actor_id=actor_id)
             if isinstance(attendance_rows, list):
-                self.save_attendance(meeting=meeting, rows=attendance_rows)
+                self.save_attendance(meeting=meeting, rows=attendance_rows, build_payload=False)
 
-        return self.read(meeting.id)
+        return meeting
 
     def read(self, meeting_id: int) -> SCMMeeting:
         queryset = self.meeting_model.objects
@@ -187,24 +193,37 @@ class SCMRepository(BaseRepository):
     def list_attendance(self, meeting_id: int):
         return self.attendance_model.objects.filter(meeting_id=meeting_id).order_by("id", "crew_id")
 
-    def save_attendance(self, *, meeting: SCMMeeting, rows: list[dict[str, object]]) -> dict[str, object]:
+    def save_attendance(
+        self,
+        *,
+        meeting: SCMMeeting,
+        rows: list[dict[str, object]],
+        build_payload: bool = True,
+    ) -> dict[str, object]:
         timezone_offset_minutes = None
         runtime_warning_details: dict[str, dict[str, object]] = {}
+        wrh_snapshots_by_crew_id = self._fetch_attendance_wrh_snapshots(
+            meeting=meeting,
+            rows=rows,
+            skip_rows_with_snapshot=build_payload,
+        )
 
         with transaction.atomic():
+            attendance_by_crew_id: dict[str, SCMAttendance] = {}
             for row in rows:
                 crew_id = str(row["crew_id"])
-                identity = self.resolve_crew_identity(
-                    vessel_id=str(meeting.vessel_id),
-                    crew_id=crew_id,
-                    active_on=meeting.meeting_date,
-                    fallback=row,
-                )
-                snapshot = self.wrh_snapshot_fetcher.fetch_24h_and_7d(
-                    crew_id=crew_id,
-                    meeting_date=meeting.meeting_date,
-                    vessel_id=str(meeting.vessel_id),
-                )
+                identity = self._attendance_identity_from_row(row)
+                if identity is None:
+                    identity = self.resolve_crew_identity(
+                        vessel_id=str(meeting.vessel_id),
+                        crew_id=crew_id,
+                        active_on=meeting.meeting_date,
+                        fallback=row,
+                    )
+                if build_payload and self._row_has_attendance_snapshot(row):
+                    snapshot = self._attendance_snapshot_from_row(row)
+                else:
+                    snapshot = wrh_snapshots_by_crew_id.get(crew_id, self._empty_attendance_snapshot())
                 if timezone_offset_minutes is None and snapshot.get("timezone_offset_minutes") is not None:
                     timezone_offset_minutes = int(snapshot["timezone_offset_minutes"])
                 runtime_warning_details[crew_id] = {
@@ -212,28 +231,135 @@ class SCMRepository(BaseRepository):
                     "warning_codes": list(snapshot.get("warning_codes") or []),
                 }
 
-                self.attendance_model.objects.update_or_create(
+                attendance_by_crew_id[crew_id] = self.attendance_model(
                     meeting_id=meeting.id,
                     crew_id=crew_id,
-                    defaults={
-                        "rank_name": identity["rank_name"],
-                        "display_name": identity["display_name"],
-                        "present": bool(row.get("present", True)),
-                        "absence_reason": row.get("absence_reason"),
-                        "wrh_data_available": bool(snapshot["wrh_data_available"]),
-                        "wrh_rest_hours_24h": snapshot["wrh_rest_hours_24h"],
-                        "wrh_rest_hours_7d": snapshot["wrh_rest_hours_7d"],
-                        "wrh_non_compliance_flag": bool(snapshot["wrh_non_compliance_flag"]),
-                        "remarks": row.get("remarks"),
-                        "schema_version": int(row.get("schema_version", 1)),
-                    },
+                    rank_name=identity["rank_name"],
+                    display_name=identity["display_name"],
+                    present=bool(row.get("present", True)),
+                    absence_reason=row.get("absence_reason"),
+                    wrh_data_available=bool(snapshot["wrh_data_available"]),
+                    wrh_rest_hours_24h=snapshot["wrh_rest_hours_24h"],
+                    wrh_rest_hours_7d=snapshot["wrh_rest_hours_7d"],
+                    wrh_non_compliance_flag=bool(snapshot["wrh_non_compliance_flag"]),
+                    remarks=row.get("remarks"),
+                    schema_version=int(row.get("schema_version", 1)),
                 )
+            self.attendance_model.objects.filter(meeting_id=meeting.id).delete()
+            if attendance_by_crew_id:
+                self.attendance_model.objects.bulk_create(list(attendance_by_crew_id.values()))
+
+        if not build_payload:
+            return {
+                "meeting_id": meeting.id,
+                "updated_count": len(rows),
+                "warnings": [],
+            }
 
         return self.build_attendance_payload(
             meeting=meeting,
             timezone_offset_minutes=timezone_offset_minutes,
             runtime_warning_details=runtime_warning_details,
         )
+
+    def _fetch_attendance_wrh_snapshots(
+        self,
+        *,
+        meeting: SCMMeeting,
+        rows: list[dict[str, object]],
+        skip_rows_with_snapshot: bool = True,
+    ) -> dict[str, dict[str, object]]:
+        crew_ids: list[str] = []
+        seen_crew_ids: set[str] = set()
+        for row in rows:
+            if skip_rows_with_snapshot and self._row_has_attendance_snapshot(row):
+                continue
+            crew_id = str(row.get("crew_id") or "").strip()
+            if not crew_id or crew_id in seen_crew_ids:
+                continue
+            crew_ids.append(crew_id)
+            seen_crew_ids.add(crew_id)
+
+        if not crew_ids:
+            return {}
+
+        fetch_many = getattr(self.wrh_snapshot_fetcher, "fetch_many_24h_and_7d", None)
+        if callable(fetch_many):
+            snapshots = fetch_many(
+                crew_ids=crew_ids,
+                meeting_date=meeting.meeting_date,
+                vessel_id=str(meeting.vessel_id),
+            )
+            return {str(crew_id): snapshot for crew_id, snapshot in snapshots.items()}
+
+        return {
+            crew_id: self.wrh_snapshot_fetcher.fetch_24h_and_7d(
+                crew_id=crew_id,
+                meeting_date=meeting.meeting_date,
+                vessel_id=str(meeting.vessel_id),
+            )
+            for crew_id in crew_ids
+        }
+
+    def _row_has_attendance_snapshot(self, row: Mapping[str, object]) -> bool:
+        return any(
+            field_name in row
+            for field_name in (
+                "wrh_data_available",
+                "wrh_rest_hours_24h",
+                "wrh_rest_hours_7d",
+                "wrh_non_compliance_flag",
+                "warning_codes",
+            )
+        )
+
+    def _attendance_snapshot_from_row(self, row: Mapping[str, object]) -> dict[str, object]:
+        warning_codes = row.get("warning_codes") or []
+        if not isinstance(warning_codes, list):
+            warning_codes = []
+        return {
+            "timezone_offset_minutes": row.get("timezone_offset_minutes"),
+            "warning_codes": warning_codes,
+            "wrh_data_available": bool(row.get("wrh_data_available", False)),
+            "wrh_rest_hours_24h": row.get("wrh_rest_hours_24h"),
+            "wrh_rest_hours_7d": row.get("wrh_rest_hours_7d"),
+            "wrh_non_compliance_flag": bool(row.get("wrh_non_compliance_flag", False)),
+        }
+
+    @staticmethod
+    def _attendance_snapshot_from_attendance(row: SCMAttendance) -> dict[str, object]:
+        return {
+            "timezone_offset_minutes": None,
+            "warning_codes": [],
+            "wrh_data_available": bool(row.wrh_data_available),
+            "wrh_rest_hours_24h": row.wrh_rest_hours_24h,
+            "wrh_rest_hours_7d": row.wrh_rest_hours_7d,
+            "wrh_non_compliance_flag": bool(row.wrh_non_compliance_flag),
+        }
+
+    @staticmethod
+    def _empty_attendance_snapshot() -> dict[str, object]:
+        return {
+            "timezone_offset_minutes": None,
+            "warning_codes": ["missing_data"],
+            "wrh_data_available": False,
+            "wrh_rest_hours_24h": None,
+            "wrh_rest_hours_7d": None,
+            "wrh_non_compliance_flag": False,
+        }
+
+    @staticmethod
+    def _attendance_identity_from_row(row: Mapping[str, object]) -> dict[str, str] | None:
+        display_name = str(row.get("display_name") or "").strip()
+        rank_name = str(row.get("rank_name") or "").strip()
+        if not display_name or not rank_name:
+            return None
+        return {
+            "crew_id": str(row.get("crew_id") or "").strip(),
+            "department": str(row.get("department") or "").strip(),
+            "display_name": display_name,
+            "rank_name": rank_name,
+        }
 
     def resolve_crew_identity(
         self,
@@ -548,15 +674,31 @@ class SCMRepository(BaseRepository):
         vessel_id: str,
         meeting_date: date,
         crew_roster: list[dict[str, object]],
+        include_wrh_preview: bool = True,
     ) -> list[dict[str, object]]:
         preview_rows: list[dict[str, object]] = []
+        wrh_snapshots = (
+            self._fetch_preview_wrh_snapshots(
+                vessel_id=vessel_id,
+                meeting_date=meeting_date,
+                crew_roster=crew_roster,
+            )
+            if include_wrh_preview
+            else {}
+        )
         for crew_member in crew_roster:
             crew_id = str(crew_member.get("crew_id") or "").strip()
-            snapshot = self.wrh_snapshot_fetcher.fetch_24h_and_7d(
-                crew_id=crew_id,
-                meeting_date=meeting_date,
-                vessel_id=vessel_id,
-            )
+            snapshot = wrh_snapshots.get(crew_id)
+            if snapshot is None:
+                snapshot = {
+                    "warning_codes": [],
+                    "warnings": ["WRH will be checked when attendance is submitted."],
+                    "wrh_data_available": False,
+                    "wrh_flag": "PENDING",
+                    "wrh_non_compliance_flag": False,
+                    "wrh_rest_hours_24h": None,
+                    "wrh_rest_hours_7d": None,
+                }
             preview_rows.append(
                 {
                     "crew_id": crew_id,
@@ -567,16 +709,45 @@ class SCMRepository(BaseRepository):
                     "remarks": "",
                     "absence_reason": None,
                     "schema_version": 1,
-                    "wrh_data_available": bool(snapshot.get("wrh_data_available")),
-                    "wrh_flag": str(snapshot.get("wrh_flag") or "RED"),
-                    "wrh_non_compliance_flag": bool(snapshot.get("wrh_non_compliance_flag")),
+                    "timezone_offset_minutes": snapshot.get("timezone_offset_minutes"),
+                    "warning_codes": snapshot.get("warning_codes") or [],
+                    "warnings": snapshot.get("warnings") or [],
+                    "wrh_24h_status": snapshot.get("wrh_24h_status"),
+                    "wrh_7d_status": snapshot.get("wrh_7d_status"),
+                    "wrh_data_available": bool(snapshot.get("wrh_data_available", False)),
+                    "wrh_flag": str(snapshot.get("wrh_flag") or "PENDING"),
+                    "wrh_non_compliance_flag": bool(snapshot.get("wrh_non_compliance_flag", False)),
                     "wrh_rest_hours_24h": snapshot.get("wrh_rest_hours_24h"),
                     "wrh_rest_hours_7d": snapshot.get("wrh_rest_hours_7d"),
-                    "warning_codes": list(snapshot.get("warning_codes") or []),
-                    "warnings": list(snapshot.get("warnings") or []),
+                    "wrh_work_date_local": snapshot.get("wrh_work_date_local"),
                 }
             )
         return preview_rows
+
+    def _fetch_preview_wrh_snapshots(
+        self,
+        *,
+        vessel_id: str,
+        meeting_date: date,
+        crew_roster: list[dict[str, object]],
+    ) -> dict[str, dict[str, object]]:
+        crew_ids = [
+            str(crew_member.get("crew_id") or "").strip()
+            for crew_member in crew_roster
+            if str(crew_member.get("crew_id") or "").strip()
+        ]
+        if not vessel_id or not crew_ids:
+            return {}
+
+        try:
+            snapshots = self.wrh_snapshot_fetcher.fetch_many_24h_and_7d(
+                crew_ids=crew_ids,
+                meeting_date=meeting_date,
+                vessel_id=vessel_id,
+            )
+        except Exception:
+            return {}
+        return {str(crew_id): snapshot for crew_id, snapshot in snapshots.items()}
 
     def _resolve_vessel_snapshot(self, *, vessel_id: str, user) -> dict[str, str]:
         if user is not None:
@@ -808,7 +979,7 @@ class SCMRepository(BaseRepository):
             return []
 
         try:
-            rows = (
+            rows = list(
                 Incident.objects.filter(
                     is_deleted=False,
                     vessel_id=normalized_vessel_id,
@@ -857,7 +1028,7 @@ class SCMRepository(BaseRepository):
             )
             if cutoff_meeting and cutoff_meeting.master_signed_off_at:
                 queryset = queryset.filter(created_date__gt=cutoff_meeting.master_signed_off_at)
-            rows = queryset.order_by("-created_date", "-id")[:row_limit]
+            rows = list(queryset.order_by("-created_date", "-id")[:row_limit])
         except (DatabaseError, OperationalError, ProgrammingError, ImportError, ValueError, FieldError):
             return []
 
@@ -926,6 +1097,9 @@ class SCMRepository(BaseRepository):
         actor_id: str | None = None,
         user=None,
         meeting_date: date | datetime | str | None = None,
+        include_feeds: bool = True,
+        include_rollups: bool = True,
+        include_wrh_preview: bool = True,
         ) -> dict[str, object]:
         from apps.safety.serializers.scm import build_default_scm_sections
 
@@ -949,12 +1123,14 @@ class SCMRepository(BaseRepository):
             crew_roster=crew_roster,
             prepared_by=prepared_by,
         )
+        empty_closed_since_last = self.build_empty_closed_since_last_payload()
 
         return {
             "attendee_rows": self._build_attendee_preview_rows(
                 vessel_id=normalized_vessel_id,
                 meeting_date=anchor_date,
                 crew_roster=crew_roster,
+                include_wrh_preview=include_wrh_preview,
             ),
             "cadence_status": self._build_cadence_status(
                 vessel_id=normalized_vessel_id,
@@ -967,46 +1143,62 @@ class SCMRepository(BaseRepository):
             "chair": chair,
             "closed_since_last": (
                 self._safe_closed_since_last_payload(vessel_id=normalized_vessel_id)
-                if normalized_vessel_id
-                else self.build_empty_closed_since_last_payload()
+                if include_rollups and normalized_vessel_id
+                else empty_closed_since_last
             ),
             "generated_at": timezone.now().isoformat(),
-            "latest_circulars": self.fetch_latest_msc_circulars(
-                vessel_id=normalized_vessel_id,
-                limit=5,
+            "latest_circulars": (
+                self.fetch_latest_msc_circulars(vessel_id=normalized_vessel_id, limit=5)
+                if include_feeds
+                else []
             ),
-            "latest_near_misses": self.fetch_latest_near_misses(
-                vessel_id=normalized_vessel_id,
-                limit=5,
+            "latest_near_misses": (
+                self.fetch_latest_near_misses(vessel_id=normalized_vessel_id, limit=5)
+                if include_feeds
+                else []
             ),
-            "latest_psc_cars": self.fetch_latest_psc_cars(
-                vessel_id=normalized_vessel_id,
-                limit=5,
+            "latest_psc_cars": (
+                self.fetch_latest_psc_cars(vessel_id=normalized_vessel_id, limit=5)
+                if include_feeds
+                else []
             ),
             "meeting_date_default": anchor_date.isoformat(),
             "meeting_type": str(meeting_type or SCMMeeting.MeetingType.REGULAR).strip().upper(),
             "overdue_soi_areas": (
                 self._safe_overdue_soi_areas(vessel_id=normalized_vessel_id)
-                if normalized_vessel_id
+                if include_rollups and normalized_vessel_id
                 else []
             ),
             "prepared_by": prepared_by,
             "sections": build_default_scm_sections(),
-            "unresolved_previous_actions": self._build_carried_forward_preview(
-                vessel_id=normalized_vessel_id,
-                meeting_date=anchor_date,
+            "unresolved_previous_actions": (
+                self._build_carried_forward_preview(
+                    vessel_id=normalized_vessel_id,
+                    meeting_date=anchor_date,
+                )
+                if include_rollups
+                else []
             ),
             "vessel": self._resolve_vessel_snapshot(vessel_id=normalized_vessel_id, user=user),
         }
 
-    def build_agenda_payload(self, *, meeting: SCMMeeting) -> dict[str, object]:
+    def build_agenda_payload(
+        self,
+        *,
+        meeting: SCMMeeting,
+        include_carried_forward: bool = False,
+    ) -> dict[str, object]:
         rows = list(self.list_sections(meeting.id))
         legacy_fields = list(self.list_legacy_fields(meeting.id))
         legacy_map: dict[int, dict[str, object]] = {}
         for field in legacy_fields:
             legacy_map.setdefault(int(field.agenda_item_number), {})[str(field.field_key)] = field
         action_map = self._action_map_for_rows(rows)
-        carried_forward_items = self._build_carried_forward_items(meeting=meeting)
+        carried_forward_items = (
+            self._build_carried_forward_items(meeting=meeting)
+            if include_carried_forward
+            else []
+        )
 
         current_action_count = sum(1 for action in action_map.values() if action is not None)
         open_action_count = sum(
@@ -1212,25 +1404,33 @@ class SCMRepository(BaseRepository):
         actor_id: str,
     ) -> SCMMeeting:
         if not rows:
-            return self.read(meeting.id)
+            return meeting
 
         section_map = {
             row.agenda_item_number: row
             for row in self.agenda_model.objects.filter(meeting_id=meeting.id)
         }
+        legacy_fields_in_payload = any("legacy_fields" in row_payload for row_payload in rows)
+        legacy_table_available = self._scm_legacy_field_table_available() if legacy_fields_in_payload else False
 
         with transaction.atomic():
+            if legacy_fields_in_payload and legacy_table_available:
+                self.legacy_field_model.objects.filter(meeting_id=meeting.id).delete()
+            agenda_rows_to_update = []
+            legacy_rows_to_create = []
             for row_payload in rows:
                 agenda_item_number = int(row_payload["agenda_item_number"])
                 agenda_row = section_map[agenda_item_number]
 
                 updated_fields: list[str] = []
                 if "legacy_fields" in row_payload:
-                    legacy_content = self._save_legacy_fields(
+                    legacy_content, legacy_rows = self._build_legacy_field_rows(
                         meeting_id=meeting.id,
                         agenda_item_number=agenda_item_number,
                         values=row_payload.get("legacy_fields"),
+                        include_rows=legacy_table_available,
                     )
+                    legacy_rows_to_create.extend(legacy_rows)
                     agenda_row.content = legacy_content or str(row_payload.get("content", "") or "")
                     updated_fields.append("content")
                 if "content" in row_payload:
@@ -1254,7 +1454,7 @@ class SCMRepository(BaseRepository):
                     agenda_row.linked_incident_ids = self._join_id_list(incident_ids)
                     updated_fields.append("linked_incident_ids")
                 if updated_fields:
-                    agenda_row.save(update_fields=updated_fields)
+                    agenda_rows_to_update.append(agenda_row)
 
                 action_payload = row_payload.get("action_item")
                 if isinstance(action_payload, dict) and action_payload.get("enabled"):
@@ -1263,8 +1463,16 @@ class SCMRepository(BaseRepository):
                         action_payload=action_payload,
                         actor_id=actor_id,
                     )
+            if agenda_rows_to_update:
+                self.agenda_model.objects.bulk_update(
+                    agenda_rows_to_update,
+                    fields=("content", "decision", "linked_finding_ids", "linked_incident_ids"),
+                    batch_size=50,
+                )
+            if legacy_rows_to_create:
+                self.legacy_field_model.objects.bulk_create(legacy_rows_to_create, batch_size=100)
 
-        return self.read(meeting.id)
+        return meeting
 
     def assign_scm_number(self, *, vessel_code: str, meeting_date: date) -> str:
         base_number = f"{vessel_code}-{meeting_date.strftime('%d-%b-%Y')}"
@@ -1285,15 +1493,20 @@ class SCMRepository(BaseRepository):
 
     def _replace_sections(self, meeting_id: int, sections: list[dict[str, object]]) -> None:
         self.agenda_model.objects.filter(meeting_id=meeting_id).delete()
-        self.legacy_field_model.objects.filter(meeting_id=meeting_id).delete()
+        legacy_table_available = self._scm_legacy_field_table_available()
+        if legacy_table_available:
+            self.legacy_field_model.objects.filter(meeting_id=meeting_id).delete()
         agenda_rows = []
+        legacy_rows_to_create = []
         for section in sections:
             agenda_item_number = int(section["agenda_item_number"])
-            legacy_content = self._save_legacy_fields(
+            legacy_content, legacy_rows = self._build_legacy_field_rows(
                 meeting_id=meeting_id,
                 agenda_item_number=agenda_item_number,
                 values=section.get("legacy_fields"),
+                include_rows=legacy_table_available,
             )
+            legacy_rows_to_create.extend(legacy_rows)
             agenda_rows.append(
                 self.agenda_model(
                     meeting_id=meeting_id,
@@ -1306,6 +1519,8 @@ class SCMRepository(BaseRepository):
                 )
             )
         self.agenda_model.objects.bulk_create(agenda_rows)
+        if legacy_rows_to_create:
+            self.legacy_field_model.objects.bulk_create(legacy_rows_to_create, batch_size=100)
 
     def _save_legacy_fields(
         self,
@@ -1313,7 +1528,34 @@ class SCMRepository(BaseRepository):
         meeting_id: int,
         agenda_item_number: int,
         values: object,
+        delete_existing: bool = True,
     ) -> str:
+        legacy_table_available = self._scm_legacy_field_table_available()
+        legacy_content, legacy_rows = self._build_legacy_field_rows(
+            meeting_id=meeting_id,
+            agenda_item_number=agenda_item_number,
+            values=values,
+            include_rows=legacy_table_available,
+        )
+        if not legacy_table_available:
+            return legacy_content
+        if delete_existing:
+            self.legacy_field_model.objects.filter(
+                meeting_id=meeting_id,
+                agenda_item_number=agenda_item_number,
+            ).delete()
+        if legacy_rows:
+            self.legacy_field_model.objects.bulk_create(legacy_rows, batch_size=100)
+        return legacy_content
+
+    def _build_legacy_field_rows(
+        self,
+        *,
+        meeting_id: int,
+        agenda_item_number: int,
+        values: object,
+        include_rows: bool,
+    ) -> tuple[str, list[SCMLegacyField]]:
         from apps.safety.serializers.scm import (
             SCM_LEGACY_FIELD_TEMPLATE,
             build_legacy_section_content,
@@ -1322,22 +1564,22 @@ class SCMRepository(BaseRepository):
         )
 
         normalized = normalize_legacy_fields(agenda_item_number, values)
-        if not self._scm_legacy_field_table_available():
-            return build_legacy_section_content(agenda_item_number, normalized)
-        for field in SCM_LEGACY_FIELD_TEMPLATE.get(agenda_item_number, ()):
-            field_key = str(field["field_key"])
-            self.legacy_field_model.objects.update_or_create(
-                meeting_id=meeting_id,
-                agenda_item_number=agenda_item_number,
-                field_key=field_key,
-                defaults={
-                    "field_label": str(field["field_label"]),
-                    "field_type": str(field["field_type"]),
-                    "field_value": legacy_value_for_storage(normalized.get(field_key), str(field["field_type"])),
-                    "schema_version": 1,
-                },
-            )
-        return build_legacy_section_content(agenda_item_number, normalized)
+        legacy_rows = []
+        if include_rows:
+            for field in SCM_LEGACY_FIELD_TEMPLATE.get(agenda_item_number, ()):
+                field_key = str(field["field_key"])
+                legacy_rows.append(
+                    self.legacy_field_model(
+                        meeting_id=meeting_id,
+                        agenda_item_number=agenda_item_number,
+                        field_key=field_key,
+                        field_label=str(field["field_label"]),
+                        field_type=str(field["field_type"]),
+                        field_value=legacy_value_for_storage(normalized.get(field_key), str(field["field_type"])),
+                        schema_version=1,
+                    )
+                )
+        return build_legacy_section_content(agenda_item_number, normalized), legacy_rows
 
     def _coerce_meeting_date(self, value: object) -> date:
         if isinstance(value, datetime):
@@ -1444,8 +1686,8 @@ class SCMRepository(BaseRepository):
         )
 
     def _scm_meeting_legacy_columns_available(self) -> bool:
-        if hasattr(self, "_legacy_columns_available"):
-            return bool(self._legacy_columns_available)
+        if self.__class__._legacy_columns_available_cache is not None:
+            return bool(self.__class__._legacy_columns_available_cache)
         required = set(self._legacy_header_field_names())
         try:
             with connection.cursor() as cursor:
@@ -1457,21 +1699,21 @@ class SCMRepository(BaseRepository):
                     )
                 }
         except Exception:
-            self._legacy_columns_available = False
+            self.__class__._legacy_columns_available_cache = False
             return False
-        self._legacy_columns_available = required.issubset(existing)
-        return bool(self._legacy_columns_available)
+        self.__class__._legacy_columns_available_cache = required.issubset(existing)
+        return bool(self.__class__._legacy_columns_available_cache)
 
     def _scm_legacy_field_table_available(self) -> bool:
-        if hasattr(self, "_legacy_field_table_available"):
-            return bool(self._legacy_field_table_available)
+        if self.__class__._legacy_field_table_available_cache is not None:
+            return bool(self.__class__._legacy_field_table_available_cache)
         try:
             existing = set(connection.introspection.table_names())
         except Exception:
-            self._legacy_field_table_available = True
+            self.__class__._legacy_field_table_available_cache = True
             return True
-        self._legacy_field_table_available = self.legacy_field_model._meta.db_table in existing
-        return bool(self._legacy_field_table_available)
+        self.__class__._legacy_field_table_available_cache = self.legacy_field_model._meta.db_table in existing
+        return bool(self.__class__._legacy_field_table_available_cache)
 
     def _build_attendance_warnings(
         self,

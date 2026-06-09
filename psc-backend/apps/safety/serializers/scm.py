@@ -454,11 +454,61 @@ class SCMMeetingSerializer(VesselDisplayMixin, serializers.ModelSerializer):
         return str(value) if value not in (None, "") else None
 
 
+class SCMMeetingDetailSerializer(SCMMeetingSerializer):
+    def get_cadence_warning(self, obj: SCMMeeting):
+        return None
+
+    def get_sections(self, obj: SCMMeeting) -> list[dict[str, object]]:
+        return []
+
+
+class SCMMeetingListSerializer(VesselDisplayMixin, serializers.ModelSerializer):
+    cadence_warning = serializers.SerializerMethodField()
+    section_count = serializers.IntegerField(read_only=True)
+    sections = serializers.SerializerMethodField()
+    vessel_code = serializers.SerializerMethodField()
+    vessel_name = serializers.SerializerMethodField()
+    vessel_display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SCMMeeting
+        fields = (
+            "id",
+            "vessel_id",
+            "vessel_code",
+            "vessel_name",
+            "vessel_display_name",
+            "scm_number",
+            "meeting_type",
+            "meeting_date",
+            "chair_crew_id",
+            "state",
+            "cadence_warning",
+            "sections",
+            "section_count",
+            "master_signed_off_at",
+            "office_comment_at",
+            "created_date",
+            "updated_date",
+        )
+
+    def get_cadence_warning(self, obj: SCMMeeting):
+        meeting_date = obj.meeting_date
+        if obj.meeting_type != SCMMeeting.MeetingType.REGULAR or not isinstance(meeting_date, date):
+            return None
+        return getattr(obj, "_cadence_warning", None)
+
+    def get_sections(self, obj: SCMMeeting) -> list[dict[str, object]]:
+        count = int(getattr(obj, "section_count", 0) or 0)
+        return [{} for _ in range(count)]
+
+
 class SCMMeetingCreateSerializer(serializers.ModelSerializer):
     attendance_rows = SCMAttendanceRowWriteSerializer(many=True, required=False)
     sections = SCMSectionSerializer(many=True, required=False)
     ad_hoc_trigger_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     vessel_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    _NULL_DECIMAL_VALUES = {"", "null", "none", "undefined"}
 
     class Meta:
         model = SCMMeeting
@@ -497,6 +547,15 @@ class SCMMeetingCreateSerializer(serializers.ModelSerializer):
             "comm_time": {"required": False},
             "comp_time": {"required": False},
         }
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+            for field_name in ("latitude", "longitude"):
+                value = data.get(field_name)
+                if isinstance(value, str) and value.strip().lower() in self._NULL_DECIMAL_VALUES:
+                    data[field_name] = None
+        return super().to_internal_value(data)
 
     def validate(self, attrs):
         meeting_type = str(attrs.get("meeting_type") or SCMMeeting.MeetingType.REGULAR).strip().upper()

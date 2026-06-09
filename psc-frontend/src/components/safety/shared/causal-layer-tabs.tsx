@@ -27,7 +27,7 @@ export function SafetyCausalLayerTabs({
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            FEAT-SAF-INC-018
+            Cause levels
           </p>
           <h2 className="text-xl font-semibold text-slate-900">Causal Layers</h2>
         </div>

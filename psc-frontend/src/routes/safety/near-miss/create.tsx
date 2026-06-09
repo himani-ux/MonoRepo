@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { SafetyNearMissForm } from "../../../components/safety/near-miss/near-miss-form";
@@ -9,8 +10,14 @@ import type { SafetyNearMissSubmitValues } from "../../../schemas/safety/near-mi
 export default function SafetyNearMissCreatePage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(values: SafetyNearMissSubmitValues) {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const nearMiss = await safetyApi.createNearMiss(values);
       toast({
@@ -27,8 +34,16 @@ export default function SafetyNearMissCreatePage() {
         description: getErrorMessage(error),
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  return <SafetyNearMissForm onSubmit={handleSubmit} />;
+  return (
+    <SafetyNearMissForm
+      onSubmit={handleSubmit}
+      submitDisabled={isSubmitting}
+      submitLabel={isSubmitting ? "Processing" : "Submit near miss"}
+    />
+  );
 }
