@@ -1,20 +1,30 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import serializers
 
-from apps.safety.models import CorrectiveAction, Incident, Recommendation, RecommendationVerification
-from apps.safety.services.deadline_pauser import DeadlinePauser
-from apps.safety.services.pic_retention import PicRetentionService
+from apps.safety.models import (
+    ExternalPartyInjury,
+    Incident,
+    IncidentLossEvaluation,
+    InjuryDropdownOption,
+    Recommendation,
+    RecommendationVerification,
+)
+from apps.safety.services.field_history_recorder import resolve_actor_id
 
 
-def _latest_verification(recommendation: Recommendation) -> RecommendationVerification | None:
-    return recommendation.verifications.order_by("-verified_at", "-id").first()
+def _choice_options(choices) -> list[dict[str, str]]:
+    return [{"value": value, "label": label} for value, label in choices]
 
 
-def _is_deferred(latest: RecommendationVerification | None) -> bool:
-    if latest is None:
+def _has_injury_record(incident: Incident) -> bool:
+    try:
+        return bool(incident.external_party_injury)
+    except ExternalPartyInjury.DoesNotExist:
         return False
-    return (latest.notes or "").strip().upper().startswith("DEFERRED:")
+    except AttributeError:
+        return False
 
 
 class RecommendationVerificationSerializer(serializers.ModelSerializer):
@@ -53,97 +63,140 @@ class IncidentPhase8CloseSerializer(serializers.Serializer):
     closure_reason = serializers.CharField(allow_blank=False)
 
 
-def build_phase8_workspace_payload(incident: Incident) -> dict[str, object]:
-    recommendations = list(
-        incident.recommendations.filter(is_deleted=False)
-        .prefetch_related("verifications", "corrective_actions")
-        .order_by("id")
-    )
-    recommendation_rows: list[dict[str, object]] = []
-    blocker_codes: list[str] = []
-    corrective_actions_summary = {
-        "total": 0,
-        "open": 0,
-        "in_progress": 0,
-        "pending_verify": 0,
-        "closed": 0,
-    }
-    physical_verification_done = 0
-    physical_verification_pending = 0
+class IncidentLossEvaluationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IncidentLossEvaluation
+        fields = (
+            "id",
+            "consequence",
+            "likelihood",
+            "risk_level",
+            "name_of_master",
+            "name_of_chief_engineer",
+            "repair_type",
+            "repair_details",
+            "last_overhaul_maintenance_survey_details",
+            "safe_working_practice",
+            "man_hours_worked",
+            "hours_worked_previous_day",
+            "hours_rest_last_96_hours",
+            "delay_to_vessel",
+            "delay_reason",
+            "repair_man_hours_lost",
+            "materials_used_repairs_onboard",
+            "materials_specify_details",
+            "materials_reason",
+            "deviation",
+            "off_hire",
+            "injury_man_hours_lost",
+            "injury_reasons",
+            "repatriation",
+            "hospitalization",
+            "evacuation",
+            "estimated_cost_off_hire",
+            "estimated_cost_delay",
+            "estimated_cost_man_hours",
+            "estimated_cost_deviation",
+            "estimated_cost_materials",
+            "estimated_cost_miscellaneous",
+            "total_estimated_cost",
+            "miscellaneous_expenses_reason",
+            "cost_medicines_onboard",
+            "cost_doctor_visits",
+            "cost_repatriation",
+            "cost_evacuation",
+            "cost_injury_delay",
+            "cost_injury_man_hours",
+            "cost_injury_deviation",
+            "cost_injury_miscellaneous",
+            "injury_total_estimated_cost",
+            "injury_miscellaneous_expenses_reason",
+            "updated_date",
+        )
+        read_only_fields = ("id", "updated_date")
 
-    for recommendation in recommendations:
-        corrective_actions = [
-            action
-            for action in recommendation.corrective_actions.all()
-            if not action.is_deleted
-        ]
-        latest_verification = _latest_verification(recommendation)
-        action_completed = True
-        for action in corrective_actions:
-            corrective_actions_summary["total"] += 1
-            if action.status == CorrectiveAction.Status.OPEN:
-                corrective_actions_summary["open"] += 1
-                action_completed = False
-            elif action.status == CorrectiveAction.Status.IN_PROGRESS:
-                corrective_actions_summary["in_progress"] += 1
-                action_completed = False
-            elif action.status == CorrectiveAction.Status.PENDING_VERIFY:
-                corrective_actions_summary["pending_verify"] += 1
-                action_completed = False
-            elif action.status == CorrectiveAction.Status.CLOSED:
-                corrective_actions_summary["closed"] += 1
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = {key: (None if value == "" else value) for key, value in data.items()}
+        return super().to_internal_value(data)
 
-            if action.physical_verification_done:
-                physical_verification_done += 1
-            else:
-                physical_verification_pending += 1
-
-        deferred = _is_deferred(latest_verification)
-        if latest_verification is None:
-            blocker_codes.append(f"pending_verification:{recommendation.pk}")
-        elif not latest_verification.is_effective and not deferred:
-            blocker_codes.append(f"ineffective_verification:{recommendation.pk}")
-
-        if corrective_actions and not action_completed and not deferred:
-            blocker_codes.append(f"open_corrective_actions:{recommendation.pk}")
-
-        recommendation_rows.append(
-            {
-                "id": recommendation.pk,
-                "tier": recommendation.tier,
-                "title": recommendation.title,
-                "action_completed": action_completed,
-                "verification_deferred": deferred,
-                "corrective_action_count": len(corrective_actions),
-                "latest_verification": (
-                    RecommendationVerificationSerializer(latest_verification).data
-                    if latest_verification is not None
-                    else None
-                ),
-            }
+    def create(self, validated_data):
+        incident: Incident = self.context["incident"]
+        user = self.context.get("user")
+        actor_id = resolve_actor_id(user)
+        return IncidentLossEvaluation.objects.create(
+            incident=incident,
+            created_by=actor_id,
+            updated_by=actor_id,
+            updated_date=timezone.now(),
+            schema_version=incident.schema_version or 1,
+            **validated_data,
         )
 
-    if not recommendations:
-        blocker_codes.append("no_recommendations")
+    def update(self, instance, validated_data):
+        user = self.context.get("user")
+        for field_name, value in validated_data.items():
+            setattr(instance, field_name, value)
+        instance.updated_by = resolve_actor_id(user)
+        instance.updated_date = timezone.now()
+        instance.save()
+        return instance
 
-    deadline_pause = DeadlinePauser().status_for_incident(incident)
-    pic_retention = PicRetentionService().current_status(incident)
+
+def empty_loss_evaluation_payload() -> dict[str, object]:
+    fields = IncidentLossEvaluationSerializer.Meta.fields
+    return {field_name: None for field_name in fields}
+
+
+def build_phase8_workspace_payload(incident: Incident) -> dict[str, object]:
+    try:
+        loss_evaluation = incident.loss_evaluation
+    except IncidentLossEvaluation.DoesNotExist:
+        loss_evaluation = None
+    except AttributeError:
+        loss_evaluation = None
+
+    safe_working_practice_options = [
+        {"id": str(option.pk), "label": option.option_label, "value": option.option_label}
+        for option in InjuryDropdownOption.objects.filter(
+            active=True,
+            field_key=InjuryDropdownOption.FieldKey.SAFE_WORKING_PRACTICE,
+        ).order_by("display_order", "option_label")
+    ]
 
     return {
         "incident_id": incident.pk,
         "current_phase": incident.current_phase,
         "state": incident.state,
         "risk_band": incident.risk_band,
-        "required_process_id": "SAF_P_005" if incident.risk_band == Incident.RiskBand.RED else "SAF_P_004",
-        "recommendations": recommendation_rows,
-        "corrective_actions_summary": corrective_actions_summary,
-        "physical_verification": {
-            "done": physical_verification_done,
-            "pending": physical_verification_pending,
-            "separate_track": True,
+        "required_process_id": "SAF_P_004",
+        "phase_title": "Loss Evaluation",
+        "report_type": "INJURY" if _has_injury_record(incident) else "INCIDENT",
+        "has_loss_evaluation": loss_evaluation is not None,
+        "loss_evaluation": (
+            IncidentLossEvaluationSerializer(loss_evaluation).data
+            if loss_evaluation is not None
+            else empty_loss_evaluation_payload()
+        ),
+        "choices": {
+            "consequence": _choice_options(IncidentLossEvaluation.Consequence.choices),
+            "likelihood": _choice_options(IncidentLossEvaluation.Likelihood.choices),
+            "risk_level": _choice_options(IncidentLossEvaluation.RiskLevel.choices),
+            "repair_type": _choice_options(IncidentLossEvaluation.RepairType.choices),
+            "yes_no": [
+                {"value": True, "label": "Yes"},
+                {"value": False, "label": "No"},
+            ],
+            "safe_working_practice": safe_working_practice_options,
         },
-        "deadline_pause": deadline_pause,
-        "pic_retention": pic_retention,
-        "ready_for_close": not blocker_codes,
-        "blockers": blocker_codes,
+        "ready_for_close": loss_evaluation is not None,
+        "blockers": [] if loss_evaluation is not None else ["loss_evaluation_not_saved"],
+        "blocker_details": []
+        if loss_evaluation is not None
+        else [
+            {
+                "code": "loss_evaluation_not_saved",
+                "message": "Save Loss Evaluation before closing the incident.",
+            }
+        ],
     }

@@ -2215,6 +2215,383 @@ Two BLOCKED items carried forward from TECH_STACK §2.2 and §2.3 (Round 20 defe
 
 ---
 
+## Amendment 1 - 2026-06-22
+
+Incident Phase 1 injury capture now supports both crew and non-crew injuries under CR-002. The original Step 1.12 external-party injury scope is superseded for injury capture only: the physical table and compatibility endpoint remain, but the functional record now branches by `injured_person_type`.
+
+Triggering discovery: post-build requirements expanded injury capture from non-crew-only to crew injuries with rank, age, vessel/activity details, investigation narrative, OCIMF reporting flags, and estimated cost fields.
+
+Superseded steps or statements:
+
+- Step 1.12 references the Phase 1 injury form as an external-party-only sub-form. That UI contract is superseded by the crew/non-crew injury section.
+- FEAT-SAF-INC-034 references non-crew-only injury capture. That feature now means crew/non-crew injury capture while preserving the original non-crew fields.
+
+Implementation record:
+
+- Migration `0046_enhance_injury_record_for_crew` expands `vims_safety_external_party_injury`.
+- `ExternalPartyInjurySerializer` and Phase 1 nested payload accept the expanded injury record.
+- `SafetyExternalPartyInjuryForm` displays the crew/non-crew branch and loads crew rank options from the selected vessel's crew list.
+
+## Amendment 2 - 2026-06-23
+
+Incident Phase 1 crew injury dropdowns are now DB-backed under CR-004. The temporary CR-003 frontend-list approach is superseded for `Nature of Injury`, `Source of Injury`, and `Affected Areas of the Body`.
+
+Triggering discovery: the injury dropdown values need to be maintained as master data with UUID primary keys instead of hardcoded frontend lists.
+
+Superseded steps or statements:
+
+- CR-003 stated no DB migration was required. That is superseded by migration `0047_injury_dropdown_options_master`.
+- Any frontend-only injury dropdown source is superseded by `vims_safety_injury_dropdown_option`.
+
+Implementation record:
+
+- Migration `0047_injury_dropdown_options_master` creates and seeds `vims_safety_injury_dropdown_option`.
+- `GET /api/safety/reference/injury-dropdown-options/` exposes active master options.
+- `SafetyExternalPartyInjuryForm` loads injury dropdown options from the reference API and keeps `Other (specify)` behavior by storing typed text in the existing injury record fields.
+
+## Amendment 3 - 2026-06-24
+
+Incident evidence capture is simplified under CR-012. The original Step 1.5 five-source tabbed evidence UI is superseded for the current user-facing workflow: users now capture evidence in one Documents section, with each row containing Attachment, Title, and Description. Users can add as many document attachments as required.
+
+Triggering discovery: post-shipment use found the People / Place / Equipment / Documents / Photos category screen too chaotic for evidence entry. The requested operating model is a repeatable document attachment list instead of category selection.
+
+Superseded steps or statements:
+
+- Step 1.5 references a required five-source tabbed user interface. That UI contract is superseded by the Documents-only evidence capture screen.
+- Step 1.5 references the marine document inventory, cargo overlay, health/fatigue subsection, and category-specific evidence cards as primary user-facing controls. Those controls are no longer primary capture fields in the current UI.
+- D-DNV-07, D-GAP-R05, D-GAP-R10, and D-GAP-R23 remain historical decisions, but their user-facing evidence-category requirements are superseded by SSOT decision `D-MAINT-CR012`.
+
+Implementation record:
+
+- `SafetyIncidentPhase3` now exposes only the Documents evidence section for the Phase 4 evidence workspace.
+- Legacy category routes for People, Place, Equipment, and Photos redirect to `/phase-4/paper/`.
+- Evidence uploads include `title` and `description` metadata; the backend stores them in both attachment metadata and the created `EvidenceItem`.
+- The Phase 4 to Phase 5 evidence gate is documented as requiring at least one recorded evidence item, not completion of all five legacy categories.
+
+## Amendment 4 - 2026-06-24
+
+Incident evidence capture is made available earlier under CR-013. The original reached-phase edit gate for Phase 4 evidence documents is superseded: authorized users can open Phase 4 Documents and save attachments before Phase 4 is formally reached, including while Phase 2 or Phase 3 are still incomplete.
+
+Triggering discovery: post-shipment testing showed the evidence screen returned a warning that investigation evidence could be edited only after Phase 4 was reached. This blocked legitimate early evidence capture when proof was available before root-cause or next-action work was complete.
+
+Superseded behavior:
+- Any statement that evidence document editing requires `current_phase >= 4` is superseded for the Documents evidence endpoints.
+- Ordered phase submit/transition requirements are not superseded; users still submit Phase 2 and Phase 3 in sequence for workflow advancement.
+- Office approval, closure, superseded-state, role, and vessel-scope locks are not superseded.
+
+Implementation impact:
+- The backend evidence workspace and attachment endpoints now enforce the normal edit lock only, not the Phase 4 reached check.
+- The frontend keeps the Phase 4 Documents route accessible and no longer redirects users away when early evidence access is attempted.
+- No schema or data migration is required.
+
+## Amendment 5 - 2026-06-26
+
+SCM meeting hosting is WRH-gated under CR-014. The original D-GAP-M11 warn-don't-block behavior is superseded for SCM Regular and Ad-Hoc meeting creation only: users may host an SCM meeting only when ship-time configuration exists for the vessel/date and all roster crew included in SCM readiness have available, compliant WRH data.
+
+Triggering discovery: post-shipment use found that allowing users to host SCM while the same flow showed WRH warnings was operationally confusing. The requested operating model is "no WRH warning means hosting allowed; any WRH warning means hosting blocked."
+
+Superseded behavior:
+- D-GAP-M11 remains historical and still applies to already-created meeting detail/PDF/Office Comment warning visibility, but it no longer allows SCM meeting creation when WRH readiness is missing or non-compliant.
+- Any APP_FLOW, BACKEND_STRUCTURE, VALIDATION_RULES, USER_GUIDE, or SSOT statement that says WRH data unavailable does not block SCM meeting creation is superseded by `D-MAINT-CR014`.
+- No SCM database schema change is required; the gate uses existing WRH ship-time configuration and WRH snapshot lookup surfaces.
+
+Implementation impact:
+- SCM Regular and Ad-Hoc create endpoints run WRH readiness before creating the meeting record.
+- The SCM create UI surfaces WRH readiness blockers near the host action and disables submit when readiness is not clear.
+- Regression tests must cover blocked creation when ship-time or WRH crew data is missing and allowed creation when all WRH readiness checks are clear.
+
+## Amendment 6 - 2026-06-29
+
+Incident Phase 4 Evidence Check is removed from the current user-facing workflow under CR-015. The original Evidence Matrix / Pro-Con supporting tool remains historical and backend-compatible only; it is no longer a Phase 4 frontend route, optional card, or Phase 5/6 user-facing gate.
+
+Triggering discovery: post-shipment use found the Safety evidence workflow still exposed too much investigation tooling after the Documents-only simplification. Users now need only the Documents attachment flow plus Witness Notes where needed.
+
+Superseded behavior:
+- D-DNV-07 remains historical, but its current user-facing Evidence Matrix surface is superseded by `D-MAINT-CR015`.
+- D-DNV-11 #4 remains historical, but the current UI no longer asks users to satisfy a Con-row Evidence Matrix guard before continuing.
+- Any APP_FLOW, PRD, VALIDATION_RULES, USER_GUIDE, FRONTEND_GUIDELINES, or SSOT statement that describes `/phase-4/evidence-matrix/` as a current Phase 4 route is superseded by `D-MAINT-CR015`.
+- No backend table or endpoint deletion is required in this change; compatibility surfaces remain for older records and existing API clients.
+
+Implementation impact:
+- The Phase 4 frontend route tree no longer registers `/safety/incidents/:id/phase-4/evidence-matrix/`.
+- The Phase 4 Documents workspace no longer renders the Evidence Check optional card and no longer calls the evidence-matrix endpoint.
+- Regression tests must assert that Phase 4 Documents hides Evidence Check and does not load evidence-matrix data.
+
+## Amendment 7 - 2026-06-29
+
+Incident Phase 4 Witness Notes are simplified under CR-016. The original user-facing 4-phase interview form, formal/informal selector, and witness read-back/sign-off controls are superseded in the current Phase 4 UI. Users now record only Witness name, What the witness said, and Closing note.
+
+Triggering discovery: post-shipment use found the Witness Notes form still exposed too much investigation protocol detail after the Evidence UI cleanup. The requested operating model is a short witness-note capture form that does not ask users to choose formal/informal mode or complete signature/read-back controls.
+
+Superseded behavior:
+- D-DNV-08 remains historical, but its current user-facing 4-phase interview form is superseded by `D-MAINT-CR016`.
+- D-GAP-R19 and D-GAP-R20 remain backend/API compatibility rules for formal/informal interview payloads, but the current Phase 4 Witness Notes UI does not expose those controls.
+- Any APP_FLOW, PRD, VALIDATION_RULES, USER_GUIDE, FRONTEND_GUIDELINES, or SSOT statement that describes formal/informal selection, read-back, witness signature, copy-to-witness, or 4-phase fields as current Phase 4 Witness Notes UI is superseded by `D-MAINT-CR016`.
+
+Implementation impact:
+- The Phase 4 Witness Notes form renders only Witness name, What the witness said, and Closing note.
+- The frontend submits the simplified note as an informal compatibility payload with a system reason so existing backend validation and stored-data contracts remain intact.
+- Regression tests must assert the three-field UI and compatibility payload.
+
+## Amendment 8 - 2026-06-29
+
+Incident Phase 1 First Checks are removed from the current user-facing workflow under CR-018. The original first-hour scene-protection checklist decision remains historical, but the current Incident Phase 1 UI, frontend schema, frontend payloads, incident serializers, and PDF output do not expose the checklist.
+
+Triggering discovery: post-shipment use found the first-check checklist unnecessary and confusing for users. The requested operating model is a direct Phase 1 intake form that captures the incident details, reporter data, risk, office communication, weather/position, and injury details without a separate checklist.
+
+Superseded behavior:
+- `D-GAP-R07` remains historical, but its current user-facing checklist UI and submit gate are superseded by `D-MAINT-CR018`.
+- Any APP_FLOW, PRD, VALIDATION_RULES, FRONTEND_GUIDELINES, BACKEND_STRUCTURE, USER_GUIDE, or SSOT statement that describes the first-check checklist as current UI, a required gate, an API serializer field, or a PDF field is superseded by `D-MAINT-CR018`.
+- The existing `first_hour_checklist_done` database column remains legacy storage only; no data migration is required in this change.
+
+Implementation impact:
+- The Phase 1 form no longer renders the First Checks card, checklist toggle, checklist checkboxes, or hidden checklist value.
+- The frontend Phase 1 schema and create/update payload builders no longer include `first_hour_checklist_done`.
+- Incident serializers and incident PDF field summaries no longer expose or print the first-check field.
+- Regression tests must assert the Phase 1 UI is absent, payloads omit the field, and current validation does not require the old gate.
+
+## Amendment 9 - 2026-06-29
+
+Incident Final Record history presentation is simplified under CR-019. The original terminal closure view described a full audit trail panel with phase log and field history. The current user-facing Final Record page now shows a clear final summary, simplified Phase History, approvals, reports, and reopen action. It does not show the Change History card or the History Rows metric.
+
+Triggering discovery: post-shipment use found the Final Record page still surfaced technical audit concepts and raw enum values that confused users. The requested operating model is a readable final page where users understand the workflow path without seeing raw field-history rows or `NOT_APPLICABLE`.
+
+Superseded behavior:
+- Any statement that the routine Final Record UI exposes field/change history as a visible card is superseded by `D-MAINT-CR019`.
+- Backend audit APIs and stored field-history rows are not removed. They remain available for authorized audit/export use.
+- The Final Record risk summary formats `imo_classifier = NOT_APPLICABLE` as `No IMO class` in the UI.
+
+Implementation impact:
+- `SafetyIncidentPhase9` no longer renders the Change History card, Show/Hide Changes toggle, or History Rows card.
+- Phase History renders as a numbered, plain-language timeline with transition status and actor/date context.
+- Regression tests must assert the removed cards are absent and raw `NOT_APPLICABLE` is not shown.
+
+## Amendment 10 - 2026-06-29
+
+The Incident Type master data is simplified under CR-021. The original 11-row incident-type seed and picklist is superseded for current behavior: `IMO_MISSING_VESSEL` / Missing vessel is removed from seed data, removed from existing databases by migration, and defensively hidden from the Phase 1 dropdown.
+
+Triggering discovery: post-shipment use found that Missing vessel should not be offered as an incident type in routine incident reporting.
+
+Superseded behavior:
+- D-DNV-04 remains historical, but the current Incident Type dropdown and master seed data contain 10 options, not 11.
+- Any APP_FLOW, BACKEND_STRUCTURE, PRD, USER_GUIDE, or SSOT statement that says `master_safety_incident_type` has 11 current rows is superseded by `D-MAINT-CR021`.
+- Existing incident records are not rewritten by this change.
+
+Implementation impact:
+- `master_safety_incident_type.json` no longer includes `IMO_MISSING_VESSEL`.
+- Migration `0049_remove_missing_vessel_incident_type` deletes the existing master row.
+- The frontend Incident Type picker defensively filters `IMO_MISSING_VESSEL` / Missing vessel if returned by an older API.
+- Regression tests must assert the seed payload count is 10 and the Phase 1 dropdown does not show Missing vessel.
+
+## Amendment 11 - 2026-06-30
+
+Phase 1 reporting context fields are moved to the incident record under CR-024. Shore Assistance Required, Location of Vessel, Location on Board, Last Port, Departure Date, and Vessel Condition are now incident-level fields rendered in the main Phase 1 Incident Report section.
+
+Triggering discovery: post-shipment UI review showed these fields were not visible in the main Incident Report screen. Repository discovery confirmed the fields existed only on `vims_safety_external_party_injury`, so they could not be saved for incidents without an injury row.
+
+Superseded behavior:
+- CR-023's temporary placement of these six fields inside a shared Injury Reporting subsection is superseded.
+- The legacy injury-table copies remain backward-compatible for old injury records and PDF fallback, but current create/edit forms source these values from `vims_safety_incident`.
+- No separate injury latitude/longitude columns are introduced; existing incident coordinates remain the shared coordinate source.
+
+Implementation impact:
+- Migration `0050_incident_reporting_context_fields` adds six nullable columns to `vims_safety_incident`.
+- Phase 1 create/edit serializers and frontend payloads include the six incident-level fields.
+- The Phase 1 UI renders the fields before Weather Condition and removes their duplicate injury-subsection rendering.
+- Incident PDFs print the incident-level reporting context and fall back to legacy injury-row values only for older records.
+
+## Amendment 12 - 2026-07-03
+
+The Incident Type master data is replaced under CR-031. The current Incident Phase 1 dropdown and `master_safety_incident_type` seed data now expose 32 active options in the user-provided order. Earlier incident-type rows that are not part of the new list are retired for new selection while remaining available for historical lookup.
+
+Triggering discovery: post-shipment classification review found the 10-option incident-type list too broad. Users need more specific options for bottom-touch events, allisions, foundering, flooding, fire/explosion split, cargo damage, equipment failures, crew injury, pollution, local-regulation breach, stowaway, security, cyber security, and Other.
+
+Superseded behavior:
+- `D-MAINT-CR021` remains historical for removing Missing vessel, but its 10-option current list is superseded by `D-MAINT-CR031`.
+- D-DNV-04 remains historical background only; current master data is the 32-option CR-031 list.
+- Any APP_FLOW, BACKEND_STRUCTURE, PRD, USER_GUIDE, or SSOT statement that says `master_safety_incident_type` has 10 or 11 current rows is superseded by `D-MAINT-CR031`.
+- Existing incident records are not rewritten by this change.
+
+Implementation impact:
+- `master_safety_incident_type.json` now contains 32 active rows with `INC_*` type codes.
+- Migration `0051_replace_incident_type_master_list` deactivates retired rows and upserts the 32 active rows for existing databases.
+- The reference Incident Type endpoint orders rows by the CR-031 business sequence.
+- The frontend Incident Type picker still filters retired `Missing vessel` if returned by an older API, and regression tests assert the new 32-option dropdown order.
+
+## Amendment 13 - 2026-07-03
+
+Incident Phase 1 field presentation is simplified under CR-032. The current form uses "Was office informed?" and "How was office informed?", hides WhatsApp from the communication-mode dropdown, places Latitude and Longitude together on one row, shifts Shore Assistance Required below the coordinate row, hides Last Port, and hides Weather ice-condition fields.
+
+Triggering discovery: post-shipment UI review showed the office wording was less professional, WhatsApp should not be offered as a current office communication mode, Latitude and Longitude were split across rows, and Last Port plus ice-condition weather fields added unnecessary clutter.
+
+Superseded behavior:
+- `D-MAINT-CR024` remains valid for moving incident reporting context onto the incident record, but its current visible-field list is superseded for Last Port. Last Port remains a nullable compatibility column and historical/PDF fallback field, but it is no longer shown or sent by the current Phase 1 frontend.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, or SSOT statement that says Last Port is a current visible Phase 1 field is superseded by `D-MAINT-CR032`.
+- The backend `office_notification_mode` storage may retain legacy `WHATSAPP` values, but the current Phase 1 dropdown only offers `ON_CALL` and `EMAIL`.
+- Weather ice-condition columns remain compatibility storage, but the current Weather Condition UI no longer shows or sends them.
+
+Implementation impact:
+- `SafetyIncidentPhase1Form` updates the office labels, removes the WhatsApp option, removes Last Port and ice-condition controls, and nests Latitude/Longitude in a two-column row.
+- Current Phase 1 save/submit payloads omit Last Port and weather ice-condition fields and normalize legacy `WHATSAPP` to null so users select a current mode when needed.
+- Regression tests must assert the new labels/options, hidden fields, coordinate grouping, and payload omission.
+
+## Amendment 14 - 2026-07-03
+
+Incident Phase 1 field placement is adjusted under CR-034. The current form places Shore Assistance Required beside Report time while Latitude and Longitude remain together on their own row.
+
+Triggering discovery: post-change UI review requested Shore Assistance Required beside Report time instead of below the coordinate row.
+
+Supersedes:
+- Amendment 13 and `D-MAINT-CR032` only for Shore Assistance Required placement.
+
+Implementation impact:
+- `SafetyIncidentPhase1Form` renders Report time and Shore Assistance Required in the same two-column row.
+- Latitude and Longitude remain grouped in a separate two-column row.
+- No backend, API, or database contract changes are required.
+
+## Amendment 15 - 2026-07-03
+
+Incident weather-condition migration compatibility is hardened under CR-035. Migration `0043_incident_weather_condition_fields` now separates Django migration state from database DDL so existing SQL Server databases can continue when `vims_safety_incident_weather_option` or incident weather columns already exist.
+
+Triggering discovery: a deployment migration failed because SQL Server already contained `vims_safety_incident_weather_option` before Django had recorded `safety.0043` as applied.
+
+Supersedes:
+- The original assumption that `0043_incident_weather_condition_fields` always owns first creation of `vims_safety_incident_weather_option`.
+- Any manual workaround requiring operators to drop the existing weather option table before rerunning migrations.
+
+Implementation impact:
+- The migration records the `IncidentWeatherOption` model and incident weather fields in Django state while running idempotent database operations.
+- SQL Server DDL conditionally creates `vims_safety_incident_weather_option`, adds missing weather columns, and converts existing weather UUID-compatible columns to the current `CHAR(32)` storage shape when needed.
+- Later weather seed migrations can run without requiring the pre-existing weather option table to be dropped.
+
+## Amendment 16 - 2026-07-03
+
+Incident RCA and Next Actions capture are simplified under CR-033. Current Incident RCA uses only Immediate Cause and Root Cause in the user-facing workflow, and Current Next Actions no longer shows or submits the "Why is this needed?" rationale field for corrective, preventive, or lessons entries.
+
+Triggering discovery: post-shipment UI review found the Intermediate Cause layer and the why-needed action rationale field added clutter and confusion to the incident investigation flow.
+
+Supersedes:
+- Original Step 1.7 and D-GAP-R01 current-flow wording only where they require a current user-facing Immediate / Intermediate / Root RCA ladder.
+- D-GAP-R09 current PDF wording only where it requires printing Immediate / Intermediate / Root labels.
+- D-MAINT-CR028 only where it kept corrective/preventive rationale available in the current UI.
+
+Implementation impact:
+- Phase 2 RCA UI, counts, and phase-gate validation require at least one Immediate Cause and one Root Cause.
+- The API rejects new `INTERMEDIATE` cause submissions with a user-facing validation message.
+- The database enum and historical migrations remain compatible with legacy `INTERMEDIATE` rows; current UI/PDF display those rows under Root Cause instead of printing Intermediate Cause.
+- Phase 3 Next Actions no longer renders or sends recommendation `rationale`; the nullable backend column remains for old records and compatibility.
+
+## Amendment 17 - 2026-07-03
+
+Incident Phase 4 Witness Statement capture is simplified under CR-036, and duplicate in-page incident phase headers are removed under CR-037. Current Phase 4 labels the supporting witness tool as Witness Statement, opens `/phase-4/interviews/` directly, loads the incident vessel crew list for witness-name selection, provides an Other typed-name option, captures What the witness said, Remark, and an optional signature image. Incident phase tabs remain the single phase number/name indicator; phase workspace content does not repeat separate Phase X/phase-title header cards.
+
+Triggering discovery: post-shipment UI review found that the "Optional" witness card and "Closing note" wording were unclear, witness names should come from the vessel crew list where possible, and repeated phase headers duplicated the already-visible phase tabs.
+
+Supersedes:
+- `D-MAINT-CR016` only for the current user-facing label and field list: Witness Notes / Closing note becomes Witness Statement / Remark, and optional signature image upload is added.
+- Existing APP_FLOW, PRD, USER_GUIDE, and SSOT wording that says current Phase 4 witness capture has only Witness name, What the witness said, and Closing note.
+- Existing UI presentation assumptions that each phase workspace repeats its phase number/name inside the content area.
+
+Implementation impact:
+- Phase 4 Documents shows a collapsed Witness Statement support card that links directly to the witness statement page.
+- The witness statement form fetches the incident vessel crew list, lets the user choose a crew member or Other, stores Other as typed text, reads image files as data URLs for `witness_signature`, and submits the existing informal witness-interview compatibility payload.
+- Saved witness statements display Witness name, What the witness said, Remark, and signature status/image.
+- Incident PDF evidence witness output uses the Witness Statement heading and Remark label.
+- Phase workspace header cards that only repeated the phase number/name are removed; functional section headings and phase tabs remain.
+
+## Amendment 18 - 2026-07-03
+
+Incident action capture is split under CR-038. Current visible workflow separates Corrective Action, Preventive Action, and Lessons Learned into separate phase tabs, moves Evidence to visible Phase 6, Office Check to visible Phase 7, Check Actions to visible Phase 8, and removes the read-only Final Record from the visible workflow tabs.
+
+Triggering discovery: post-shipment UI review found that combining corrective action, preventive action, and lessons learned inside one screen made the workflow harder to understand, and that Final Record is read-only so it should not appear as a normal editable phase.
+
+Supersedes:
+- The current-flow wording that treats Phase 3 as one combined Next Actions screen.
+- The visible workflow assumption that Final Record is a normal phase tab.
+- Current action-entry wording that requires a visible owner/checker card, Remaining risk field, or risk-confirmation checkbox.
+
+Implementation impact:
+- Phase tabs now show Phase 1 Report Incident, Phase 2 RCA, Phase 3 Corrective Action, Phase 4 Preventive Action, Phase 5 Lessons Learned, Phase 6 Add Evidence, Phase 7 Office Check, and Phase 8 Check Actions.
+- Corrective Action uses the existing action storage contract but shows Description and Due date only; the owner/checker card is removed.
+- Preventive Action hides Remaining risk and the risk-confirmation checkbox while maintaining backend compatibility values.
+- Lessons Learned is captured on its own screen.
+- Direct Final Record routes remain available for legacy/audit access but are hidden from the visible workflow.
+- No database migration or backend endpoint change is required.
+
+## Amendment 19 - 2026-07-03
+
+Incident workflow is shortened under CR-042. The visible Phase 5 Lessons Learned screen is removed, Preventive Action now continues directly to Office Review, Office Check is renamed Office Review, and Office Review captures unrestricted Office Comments.
+
+Triggering discovery: post-shipment workflow review found that the added Lessons Learned phase created unnecessary work, while the office decision screen lacked the important office comment field needed by reviewers.
+
+Supersedes:
+- Amendment 18 only where it made Lessons Learned a current visible phase and used the Office Check label.
+- D-MAINT-CR038 only for the current visible Lessons Learned screen. Corrective Action and Preventive Action remain separate visible screens.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says `/safety/incidents/:id/phase-5/` is a current Lessons Learned or analysis workspace is superseded by `D-MAINT-CR042`.
+
+Implementation impact:
+- Incident phase tabs now show Phase 1 Report Incident, Phase 2 RCA, Phase 3 Corrective Action, Phase 4 Preventive Action, Phase 6 Add Evidence, Phase 7 Office Review, and Phase 8 Check Actions.
+- `/safety/incidents/:id/phase-3/lessons/` remains as a legacy route but redirects to Office Review.
+- Preventive Action uses the existing continue control to route directly to Office Review.
+- Migration `0052_incident_office_comment` adds nullable `vims_safety_incident.office_comment`.
+- Phase 7 preflight and accept/approve-red payloads expose/save `office_comment`; the field has no word or character limit.
+- Incident PDFs print Office Review comments and closure reason before Signature when present. Current PDF section selectors do not show Lessons Learned by default; legacy lesson export support remains compatibility-only.
+
+## Amendment 20 - 2026-07-03
+
+Incident visible phase numbering is made sequential under CR-043. After Lessons Learned was removed, the current visible workflow must no longer skip from Phase 4 to Phase 6.
+
+Triggering discovery: post-shipment UI review found the phase tabs showed Phase 4 and then Phase 6, which looked broken to users even though the backend compatibility route paths still worked.
+
+Supersedes:
+- Amendment 19 only where it listed visible Add Evidence as Phase 6, Office Review as Phase 7, and Check Actions as Phase 8.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that uses the old visible Phase 6/7/8 labels for Add Evidence, Office Review, or Check Actions.
+
+Implementation impact:
+- Visible incident phase tabs now show Phase 1 Report Incident, Phase 2 RCA, Phase 3 Corrective Action, Phase 4 Preventive Action, Phase 5 Add Evidence, Phase 6 Office Review, and Phase 7 Check Actions.
+- Shared frontend phase-label helpers map legacy backend `current_phase` values to the sequential visible labels.
+- Backend `current_phase` values, route paths, API names, component names, and migrations remain unchanged for compatibility.
+- No database migration or backend endpoint change is required.
+
+## Amendment 21 - 2026-07-06
+
+Incident Office Review authority is simplified under CR-044. Current Office Review decisions are not risk-band specific: PIC and DPA can accept, close, or send an incident back for rework for GREEN, YELLOW, and RED risk bands.
+
+Triggering discovery: post-shipment permission review found users need PIC and DPA to perform the same Office Review decision actions regardless of risk band, instead of being blocked by the old GREEN/PIC, YELLOW/DPA, RED/FM closer mapping.
+
+Supersedes:
+- D-RBAC-01 and D-RBAC-05 only for current Incident Office Review accept/close/send-back authority.
+- Amendment 19 and Amendment 20 only where their Office Review wording inherited the old risk-band closer model.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says current Office Review acceptance, closure, or rework is limited by GREEN/PIC, YELLOW/DPA, or RED/FM.
+
+Implementation impact:
+- Phase 6 Office Review preflight advertises PIC and DPA as allowed decision roles for every risk band.
+- Phase 6 accept and send-back endpoints allow PIC or DPA with the relevant process permission for every risk band.
+- The legacy RED approval endpoint remains for route compatibility but no longer requires FM in the current implemented flow.
+- Phase 7 Check Actions verification/close allows PIC or DPA for every risk band after action checks are complete or validly deferred.
+- Incident PDF signature output prints the Office Review signature as PIC / DPA office signature rather than a risk-band-specific FM/PIC/DPA closer slot.
+- No database migration is required.
+
+## Amendment 22 - 2026-07-06
+
+Incident visible Phase 7 is replaced under CR-047. The current user-facing Phase 7 is Loss Evaluation, not Check Actions. The compatibility route and backend phase number remain `/safety/incidents/:id/phase-6` and backend `current_phase` 8, but the screen now captures risk assessment, report-specific other details, cost evaluation, and estimated costs before closure.
+
+Triggering discovery: post-shipment workflow review found the old Check Actions phase no longer matched the requested final review content. The final visible phase needs to evaluate operational loss and cost for Incident Report records and injury-specific loss/cost details for Injury Report records.
+
+Supersedes:
+- Amendment 20 only where it names visible Phase 7 as Check Actions.
+- Amendment 21 only where it says Phase 7 Check Actions verification/close is the current closure step after Office Review.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that describes current visible Phase 7 as action checks/effectiveness verification.
+
+Implementation impact:
+- Visible incident phase tabs now show Phase 1 Report Incident, Phase 2 RCA, Phase 3 Corrective Action, Phase 4 Preventive Action, Phase 5 Add Evidence, Phase 6 Office Review, and Phase 7 Loss Evaluation.
+- Migration `0053_incident_loss_evaluation` adds `vims_safety_incident_loss_evaluation`, one editable Loss Evaluation row per incident.
+- Migration `0054_alter_injurydropdownoption_field_key` adds the `SAFE_WORKING_PRACTICE` dropdown category for future Injury Report safe-working-practice options.
+- `GET /api/safety/incidents/{id}/phase-6/` returns the Loss Evaluation workspace; `PATCH /api/safety/incidents/{id}/phase-6/` saves it.
+- `POST /api/safety/incidents/{id}/phase-6/close/` closes only after a Loss Evaluation row has been saved and a closure note is supplied.
+- The old `/phase-6/verify/` effectiveness-verification endpoint remains registered as a compatibility endpoint but is not the current visible Phase 7 UI.
+- The Incident PDF Estimated Cost selection prints Loss Evaluation blocks when a Loss Evaluation record exists.
+
 **Document Control:**
 - Created: 2026-04-17
 - Author: Wave 3 docsuite generation agent (Implementation Plan)

@@ -16,6 +16,7 @@ def bootstrap_django(*, root_urlconf: str | None = None) -> None:
                 "django.contrib.auth",
                 "django.contrib.contenttypes",
                 "rest_framework",
+                "apps.notifications",
                 "apps.safety",
             ],
             DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
@@ -43,9 +44,13 @@ def recreate_incident_table() -> None:
         IncidentCauseTag,
         IncidentEvidence,
         IncidentFact,
+        IncidentLossEvaluation,
         IncidentPhase5Assessment,
         IncidentPhaseLog,
+        InjuryDropdownOption,
+        NearMissCategory,
         NearMissGuidancePrompt,
+        NearMissCauseOption,
         NearMissKpiTarget,
         IncidentSafeguardFailure,
         Recommendation,
@@ -72,8 +77,12 @@ def recreate_incident_table() -> None:
         cursor.execute("DROP TABLE IF EXISTS vims_safety_recommendation")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_field_history")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_incident_phase_log")
+        cursor.execute("DROP TABLE IF EXISTS vims_safety_incident_loss_evaluation")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_external_party_injury")
+        cursor.execute("DROP TABLE IF EXISTS vims_safety_injury_dropdown_option")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_near_miss_guidance_prompt")
+        cursor.execute("DROP TABLE IF EXISTS vims_safety_NM_categories")
+        cursor.execute("DROP TABLE IF EXISTS vims_safety_near_miss_cause_option")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_near_miss_kpi_target")
         cursor.execute("DROP TABLE IF EXISTS vims_safety_incident")
         cursor.execute("PRAGMA foreign_keys = ON")
@@ -81,10 +90,14 @@ def recreate_incident_table() -> None:
     with connection.schema_editor() as schema_editor:
         schema_editor.create_model(Incident)
         schema_editor.create_model(IncidentPhaseLog)
+        schema_editor.create_model(NearMissCategory)
         schema_editor.create_model(NearMissGuidancePrompt)
+        schema_editor.create_model(NearMissCauseOption)
         schema_editor.create_model(NearMissKpiTarget)
         schema_editor.create_model(SafetyFieldHistory)
+        schema_editor.create_model(InjuryDropdownOption)
         schema_editor.create_model(ExternalPartyInjury)
+        schema_editor.create_model(IncidentLossEvaluation)
         schema_editor.create_model(IncidentEvidence)
         schema_editor.create_model(EvidenceItem)
         schema_editor.create_model(ChainOfCustody)
@@ -99,6 +112,39 @@ def recreate_incident_table() -> None:
         schema_editor.create_model(Recommendation)
         schema_editor.create_model(RecommendationVerification)
         schema_editor.create_model(CorrectiveAction)
+    seed_near_miss_categories()
+
+
+def seed_near_miss_categories() -> None:
+    from apps.safety.models import NearMissCategory
+
+    category_names = [
+        "PPE",
+        "Fire Safety",
+        "LSA",
+        "Safety Awareness",
+        "Work Routines",
+        "Maintenance",
+        "Machinery",
+        "Housekeeping",
+        "Seamanship",
+        "Pollution",
+        "Communication/Instructions",
+        "Navigation",
+        "Leadership",
+        "Structural",
+        "Cargo Operation",
+        "Other",
+    ]
+    for display_order, category_name in enumerate(category_names, start=1):
+        NearMissCategory.objects.update_or_create(
+            category_name=category_name,
+            defaults={
+                "display_order": display_order,
+                "active": True,
+                "created_by": "test",
+            },
+        )
 
 
 def recreate_master_notification_table() -> None:
@@ -672,6 +718,8 @@ def recreate_taxonomy_reference_tables() -> None:
 
 
 def recreate_near_miss_reference_tables() -> None:
+    from apps.safety.models import NearMissCauseOption
+
     with connection.cursor() as cursor:
         cursor.execute("DROP TABLE IF EXISTS master_mscat_taxonomy")
         cursor.execute("DROP TABLE IF EXISTS master_loss_types")
@@ -790,3 +838,25 @@ def recreate_near_miss_reference_tables() -> None:
             ) VALUES ('00000000000000000000000000000007', 3, 10, 'Immediate Causes', '10.03', 'Unsafe practice observed', 'Immediate', 1)
             """
         )
+    factor_labels = {
+        "HUMAN": "Human Factors",
+        "VESSEL": "Vessel Factors",
+        "MANAGEMENT": "Management Factors",
+        "OTHER": "Other Factors",
+    }
+    for factor, label in factor_labels.items():
+        NearMissCauseOption.objects.create(
+            factor=factor,
+            cause_stage=NearMissCauseOption.CauseStage.IMMEDIATE,
+            option_code=f"{factor}_IMMEDIATE_TEST",
+            option_text=f"{label} immediate test cause",
+            display_order=1,
+        )
+        NearMissCauseOption.objects.create(
+            factor=factor,
+            cause_stage=NearMissCauseOption.CauseStage.ROOT,
+            option_code=f"{factor}_ROOT_TEST",
+            option_text=f"{label} root test cause",
+            display_order=1,
+        )
+    seed_near_miss_categories()

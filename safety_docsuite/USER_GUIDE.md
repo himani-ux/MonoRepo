@@ -100,12 +100,15 @@ Step-by-step:
 
 1. On `/safety/incidents/create/` (Phase 1 — Intake + Scene Control), fill:
    - **What happened** — free-text narrative (minimum 200 characters; enforced by `V-INC-001`).
-   - **When** — date + time; the system joins to the latest Daily Report within ±12 h to auto-fill position (FEAT-SAF-XMOD-001, D-GAP-M09). An amber banner reads "Position auto-filled from Daily Report {ref}."
-   - **Where** — location on vessel (picklist of physical areas).
-   - **Incident type** — picked from `master_safety_incident_type` (11 rows).
+   - **When and position** — date, time, Latitude, and Longitude. Report time appears beside Shore Assistance Required. Latitude and Longitude appear together on their own row.
+   - **Office communication** — answer **Was office informed?**. If Yes, select how it was informed: On call or On email.
+   - **Reporting context** — Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition. Shore Assistance Required is beside Report time; the remaining reporting-context fields appear below the coordinates. These are stored on the incident report and are used for both incident and injury reporting. Last Port is not shown in the current form.
+   - **Weather Condition** — record weather and sea details. Ice condition on-board and Ice condition at sea are not shown in the current form.
+   - **Incident type** — picked from `master_safety_incident_type` (32 active options; retired earlier options such as `Missing vessel` are not offered).
+   - **Injury Details** — optional. Select `Crew` for crew injury and fill rank, age, and `Type of Activity`. Select `Non-crew` for pilot/contractor/shipyard/passenger injuries and fill the existing person/company/type/injury-level fields. In crew injury, choose `Type of Activity`, nature of injury, source of injury, and affected body area from the dropdowns; select `Others(Specify)` when the required value is not listed. Estimated cost details are optional: select Yes to open the cost fields, or No to continue without them.
    - **Scene control** — confirm the area is secured per SSQE §11.
 2. Tap **Save Draft**. System issues a draft reference `DRAFT-{VslCode}/{YYYY}/T{nnn}` (D-GAP-C1).
-3. Attach evidence (photos, logs, VDR exports) under the Evidence tab if immediately available, or defer to Phase 3.
+3. Attach evidence under **Phase 4 → Documents** if photos, logs, VDR exports, or other proof are immediately available. You do not need to finish Phase 2 or Phase 3 before saving these documents.
 4. When ready, tap **Continue to Phase 2** — `/safety/incidents/:id/phase-2/`.
 5. Phase 2 is **Notifications + Resource Allocation**. You:
    - Select **IMO classification** (SMC / MC / MI) per the IMO Casualty Investigation Code MSC.255(84) picklist — this is a regulatory field (FEAT-SAF-INC-002).
@@ -114,6 +117,8 @@ Step-by-step:
 6. Tap **Submit to office**. The system assigns the formal reference `{VslCode}/{YYYY}/{NNN}` (gap-free), routes to `/safety/incidents/:id/phase-3/`, and fires notifications to PIC + DPA via `master_notification` (FEAT-SAF-XMOD-006, D-GAP-F2).
 7. After Phase 2 submission, the investigation workspace is driven by the Master (lead for GREEN / YELLOW) or the shore team (RED). You continue contributing witness statements and evidence when asked.
 
+Until office approval, authorized users can return to saved incident details and correct them. User-facing investigation phases are flexible: RCA, Corrective Action, Preventive Action, Evidence Documents, and Witness Statements can be opened and saved even when the formal workflow has not yet moved to that legacy backend phase number. Moving from one phase to the next does not make earlier phases read-only. Phase 2 saved Immediate Cause and Root Cause cards include **Edit**, which loads the existing cause into the form and updates that same saved cause. Phase 3 Corrective Action, Phase 4 Preventive Action, and Phase 5 Add Evidence saved cards also include **Edit** and update the existing saved row instead of adding a duplicate. The former Lessons Learned screen is removed from the current workflow; its old URL redirects to Office Review. The Phase 1 edit page loads the saved report and **Save changes** writes back to the incident; leaving the injury section unchanged does not remove a saved injury record. Once office approves, closes, or supersedes the incident, the record is locked for normal phase edits.
+
 ### 3.3 Reporting a Near Miss
 
 **Entry point:** Safety sidebar → **Near Miss** → **New Near Miss** (`/safety/near-miss/create/`). Any crew member can use this (`SAF_P_001` scoped to `SAF_F_002`).
@@ -121,32 +126,30 @@ Step-by-step:
 Step-by-step:
 
 1. On `/safety/near-miss/create/`:
-   - **What happened** — free-text description (minimum 80 characters; enforced by `V-NM-001`).
+   - **What happened** — free-text description (minimum 100 characters; enforced by `V-NM-001`).
    - **Where** — location picklist.
-   - **Photo** — optional but strongly encouraged for HIGH-severity scenarios.
-   - **Contributing factors** — optional SHELL picklist (from `master_mscat_taxonomy`).
-2. A rate-limit banner may appear: you are limited to 5 Near Miss reports per 24 hours (`FEAT-SAF-NM-005`, enforced server-side via `/api/safety/near-miss/rate-limit/`). This is to prevent accidental duplicates, not to discourage reporting — talk to your SO if you hit the limit.
+   - **Photo** — mandatory for HIGH severity; optional otherwise.
+   - **Category** — one user-facing dropdown that combines the old Category and Possible Loss Type options.
+   - **Factor causes** — select Immediate Cause and Root Cause for Human Factors, Vessel Factors, Management Factors, and Other Factors. Use `Not Applicable` where a factor does not apply. Use `Other` only when no dropdown option fits, then type the custom text.
+2. There is no daily Near Miss submission cap. While submission is running, the button shows **Processing** so users do not click multiple times and create duplicates.
 3. Tap **Submit**. System routes to `/safety/near-miss/:id/` with confirmation and the Near Miss reference number.
 
-### 3.4 Anonymity — Your Identity is Protected (D-GAP-J1)
+### 3.4 Reporter Identity (D-GAP-J1 revised)
 
-> **This is the most important rule in this entire section.**
-
-When you file a Near Miss, the system **stores** your name (audit trail requirement) but **hides** it from most users:
+When you file a Near Miss, the system stores your name, rank, and user reference for follow-up and audit. Anonymous reporting is removed from V1.
 
 | Who is looking at your report | Sees your name? |
 |-------------------------------|-----------------|
 | You (yourself) | Yes — full name |
 | **DPA (shore)** | **Yes — full name** |
 | **FM (shore)** | **Yes — full name** |
-| Master | **No — shows "Anonymous Reporter"** |
-| HOD / CO / CE | **No — shows "Anonymous Reporter"** |
-| SO | No — shows "Anonymous Reporter" |
-| TD (shore) | No — shows "Anonymous Reporter" |
-| PDF exports (Master-scoped) | Prints "Anonymous Reporter" literally |
-| PDF exports (DPA/FM-scoped) | Prints your name |
+| Master | Yes — full name within vessel scope |
+| HOD / CO / CE | Yes — full name within vessel scope |
+| SO | Yes — full name within vessel scope |
+| TD / authorized shore user | Yes, where vessel scope and Safety permission allow |
+| PDF exports | Prints reporter details for authorized viewers; no anonymous/masked wording |
 
-This is enforced at the API serializer layer in `apps/safety/authentication/anonymity.py`. The user interface cannot "show" your name to the Master even if it wanted to — the data never leaves the server un-masked for their session. The anonymity badge (an `EyeOff` icon) appears next to your (masked) name on every Near Miss screen (DESIGN_SYSTEM §8). This guarantees a reporting-culture-protective environment without losing audit traceability.
+The UI and PDF must not display `Anonymous Reporter`, `identity withheld`, or `Reporter identity is masked`.
 
 ### 3.5 What Happens After You Submit?
 
@@ -179,7 +182,9 @@ You will receive a `master_notification` when state changes materially (triage c
 
 ### 4.1 Day in the Life — HOD (Chief Officer)
 
-You see a draft incident notification at 07:10. The Master opened it at 06:40 after a crane-wire pre-tension parted on #3 cargo hold. By 08:00 you are at your workstation reviewing Phase 3 evidence. You add two interview rows under the People tab, link three photos from the People tab's evidence section, and flag one witness statement as FORMAL — triggering the read-back protocol (D-GAP-R19). At Phase 6 the Master drafts the recommendations; you counter-sign the HOD signature block once the Master has signed and before the DPA closes. Your name + timestamp + device fingerprint lock the HOD signature (D-GAP-D1).
+You see a draft incident notification at 07:10. The Master opened it at 06:40 after a crane-wire pre-tension parted on #3 cargo hold. By 08:00 you are at your workstation reviewing evidence documents and witness statements. The Master records Corrective Action and Preventive Action on separate action screens; you counter-sign the HOD signature block once the Master has signed and before the DPA closes. Your name + timestamp + device fingerprint lock the HOD signature (D-GAP-D1).
+
+Current Witness Statement update: the Phase 4 Witness Statement screen no longer asks users to flag statements as FORMAL or complete read-back/copy-to-witness controls. Choose a crew witness from the vessel list or select Other and type the name, then enter What the witness said, Remark, and an optional signature image.
 
 ### 4.2 Reviewing Incoming Incident Reports
 
@@ -188,31 +193,48 @@ Entry point: Safety sidebar → **Incidents** (`/safety/incidents/`).
 1. The list shows columns `Ref No | Vessel | Date | Type | SMC/MC/MI | Band | Phase | Closer | Updated`. Filter by band, classification, or phase.
 2. Click a row to open `/safety/incidents/:id/`. The landing tab shows the current phase + bias-guard status.
 3. Read the Phase 1 intake narrative, Phase 2 classifier + band rationale, and the evidence gathered so far.
+4. If a correction is needed before office approval, open the relevant earlier phase and edit it directly. A formal send-back is not required just because the incident has moved forward.
 
 ### 4.3 Contributing to Investigation Phases
 
-**Phase 3 — Evidence Workspace** (`/safety/incidents/:id/phase-3/`):
+**Phase 2 - RCA (Root Cause Analysis)** (`/safety/incidents/:id/phase-2/`):
 
-1. Five tabs: Position · People · Parts · Paper · Electronic. All five must have ≥1 entry **or** an explicit "n/a — justified" note (recency-bias guard `V-INC-040` / D-DNV-11 #1).
-2. Under **People** (`/safety/incidents/:id/phase-3/evidence/people/`), record interviews. For each interview, set `interview_type` = FORMAL or INFORMAL (D-GAP-R20). For FORMAL interviews, the system enforces the read-back protocol: witness reads back, signs on paper, copy issued (D-GAP-R19 / `V-INC-032`).
-3. Under **Chain of Custody** (`/safety/incidents/:id/phase-3/chain-of-custody/`), every physical evidence item needs description, collection date-time, collector signature, storage location, witness signature, handover log (D-GAP-R04 / `V-INC-020`).
-4. Every fact you record must link to ≥1 evidence row (assumption-bias guard `V-INC-041` / D-DNV-11 #2).
+1. Add at least one Immediate Cause and one Root Cause using the visible cause dropdowns.
+2. After a cause saves, the page shows a success message and moves to the Saved causes area so you can immediately review the saved cause.
+3. To correct a saved cause, use **Edit** on that cause card. The form is filled with the saved values; **Update** changes the existing card instead of adding a duplicate.
 
-**Phase 4 — Facts Systemized** (`/safety/incidents/:id/phase-4/`):
+**Current action phases (CR-038, superseded by CR-042 for Lessons Learned):**
 
-1. Facts pulled from Phase 3 appear in a single chronological list. You add missing facts; every row needs a linked evidence ID.
-2. Tap **Continue to Phase 5** only after Phase 4 fact base is complete.
+1. **Phase 3 - Corrective Action** (`/safety/incidents/:id/phase-3/`) captures the corrective action description and due date. The old owner/checker card is not shown.
+2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures the preventive action without asking for Remaining risk or the "I confirm this will reduce risk" checkbox.
+3. The former **Lessons Learned** screen is removed from current navigation. Its old URL redirects to Office Review.
+4. Each save shows a success message and moves to the saved item so users can review what was saved.
+5. To correct a saved corrective or preventive action, use **Edit** on that saved card. The form is filled with the saved values; **Update** changes that existing item instead of adding a duplicate.
 
-**Phase 5 — Analysis** (`/safety/incidents/:id/phase-5/`):
+**Phase 4 — Evidence Workspace** (`/safety/incidents/:id/phase-4/`):
 
-1. Five tools: STEP swimlane · Fact Tree · ECF Chart · Barrier Analysis · Change Analysis (D-DNV-10 / FEAT-SAF-INC-020).
-2. Depth rule (`V-INC-056` / D-GAP-R14): DEEP investigation needs all 5; MEDIUM needs ≥3; SHALLOW needs ≥2.
-3. Causal Layering tab (`/safety/incidents/:id/phase-5/causal-layering/`): tag each cause as **Immediate**, **Intermediate**, or **Root** over the M-SCAT 174-row taxonomy (FEAT-SAF-INC-018). There is no artificial cap on root causes (Round 21 R03).
-4. Human Factors tab: SHELL + IMO Resolution A.884(21) 7+1 domains (FEAT-SAF-INC-026 / `V-REG-010`).
+1. Open **Documents** (`/safety/incidents/:id/phase-4/paper/`) whenever evidence is available. Documents can be added before Phase 2 or Phase 3 are completed; official phase submit steps still move in order.
+2. Add one evidence entry with **Attachment**, **Title**, and **Description**. Repeat the same form for as many attachments as needed.
+3. Use the title to name what the attachment is, and use the description to explain why it matters.
+4. After a document or witness statement saves, the page shows a success message and moves to the saved-content area so you can immediately review the saved entry.
+5. Click **Witness Statement** when a statement needs to be recorded; it opens the witness statement page directly with no extra **Open Witness Statement** step. Choose a crew witness from the incident vessel list or select **Other** and type the name, enter What the witness said, add a Remark, and optionally upload a signature image. Evidence Check is not part of the current Phase 4 screen.
+6. To correct a saved document title/description or saved Witness Statement, use **Edit** on that saved card. Document Edit keeps the original file and updates only the metadata; Witness Statement Edit updates the same witness row.
+7. Every fact you record must link to ≥1 evidence row (assumption-bias guard `V-INC-041` / D-DNV-11 #2).
+
+**Legacy combined action screen (superseded by CR-038)** (`/safety/incidents/:id/phase-3/`):
+
+1. This older combined view is superseded by the current separate Corrective Action and Preventive Action screens above.
+2. Do not use this legacy wording as current user guidance for owner/checker fields or remaining-risk confirmation.
+
+**Legacy analysis tools**:
+
+1. Older DNV analysis tools remain background/compatibility material only.
+2. Current users complete RCA on Phase 2, Corrective Action on Phase 3, Preventive Action on Phase 4, and then continue to Office Review.
+3. The current `/safety/incidents/:id/phase-5/` route is **Office Review**, not an analysis workspace.
 
 ### 4.4 Recommending Corrective / Preventive / Lessons
 
-**Phase 6 — Recommendations** (`/safety/incidents/:id/phase-6/`):
+**Legacy recommendations screen (superseded by CR-038)** (`/safety/incidents/:id/phase-6/`):
 
 1. Three tiers are **mandatory** for YELLOW / RED closure (`V-INC-064` / D-GAP-R13):
    - ≥1 **Corrective Action** (fix this incident's root cause)
@@ -240,11 +262,13 @@ Signature sequence is **Reporter → Master → HOD → DPA → FM** (as applica
 | Route | Purpose |
 |-------|---------|
 | `/safety/incidents/` | Incident list |
-| `/safety/incidents/:id/phase-3/evidence/people/` | Interview input |
-| `/safety/incidents/:id/phase-3/chain-of-custody/` | Chain-of-custody ledger |
-| `/safety/incidents/:id/phase-4/` | Fact base |
+| `/safety/incidents/:id/phase-4/people/` | Interview input |
+| `/api/safety/incidents/:id/phase-4/chain-of-custody/` | Chain-of-custody ledger |
+| `/safety/incidents/:id/phase-3/` | Corrective Action |
+| `/safety/incidents/:id/phase-3/preventive/` | Preventive Action |
+| `/safety/incidents/:id/phase-3/lessons/` | Legacy redirect to Office Review |
 | `/safety/incidents/:id/phase-5/analysis/*` | Analysis tools + Human Factors |
-| `/safety/incidents/:id/phase-6/` | Recommendations |
+| `/safety/incidents/:id/phase-6/` | Loss Evaluation |
 | `/safety/scm/:id/` | SCM read + HOD department input |
 
 ---
@@ -357,7 +381,7 @@ Trainees are stored in `vims_safety_soi_trainee` per event. Pick their names in 
 
 ### 6.1 Day in the Life — Master
 
-Your day begins with the dashboard tile on `/safety/dashboard/`. You have one YELLOW incident at Phase 5 awaiting your review, one SCM due in 3 days, two SOI areas in `Pending Closure`, and zero open Near Misses on your vessel. You tap the YELLOW incident, read the analysis, approve the causal layering, sign the Master block at Phase 6, then route the record to the DPA. You call the CO to review the SOI closure items, approve both. You glance at the fleet-wide closed incidents tab (your cross-vessel read access per D-RBAC-09) to see what sister vessels have closed this month. By 11:00 you have cleared your Safety queue.
+Your day begins with the dashboard tile on `/safety/dashboard/`. You have one YELLOW incident awaiting Office Review, one SCM due in 3 days, two SOI areas in `Pending Closure`, and zero open Near Misses on your vessel. You tap the YELLOW incident, review the saved RCA/actions/evidence, sign where required, then route the record to the DPA. You call the CO to review the SOI closure items, approve both. You glance at the fleet-wide closed incidents tab (your cross-vessel read access per D-RBAC-09) to see what sister vessels have closed this month. By 11:00 you have cleared your Safety queue.
 
 ### 6.2 Signature Authority in Every Flow
 
@@ -395,16 +419,17 @@ Incident and SOI signature type: typed name + ISO-8601 timestamp + device finger
    - **Scheduled date/time** — when the meeting will run.
    - **Agenda** — draft items (you can edit until office adds Office Comment).
    - **Attendee picklist** — pre-populated from CMS crew roster, WRH-checked.
-3. Save Draft. System creates the SCM record with `meeting_type = 'AD_HOC'`.
-4. At meeting time, go to `/safety/scm/:id/`, run through agenda, record Suggestions / Recommendations in `/safety/scm/:id/agenda/`.
-5. Office adds Office Comment on the SCM detail page. Saving Office Comment closes the meeting. WRH badges and overdue SOI items are warnings only and do not block closure.
+3. Check the **WRH readiness** card. The SCM can be hosted only when ship time is configured and every roster crew member has available, compliant WRH data.
+4. Save Draft. System creates the SCM record with `meeting_type = 'AD_HOC'`. If WRH readiness is not clear, the host action is disabled and the backend rejects creation until the warning is fixed.
+5. At meeting time, go to `/safety/scm/:id/`, run through agenda, record Suggestions / Recommendations in `/safety/scm/:id/agenda/`.
+6. Office adds Office Comment on the SCM detail page. Saving Office Comment closes the meeting. WRH badges and overdue SOI items are warnings only and do not block closure after the meeting exists.
 
 > **An Ad-Hoc SCM does NOT replace the monthly Regular SCM.** The cadence counter + Closed-Since-Last-SCM snapshot anchors on **last SCM closure timestamp regardless of type** (D-GAP-M-ADHOC). If the Ad-Hoc happens on the 15th, your Regular is still due 30 days after that.
 
 ### 6.4 Regular SCM Chairing (SSQE §9)
 
-1. Master or CO prepares the draft at `/safety/scm/create-regular/` using the **Meeting type** selector (D-RBAC-06).
-2. You attend the scheduled meeting. The system auto-assembles on `/safety/scm/:id/`:
+1. Master or CO prepares the draft at `/safety/scm/create-regular/` using the **Meeting type** selector (D-RBAC-06). Confirm the **WRH readiness** card is clear before hosting; missing ship time, missing WRH rows, or non-compliant crew blocks SCM creation.
+2. You attend the scheduled meeting. The system auto-assembles on `/safety/scm/:id/` after the meeting is created:
    - **Closed-Since-Last-SCM** block — SOI findings + Near Miss + Incident records closed since prior SCM closure timestamp (`/safety/scm/:id/closed-since-last/`, D-GAP-M22).
    - **Safety Observations** — auto-filled from open SOI findings (FEAT-SAF-SOI-020 / `/api/safety/soi/open-findings/`).
    - **Attendance** — WRH join; per-row badges + tooltip (D-GAP-M11 / D-GAP-M26).
@@ -425,12 +450,12 @@ When all picked areas on an SOI event reach `Submitted`, the event moves to `Pen
 
 ### 6.6 Approving Incident Findings Before Shore Escalation
 
-At Phase 6 you review the HOD's recommendations, the causal layering, and the 8 bias guards. Before you sign the Master block:
+At the action-check stage you review the saved corrective/preventive action entries, causal layering, and the 8 bias guards. Before you sign the Master block:
 
-1. Check that ≥1 **Corrective** + ≥1 **Preventive** + ≥1 **Lessons Learnt** is recorded for YELLOW / RED (`V-INC-064`).
+1. Check that action recommendations are recorded before Office Review (`V-INC-064`).
 2. Check ALARP attestation on every System-Action (`V-INC-065` / Round 21 R02).
 3. Check the 8 bias guards are attested (5 DNV + 3 organisational defence-traps per D-GAP-R12 / `V-INC-055`).
-4. Sign. The record routes to the DPA at Phase 7 (`/safety/incidents/:id/phase-7/`). RED records route to DPA then FM (D-GAP-M06).
+4. Sign. The record routes to the DPA for Office Review (`/safety/incidents/:id/phase-5/`). RED records route to DPA then FM (D-GAP-M06).
 
 ### 6.7 Fleet-Wide Read Access
 
@@ -441,7 +466,7 @@ You have fleet-wide read-only access to **closed** incidents on sister vessels (
 | Route | Purpose |
 |-------|---------|
 | `/safety/dashboard/` | Fleet dashboard (your vessel default; cross-vessel read) |
-| `/safety/incidents/:id/phase-6/` | Master signature + recommendations review |
+| `/safety/incidents/:id/phase-6/` | Loss Evaluation |
 | `/safety/scm/create-adhoc/` | Host Ad-Hoc SCM (D-GAP-M-ADHOC) |
 | `/safety/scm/:id/` | SCM detail, Edit Meeting, Office Comment, PDF download |
 | `/safety/soi/:id/findings/:findId/` | Approve SOI finding closure |
@@ -456,59 +481,63 @@ You have fleet-wide read-only access to **closed** incidents on sister vessels (
 
 ### 7.1 Day in the Life — DPA
 
-You arrive at your desk at 07:30. One incident closed overnight on MV Alpha — you do the Phase 7 acceptance. Two Near Misses were filed in the last 24 hours — you triage both, mark one HIGH (a mooring rope tension reading + crew fatigue signal), prepare the Circular/Alert handoff from `/safety/near-miss/:id/fleet-alert/`, complete the remaining Circular fields in the Circular module, then record the Near Miss fleet-alert step as issued. You open the Safety Intelligence Dashboard at `/safety/dashboard/`, check the Pareto of root causes across the fleet, notice the 10.15 Design/MOC Governance category creeping up. You open the taxonomy admin at `/safety/admin/mscat/` and check the case-study repository. Before lunch you approve two SOI area-applicability requests from Masters. Afternoon is a cross-vessel lessons-learned digest export from the dashboard.
+You arrive at your desk at 07:30. One incident closed overnight on MV Alpha — you do the Office Review acceptance. Two Near Misses were filed in the last 24 hours — you triage both, mark one HIGH (a mooring rope tension reading + crew fatigue signal), prepare the Circular/Alert handoff from `/safety/near-miss/:id/fleet-alert/`, complete the remaining Circular fields in the Circular module, then record the Near Miss fleet-alert step as issued. You open the Safety Intelligence Dashboard at `/safety/dashboard/`, check the Pareto of root causes across the fleet, notice the 10.15 Design/MOC Governance category creeping up. You open the taxonomy admin at `/safety/admin/mscat/` and check the case-study repository. Before lunch you approve two SOI area-applicability requests from Masters. Afternoon is a cross-vessel lessons-learned digest export from the dashboard.
 
 ### 7.2 Owning the Investigation Lifecycle
 
-The DPA is the lead authority at every Incident investigation phase (except the RED-band closure, which is FM's per D-GAP-M06):
+The DPA is a lead authority at every Incident investigation phase. Under the current CR-044 authority model, PIC and DPA can accept, close, or send rework for every risk band:
 
 | Phase | DPA role |
 |-------|----------|
 | Phase 1 — Intake | Monitor; receive notifications via `master_notification` |
 | Phase 2 — Classification + band | Review IMO classifier + internal band |
-| Phase 3 — Evidence | Comment; request more evidence; enforce chain-of-custody (D-GAP-R04) |
-| Phase 4 — Facts | Read-only review |
-| Phase 5 — Analysis | Lead review of causal layering + bias guards |
-| Phase 6 — Recommendations | Review ALARP + 3-tier completeness; approve before closure |
-| **Phase 7 — Acceptance (YELLOW closer)** | **Accept or send back** at `/safety/incidents/:id/phase-7/` |
-| Phase 8 — Follow-up verification | Verify CA effectiveness |
+| Phase 4 — Evidence | Comment; request more evidence; enforce chain-of-custody (D-GAP-R04) |
+| Phase 3 — Corrective Action | Review corrective action |
+| Phase 4 — Preventive Action | Review preventive action |
+| Legacy Lessons route | Redirects to Office Review; not a current DPA work step |
+| Legacy analysis tools | Background compatibility only; not a current visible phase |
+| Phase 7 — Loss Evaluation | Save final risk, loss, repair/injury, and cost evaluation before closure |
+| **Phase 6 — Office Review (YELLOW closer)** | **Enter Office Comments, accept, or send back** at `/safety/incidents/:id/phase-5/` |
+| Legacy follow-up verification | Compatibility route only; current visible Phase 7 is Loss Evaluation |
 | Closure | YELLOW band — sign and close. RED band — hand to FM. |
 
 ### 7.3 Near Miss Triage — DPA Only
 
 Entry point: Safety sidebar → **Near Miss** → click a LOW-triage item → `/safety/near-miss/:id/triage/`.
 
-1. Review the reporter's description + attached photo + SHELL factors.
-2. Read the reporter's identity (you and FM are the only roles who can — D-GAP-J1).
+1. Review the reporter's description, attached photo, category, and factor causes.
+2. Read the reporter's identity where vessel scope and Safety permission allow.
 3. Set priority LOW or HIGH (D-GAP-R22). If HIGH, proceed to fleet alert at `/safety/near-miss/:id/fleet-alert/`.
 4. Fleet alert payload auto-drafts with vessel + crew names anonymised per D-GAP-M08. Review and edit the alert text and fleet-learning text.
 5. Use **Issue Circular/Alert** when you want the same alert prepared in the Circular module. The Circular page opens with only the title and body prefilled; complete recipients, category, priority, attachments, and publish there as normal (FEAT-SAF-NM-006 / D-CFG-04).
 6. Use **Issue fleet alert** in Near Miss to record that the HIGH-priority fleet-alert requirement is complete. This is separate from the Circular module publish action.
 
-### 7.4 Anonymity — Your Privileged View (D-GAP-J1)
+### 7.4 Reporter Identity View (D-GAP-J1 revised)
 
-Near Miss reporter identity is **visible to you and the FM only**. Every other role — Master, HOD, CO, CE, SO, TD — sees "Anonymous Reporter". This is enforced at the API serializer layer (`apps/safety/authentication/anonymity.py`) so the raw identity data does not leave the server for non-privileged sessions.
+Near Miss reporter identity is visible to authorized users within vessel scope. The anonymous/masked reporter concept is removed from V1.
 
 **What this means for your work:**
 
-- You can talk to the reporter directly if needed (you know who they are).
-- You must **not** quote the reporter's name on any PDF, email, or verbal communication that would reach Master / HOD / CO.
-- The Master-scoped PDF export prints "Anonymous Reporter" literally. Your DPA-scoped PDF prints the name.
-- If you share the PDF outside VIMS, be mindful which version you are forwarding.
-
-> **If you accidentally breach anonymity (e.g., copy-paste a name into a shore email to the Master), follow your own company's incident-escalation procedure. The system audit logs the reveal event at `vims_safety_field_history` — this is a data point for L-###-style lessons in `LESSONS.md`.**
+- You can talk to the reporter directly if follow-up is needed.
+- Master and authorized vessel/office users can see reporter details where their vessel scope allows it.
+- PDFs must not print `Anonymous Reporter` or any masked-reporter wording.
 
 ### 7.5 Closing Incidents — ALARP Attestation
 
-Phase 7 preflight returns `{bias_guards_resolved, root_count, recommendation_tier_count, alarp_complete, signature_chain_status}`. Before you tap **Accept**:
+Office Review preflight returns `{bias_guards_resolved, root_count, recommendation_tier_count, alarp_complete, signature_chain_status}`. Before you tap **Accept**:
 
 1. Confirm all 8 bias guards are attested (5 DNV + 3 organisational defence-traps per Round 21 R12).
 2. Confirm ≥1 **Root** layer cause (no artificial cap — Round 21 R03).
-3. Confirm ≥1 Corrective, ≥1 Preventive, ≥1 Lessons Learnt recommendation.
+3. Confirm at least one action recommendation is recorded.
 4. Confirm ALARP attestation on every RED/YELLOW System-Action (Round 21 R02).
-5. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001), transitions state to Phase 8, writes closure event to `vims_safety_incident_phase_log`.
+5. Enter **Office Comments** if the office review needs a note. There is no word limit.
+6. Before previewing or downloading the PDF, review the **Select PDF content** checklist. All items are selected by default: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature.
+7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8, writes closure event to `vims_safety_incident_phase_log`.
+8. Open `/safety/incidents/:id/phase-6/`, complete **Loss Evaluation**, and save it. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds.
 
-For RED-band incidents you sign, then the record routes to the FM for final sign and closure (D-GAP-M06).
+If **Record injury** was saved on Phase 1, the PDF prints the title `Injury Report`. If no injury was recorded, it prints `Incident Report`. Office Comments and closure reason appear near the end of the PDF before Signature, not in Summary. Evidence documents appear as separate document blocks with Description and File rows instead of numbered attachment rows; internal evidence notes are not printed. Action descriptions appear once inside their detail box without recommendation rationale / "Why is this needed?" text. Required signature rows remain visible in the PDF even when unsigned; unsigned rows show as `Pending`.
+
+Under the current CR-044 authority model, PIC or DPA can complete Office Review and later closure for any risk band.
 
 ### 7.6 Overseeing M-SCAT Root-Cause Analysis
 
@@ -518,10 +547,10 @@ You are the **sole maintainer** of the M-SCAT taxonomy, case-study library, and 
 
 The 8 bias-guard catalogue lives at `/safety/admin/bias-guards/` (read-only for V1 — maintained centrally as `master_safety_bias_guard`). The 8 are:
 
-1. Recency (DNV) — every evidence category populated or justified (D-DNV-11 #1 / `V-INC-040`).
+1. Recency (DNV) — at least one evidence item is recorded before leaving evidence capture (D-MAINT-CR012 / `V-INC-040`).
 2. Assumption (DNV) — every fact linked to evidence (D-DNV-11 #2 / `V-INC-041`).
 3. Hindsight (DNV) — no info dated after `occurred_at` without justification (D-DNV-11 #3 / `V-INC-042`).
-4. Confirmation (DNV) — every major finding has ≥1 Con row in Evidence Matrix (D-DNV-11 #4 / `V-INC-043`).
+4. Confirmation (DNV) — current users document contradictory evidence in Documents, Witness Statement, and analysis notes; the Evidence Matrix Con-row gate is compatibility-only after D-MAINT-CR015.
 5. Blame-fixation (DNV) — roots not all in Personal Factors (cat 1–4) unless DPA override (D-DNV-11 #5 / `V-INC-044`).
 6. Defence-trap: Plant (organisational) — D-GAP-R12.
 7. Defence-trap: Personnel (organisational) — D-GAP-R12.
@@ -534,7 +563,7 @@ You are the override authority for guard #5 (blame-fixation) via `SAF_P_006`. Us
 | Route | Purpose |
 |-------|---------|
 | `/safety/dashboard/` | Fleet-wide Safety Intelligence Dashboard |
-| `/safety/incidents/:id/phase-7/` | Acceptance / closure for YELLOW; RED relay to FM |
+| `/safety/incidents/:id/phase-5/` | Office Review acceptance or rework for any risk band |
 | `/safety/near-miss/:id/triage/` | LOW / HIGH triage |
 | `/safety/near-miss/:id/fleet-alert/` | Prepare Circular/Alert handoff and issue Near Miss fleet-alert step (HIGH) |
 | `/safety/soi/:id/applicability/approve/` | Approve Master's area-applicability request |
@@ -551,7 +580,7 @@ You are the override authority for guard #5 (blame-fixation) via `SAF_P_006`. Us
 
 ### 8.1 Day in the Life — FM
 
-You start the day reviewing the RED-band incident MV Bravo filed yesterday. The DPA has signed at Phase 7; the record is now on your desk at `/safety/incidents/:id/phase-7/` awaiting FM closure. You scrutinise the commercial impact, confirm the ALARP attestation on each System-Action, review the linked purchase requisitions on each Corrective Action, and sign to close. You then open `/safety/dashboard/` (read-only for you per D-GAP-M31) to check fleet-wide trends. Two Corrective Actions need budget approval — both flow from the Corrective Action → Purchase Requisition hard-FK link (D-GAP-M12). You approve the larger one in the Purchase module and leave the second for tomorrow pending quote clarification.
+You start the day reviewing the RED-band incident MV Bravo filed yesterday. The DPA has signed during Office Review; the record is now on your desk at `/safety/incidents/:id/phase-5/` awaiting FM closure. You scrutinise the commercial impact, confirm the ALARP attestation on each System-Action, review the linked purchase requisitions on each Corrective Action, and sign to close. You then open `/safety/dashboard/` (read-only for you per D-GAP-M31) to check fleet-wide trends. Two Corrective Actions need budget approval — both flow from the Corrective Action → Purchase Requisition hard-FK link (D-GAP-M12). You approve the larger one in the Purchase module and leave the second for tomorrow pending quote clarification.
 
 ### 8.2 Budget Approval on Corrective Action (D-GAP-M12)
 
@@ -579,18 +608,19 @@ Every Corrective Action on an Incident can be linked to a Purchase Requisition. 
 3. Creates the requisition — the `linked_safety_ca` parameter forms the hard FK.
 4. Requisition routes for approval through standard Purchase flow, ending at your desk for sign-off.
 
-### 8.3 Anonymity — Your Privileged View
+### 8.3 Reporter Identity View
 
-Same as the DPA (see [§7.4](#74-anonymity--your-privileged-view-d-gap-j1)). You and the DPA are the only roles who see Near Miss reporter identity. The `Eye` badge (primary-500) renders on your view; the `EyeOff` badge (masked) renders on every other role's view. The serializer enforces this — the data does not leave the server for non-privileged sessions.
+Same as the DPA (see §7.4). Near Miss reporter identity is visible where vessel scope and Safety permission allow it; the masked reporter concept is removed from V1.
 
 ### 8.4 RED-Band Incident Closure
 
 For RED-band incidents only, you are the closer (D-GAP-M06):
 
-1. DPA signs at Phase 7.
-2. Record routes to you at `/safety/incidents/:id/phase-7/`.
-3. Review the full investigation record; read-access to Phase 3 / 4 / 5 / 6 is full edit for RED (D-GAP-M06 gives you full-edit authority on RED — unusual among shore roles).
-4. Tap **Accept**. Record transitions to Phase 8 (effectiveness verification). PDF generates (FEAT-SAF-PDF-001). Closure event logs to `vims_safety_incident_phase_log`.
+1. DPA signs during Office Review.
+2. Record routes to you at `/safety/incidents/:id/phase-5/`.
+3. Review the full investigation record; read-access to RCA, actions, evidence, and Office Review is full edit for RED (D-GAP-M06 gives you full-edit authority on RED — unusual among shore roles).
+4. Tap **Accept**. Record transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8. PDF generates (FEAT-SAF-PDF-001). Closure event logs to `vims_safety_incident_phase_log`.
+5. Complete and save Loss Evaluation at `/safety/incidents/:id/phase-6/`; then close with a closure note.
 5. Your signature is the terminal node in the Reporter → Master → HOD → DPA → FM chain (`V-INC-073` / `V-INC-074`).
 
 ### 8.5 FM Routes at a Glance
@@ -598,8 +628,8 @@ For RED-band incidents only, you are the closer (D-GAP-M06):
 | Route | Purpose |
 |-------|---------|
 | `/safety/dashboard/` | Fleet-wide read-only (D-GAP-M31) |
-| `/safety/incidents/:id/phase-6/` | Corrective Action review (RED full-edit per D-GAP-M06) |
-| `/safety/incidents/:id/phase-7/` | RED-band closure signature |
+| `/safety/incidents/:id/phase-6/` | Loss Evaluation |
+| `/safety/incidents/:id/phase-5/` | RED-band Office Review closure signature |
 | `/safety/near-miss/:id/` | Near Miss detail — full reporter identity visible |
 | `/purchase/requisitions/:reqId` | Linked Purchase Req approval (cross-module) |
 
@@ -619,7 +649,7 @@ V1 breakpoints per D-GAP-M34 / DESIGN_SYSTEM §9 / APP_FLOW §11:
 
 - Mobile-first is the mandate — every Safety screen starts mobile and scales up (`FRONTEND_GUIDELINES.md`).
 - The SOI pick-areas screen is single-column at 768px portrait.
-- The Evidence Workspace tab bar collapses to horizontal scroll on tablet — swipe left/right between Position · People · Parts · Paper · Electronic.
+- The Evidence Workspace uses a single Documents form on tablet: Attachment, Title, and Description.
 - Hit-target for all buttons is ≥44px to satisfy WCAG AA (Round 20).
 
 ### 9.2 Offline — Paper-First SOI Download
@@ -633,8 +663,8 @@ SOI is designed for offline use via paper. Once you download the PDF or Excel at
 ### 9.3 Other Offline Considerations
 
 - Incident Phase 1 intake can be drafted offline via local browser storage; Phase 2 submission requires connectivity (to fire notifications and assign the formal reference).
-- Near Miss submission requires connectivity (to hit the rate-limit endpoint and issue the reference).
-- SCM Office Comment closure requires connectivity. WRH live join warnings do not block closure.
+- Near Miss submission requires connectivity to issue the reference.
+- SCM hosting requires ship-time configuration and clear WRH readiness for all roster crew. SCM Office Comment closure requires connectivity; WRH live join warnings do not block closure after the meeting exists.
 
 ### 9.4 Phone-Specific Limitations
 
@@ -653,11 +683,10 @@ When a screen blocks your action, the error message names the validation rule ID
 | "Risk band must be GREEN, YELLOW, or RED." | `V-INC-009` | Invalid band value | Re-select the band from the picklist |
 | "Chain-of-custody entry requires description, collection date-time, collector signature, and storage location." | `V-INC-020` | Missing fields on a physical evidence row | Fill all four required fields (D-GAP-R04) |
 | "Physical evidence requires witness signature per chain-of-custody protocol." | `V-INC-021` | Witness signature missing | Add witness signature (paper or digital) |
-| "Formal interview requires: read-back to witness, witness signature, copy to witness." | `V-INC-032` | Missing 3-step protocol | Complete all three (D-GAP-R19) |
-| "Recency bias guard: every evidence category must have ≥1 entry or an explicit 'n/a — justified' note." | `V-INC-040` | Phase 4 transition blocked | Populate all 5 evidence categories or justify n/a |
+| "Formal interview requires: read-back to witness, witness signature, copy to witness." | `V-INC-032` | Legacy/API formal interview payload missing the protocol fields | Use the current simplified Witness Statement screen unless maintaining an older formal interview integration |
+| "Phase 4 evidence is incomplete: add at least one evidence note, file, interview, or N/A reason." | `V-INC-040` | Phase 4 transition blocked | Add at least one document attachment with title and description, or record another valid evidence item |
 | "Assumption bias guard: every fact requires a linked evidence reference." | `V-INC-041` | Unlinked fact row | Link an evidence ID to each fact |
 | "Hindsight bias guard: cannot reference information dated after the incident." | `V-INC-042` | Post-incident date on a finding | Remove or justify the reference |
-| "Confirmation bias guard: each major finding needs ≥1 contradicting evidence row." | `V-INC-043` | Evidence Matrix missing Con rows | Add Con rows to each major finding |
 | "Blame-fixation bias guard: add a Lack-of-Control cause or request DPA override." | `V-INC-044` | All roots in Personal Factors | Add a Lack-of-Control cause or request DPA override |
 | "All 8 bias guards must be attested (5 DNV + 3 organisational defence-traps per Round 21 R12) before Phase 6 → 7 transition." | `V-INC-055` | Guard attestations incomplete | Attest remaining guards |
 | "Investigation depth '{depth}' requires {N} analysis tools (D-GAP-R14)." | `V-INC-056` | Too few Phase 5 tools | Add tools (DEEP=5, MEDIUM=3, SHALLOW=2) |
@@ -737,14 +766,13 @@ This index cross-references every route from `APP_FLOW.md` against the roles tha
 | `/safety/incidents/:id/phase-1/` | Top-4 reporters | §3.2 |
 | `/safety/incidents/:id/phase-2/` | Top-4 (band + classifier) | §3.2 |
 | `/safety/incidents/:id/phase-3/` | Master lead, HOD contribute | §4.3 |
-| `/safety/incidents/:id/phase-3/evidence/position/` | HOD, Reporter (witness) | §4.3 |
-| `/safety/incidents/:id/phase-3/evidence/people/` | HOD (interviews) | §4.3 |
-| `/safety/incidents/:id/phase-3/evidence/parts/` | HOD | §4.3 |
-| `/safety/incidents/:id/phase-3/evidence/paper/` | HOD | §4.3 |
-| `/safety/incidents/:id/phase-3/evidence/electronic/` | HOD | §4.3 |
-| `/safety/incidents/:id/phase-3/chain-of-custody/` | HOD | §4.3 |
-| `/safety/incidents/:id/phase-3/matrix/` | HOD | §4.3 |
-| `/safety/incidents/:id/phase-3/interview/:intId/` | HOD | §4.3 |
+| `/safety/incidents/:id/phase-4/places/` | HOD, Reporter (witness) | §4.3 |
+| `/safety/incidents/:id/phase-4/people/` | HOD (interviews) | §4.3 |
+| `/safety/incidents/:id/phase-4/parts/` | HOD | §4.3 |
+| `/safety/incidents/:id/phase-4/paper/` | HOD | §4.3 |
+| `/safety/incidents/:id/phase-4/photos/` | HOD | §4.3 |
+| `/api/safety/incidents/:id/phase-4/chain-of-custody/` | HOD | §4.3 |
+| `/safety/incidents/:id/phase-4/interviews/` | HOD | §4.3 |
 | `/safety/incidents/:id/phase-4/` | HOD, Master | §4.3 |
 | `/safety/incidents/:id/phase-5/` | HOD, Master, DPA (review) | §4.3, §7.2 |
 | `/safety/incidents/:id/phase-5/analysis/step/` | HOD | §4.3 |
@@ -755,21 +783,21 @@ This index cross-references every route from `APP_FLOW.md` against the roles tha
 | `/safety/incidents/:id/phase-5/causal-layering/` | HOD, Master | §4.3 |
 | `/safety/incidents/:id/phase-5/human-factors/` | HOD | §4.3 |
 | `/safety/incidents/:id/phase-6/` | Master, HOD, FM (RED edit) | §4.4, §6.6, §8.2 |
-| `/safety/incidents/:id/phase-7/` | DPA (YELLOW), FM (RED) | §7.2, §7.5, §8.4 |
-| `/safety/incidents/:id/phase-7/verification/` | DPA | §7.2 |
+| `/safety/incidents/:id/phase-5/` | DPA (YELLOW), FM (RED) Office Review | §7.2, §7.5, §8.4 |
+| `/safety/incidents/:id/phase-7/verification/` | Legacy verification compatibility | §7.2 |
 | `/safety/incidents/:id/phase-8/` | DPA | §7.2 |
 | `/safety/incidents/:id/closure/` | Terminal read; all | §7.2 |
 | `/safety/incidents/:id/audit/` | DPA, FM, auditors | §7.2 |
-| `/safety/incidents/:id/pdf/incident/` | All (scoped PDF) | §7.5 |
+| `/safety/incidents/:id/pdf/incident/` | All (scoped PDF with selectable content checklist) | §7.5 |
 | `/safety/incidents/:id/pdf/mscmepc3/` | DPA | §7.8 |
 | `/safety/incidents/:id/pdf/auditor-zip/` | DPA | §7.8 |
 | `/safety/incidents/:id/reopen/` | DPA (GREEN/YELLOW), FM (RED) | §7.5 |
 | `/safety/near-miss/` | All | §3.6, §7.3 |
 | `/safety/near-miss/create/` | Any crew | §3.3 |
-| `/safety/near-miss/:id/` | DPA / FM see reporter; others masked | §3.4, §7.4, §8.3 |
+| `/safety/near-miss/:id/` | Authorized users see reporter within vessel scope | §3.4, §7.4, §8.3 |
 | `/safety/near-miss/:id/triage/` | DPA | §7.3 |
 | `/safety/near-miss/:id/fleet-alert/` | DPA | §7.3 |
-| `/safety/near-miss/:id/pdf/` | All (role-masked) | §7.3 |
+| `/safety/near-miss/:id/pdf/` | Authorized users; no masked-reporter wording | §7.3 |
 | `/safety/scm/` | All | §6.4 |
 | `/safety/scm/create-regular/` | Master or CO | §6.4 |
 | `/safety/scm/create-adhoc/` | Master or CO | §6.3 |

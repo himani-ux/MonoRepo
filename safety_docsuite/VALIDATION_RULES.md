@@ -12,7 +12,11 @@
 
 **Reference validation note:** Safety-owned child rows store UUID-compatible references to Safety-owned parent rows. Polymorphic references must include the record/source type discriminator plus UUID value. External/shared VIMS identifiers remain in their original format and are not converted by Safety validation.
 
-**Master/reference validation note:** Safety-owned master/reference rows use UUID `id` as the actual database primary key. Stable natural keys remain authoritative for their domains, for example M-SCAT `subcode_id`, loss `loss_type_id`, SOI `area_id`, and bias guard `guard_code`.
+**Master/reference validation note:** Safety-owned master/reference rows use UUID `id` as the actual database primary key. Stable natural keys remain authoritative for their domains, for example M-SCAT `subcode_id`, loss `loss_type_id`, SOI `area_id`, bias guard `guard_code`, Near Miss cause option `option_code`, and the injury dropdown `field_key` values used for `TYPE_OF_ACTIVITY`, `NATURE_OF_INJURY`, `SOURCE_OF_INJURY`, and `AFFECTED_BODY_AREA`.
+
+**Incident simplification validation update (2026-07-03):** For incident records, current validation follows the simplified flow in `safety_ssot/VIMS-SAFETY-MODULE-SSOT.md` section 3.0. Binding rules are: narrative minimum still applies; occurred/reported timestamps cannot be in the future or reversed; vessel scope is enforced; reporter identity is required; risk band is required; investigation depth is derived from risk band; office communication is required as yes/no using "Was office informed?", and mode is required only when yes using "How was office informed?"; the current mode dropdown offers On call and On email only; Report time and Shore Assistance Required are visible together on one Phase 1 row; latitude and longitude are visible together on their own Phase 1 row and stored on the incident record; Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition are nullable visible Phase 1 incident-reporting context fields; Last Port remains legacy storage only and is not shown or sent by the current frontend; Weather ice-condition fields remain legacy storage only and are not shown or sent by the current Weather Condition UI; up to three loss types are allowed including `Other`; `Other` requires text. Corrective Action and Preventive Action are separate visible screens; Corrective Action validates user-visible Description and Due date, not owner/checker fields; Preventive Action does not validate a user-visible Remaining risk field or risk-confirmation checkbox; the former Lessons Learned screen is removed from current navigation and its old route redirects to Office Review. The former Phase 1 first-check gate is removed from the current UI/API/PDF flow under `D-MAINT-CR018`. User-entered IMO classifier, resource handoff, link-to-existing-finding, and mandatory bias-filter gates are superseded for the simplified V1 UI.
+
+**Incident Phase 2-6 editability update (2026-07-03):** RCA, facts/evidence helpers, Corrective Action, Preventive Action, Evidence Documents, and Witness Statements save endpoints remain editable for authorized users until office approval, closure, or supersession, regardless of legacy backend `current_phase` numbering. Saved RCA causes, action cards, evidence document metadata, and Witness Statement cards expose Edit controls that update the existing row instead of adding duplicates. Submit/continue endpoints still enforce ordered workflow movement. Office Review captures optional Office Comments with no word or character limit.
 
 ---
 
@@ -84,7 +88,6 @@ Every Incident record is a row in `vims_safety_incident` with `record_type='INCI
 | V-INC-003 | `reported_at` > NOW() (server clock, UTC) | server | "Reported time cannot be in the future." | Round 20 timestamp sanity |
 | V-INC-004 | `occurred_at` > NOW() | client + server | "Occurred time cannot be in the future." | Round 20 timestamp sanity |
 | V-INC-005 | `vessel_id` not in user's `master_RoleByVessel` scope (office) or `Crew_Onboarding_History` (ship) | server | "You are not assigned to this vessel." | D-GAP-A3 + platform auth |
-| V-INC-006 | First-hour scene-protection checklist has any unticked item at Phase 1 submit | client + server | "Complete the first-hour scene-protection checklist before submitting Phase 1." | D-GAP-R07 |
 | V-INC-007 | `imo_classifier` not in {`SMC`, `MC`, `MI`, `NOT_APPLICABLE`} | server | "IMO classifier must be SMC, MC, MI, or NOT_APPLICABLE." | D-GAP-R08 |
 | V-INC-008 | `imo_classifier` missing for incident with `loss_type` in {People-Fatality, People-Major-Injury, Environmental-Major} | client + server | "IMO casualty classifier (SMC/MC/MI) is mandatory for this incident type. This is independent of internal risk band (D-GAP-R08 reconciliation option b)." | D-GAP-R08 |
 | V-INC-009 | `risk_band` not in {`GREEN`, `YELLOW`, `RED`} | server | "Risk band must be GREEN, YELLOW, or RED." | D-DNV-02 |
@@ -93,6 +96,10 @@ Every Incident record is a row in `vims_safety_incident` with `record_type='INCI
 | V-INC-012 | Position (`latitude`, `longitude`) missing for `imo_classifier IN ('SMC','MC','MI')` | client + server | "Position is mandatory for IMO-classified casualties. Auto-fill from Daily Report within ±12h or enter manually." | D-GAP-M09 |
 | V-INC-013 | Tolerable-Failure Filter used on YELLOW or RED band | server | "Tolerable-Failure fast-close is GREEN-band only." | D-GAP-R11 |
 | V-INC-014 | Tolerable-Failure closure without DPA acknowledgment | server | "Tolerable-Failure closure requires DPA acknowledgment." | D-GAP-R11 |
+| V-INC-015 | `external_party_injury.injured_person_type='NON_CREW'` and any original non-crew field is blank (`party_name`, `party_type`, `company_name`, `severity`) | client + server | "Required for non-crew injury." | D-EDGE-02 |
+| V-INC-016 | `external_party_injury.injured_person_type='CREW'` with optional crew detail fields blank | none until final submission policy is defined | Crew injury details are nullable draft fields; rank options are loaded from current vessel crew. | CR-002 |
+| V-INC-017 | Crew injury `crew_activity_type`, `nature_of_injury`, `source_of_injury`, or `affected_body_areas` is outside `vims_safety_injury_dropdown_option` because `Others(Specify)` was used | none | The typed value is stored in the same injury record text field. | CR-004 |
+| V-INC-018 | Injury estimated cost choice is No or no cost fields are provided | none | Estimated cost details are optional; the UI hides the cost fields unless the user chooses Yes and continuation is allowed without cost values. | CR-025 |
 
 ### 2.2 Evidence (Phase 3) — Chain of Custody & Preservation
 
@@ -106,27 +113,31 @@ Every Incident record is a row in `vims_safety_incident` with `record_type='INCI
 | V-INC-025 | AIS shore-request overdue at 24h from `occurred_at` | server (cron) | "AIS shore-request overdue (24h)." | D-GAP-R06 |
 | V-INC-026 | Photo walk-around overdue at 48h from `occurred_at` | server (cron) | "Photo walk-around overdue (48h)." | D-GAP-R06 |
 | V-INC-027 | Formal statements overdue at 7 days from `occurred_at` | server (cron) | "Formal statements overdue (7 days)." | D-GAP-R06 |
-| V-INC-028 | Marine-document auto-checklist (Deck Log / Engine Log / Radio Log / etc.) has items unticked at Phase 3 → 4 transition | client + server | "Marine document auto-checklist must be completed before leaving Phase 3." | D-GAP-R05 |
-| V-INC-029 | Cargo-type incident missing cargo-specific evidence overlay items at Phase 3 → 4 transition | client + server | "Cargo incident requires tank ullage / sounding / hold-bilge / sampling / hatch-cover / temperature-humidity / stability / manifest / shipper / inspection records (D-GAP-R10)." | D-GAP-R10 |
-| V-INC-030 | Personal-injury incident missing health / fatigue sub-section (medical, medication, 96h WRH lookback, sleep, fitness, vaccination, pre-existing, medical advice) | client + server | "Personal-injury incident requires health/fatigue evidence sub-section (D-GAP-R23)." | D-GAP-R23 |
-| V-INC-031 | Interview record missing `interview_type IN ('FORMAL','INFORMAL')` | server | "Interview must be flagged FORMAL or INFORMAL." | D-GAP-R20 |
-| V-INC-032 | `interview_type='FORMAL'` missing read-back tick, witness signature, or copy-to-witness record | client + server | "Formal interview requires: read-back to witness, witness signature, copy to witness (D-GAP-R19)." | D-GAP-R19 |
-| V-INC-033 | `interview_type='INFORMAL'` missing `reason` (why formal was impossible) | client + server | "Informal interview requires a reason explaining why formal interview was not possible." | D-GAP-R20 |
+| V-INC-028 | Legacy marine-document checklist data is absent | none in current simplified UI | Not a blocking validation in the Documents-only evidence screen. Capture the relevant document as an attachment with title and description. | D-MAINT-CR012 supersedes D-GAP-R05 user-facing enforcement |
+| V-INC-029 | Cargo-type incident has no cargo-specific overlay data | none in current simplified UI | Not a blocking validation in the Documents-only evidence screen. Capture cargo evidence as document attachments with title and description. | D-MAINT-CR012 supersedes D-GAP-R10 user-facing enforcement |
+| V-INC-030 | Personal-injury incident has no health / fatigue sub-section data | none in current simplified UI | Not a blocking validation in the Documents-only evidence screen. Capture health/fatigue evidence as document attachments with title and description where applicable. | D-MAINT-CR012 supersedes D-GAP-R23 user-facing enforcement |
+| V-INC-031 | Interview record missing `interview_type IN ('FORMAL','INFORMAL')` | server compatibility | "Interview must be flagged FORMAL or INFORMAL." Current UI supplies `INFORMAL` automatically for simplified Witness Statement records. | D-GAP-R20; D-MAINT-CR016; D-MAINT-CR036 |
+| V-INC-032 | `interview_type='FORMAL'` missing read-back tick, witness signature, or copy-to-witness record | server compatibility | "Formal interview requires: read-back to witness, witness signature, copy to witness (D-GAP-R19)." Formal read-back/copy controls are not exposed in the current Witness Statement UI; the simplified UI can upload an optional signature image only. | D-GAP-R19; D-MAINT-CR016; D-MAINT-CR036 |
+| V-INC-033 | `interview_type='INFORMAL'` missing `reason` (why formal was impossible) | server compatibility | "Informal interview requires a reason explaining why formal interview was not possible." Current UI supplies a system reason for simplified Witness Statement records. | D-GAP-R20; D-MAINT-CR016; D-MAINT-CR036 |
 
-### 2.3 Analysis (Phase 5) — Causal Layering, Bias Guards, ALARP
+### 2.3 Legacy Analysis (former Phase 5) — Causal Layering, Bias Guards, ALARP
+
+The current simplified incident workflow does not expose a visible Phase 5 analysis screen. Rules in this section remain historical/backend compatibility references only unless a current workflow section above explicitly carries the same rule forward.
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
-| V-INC-040 | Phase 4 → 5 transition: any of 5 evidence categories empty AND no "n/a — justified" note | client + server | "Recency bias guard: every evidence category must have ≥1 entry or an explicit 'n/a — justified' note." | D-DNV-11 #1 |
+| V-INC-040 | Phase 4 → 5 transition attempted with no evidence recorded | client + server | "Phase 4 evidence is incomplete: add at least one evidence note, file, interview, or N/A reason." | D-MAINT-CR012; D-DNV-11 #1 |
 | V-INC-041 | Fact entry saved without linked evidence ID (interview / document / photo) | client + server | "Assumption bias guard: every fact requires a linked evidence reference." | D-DNV-11 #2 |
 | V-INC-042 | Finding/decision row references info dated after `occurred_at` without justification | server | "Hindsight bias guard: cannot reference information dated after the incident." | D-DNV-11 #3 |
-| V-INC-043 | Phase 5 → 6 transition: DPA-flagged "major finding" missing ≥1 Con row in Evidence Matrix | client + server | "Confirmation bias guard: each major finding needs ≥1 contradicting evidence row." | D-DNV-11 #4 |
+| V-INC-043 | Legacy Evidence Matrix Con-row check | none in current Documents-only UI | Not enforced in the current user-facing workflow; Evidence Check / Evidence Matrix is compatibility-only after D-MAINT-CR015. | D-MAINT-CR015 supersedes D-DNV-11 #4 for current UI |
 | V-INC-044 | Phase 6 → 7 transition: root causes all in Personal Factors (cat 1–4) AND no Lack-of-Control entry | server (hard block; DPA override only) | "Blame-fixation bias guard: add a Lack-of-Control cause or request DPA override." | D-DNV-11 #5 |
 | V-INC-045 | Investigation-coded causes cluster into "Plant" (hardware only) | client + server (soft warn) | "Plant-Problem trap: review whether process / organisational factors are under-coded (D-GAP-R12)." | D-GAP-R12 |
 | V-INC-046 | Investigation-coded causes cluster into "Personnel" (person only) | client + server (soft warn) | "Personnel-Problem trap: review whether system / process factors are under-coded (D-GAP-R12)." | D-GAP-R12 |
 | V-INC-047 | Investigation-coded causes cluster into "External event" (weather / port only) | client + server (soft warn) | "External-Event trap: review whether internal control factors contributed (D-GAP-R12)." | D-GAP-R12 |
 | V-INC-048 | Phase 5 → 6: People / Process / Plant interrogatory trio not all answered | client + server | "People / Process / Plant interrogatory: answer all three questions before leaving Phase 5 (D-GAP-R16)." | D-GAP-R16 |
-| V-INC-049 | Phase 5 close attempted with no causes tagged as `causal_layer='ROOT'` | client + server | "Causal layering: Phase 5 cannot close with Immediate-only codes. ≥1 Root-level cause required (D-GAP-R01)." | D-GAP-R01 |
+| V-INC-049 | Current RCA advance attempted without both an Immediate Cause and a Root Cause | client + server | "Add at least one Immediate Cause and one Root Cause." | D-MAINT-CR033 supersedes D-GAP-R01 for current UI |
+| V-INC-049A | New cause submitted with `causal_layer='INTERMEDIATE'` | server | "Use Immediate Cause or Root Cause." | D-MAINT-CR033 |
+| V-INC-049B | Saved RCA cause edited with missing selected cause option, invalid option, missing Other text where Other is selected, or missing reason | client; server rejects invalid option, missing Other text, missing reason, Intermediate layer, and root-limit violations | "Complete the selected cause and reason before saving." | D-MAINT-CR040 |
 | V-INC-050 | Phase 5 close with zero root causes identified | client + server | "At least one root cause must be identified (D-GAP-R03 — multiple root causes is the default)." | D-GAP-R03 |
 | V-INC-051 | Single root cause saved at Phase 5 close without monocausal justification in closure note | client + server | "Monocausal conclusion requires a written justification in the closure note (D-GAP-R03)." | D-GAP-R03 |
 | V-INC-052 | Artificial cap attempted on number of root-cause rows | server (rejected by design) | "No cap on root causes — multiple root causes are the default (D-GAP-R03)." | D-GAP-R03 |
@@ -135,16 +146,28 @@ Every Incident record is a row in `vims_safety_incident` with `record_type='INCI
 | V-INC-055 | 8 bias-guard attestation set not all confirmed before Phase 6 → 7 transition. The 8 guards = 5 DNV (Recency, Assumption, Hindsight, Confirmation, Blame-fixation) + 3 organisational defence-traps (Plant / Personnel / External-event) from D-GAP-R12 | client + server | "All 8 bias guards must be attested (5 DNV + 3 organisational defence-traps per Round 21 R12) before Phase 6 → 7 transition." | D-DNV-11 + D-GAP-R12 |
 | V-INC-056 | Analysis tool coverage below depth rule: DEEP requires all 5 D-DNV-10 tools, MEDIUM requires ≥3, SHALLOW requires ≥2 | server | "Investigation depth '{depth}' requires {N} analysis tools (D-GAP-R14)." | D-GAP-R14 |
 
-### 2.4 Recommendations & ALARP Gate (Phase 6 — Findings → System Actions)
+### 2.4 Action Phases and Compatibility Risk Fields
+
+Current user-facing action validation is split by screen:
+
+| Screen | Current user-visible validation | Compatibility note |
+|--------|--------------------------------|--------------------|
+| Corrective Action | Description and Due date are required before the user continues. | Owner/checker fields are not user-facing; frontend supplies compatibility values where the existing backend contract requires them. |
+| Preventive Action | Preventive action description and visible risk-reduction fields are validated where shown. | Remaining risk and the risk-confirmation checkbox are not user-facing under D-MAINT-CR038; frontend supplies compatibility values where required. |
+| Legacy Lessons Learned | Not a current user-facing validation gate. | Legacy `LESSONS_LEARNT` rows remain readable for old records/API compatibility only. |
+
+Editing a saved Corrective Action or Preventive Action card reuses the same visible-field validation and PATCHes the existing recommendation/action row. Editing must not create a second row for the same phase category.
+
+Legacy recommendation and ALARP rules below remain backend compatibility rules where older clients or stored rows still use those fields.
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
 | V-INC-060 | `risk_band IN ('RED','YELLOW')` and System-Action row missing any of: `estimated_effort`, `estimated_likelihood_reduction`, `residual_risk_acceptability_statement` | client + server | "ALARP gate: System-Actions on RED/YELLOW require effort, likelihood-reduction, and residual-risk acceptability (D-GAP-R02)." | D-GAP-R02 |
 | V-INC-061 | Closure attempt on RED/YELLOW without ALARP attestation flag `true` on every System-Action | server (hard block) | "Cannot close — ALARP attestation missing on one or more System-Actions (D-GAP-R02)." | D-GAP-R02 |
 | V-INC-062 | GREEN band System-Action saved without ALARP fields → prompt only, not block | client (prompt) | "Consider ALARP fields for this System-Action? (Optional on GREEN — D-GAP-R02)." | D-GAP-R02 |
-| V-INC-063 | Recommendation row without tier tag `IN ('CORRECTIVE','PREVENTIVE','LESSONS_LEARNT')` | client + server | "Recommendations must be tagged Corrective, Preventive, or Lessons Learnt (D-GAP-R13)." | D-GAP-R13 |
-| V-INC-064 | `risk_band IN ('RED','YELLOW')` closure without ≥1 recommendation per tier (Corrective / Preventive / Lessons Learnt) | client + server | "YELLOW/RED closure requires ≥1 Corrective + ≥1 Preventive + ≥1 Lessons-Learnt recommendation (D-DNV-06 + D-GAP-R13)." | D-DNV-06 / D-GAP-R13 |
-| V-INC-065 | System-Action recommendation missing per D-DNV-06 3-tier rubric | client + server | "Each closure requires Lessons Learned + ≥1 Immediate Action + ≥1 System Action (D-DNV-06)." | D-DNV-06 |
+| V-INC-063 | Recommendation row without tier tag `IN ('CORRECTIVE','PREVENTIVE','LESSONS_LEARNT')` | client + server | "Recommendations must be tagged Corrective, Preventive, or legacy Lessons Learnt (D-GAP-R13)." | D-GAP-R13; D-MAINT-CR042 |
+| V-INC-064 | Office Review attempted with no active recommendation/action row | client + server | "At least one action recommendation is required before Office Review." | D-DNV-06 / D-GAP-R13; D-MAINT-CR042 |
+| V-INC-065 | Legacy System-Action recommendation missing per D-DNV-06 3-tier rubric | legacy compatibility | Current UI does not require a visible Lessons Learned or System-Action tier; ALARP checks on current Preventive rows are covered by V-INC-060 and V-INC-061. | D-DNV-06; D-MAINT-CR042 |
 
 ### 2.5 Chain of Signatures (Phase-Gate Progression)
 
@@ -165,15 +188,25 @@ Sequencing is **Reporter → Master → HOD → DPA → FM**. Each next signatur
 
 | From → To | Must be complete | Decision ref |
 |-----------|------------------|--------------|
-| 0 → 1 | First-hour scene-protection checklist ticked; `investigation_depth` chosen | D-GAP-R07, R14 |
-| 1 → 2 | Intake narrative ≥200 chars; `imo_classifier`; `risk_band`; position (if classified); Reporter signature | V-INC-001..012, V-INC-070 |
+| 0 → 1 | Draft created with vessel scope and reporter context | D-GAP-C1, D-EDGE-08 |
+| 1 → 2 | Intake narrative ≥200 chars; `risk_band`; office communication yes/no; communication mode when office was told; Reporter signature | V-INC-001..005, V-INC-009, V-INC-070, D-MAINT-CR018 |
 | 2 → 3 | Investigator team + resources allocated | D-DNV baseline |
-| 3 → 4 | Marine-document checklist complete; cargo overlay (if cargo); health/fatigue (if personal injury); evidence-preservation deadlines not overdue or explicitly justified | D-GAP-R05/R10/R23/R06 |
-| 4 → 5 | Recency bias guard passes (all 5 evidence categories populated or justified) | D-DNV-11 #1 |
-| 5 → 6 | ≥1 ROOT-layer cause; safeguard 6-dim coding; People/Process/Plant answered; Confirmation bias (Con rows) | R01, R03, R16, R18, R21, DNV-11 #4 |
-| 6 → 7 | All 8 bias guards attested; ALARP fields on RED/YELLOW System-Actions; ≥1 rec per Corrective/Preventive/Lessons; Master → HOD → DPA signatures | R02, R12, R13, DNV-06, signature chain |
-| 7 → 8 | DPA accepted; PDF report issued; FM signature if RED | D-GAP-M06, D-PDF-01 |
-| 8 → CLOSED | Effectiveness verification complete (`psc_physical_verification` pattern per D-EDGE-06) | D-EDGE-06 |
+| Visible Phase 2-6 saves | RCA create/update, facts/evidence helpers, Corrective Action, Preventive Action, Evidence Documents, and Witness Statements can be saved or edited by authorized users before office approval even when legacy backend `current_phase` has not reached the old phase number. Edits update existing rows rather than adding duplicates. | D-MAINT-CR039, D-MAINT-CR040, D-MAINT-CR041, D-MAINT-CR042 |
+| Visible Phase 3 → 4 | Corrective Action saved with Description and Due date | D-MAINT-CR038 |
+| Visible Phase 4 → 6 | Preventive Action saved with the current visible preventive fields; frontend continues directly to Office Review | D-MAINT-CR038, D-MAINT-CR042, D-MAINT-CR043 |
+| Visible Phase 5 Evidence | Evidence Documents can be opened early by authorized users; document Edit requires a title and updates title/description metadata without replacing the file. Witness Statement Edit reuses the simplified witness required fields and updates the existing witness row. Official submit/order still follows backend workflow gates | D-MAINT-CR012, D-MAINT-CR013, D-MAINT-CR039, D-MAINT-CR041, D-MAINT-CR043 |
+| Visible Phase 6 → 7 | Office Review accepted by PIC or DPA for any risk band; optional Office Comments saved without a word limit; PDF report issued where applicable | D-PDF-01, D-MAINT-CR042, D-MAINT-CR043, D-MAINT-CR044 |
+| Visible Phase 7 → CLOSED | Loss Evaluation row saved in `vims_safety_incident_loss_evaluation` and closure note supplied | D-MAINT-CR047 |
+
+### 2.6.1 Phase 7 Loss Evaluation Validation
+
+| Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
+|---------|-------------------|-------------------|---------------|--------------|
+| V-INC-090 | User opens Loss Evaluation before Office Review has advanced the incident to backend `current_phase = 8` | server/UI | "Loss Evaluation is available after Office Review approval." | D-MAINT-CR047 |
+| V-INC-091 | User closes an incident from Phase 7 before saving Loss Evaluation | server | "Save Loss Evaluation before closing the incident." | D-MAINT-CR047 |
+| V-INC-092 | User closes an incident without a closure note | server | `closure_reason` required | D-MAINT-CR047 |
+| V-INC-093 | Consequence, Likelihood, Risk level, or Type of Repairs submitted outside the configured fixed dropdown values | server serializer | field-level choice validation | D-MAINT-CR047 |
+| V-INC-094 | Code of Safe Working Practices options are unavailable | UI/API | field remains nullable; options are loaded from `vims_safety_injury_dropdown_option` where `field_key = SAFE_WORKING_PRACTICE` when seeded later | D-MAINT-CR047 |
 
 ### 2.7 Timeline-Extension (D-GAP-B2)
 
@@ -188,14 +221,14 @@ Sequencing is **Reporter → Master → HOD → DPA → FM**. Each next signatur
 
 ## 3. Near Miss Validation
 
-Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. Anonymous reporting is removed from V1; reporter details are stored and visible to Master and authorized users within vessel scope.
+Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. Anonymous reporting is removed from V1; reporter details are stored and visible to Master and authorized users within vessel scope. Near Miss cause analysis uses `vims_safety_near_miss_cause_option` and stores selections in `vims_safety_incident.near_miss_factor_causes`; old M-SCAT near-miss fields are compatibility-only for historical rows.
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
 | V-NM-001 | `description` < 100 characters at submit | client + server | "Near-miss description must be at least 100 characters (D-GAP-M38)." | D-GAP-M38 |
 | V-NM-002 | `severity` not selected | client + server | "Select a severity level before submitting." | D-GAP-M38 |
 | V-NM-002A | `place` outside {`AT_ANCHOR`, `AT_SEA`, `AT_PORT`} | client + server | "Select a valid place." | FEAT-SAF-NM-001 |
-| V-NM-002B | Category or immediate cause has more than 3 selected values | client + server | "Select up to 3 values only." | FEAT-SAF-NM-001 |
+| V-NM-002B | Missing factor-cause selection for any required factor/stage pair (`HUMAN`, `VESSEL`, `MANAGEMENT`, `OTHER` × `IMMEDIATE`, `ROOT`) | client + server | "Select immediate and root causes for every factor, or choose Not Applicable." | FEAT-SAF-NM-001 |
 | V-NM-002C | Category value outside the approved combined Category/Possible Loss list and not saved through `Other - Specify` | client + server | "Select a valid category." | FEAT-SAF-NM-001 |
 | V-NM-003 | Near Miss Type submitted from the UI | client + server | "Near Miss Type is not used. Select Category instead." | D-GAP-M38 revised 2026-06-09 |
 | V-NM-004 | Office Comments priority not in {`LOW`, `MEDIUM`, `HIGH`} on Accept | server | "Near-miss priority must be LOW, MEDIUM, or HIGH." | D-GAP-R22 |
@@ -207,13 +240,14 @@ Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. A
 | V-NM-010 | Master attempts rework on a near miss originally reported by another authorized user | server | Allowed; no error | D-GAP-J1 revised 2026-06-09 |
 | V-NM-011 | `priority='LOW'` or `priority='MEDIUM'` close without closure note | server | "LOW/MEDIUM-priority near-miss closure requires a closure note." | D-GAP-R22 |
 | V-NM-012 | `priority='HIGH'` close without preventive measures + fleet learning + fleet alert | server | "HIGH-priority near miss can be closed only after preventive measures, fleet learning, and the fleet alert are completed." | D-GAP-R22 |
-| V-NM-013 | Immediate cause custom value entered outside the `Other - Specify` dropdown path | client | "Select Other - Specify from Immediate cause before typing a custom cause." | FEAT-SAF-NM-001 |
+| V-NM-013 | Factor cause option is `Other` and the matching custom text is blank | client + server | "Specify the cause when Other is selected." | FEAT-SAF-NM-001 |
+| V-NM-014 | Factor cause option UUID is inactive, belongs to another factor/stage, or does not exist | server | "Select valid near-miss cause options." | FEAT-SAF-NM-001 |
 
 ---
 
 ## 4. SCM Validation
 
-SCM records live in `vims_safety_scm_meeting` with `meeting_type IN ('REGULAR','AD_HOC')`. Attendance joins to WRH via `wrh_ship_time_config` (D-GAP-M26).
+SCM records live in `vims_safety_scm_meeting` with `meeting_type IN ('REGULAR','AD_HOC')`. Meeting creation is WRH-gated: ship-time configuration must exist and all roster crew WRH data must be available and compliant before hosting (D-MAINT-CR014). Created-meeting attendance still joins to WRH via `wrh_ship_time_config` (D-GAP-M26).
 
 Active SCM state display:
 - `DRAFT` displays as `Draft`.
@@ -233,13 +267,14 @@ Active SCM state display:
 | V-SCM-007 | Office Comment save attempted with blank comment | client + server | "Office Comment is required before closing the SCM meeting." | D-RBAC-06 |
 | V-SCM-008 | Vessel-side edit attempted after `office_comment_at` is set or state is `CLOSED` | server | "SCM meeting is closed after Office Comment. Editing is stopped." | D-GAP-M22 |
 | V-SCM-009 | Submit to Office clicked but meeting remains `DRAFT` after save | client + server | "SCM meeting must be submitted to office." | D-RBAC-06 revised 2026-06-09 |
+| V-SCM-014 | SCM Regular or Ad-Hoc creation attempted while ship-time config is missing, roster WRH data is unavailable, WRH lookup fails, or any roster crew is non-compliant | client + server | "SCM meeting cannot be hosted until all WRH warnings are cleared." | D-MAINT-CR014, D-GAP-M26 |
 
 ### 4.2 Attendance (WRH Join)
 
 | Rule ID | Trigger condition | Enforcement point | Error message | Decision ref |
 |---------|-------------------|-------------------|---------------|--------------|
-| V-SCM-010 | Attendee row WRH rest-hour non-compliant in trailing 24h window | server (warn, never block) | "Warning: attendee '{name}' had WRH non-compliance in the trailing 24h. Meeting may proceed and office may close (D-GAP-M11)." | D-GAP-M11 |
-| V-SCM-011 | WRH data unavailable for attendee at meeting timestamp | server (warn) | "Warning: WRH data unavailable for '{name}'. Row flagged; submission proceeds (D-GAP-M11)." | D-GAP-M11 |
+| V-SCM-010 | Attendee row WRH rest-hour non-compliant in trailing 24h window | server (blocks create; warning-only after meeting exists) | "SCM meeting cannot be hosted until all WRH warnings are cleared." at create; after creation: "Warning: attendee '{name}' had WRH non-compliance in the trailing 24h." | D-MAINT-CR014, D-GAP-M11 |
+| V-SCM-011 | WRH data unavailable for attendee at meeting timestamp | server (blocks create; warning-only after meeting exists) | "SCM meeting cannot be hosted until all WRH warnings are cleared." at create; after creation: "Warning: WRH data unavailable for '{name}'." | D-MAINT-CR014, D-GAP-M11 |
 | V-SCM-012 | Timestamp resolution for attendee attempts direct local-time input | server (reject) | "Attendance timestamps are stored UTC and resolved via `wrh_ship_time_config` (D-GAP-M26)." | D-GAP-M26 |
 | V-SCM-013 | Dateline event (vessel crosses IDL during meeting) without Master override in `wrh_ship_time_config` | server | "Dateline event requires Master-set time configuration in `wrh_ship_time_config` (D-GAP-M26)." | D-GAP-M26 |
 
@@ -339,7 +374,7 @@ Safety lives in `ksm_marine_live` alongside Reporting, WRH, CMS, Purchase. Cross
 
 ### 6.2 WRH Attendance (SCM)
 
-See §4.2 above. Warn-don't-block per D-GAP-M11; timezone via `wrh_ship_time_config` per D-GAP-M26.
+See §4.2 above. SCM creation is blocked by WRH host readiness per D-MAINT-CR014; after a meeting exists, attendance warnings remain warning-only per D-GAP-M11. Timezone via `wrh_ship_time_config` per D-GAP-M26.
 
 ### 6.3 Purchase Requisition (Corrective Action)
 

@@ -2,17 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from collections import defaultdict
+import json
 import os
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import quote
 
-from django.db import connections
+from django.db import DatabaseError, connections
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.safety.models import (
     CorrectiveAction,
+    IncidentCauseTag,
+    ExternalPartyInjury,
     Incident,
+    IncidentLossEvaluation,
+    IncidentWeatherOption,
     IncidentPhaseLog,
     MasterLossType,
     MasterMscatTaxonomy,
@@ -33,14 +40,17 @@ from apps.safety.services.closed_since_last_scm import ClosedSinceLastSCMService
 from apps.safety.services.field_history_recorder import parse_history_value, resolve_actor_id, resolve_actor_role
 from apps.safety.services.fleet_alert_issuer import FleetAlertIssuer
 from apps.safety.services.mscmepc3_position_fetcher import Mscmepc3PositionFetcher
+from apps.safety.services.incident_weather_schema_guard import WEATHER_OPTION_SEEDS
 from apps.safety.services.pdf_post_process import PdfPostProcessor
 from apps.safety.services.pdf_templates.incident_10_section import (
     IncidentPdfContext,
+    IncidentPdfDetailBlock,
     IncidentPdfSignatureRow,
     IncidentTenSectionTemplate,
 )
 from apps.safety.services.pdf_templates.msc_mepc3_circ4 import MscMepc3Circ4PdfContext, MscMepc3Circ4Template
 from apps.safety.services.pdf_templates.near_miss_lightweight import (
+    NearMissCauseFactorPdfRow,
     NearMissLightweightPdfContext,
     NearMissLightweightTemplate,
     NearMissPdfSignatureRow,
@@ -77,6 +87,21 @@ class IncidentPdfRenderResult:
     section_titles: list[str]
 
 
+INCIDENT_PDF_SECTION_LABELS = {
+    "summary": "Summary",
+    "reporter_details": "Reporter Details",
+    "injury_details": "Injury Details",
+    "estimated_cost": "Estimated Cost",
+    "root_cause": "Root Cause",
+    "evidence_documents": "Evidence (Documents)",
+    "corrective_preventive_actions": "Corrective / Preventive Actions",
+    "lessons_learned": "Lessons Learned",
+    "signature": "Signature",
+}
+DEFAULT_INCIDENT_PDF_SECTION_KEYS = tuple(INCIDENT_PDF_SECTION_LABELS)
+ATTACHMENT_FILE_SUFFIXES = {".csv", ".doc", ".docx", ".gif", ".jpeg", ".jpg", ".pdf", ".png", ".txt", ".xls", ".xlsx"}
+
+
 class IncidentPdfRenderer:
     content_type = "application/pdf"
 
@@ -100,11 +125,13 @@ class IncidentPdfRenderer:
         incident_id,
         viewer_user,
         persist: bool = True,
+        included_sections: Iterable[str] | None = None,
     ) -> IncidentPdfRenderResult:
         incident = self._get_incident(incident_id)
         self._validate_exportable(incident)
+        section_keys = self.normalize_section_keys(included_sections)
 
-        context = self._build_context(incident)
+        context = self._build_context(incident, viewer_user=viewer_user, included_sections=section_keys)
         raw_content = self.template.render(context)
         final_content = self.post_processor.add_page_numbering_and_confidentiality(
             raw_content,
@@ -124,15 +151,34 @@ class IncidentPdfRenderer:
             export_path=export_path,
             file_name=self._build_file_name(incident),
             incident_id=incident.pk,
-            section_titles=list(self.template.SECTION_TITLES),
+            section_titles=[INCIDENT_PDF_SECTION_LABELS[key] for key in section_keys],
         )
+
+    @staticmethod
+    def normalize_section_keys(section_keys: Iterable[str] | None) -> tuple[str, ...]:
+        if section_keys is None:
+            return DEFAULT_INCIDENT_PDF_SECTION_KEYS
+        normalized = tuple(dict.fromkeys(str(key).strip() for key in section_keys if str(key).strip()))
+        if not normalized:
+            return DEFAULT_INCIDENT_PDF_SECTION_KEYS
+        invalid = [key for key in normalized if key not in INCIDENT_PDF_SECTION_LABELS]
+        if invalid:
+            raise ValidationError(f"Unknown incident PDF section(s): {', '.join(invalid)}.")
+        return normalized
 
     def _get_incident(self, incident_id: int) -> Incident:
         return (
-            self.model_class.objects.select_related("phase5_assessment")
+            self.model_class.objects.select_related(
+                "phase5_assessment",
+                "blame_override",
+                "external_party_injury",
+                "loss_evaluation",
+            )
             .prefetch_related(
+                "bias_guard_responses",
                 "chain_of_custody_rows",
-                "cause_tags",
+                "cause_tags__source_fact",
+                "evidence_deadline_tasks",
                 "evidence_items",
                 "evidence_tabs",
                 "facts",
@@ -152,13 +198,15 @@ class IncidentPdfRenderer:
         if incident.current_phase < 7 and incident.state not in {"APPROVED", "CLOSED"}:
             raise ValidationError("Formal incident PDF export is available after Phase 7 acceptance.")
 
-    def _build_context(self, incident: Incident) -> IncidentPdfContext:
+    def _build_context(self, incident: Incident, *, viewer_user=None, included_sections: Iterable[str] | None = None) -> IncidentPdfContext:
         assessment = getattr(incident, "phase5_assessment", None)
         recommendations = list(incident.recommendations.filter(is_deleted=False).order_by("id"))
+        vessel_display = resolve_vessel_display(incident.vessel_id, user=viewer_user)
+        vessel_name = vessel_display["vessel_display_name"] or str(incident.vessel_id)
         return IncidentPdfContext(
             incident_id=incident.pk,
             incident_number=incident.incident_number,
-            vessel_id=str(incident.vessel_id),
+            vessel_id=vessel_name,
             current_phase=incident.current_phase,
             risk_band=incident.risk_band,
             imo_classifier=incident.imo_classifier,
@@ -176,21 +224,546 @@ class IncidentPdfRenderer:
             notification_rows=self._build_notification_rows(incident),
             signature_rows=self._build_signature_rows(incident),
             appendix_rows=self._build_appendix_rows(incident),
+            report_title=self._build_report_title(incident),
             section_titles=list(self.template.SECTION_TITLES),
+            classification_rows=self._build_classification_rows(incident, vessel_name=vessel_name),
+            summary_blocks=self._build_summary_blocks(incident),
+            investigator_blocks=self._build_investigator_blocks(incident),
+            reporter_blocks=self._build_reporter_blocks(incident),
+            injury_detail_blocks=self._build_injury_detail_blocks(incident),
+            estimated_cost_blocks=self._build_estimated_cost_blocks(incident),
+            evidence_blocks=self._build_evidence_blocks(incident),
+            cause_blocks=self._build_cause_blocks(incident, assessment=assessment),
+            factor_blocks=self._build_factor_blocks(incident, assessment=assessment),
+            action_blocks=self._build_action_blocks_detail(recommendations),
+            lesson_blocks=self._build_lesson_blocks(recommendations),
+            closure_blocks=self._build_closure_blocks(incident),
+            notification_blocks=[],
+            appendix_blocks=[],
+            included_section_keys=list(self.normalize_section_keys(included_sections)),
         )
+
+    def _build_summary_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        weather_block = self._build_weather_condition_block(incident)
+        return [weather_block] if weather_block.rows else []
+
+    @staticmethod
+    def _external_party_injury_record(incident: Incident) -> ExternalPartyInjury | None:
+        try:
+            return incident.external_party_injury
+        except ExternalPartyInjury.DoesNotExist:
+            return None
+        except AttributeError:
+            return None
+
+    @staticmethod
+    def _loss_evaluation_record(incident: Incident) -> IncidentLossEvaluation | None:
+        try:
+            return incident.loss_evaluation
+        except IncidentLossEvaluation.DoesNotExist:
+            return None
+        except AttributeError:
+            return None
+
+    @classmethod
+    def _build_report_title(cls, incident: Incident) -> str:
+        return "Injury Report" if cls._external_party_injury_record(incident) else "Incident Report"
+
+    def _build_classification_rows(self, incident: Incident, *, vessel_name: str) -> list[tuple[str, str]]:
+        loss_values = [
+            self._loss_type_name(incident.loss_type_primary_id),
+            self._loss_type_name(incident.loss_type_secondary_id),
+            self._loss_type_name(incident.loss_type_tertiary_id),
+        ]
+        selected_loss_values = [value for value in loss_values if value != "Not recorded"]
+        if incident.loss_type_other:
+            selected_loss_values.append(f"Other - {incident.loss_type_other}")
+        return [
+            ("Incident number", self._display(incident.incident_number)),
+            ("Vessel", self._display(vessel_name)),
+            ("Status", self._display(incident.state)),
+            ("Risk band", self._display(incident.risk_band)),
+            ("Incident type", self._incident_type_name(incident.incident_type_id)),
+            ("Type of loss", ", ".join(selected_loss_values) if selected_loss_values else "Not recorded"),
+            ("Occurred at", self._format_pdf_datetime(incident.occurred_at) or "Not recorded"),
+            ("Reported at", self._format_pdf_datetime(incident.reported_at) or "Not recorded"),
+            ("Latitude", self._display(incident.latitude)),
+            ("Longitude", self._display(incident.longitude)),
+            ("Shore assistance required", self._yes_no(incident.shore_assistance_required)),
+            ("Vessel location", self._display(incident.vessel_location)),
+            ("Onboard location", self._display(incident.onboard_location)),
+            ("Last port", self._display(incident.last_port)),
+            ("Departure date", self._display(incident.departure_date)),
+            ("Vessel condition", self._choice_label(incident.vessel_condition)),
+            ("Office informed?", self._yes_no(incident.office_notified)),
+            ("Communication mode", self._choice_label(incident.office_notification_mode)),
+            ("Generated at", self._format_pdf_datetime(timezone.now()) or ""),
+        ]
+
+    def _build_closure_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        blocks = []
+        office_block = self._detail_block(
+            "Office Review",
+            [
+                ("Office comments", self._display(incident.office_comment)),
+            ],
+        )
+        if office_block.rows:
+            blocks.append(office_block)
+
+        closure_block = self._detail_block(
+            "Closure reason",
+            [
+                ("Reason", self._display(incident.closure_reason)),
+            ],
+        )
+        if closure_block.rows:
+            blocks.append(closure_block)
+        return blocks
+
+    def _build_investigator_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        blocks: list[IncidentPdfDetailBlock] = []
+        blocks.extend(self._build_reporter_blocks(incident))
+        blocks.extend(self._build_injury_detail_blocks(incident))
+        blocks.extend(self._build_estimated_cost_blocks(incident))
+
+        office_block = self._detail_block(
+                "Office acceptance and closure",
+                [
+                    ("PIC / DPA accepted by", self._display(incident.dpa_accepted_by)),
+                    ("PIC / DPA accepted at", self._format_pdf_datetime(incident.dpa_accepted_at) or "Not recorded"),
+                ],
+            )
+        if office_block.rows:
+            blocks.append(office_block)
+
+        weather_block = self._build_weather_condition_block(incident)
+        if weather_block.rows:
+            blocks.append(weather_block)
+        return blocks
+
+    def _build_reporter_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        block = self._detail_block(
+            "Reporter details",
+            [
+                ("Reporter name", self._display(incident.reporter_name)),
+                ("Reporter rank", self._display(incident.reporter_rank)),
+                ("Reporter department", self._display(incident.reporter_department)),
+                ("Reporter email", self._display(incident.reporter_email)),
+            ],
+        )
+        return [block] if block.rows else []
+
+    def _build_injury_detail_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        return [
+            block
+            for block in self._build_injury_blocks(incident)
+            if block.heading != "Estimated injury costs"
+        ]
+
+    def _build_estimated_cost_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        loss_evaluation_blocks = self._build_loss_evaluation_blocks(incident)
+        if loss_evaluation_blocks:
+            return loss_evaluation_blocks
+        return [
+            block
+            for block in self._build_injury_blocks(incident)
+            if block.heading == "Estimated injury costs"
+        ]
+
+    def _build_injury_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        injury = self._external_party_injury_record(incident)
+        if injury is None:
+            return []
+
+        blocks: list[IncidentPdfDetailBlock] = []
+        for block in [
+            self._detail_block(
+                "Injury details",
+                [
+                    ("Injured person type", self._choice_label(injury.injured_person_type)),
+                    ("Party name", self._display(injury.party_name)),
+                    ("Party type", self._choice_label(injury.party_type)),
+                    ("Company name", self._display(injury.company_name)),
+                    ("Severity", self._display(injury.severity)),
+                    ("Crew rank", self._display(injury.crew_rank)),
+                    ("Crew age", self._display(injury.crew_age)),
+                    ("Type of activity", self._display(injury.crew_activity_type)),
+                    (
+                        "Shore assistance required",
+                        self._yes_no(
+                            incident.shore_assistance_required
+                            if incident.shore_assistance_required is not None
+                            else injury.shore_assistance_required
+                        ),
+                    ),
+                    ("Vessel location", self._display(incident.vessel_location or injury.vessel_location)),
+                    ("Onboard location", self._display(incident.onboard_location or injury.onboard_location)),
+                    ("Last port", self._display(incident.last_port or injury.last_port)),
+                    ("Departure date", self._display(incident.departure_date or injury.departure_date)),
+                    ("Vessel condition", self._choice_label(incident.vessel_condition or injury.vessel_condition)),
+                    ("What happened", self._display(injury.what_happened_narrative)),
+                    ("Nature of injury", self._display(injury.nature_of_injury)),
+                    ("Source of injury", self._display(injury.source_of_injury)),
+                    ("Affected body areas", self._display(injury.affected_body_areas)),
+                    ("First aid details", self._display(injury.first_aid_details)),
+                    ("Notes", self._display(injury.notes)),
+                ],
+            ),
+            self._detail_block(
+                "Injury investigation",
+                [
+                    ("Why it happened", self._display(injury.why_it_happened_analysis)),
+                    ("Regulation or procedure breach", self._display(injury.regulation_or_procedure_breach)),
+                    ("Risk assessment carried out", self._choice_label(injury.risk_assessment_carried_out)),
+                    ("Toolbox meeting carried out", self._choice_label(injury.toolbox_meeting_carried_out)),
+                    ("Prevention action taken / required", self._display(injury.prevention_action_taken_required)),
+                ],
+            ),
+            self._detail_block(
+                "OCIMF injury reporting",
+                [
+                    ("Fatality", self._yes_no(injury.ocimf_fatality)),
+                    ("Permanent total disability", self._yes_no(injury.ocimf_permanent_total_disability)),
+                    ("Permanent partial disability", self._yes_no(injury.ocimf_permanent_partial_disability)),
+                    ("Lost workday case", self._yes_no(injury.ocimf_lost_workday_case)),
+                    ("Restricted workday case", self._yes_no(injury.ocimf_restricted_workday_case)),
+                    ("Medical treatment case", self._yes_no(injury.ocimf_medical_treatment_case)),
+                    ("First aid case", self._yes_no(injury.ocimf_first_aid_case)),
+                ],
+            ),
+            self._detail_block(
+                "Estimated injury costs",
+                [
+                    ("Medicines onboard", self._display(injury.cost_medicines_onboard)),
+                    ("Doctor visits", self._display(injury.cost_doctor_visits)),
+                    ("Repatriation", self._display(injury.cost_repatriation)),
+                    ("Evacuation", self._display(injury.cost_evacuation)),
+                    ("Off hire", self._display(injury.cost_off_hire)),
+                    ("Vessel delays", self._display(injury.cost_vessel_delays)),
+                    ("Man hours lost", self._display(injury.cost_man_hours_lost)),
+                    ("Deviation", self._display(injury.cost_deviation)),
+                    ("Miscellaneous", self._display(injury.cost_miscellaneous)),
+                    ("Miscellaneous reason", self._display(injury.miscellaneous_expenses_reason)),
+                    ("Total estimated cost", self._display(injury.total_estimated_cost)),
+                ],
+            ),
+        ]:
+            if block.rows:
+                blocks.append(block)
+        return blocks
+
+    def _build_loss_evaluation_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        loss = self._loss_evaluation_record(incident)
+        if loss is None:
+            return []
+
+        is_injury_report = self._external_party_injury_record(incident) is not None
+        blocks = [
+            self._detail_block(
+                "Loss Evaluation - Risk Assessment",
+                [
+                    ("Consequence", self._choice_label(loss.consequence)),
+                    ("Likelihood", self._choice_label(loss.likelihood)),
+                    ("Risk level", self._choice_label(loss.risk_level)),
+                ],
+            ),
+            self._detail_block(
+                "Loss Evaluation - Other Details",
+                [
+                    ("Name of master", self._display(loss.name_of_master)),
+                    ("Name of Chief Engineer", self._display(loss.name_of_chief_engineer)),
+                    *(
+                        [
+                            (
+                                "Code of Safe Working Practices",
+                                self._display(loss.safe_working_practice),
+                            ),
+                            ("Man hours worked", self._display(loss.man_hours_worked)),
+                            ("Hours worked on the previous day", self._display(loss.hours_worked_previous_day)),
+                            ("Hours of rest in the last 96 hours", self._display(loss.hours_rest_last_96_hours)),
+                        ]
+                        if is_injury_report
+                        else [
+                            ("Type of Repairs", self._choice_label(loss.repair_type)),
+                            (
+                                "Details of temporary / permanent repairs done / required",
+                                self._display(loss.repair_details),
+                            ),
+                            (
+                                "Details of last overhaul / maintenance / survey of equipment",
+                                self._display(loss.last_overhaul_maintenance_survey_details),
+                            ),
+                        ]
+                    ),
+                ],
+            ),
+            self._detail_block(
+                "Loss Evaluation - Cost Evaluation",
+                [
+                    ("Delays to Vessel (if any)", self._display(loss.delay_to_vessel)),
+                    *(
+                        [
+                            ("Man hours lost", self._display(loss.injury_man_hours_lost)),
+                            ("Reasons", self._display(loss.injury_reasons)),
+                            ("Off Hire", self._yes_no(loss.off_hire)),
+                            ("Repatriation", self._yes_no(loss.repatriation)),
+                            ("Hospitalization", self._yes_no(loss.hospitalization)),
+                            ("Deviation", self._yes_no(loss.deviation)),
+                            ("Evacuation", self._yes_no(loss.evacuation)),
+                        ]
+                        if is_injury_report
+                        else [
+                            ("Reasons for delay", self._display(loss.delay_reason)),
+                            ("Man hours lost in repairs", self._display(loss.repair_man_hours_lost)),
+                            ("Materials used for repairs onboard", self._display(loss.materials_used_repairs_onboard)),
+                            ("Specify Details", self._display(loss.materials_specify_details)),
+                            ("Reasons", self._display(loss.materials_reason)),
+                            ("Deviation", self._yes_no(loss.deviation)),
+                            ("Off Hire", self._yes_no(loss.off_hire)),
+                        ]
+                    ),
+                ],
+            ),
+            self._detail_block(
+                "Loss Evaluation - Estimated Costs",
+                (
+                    [
+                        ("Cost for Medicines Given Onboard", self._display(loss.cost_medicines_onboard)),
+                        ("Cost for Visits to Doctors", self._display(loss.cost_doctor_visits)),
+                        ("Cost for Repatriation", self._display(loss.cost_repatriation)),
+                        ("Cost for Evacuation", self._display(loss.cost_evacuation)),
+                        ("Cost for Delays to Vessel if any", self._display(loss.cost_injury_delay)),
+                        ("Cost for Man Hours Lost", self._display(loss.cost_injury_man_hours)),
+                        ("Cost for Deviation", self._display(loss.cost_injury_deviation)),
+                        ("Cost for Miscellaneous Expenses", self._display(loss.cost_injury_miscellaneous)),
+                        ("Total Estimated cost", self._display(loss.injury_total_estimated_cost)),
+                        (
+                            "Reasons for Miscellaneous Expenses",
+                            self._display(loss.injury_miscellaneous_expenses_reason),
+                        ),
+                    ]
+                    if is_injury_report
+                    else [
+                        ("Estimated Cost for Off Hire", self._display(loss.estimated_cost_off_hire)),
+                        ("Estimated Cost for Delays to Vessel if any", self._display(loss.estimated_cost_delay)),
+                        ("Estimated Cost for Man Hour Lost", self._display(loss.estimated_cost_man_hours)),
+                        ("Estimated Cost for Deviation", self._display(loss.estimated_cost_deviation)),
+                        ("Estimated Cost for Materials used in Repairs", self._display(loss.estimated_cost_materials)),
+                        ("Estimated Cost for Miscellaneous Expenses", self._display(loss.estimated_cost_miscellaneous)),
+                        ("Total Estimated cost", self._display(loss.total_estimated_cost)),
+                        ("Reasons for Miscellaneous Expenses", self._display(loss.miscellaneous_expenses_reason)),
+                    ]
+                ),
+            ),
+        ]
+        return [block for block in blocks if block.rows]
+
+    def _build_weather_condition_block(self, incident: Incident) -> IncidentPdfDetailBlock:
+        return self._detail_block(
+            "Weather Condition",
+            [
+                ("Visibility", self._weather_option_label(incident.weather_visibility_id)),
+                ("Precipitation", self._weather_option_label(incident.weather_precipitation_id)),
+                ("Sea State", self._weather_option_label(incident.weather_sea_state_id)),
+                ("Wind Scale", self._weather_option_label(incident.weather_wind_scale_id)),
+                ("Wind Direction", self._weather_option_label(incident.weather_wind_direction_id)),
+                ("Source of Lighting", self._weather_option_label(incident.weather_lighting_source_id)),
+                ("Current Direction", self._weather_option_label(incident.weather_current_direction_id)),
+                ("Current Strength (knots)", self._display(incident.weather_current_strength_knots)),
+                ("Ambient Temperature (Deg C)", self._display(incident.weather_ambient_temperature_c)),
+                ("Ice condition on-board", self._weather_option_label(incident.weather_ice_condition_onboard_id)),
+                ("Ice condition at sea", self._weather_option_label(incident.weather_ice_condition_at_sea_id)),
+                ("Light condition", self._weather_option_label(incident.weather_light_condition_id)),
+            ],
+        )
+
+    def _build_evidence_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        blocks = self._build_evidence_document_blocks(incident)
+        blocks.extend(self._build_witness_note_blocks(incident))
+        return blocks
+
+    def _build_witness_note_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        rows: list[tuple[str, str]] = []
+        interviews = list(incident.witness_interviews.all().order_by("created_date", "id"))
+        multiple_notes = len(interviews) > 1
+        for index, interview in enumerate(interviews, start=1):
+            witness_name_label = f"Witness {index} name" if multiple_notes else "Witness name"
+            witness_statement_label = f"What witness {index} said" if multiple_notes else "What the witness said"
+            remark_label = f"Remark {index}" if multiple_notes else "Remark"
+            rows.extend(
+                [
+                    (witness_name_label, self._display(interview.witness_name)),
+                    (witness_statement_label, self._display(interview.meeting_notes)),
+                    (remark_label, self._display(interview.conclusion_notes)),
+                ]
+            )
+
+        block = self._detail_block("Witness Statement", rows)
+        return [block] if block.rows else []
+
+    def _build_evidence_document_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        blocks: list[IncidentPdfDetailBlock] = []
+        for item in incident.evidence_items.all().order_by("created_date", "id"):
+            attachment_links = self._attachment_links_for_item(incident, item)
+            title = self._clean_text(item.title)
+            description = self._clean_text(item.description)
+            if attachment_links:
+                meaningful_title = self._meaningful_evidence_title(title, attachment_links)
+                rows: list[tuple[str, str]] = []
+                if description:
+                    rows.append(("Description", description))
+                rows.append(("File", attachment_links))
+                block = self._detail_block(meaningful_title or "Evidence document", rows)
+                if block.rows:
+                    blocks.append(block)
+                continue
+
+        return blocks
+
+    def _build_cause_blocks(self, incident: Incident, *, assessment) -> list[IncidentPdfDetailBlock]:
+        grouped_causes = defaultdict(list)
+        layer_order = {
+            IncidentCauseTag.CausalLayer.IMMEDIATE: 0,
+            IncidentCauseTag.CausalLayer.ROOT: 1,
+        }
+        for cause in incident.cause_tags.all().order_by("causal_layer", "id"):
+            grouped_causes[self._current_causal_layer_key(cause.causal_layer)].append(cause)
+
+        blocks: list[IncidentPdfDetailBlock] = []
+        for layer_key in sorted(grouped_causes, key=lambda key: layer_order.get(key, 99)):
+            causes = grouped_causes[layer_key]
+            rows: list[tuple[str, str]] = []
+            for index, cause in enumerate(causes, start=1):
+                cause_lines = [
+                    f"Cause factor: {self._cause_factor_label(cause.cause_factor)}",
+                    f"Cause: {self._display(cause.cause_option_text)}",
+                    f"Reason: {self._display(cause.rationale)}",
+                ]
+                rows.append((f"Cause {index}", "\n".join(cause_lines)))
+            block = self._detail_block(self._causal_layer_heading(layer_key), rows)
+            if block.rows:
+                blocks.append(block)
+        return blocks
+
+    def _build_factor_blocks(self, incident: Incident, *, assessment) -> list[IncidentPdfDetailBlock]:
+        blocks: list[IncidentPdfDetailBlock] = []
+        for safeguard in incident.safeguard_failures.all().order_by("safeguard_name", "id"):
+            block = self._detail_block(
+                    f"Safeguard failure - {safeguard.safeguard_name}",
+                    [
+                        ("Safeguard", self._display(safeguard.safeguard_name)),
+                        ("Notes", self._display(safeguard.notes)),
+                    ],
+                )
+            if block.rows:
+                blocks.append(block)
+        return blocks
+
+    def _build_action_blocks_detail(self, recommendations: Iterable[Recommendation]) -> list[IncidentPdfDetailBlock]:
+        blocks: list[IncidentPdfDetailBlock] = []
+        for recommendation in recommendations:
+            for action in recommendation.corrective_actions.all():
+                block = self._detail_block(
+                        "Corrective action",
+                        [
+                            ("Description", self._display(action.description)),
+                            ("Due date", self._display(action.due_date)),
+                            ("Status", self._display(action.status)),
+                            ("Physical verification note", self._display(action.physical_verification_note)),
+                            ("Closed at", self._format_pdf_datetime(action.closed_at) or "Not closed"),
+                        ],
+                    )
+                if block.rows:
+                    blocks.append(block)
+            for verification in recommendation.verifications.all():
+                block = self._detail_block(
+                        "Verification",
+                        [
+                            ("Effective", self._yes_no(verification.is_effective)),
+                            ("Residual risk", self._display(verification.residual_risk)),
+                            ("Verified at", self._format_pdf_datetime(verification.verified_at) or "Not recorded"),
+                            ("Notes", self._display(verification.notes)),
+                        ],
+                    )
+                if block.rows:
+                    blocks.append(block)
+        return blocks
+
+    def _build_lesson_blocks(self, recommendations: Iterable[Recommendation]) -> list[IncidentPdfDetailBlock]:
+        return [
+            self._detail_block(
+                "Lessons learnt",
+                [
+                    ("Description", self._display(recommendation.description)),
+                    ("Residual risk", self._display(recommendation.residual_risk_statement)),
+                ],
+            )
+            for recommendation in recommendations
+            if recommendation.tier == Recommendation.Tier.LESSONS_LEARNT
+        ]
+
+    def _build_notification_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        blocks: list[IncidentPdfDetailBlock] = []
+        office_block = self._detail_block(
+            "Office communication",
+            [
+                ("Office informed?", self._yes_no(incident.office_notified)),
+                ("Communication mode", self._choice_label(incident.office_notification_mode)),
+            ],
+        )
+        if office_block.rows:
+            blocks.append(office_block)
+
+        history_rows = SafetyFieldHistory.objects.filter(
+            parent_table=incident._meta.db_table,
+            parent_id=incident.pk,
+            field_name__in=[
+                "incident_circular_publish",
+                "fleet_alert_issue",
+                "fleet_alert_notification",
+                "phase8_notification",
+            ],
+        ).order_by("changed_at", "id")
+        for row in history_rows:
+            block = self._detail_block(
+                    "Fleet alert / office notice",
+                    [
+                        ("Changed at", self._format_pdf_datetime(row.changed_at) or "Not recorded"),
+                        ("Details", self._history_text(row.new_value)),
+                        ("Reason", self._display(row.change_reason)),
+                    ],
+                )
+            if block.rows:
+                blocks.append(block)
+        return blocks
+
+    def _build_appendix_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
+        blocks: list[IncidentPdfDetailBlock] = []
+        for evidence_item in incident.evidence_items.all().order_by("created_date", "id"):
+            attachment_links = self._attachment_links_for_item(incident, evidence_item)
+            if not attachment_links:
+                continue
+            block = self._detail_block(
+                    f"Attachment - {evidence_item.title}",
+                    [
+                        ("Evidence title", self._display(evidence_item.title)),
+                        ("File", attachment_links),
+                    ],
+                )
+            if block.rows:
+                blocks.append(block)
+        return blocks
 
     def _build_investigator_rows(self, incident: Incident) -> list[tuple[str, str]]:
         phase_log_roles = {(row.actor_role_code or "").upper(): row for row in incident.phase_logs.all()}
         rows = [
             ("Reporter", self._nonblank(incident.reporter_name, incident.reporter_id, default="Not recorded")),
-            ("Prepared by", self._nonblank(incident.created_by, default="Not recorded")),
             ("PIC", self._nonblank(incident.pic_user_id, default="Not assigned")),
             ("Master chain evidence", "Present" if "MASTER" in phase_log_roles else "Awaiting phase-log evidence"),
             ("HOD chain evidence", "Present" if "HOD" in phase_log_roles else "Awaiting phase-log evidence"),
-            ("DPA closer", self._nonblank(incident.dpa_accepted_by, default="Awaiting closer signature")),
+            ("Office closer", self._nonblank(incident.dpa_accepted_by, default="Awaiting PIC/DPA signature")),
         ]
-        if incident.risk_band == Incident.RiskBand.RED:
-            rows.append(("FM approver", self._nonblank(incident.fm_approved_by, default="Awaiting FM signature")))
         return rows
 
     def _build_evidence_rows(self, incident: Incident) -> list[tuple[str, str, str]]:
@@ -205,7 +778,7 @@ class IncidentPdfRenderer:
 
     def _build_cause_rows(self, incident: Incident) -> list[tuple[str, str, str]]:
         rows = [
-            (cause.causal_layer.title(), cause.mscat_subcode_id, cause.rationale)
+            (self._causal_layer_label(cause.causal_layer).replace(" Cause", ""), cause.mscat_subcode_id, cause.rationale)
             for cause in incident.cause_tags.all().order_by("id")
         ]
         return rows or [("Root", "Uncoded", "No causal-layer rows recorded.")]
@@ -252,7 +825,7 @@ class IncidentPdfRenderer:
             if row.tier == Recommendation.Tier.LESSONS_LEARNT and row.description.strip()
         ]
         if not lessons:
-            return "No lessons-learnt narrative has been recorded for this incident yet."
+            return ""
         return " ".join(lessons)
 
     def _build_notification_rows(self, incident: Incident) -> list[tuple[str, str, str]]:
@@ -284,13 +857,8 @@ class IncidentPdfRenderer:
             self._signature_row("Master signature", row=self._role_phase_log(incident, "MASTER")),
             self._signature_row("HOD signature", row=self._role_phase_log(incident, "HOD")),
         ]
-        if incident.risk_band == Incident.RiskBand.GREEN:
-            rows.append(self._signature_row("PIC closer signature", row=history_rows.get("phase7_signature_pic")))
-        elif incident.risk_band == Incident.RiskBand.YELLOW:
-            rows.append(self._signature_row("DPA signature", row=history_rows.get("phase7_signature_dpa")))
-        else:
-            rows.append(self._signature_row("DPA signature", row=history_rows.get("phase7_signature_dpa")))
-            rows.append(self._signature_row("FM signature", row=history_rows.get("phase7_signature_fm")))
+        office_signature = history_rows.get("phase7_signature_dpa") or history_rows.get("phase7_signature_pic")
+        rows.append(self._signature_row("PIC / DPA office signature", row=office_signature))
         return rows
 
     def _build_appendix_rows(self, incident: Incident) -> list[tuple[str, str, str]]:
@@ -300,15 +868,17 @@ class IncidentPdfRenderer:
         for interview in incident.witness_interviews.all():
             rows.append((interview.witness_name, "Witness interview", interview.interview_type))
         for action in CorrectiveAction.objects.filter(source_table="vims_safety_incident", source_id=incident.pk).order_by("id"):
-            rows.append((action.title, "Corrective action", action.status))
+            rows.append((action.description, "Corrective action", action.status))
         return rows or [("Appendices", "N/A", "No appendix artifacts recorded.")]
 
     def _reporter_signature_row(self, incident: Incident) -> IncidentPdfSignatureRow:
         return IncidentPdfSignatureRow(
             label="Reporter signature",
-            signed_by=self._nonblank(incident.reporter_id, incident.created_by, default="Awaiting signature"),
-            signed_at=self._format_pdf_datetime(incident.reported_at) or "Awaiting signature",
-            typed_name=self._nonblank(incident.reporter_name, incident.reporter_id, default="Awaiting signature"),
+            signed_by=self._nonblank(incident.reporter_id, incident.created_by, default=""),
+            signed_at=self._format_pdf_datetime(incident.reported_at) or "",
+            typed_name=self._nonblank(incident.reporter_name, incident.reporter_id, default=""),
+            source_detail="Reporter submission data",
+            device_fingerprint=self._display(incident.reporter_device_fingerprint),
         )
 
     def _persist_content(self, incident: Incident, content: bytes) -> str:
@@ -377,6 +947,341 @@ class IncidentPdfRenderer:
         return default
 
     @staticmethod
+    def _display(value, *, default: str = "Not recorded") -> str:
+        if value is None:
+            return default
+        if isinstance(value, str):
+            return value.strip() or default
+        if isinstance(value, datetime):
+            return IncidentPdfRenderer._format_pdf_datetime(value) or default
+        return str(value)
+
+    @staticmethod
+    def _yes_no(value) -> str:
+        if value is None:
+            return "Not recorded"
+        return "Yes" if bool(value) else "No"
+
+    def _position_text(self, incident: Incident) -> str:
+        if incident.latitude is None or incident.longitude is None:
+            return "Not recorded"
+        return f"{incident.latitude}, {incident.longitude}"
+
+    def _json_text(self, value) -> str:
+        return self._readable_payload_text(value)
+
+    def _history_text(self, value) -> str:
+        if value in (None, "", [], {}):
+            return "Not recorded"
+        parsed = parse_history_value(value)
+        return self._readable_payload_text(parsed) if isinstance(parsed, (dict, list)) else self._display(parsed)
+
+    @staticmethod
+    def _humanize_key(value: object) -> str:
+        return str(value or "Detail").replace("_", " ").replace("-", " ").strip().title()
+
+    def _choice_label(self, value) -> str:
+        text = self._display(value)
+        if text == "Not recorded":
+            return text
+        labels = {
+            "ON_CALL": "On call",
+            "WHATSAPP": "On WhatsApp",
+            "EMAIL": "On email",
+            "NOT_APPLICABLE": "Not applicable",
+        }
+        return labels.get(text, text.replace("_", " ").title())
+
+    def _readable_payload_text(self, value, *, depth: int = 0) -> str:
+        if value in (None, "", [], {}):
+            return "Not recorded"
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return "Not recorded"
+            try:
+                parsed = json.loads(stripped)
+            except (TypeError, ValueError):
+                return stripped
+            return self._readable_payload_text(parsed, depth=depth)
+        if isinstance(value, dict):
+            parts: list[str] = []
+            for key, nested_value in value.items():
+                if nested_value in (None, "", [], {}):
+                    continue
+                label = self._humanize_key(key)
+                rendered = self._readable_payload_text(nested_value, depth=depth + 1)
+                if rendered != "Not recorded":
+                    parts.append(f"{label}: {rendered}")
+            return "\n".join(parts) if parts else "Not recorded"
+        if isinstance(value, (list, tuple, set)):
+            rendered_items = [
+                self._readable_payload_text(item, depth=depth + 1)
+                for item in value
+                if item not in (None, "", [], {})
+            ]
+            rendered_items = [item for item in rendered_items if item != "Not recorded"]
+            if not rendered_items:
+                return "Not recorded"
+            if all("\n" not in item and len(item) < 80 for item in rendered_items):
+                return ", ".join(rendered_items)
+            return "\n".join(f"{index}. {item}" for index, item in enumerate(rendered_items, start=1))
+        if isinstance(value, bool):
+            return self._yes_no(value)
+        if isinstance(value, datetime):
+            return self._format_pdf_datetime(value) or "Not recorded"
+        return str(value)
+
+    def _extract_attachment_paths(self, value, *, key_hint: str = "") -> list[str]:
+        if isinstance(value, dict):
+            paths: list[str] = []
+            for key, nested_value in value.items():
+                paths.extend(self._extract_attachment_paths(nested_value, key_hint=str(key)))
+            return paths
+        if isinstance(value, list):
+            paths: list[str] = []
+            for nested_value in value:
+                paths.extend(self._extract_attachment_paths(nested_value, key_hint=key_hint))
+            return paths
+        if not isinstance(value, str):
+            return []
+
+        key = key_hint.lower()
+        if key and not any(token in key for token in ("attachment", "path", "file", "photo", "scan", "evidence")):
+            return []
+        candidate = value.strip()
+        if not candidate:
+            return []
+        suffix = Path(candidate).suffix.lower()
+        if suffix not in ATTACHMENT_FILE_SUFFIXES:
+            return []
+        return [candidate]
+
+    def _attachment_links_from_metadata(self, incident: Incident, metadata_value) -> str:
+        metadata = metadata_value if isinstance(metadata_value, dict) else {}
+        links: list[str] = []
+        seen_labels: set[str] = set()
+        seen_paths: set[str] = set()
+        for path in self._extract_attachment_paths(metadata):
+            path_text = str(path).strip()
+            path_key = path_text.replace("\\", "/").casefold()
+            if not path_key or path_key in seen_paths:
+                continue
+            label = self._attachment_label(metadata, path_text)
+            label_key = str(label).strip().casefold()
+            if label_key and label_key in seen_labels:
+                continue
+            seen_paths.add(path_key)
+            if label_key:
+                seen_labels.add(label_key)
+            href = f"/api/safety/incidents/{incident.id}/phase-4/evidence/attachments/?path={quote(path_text, safe='')}"
+            links.append(f"PDF_LINK::{href}::{label}")
+        return "\n".join(links)
+
+    def _attachment_links_for_item(self, incident: Incident, item) -> str:
+        return self._attachment_links_from_metadata(incident, item.metadata_json)
+
+    def _attachment_label(self, metadata: dict, path: str) -> str:
+        direct_label = str(metadata.get("original_name") or metadata.get("file_name") or "").strip()
+        if direct_label:
+            return direct_label
+        for attachment in metadata.get("attachments") or []:
+            if not isinstance(attachment, dict):
+                continue
+            attachment_path = str(attachment.get("attachment_path") or "").strip()
+            if attachment_path != str(path).strip():
+                continue
+            label = str(attachment.get("original_name") or attachment.get("file_name") or "").strip()
+            if label:
+                return label
+        return Path(str(path)).name
+
+    @staticmethod
+    def _clean_text(value) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    @classmethod
+    def _meaningful_evidence_title(cls, title: str, attachment_links: str) -> str:
+        title_text = cls._clean_text(title)
+        if not title_text:
+            return ""
+        title_name = Path(title_text).name.casefold()
+        for label in cls._attachment_link_labels(attachment_links):
+            if title_name == Path(label).name.casefold():
+                return ""
+        if cls._looks_like_generated_attachment_title(title_text):
+            return ""
+        return title_text
+
+    @staticmethod
+    def _attachment_link_labels(attachment_links: str) -> list[str]:
+        labels: list[str] = []
+        for line in str(attachment_links or "").splitlines():
+            if not line.startswith("PDF_LINK::"):
+                continue
+            parts = line.split("::", 2)
+            if len(parts) == 3 and parts[2].strip():
+                labels.append(parts[2].strip())
+        return labels
+
+    @staticmethod
+    def _looks_like_generated_attachment_title(value: str) -> bool:
+        file_name = Path(str(value or "").strip()).name
+        if not file_name or " " in file_name:
+            return False
+        suffix = Path(file_name).suffix.lower()
+        if suffix not in ATTACHMENT_FILE_SUFFIXES:
+            return False
+        stem = Path(file_name).stem
+        return len(stem) > 24 or any(character.isdigit() for character in stem)
+
+    @staticmethod
+    def _evidence_tab_label(value) -> str:
+        labels = {
+            "POSITION": "Position / scene",
+            "PEOPLE": "People / witness",
+            "PARTS": "Parts / equipment",
+            "PAPER": "Documents",
+            "ELECTRONIC": "Electronic records",
+        }
+        text = str(value or "").strip().upper()
+        return labels.get(text, text.replace("_", " ").title() or "Evidence")
+
+    @staticmethod
+    def _mscat_subcode_label(value) -> str:
+        if value in (None, ""):
+            return "Not recorded"
+        try:
+            row = MasterMscatTaxonomy.objects.filter(subcode_id=str(value)).first()
+        except DatabaseError:
+            return str(value)
+        if row is None:
+            return str(value)
+        return " - ".join(part for part in [row.category_name, row.subcode_description, row.subcode_id] if part)
+
+    @staticmethod
+    def _cause_factor_label(value) -> str:
+        labels = {
+            "HUMAN": "Human",
+            "VESSEL": "Vessel",
+            "MANAGEMENT": "Management",
+            "OTHER": "Other",
+        }
+        if value in (None, ""):
+            return "Not recorded"
+        return labels.get(str(value).strip().upper(), str(value).replace("_", " ").title())
+
+    @staticmethod
+    def _causal_layer_label(value) -> str:
+        labels = {
+            IncidentCauseTag.CausalLayer.IMMEDIATE: "Immediate Cause",
+            IncidentCauseTag.CausalLayer.ROOT: "Root Cause",
+        }
+        if value in (None, ""):
+            return "Not recorded"
+        return labels.get(IncidentPdfRenderer._current_causal_layer_key(value), "Root Cause")
+
+    @classmethod
+    def _causal_layer_heading(cls, value) -> str:
+        return cls._causal_layer_label(value)
+
+    @staticmethod
+    def _current_causal_layer_key(value) -> str:
+        text = str(value or "").strip().upper()
+        if text == IncidentCauseTag.CausalLayer.IMMEDIATE:
+            return IncidentCauseTag.CausalLayer.IMMEDIATE
+        return IncidentCauseTag.CausalLayer.ROOT
+
+    @staticmethod
+    def _incident_type_name(value) -> str:
+        if value in (None, ""):
+            return "Not recorded"
+        row = (
+            MasterSafetyIncidentType.objects.filter(legacy_int_id=value).first()
+            or MasterSafetyIncidentType.objects.filter(type_code=str(value)).first()
+        )
+        if row is None:
+            return str(value)
+        return row.type_name or str(value)
+
+    @staticmethod
+    def _loss_type_name(value) -> str:
+        if value in (None, ""):
+            return "Not recorded"
+        row = MasterLossType.objects.filter(loss_type_id=value).first()
+        if row is None:
+            return str(value)
+        return row.loss_type_name or str(value)
+
+    @staticmethod
+    def _weather_option_label(value) -> str:
+        if value in (None, ""):
+            return "Not recorded"
+        value_text = str(value)
+        try:
+            row = IncidentWeatherOption.objects.filter(pk=value).first()
+        except (DatabaseError, ValueError, TypeError):
+            row = None
+        if row is not None:
+            return row.option_label or value_text
+
+        fallback_prefix = "00000000-0000-4000-8000-"
+        if value_text.startswith(fallback_prefix):
+            try:
+                fallback_index = int(value_text.removeprefix(fallback_prefix), 16) - 1
+            except ValueError:
+                fallback_index = -1
+            if 0 <= fallback_index < len(WEATHER_OPTION_SEEDS):
+                return WEATHER_OPTION_SEEDS[fallback_index][1]
+        normalized_value_text = value_text.replace("-", "").lower()
+        fallback_prefix_char32 = "00000000000040008000"
+        if normalized_value_text.startswith(fallback_prefix_char32):
+            try:
+                fallback_index = int(normalized_value_text.removeprefix(fallback_prefix_char32), 16) - 1
+            except ValueError:
+                fallback_index = -1
+            if 0 <= fallback_index < len(WEATHER_OPTION_SEEDS):
+                return WEATHER_OPTION_SEEDS[fallback_index][1]
+        return value_text
+
+    @staticmethod
+    def _join_nonblank(*values: object) -> str:
+        parts = [str(value).strip() for value in values if value is not None and str(value).strip()]
+        return "\n".join(parts)
+
+    @staticmethod
+    def _detail_block(heading: str, rows: list[tuple[str, str]]) -> IncidentPdfDetailBlock:
+        skip_values = {
+            "",
+            "N/A",
+            "Not closed",
+            "Not recorded",
+            "No data recorded.",
+            "No evidence rows recorded.",
+            "No recommendation rows recorded.",
+            "Timeline/status not recorded.",
+        }
+
+        def _row_value(value) -> str:
+            if value is None:
+                return ""
+            value_text = str(value).strip()
+            return value_text
+
+        cleaned_rows = []
+        for label, value in rows:
+            value_text = _row_value(value)
+            if value_text in skip_values:
+                continue
+            cleaned_rows.append((str(label or "Field"), value_text))
+        return IncidentPdfDetailBlock(
+            heading=str(heading or "Detail"),
+            rows=cleaned_rows,
+        )
+
+    @staticmethod
     def _prefixed_point(prefix: str, value: str) -> str:
         return f"{prefix}: {value.strip() if isinstance(value, str) else value}"
 
@@ -406,6 +1311,8 @@ class IncidentPdfRenderer:
                 signed_at=self._format_pdf_datetime(row.occurred_at),
                 signed_by=row.actor_user_id,
                 typed_name=row.actor_user_id,
+                source_detail=f"Phase log; signature valid: {self._yes_no(row.signature_valid)}",
+                device_fingerprint=row.device_fingerprint,
             )
 
         payload = {}
@@ -415,9 +1322,11 @@ class IncidentPdfRenderer:
                 payload = parsed
         return IncidentPdfSignatureRow(
             label=label,
-            signed_at=str(payload.get("signed_at") or self._format_pdf_datetime(getattr(row, "changed_at", None)) or "Awaiting signature"),
-            signed_by=str(payload.get("signed_by") or getattr(row, "actor_user_id", "") or "Awaiting signature"),
-            typed_name=str(payload.get("typed_name") or payload.get("signed_by") or "Awaiting signature"),
+            signed_at=str(payload.get("signed_at") or self._format_pdf_datetime(getattr(row, "changed_at", None)) or ""),
+            signed_by=str(payload.get("signed_by") or getattr(row, "actor_user_id", "") or ""),
+            typed_name=str(payload.get("typed_name") or payload.get("signed_by") or ""),
+            source_detail=f"Field history: {getattr(row, 'field_name', 'signature')}",
+            device_fingerprint=str(payload.get("device_fingerprint") or "Not recorded"),
         )
 
 
@@ -519,26 +1428,24 @@ class NearMissLightweightPdfRenderer:
             categories=self._format_list(serialized.get("near_miss_category_tags"), near_miss.near_miss_shell_tag, default="Not selected"),
             near_miss_types=self._build_near_miss_type_text(near_miss, serialized=serialized),
             possible_loss_type=self._build_loss_type_text(near_miss),
-            immediate_causes=self._build_immediate_cause_text(near_miss, serialized=serialized),
+            cause_factor_rows=self._build_near_miss_cause_factor_rows(serialized),
             occurred_at=self._format_pdf_datetime(near_miss.occurred_at),
             reported_at=self._format_pdf_datetime(near_miss.reported_at),
-            reporter_name=self._nonblank(serialized.get("reporter_name"), default="Not recorded"),
-            reporter_rank=self._nonblank(serialized.get("reporter_rank"), default="Not recorded"),
-            what_happened=self._nonblank(serialized.get("narrative"), default="Narrative not recorded."),
+            reporter_name=self._nonblank(serialized.get("reporter_name"), default=""),
+            reporter_rank=self._nonblank(serialized.get("reporter_rank"), default=""),
+            what_happened=self._nonblank(serialized.get("narrative"), default=""),
             suggestion_text=self._build_suggestion_text(near_miss, suggestion),
             immediate_action_text=self._build_immediate_action_text(near_miss),
-            root_cause_detail=self._nonblank(near_miss.near_miss_root_cause_detail, default="Not recorded."),
-            corrective_action=self._nonblank(near_miss.near_miss_corrective_action, default="Not recorded."),
-            weather_voyage_details=self._nonblank(near_miss.near_miss_weather_voyage_details, default="Not recorded."),
-            equipment_details=self._nonblank(near_miss.near_miss_equipment_details, default="Not recorded."),
-            lessons_learned=self._nonblank(near_miss.near_miss_lessons_learned, default="Not recorded."),
+            root_cause_detail=self._nonblank(near_miss.near_miss_root_cause_detail, default=""),
+            corrective_action=self._nonblank(near_miss.near_miss_corrective_action, default=""),
+            weather_voyage_details=self._nonblank(near_miss.near_miss_weather_voyage_details, default=""),
+            equipment_details=self._nonblank(near_miss.near_miss_equipment_details, default=""),
+            lessons_learned=self._nonblank(near_miss.near_miss_lessons_learned, default=""),
+            vessel_review_comment=self._build_vessel_review_comment_text(near_miss, serialized=serialized),
             office_comments=self._build_office_comment_text(near_miss),
-            rework_summary=self._build_rework_summary_text(near_miss, serialized=serialized),
-            closure_reason=self._nonblank(near_miss.closure_reason, default="Closure reason is not recorded."),
-            fleet_alert_due_by=self._format_pdf_datetime(getattr(fleet_status, "due_by", None)),
+            closure_reason=self._nonblank(near_miss.closure_reason, default=""),
             fleet_alert_issued_at=self._format_pdf_datetime(getattr(fleet_status, "issued_at", None)),
-            fleet_alert_status=getattr(fleet_status, "sla_status", "Not required"),
-            fleet_learning_text=self._nonblank(fleet_learning, default="Fleet learning / lessons are not recorded."),
+            fleet_learning_text=self._nonblank(fleet_learning, default=""),
             generated_at=self._format_pdf_datetime(timezone.now()) or "",
             visibility_note=(
                 "Reporter details are visible to authorized users."
@@ -552,15 +1459,13 @@ class NearMissLightweightPdfRenderer:
     def _build_immediate_action_text(near_miss: Incident) -> str:
         if (near_miss.near_miss_immediate_action or "").strip():
             return near_miss.near_miss_immediate_action.strip()
-        if (near_miss.closure_reason or "").strip():
-            return near_miss.closure_reason.strip()
-        return "No immediate action is recorded."
+        return ""
 
     @staticmethod
     def _build_suggestion_text(near_miss: Incident, suggestion: dict[str, str]) -> str:
         if (near_miss.near_miss_suggestion or "").strip():
             return near_miss.near_miss_suggestion.strip()
-        return f"Priority suggestion {suggestion['priority']}: {suggestion['rationale']}"
+        return ""
 
     @staticmethod
     def _format_near_miss_place(value: str | None) -> str:
@@ -607,6 +1512,22 @@ class NearMissLightweightPdfRenderer:
         return row.loss_type_name if row is not None else f"Loss type {near_miss.loss_type_primary_id}"
 
     def _build_immediate_cause_text(self, near_miss: Incident, *, serialized: dict) -> str:
+        factor_causes = self._coerce_factor_causes(serialized.get("near_miss_factor_causes"))
+        if factor_causes:
+            lines: list[str] = []
+            factor_labels = {
+                "HUMAN": "Human Factors",
+                "VESSEL": "Vessel Factors",
+                "MANAGEMENT": "Management Factors",
+                "OTHER": "Other Factors",
+            }
+            for row in factor_causes:
+                factor = factor_labels.get(str(row.get("factor") or "").strip().upper(), "Factor")
+                immediate = self._factor_cause_label(row, "immediate")
+                root = self._factor_cause_label(row, "root")
+                lines.append(f"{factor}: Immediate - {immediate}; Root - {root}")
+            return "\n".join(lines)
+
         subcodes = self._coerce_text_list(serialized.get("near_miss_mscat_subcode_ids"))
         fallback = str(near_miss.near_miss_mscat_subcode_id or "").strip()
         if fallback and fallback not in subcodes:
@@ -626,6 +1547,59 @@ class NearMissLightweightPdfRenderer:
             label_by_subcode = {}
         return "; ".join(label_by_subcode.get(subcode, subcode) for subcode in subcodes)
 
+    def _build_near_miss_cause_factor_rows(self, serialized: dict) -> list[NearMissCauseFactorPdfRow]:
+        factor_causes = self._coerce_factor_causes(serialized.get("near_miss_factor_causes"))
+        if not factor_causes:
+            return []
+
+        factor_labels = {
+            "HUMAN": "Human Factors",
+            "VESSEL": "Vessel Factors",
+            "MANAGEMENT": "Management Factors",
+            "OTHER": "Other Factors",
+        }
+        order = ["HUMAN", "VESSEL", "MANAGEMENT", "OTHER"]
+        row_by_factor = {
+            str(row.get("factor") or "").strip().upper(): row
+            for row in factor_causes
+            if isinstance(row, dict)
+        }
+
+        rows: list[NearMissCauseFactorPdfRow] = []
+        for factor in order:
+            row = row_by_factor.get(factor)
+            if not row:
+                continue
+            rows.append(
+                NearMissCauseFactorPdfRow(
+                    factor=factor_labels[factor],
+                    immediate_cause=self._factor_cause_label(row, "immediate"),
+                    root_cause=self._factor_cause_label(row, "root"),
+                )
+            )
+        return rows
+
+    @staticmethod
+    def _coerce_factor_causes(value) -> list[dict]:
+        if isinstance(value, list):
+            return [row for row in value if isinstance(row, dict)]
+        if isinstance(value, str) and value.strip():
+            try:
+                parsed = json.loads(value)
+            except (TypeError, ValueError):
+                return []
+            if isinstance(parsed, list):
+                return [row for row in parsed if isinstance(row, dict)]
+        return []
+
+    @staticmethod
+    def _factor_cause_label(row: dict, stage: str) -> str:
+        option_text = str(row.get(f"{stage}_option_text") or "").strip()
+        other_text = str(row.get(f"{stage}_other_text") or "").strip()
+        if option_text.lower() in {"other", "others", "other-specify"} and other_text:
+            return other_text
+        return option_text or other_text or "Not selected"
+
     @staticmethod
     def _build_office_comment_text(near_miss: Incident) -> str:
         row = (
@@ -638,6 +1612,32 @@ class NearMissLightweightPdfRenderer:
         )
         if row and str(row.loop_back_reason or "").strip():
             return NearMissLightweightPdfRenderer._strip_office_comment_prefix(str(row.loop_back_reason).strip())
+        return "Not recorded."
+
+    @staticmethod
+    def _build_vessel_review_comment_text(near_miss: Incident, *, serialized: dict) -> str:
+        vessel_review_summary = serialized.get("vessel_review_summary")
+        if isinstance(vessel_review_summary, dict) and str(vessel_review_summary.get("comment") or "").strip():
+            return str(vessel_review_summary["comment"]).strip()
+
+        row = (
+            SafetyFieldHistory.objects.filter(
+                parent_table=near_miss._meta.db_table,
+                parent_id=near_miss.pk,
+                field_name="near_miss_vessel_review_signature",
+            )
+            .order_by("-changed_at", "-id")
+            .first()
+        )
+        if row is not None and str(row.change_reason or "").strip():
+            payload = parse_history_value(row.new_value)
+            decision = ""
+            if isinstance(payload, dict):
+                decision = str(payload.get("decision") or "").strip()
+            fallback = f"Near-miss vessel review decision: {decision}."
+            comment = str(row.change_reason).strip()
+            if comment != fallback:
+                return comment
         return "Not recorded."
 
     @staticmethod
@@ -755,7 +1755,7 @@ class NearMissLightweightPdfRenderer:
             rows.append(self._field_history_signature_row("Closure signature", row=closure_signature))
         elif near_miss.state == "CLOSED":
             rows.append(NearMissPdfSignatureRow(label="Closure signature"))
-        return rows or [NearMissPdfSignatureRow(label="Office review signature")]
+        return rows
 
     def _field_history_signature_row(self, label: str, *, row) -> NearMissPdfSignatureRow:
         payload = {}
@@ -1407,7 +2407,7 @@ class MscMepc3PdfRenderResult:
     download_path: str
     export_path: str | None
     file_name: str
-    incident_id: int
+    incident_id: object
     appendix_titles: list[str]
 
 
@@ -1454,11 +2454,11 @@ class MscMepc3Circ4PdfRenderer:
     def render_export_pdf(
         self,
         *,
-        incident_id: int,
+        incident_id,
         viewer_user,
         persist: bool = True,
     ) -> MscMepc3PdfRenderResult:
-        incident = self._get_incident(int(incident_id))
+        incident = self._get_incident(incident_id)
         self._validate_exportable(incident)
 
         context = self._build_context(incident)
@@ -1484,7 +2484,7 @@ class MscMepc3Circ4PdfRenderer:
             appendix_titles=list(self.template.APPENDIX_TITLES),
         )
 
-    def _get_incident(self, incident_id: int) -> Incident:
+    def _get_incident(self, incident_id) -> Incident:
         return (
             self.model_class.objects.prefetch_related(
                 "cause_tags",
@@ -1683,117 +2683,112 @@ class MscMepc3Circ4PdfRenderer:
                 "vims_safety_incident.awaiting_daily_report_match",
             ),
             (
-                "Field 08 - First-hour checklist",
-                "Complete" if incident.first_hour_checklist_done else "Pending",
-                "vims_safety_incident.first_hour_checklist_done",
-            ),
-            (
-                "Field 09 - Marine documents checklist",
+                "Field 08 - Marine documents checklist",
                 "Complete" if incident.marine_docs_checklist_done else "Pending",
                 "vims_safety_incident.marine_docs_checklist_done",
             ),
             (
-                "Field 10 - Chain of custody status",
+                "Field 09 - Chain of custody status",
                 "Complete" if incident.chain_of_custody_ok else "Pending",
                 "vims_safety_incident.chain_of_custody_ok",
             ),
             (
-                "Field 11 - Cargo evidence applicable",
+                "Field 10 - Cargo evidence applicable",
                 "Yes" if incident.cargo_evidence_applicable else "No",
                 "vims_safety_incident.cargo_evidence_applicable",
             ),
             (
-                "Field 12 - Health / fatigue applicable",
+                "Field 11 - Health / fatigue applicable",
                 "Yes" if incident.health_fatigue_applicable else "No",
                 "vims_safety_incident.health_fatigue_applicable",
             ),
             (
-                "Field 13 - Causal layering complete",
+                "Field 12 - Causal layering complete",
                 "Yes" if incident.causal_layering_complete else "No",
                 "vims_safety_incident.causal_layering_complete",
             ),
             (
-                "Field 14 - ALARP attested",
+                "Field 13 - ALARP attested",
                 "Yes" if incident.alarp_attested else "No",
                 "vims_safety_incident.alarp_attested",
             ),
             (
-                "Field 15 - Bias guard attestations",
+                "Field 14 - Bias guard attestations",
                 incident.bias_guard_attestations or "Not recorded",
                 "vims_safety_incident.bias_guard_attestations",
             ),
             (
-                "Field 16 - Reporter rank",
+                "Field 15 - Reporter rank",
                 self._string_value(incident.reporter_rank, default="Not recorded"),
                 "vims_safety_incident.reporter_rank",
             ),
             (
-                "Field 17 - Reporter department",
+                "Field 16 - Reporter department",
                 self._string_value(incident.reporter_department, default="Not recorded"),
                 "vims_safety_incident.reporter_department",
             ),
             (
-                "Field 18 - DPA notified",
+                "Field 17 - DPA notified",
                 self._string_value(self._serialize_datetime(incident.dpa_notified_at), default="Not recorded"),
                 "vims_safety_incident.dpa_notified_at",
             ),
             (
-                "Field 19 - FM notified",
+                "Field 18 - FM notified",
                 self._string_value(self._serialize_datetime(incident.fm_notified_at), default="Not recorded"),
                 "vims_safety_incident.fm_notified_at",
             ),
             (
-                "Field 20 - Office notified",
+                "Field 19 - Office notified",
                 self._string_value(self._serialize_datetime(incident.office_notified_at), default="Not recorded"),
                 "vims_safety_incident.office_notified_at",
             ),
             (
-                "Field 21 - Vessel flag",
+                "Field 20 - Vessel flag",
                 self._string_value(vessel_particulars.get("flags"), default="Not available in workspace"),
                 "VesselData.flags",
             ),
             (
-                "Field 22 - Vessel class",
+                "Field 21 - Vessel class",
                 self._string_value(vessel_particulars.get("ClassificationSociety"), default="Not available in workspace"),
                 "VesselData.ClassificationSociety",
             ),
             (
-                "Field 23 - Vessel gross tonnage",
+                "Field 22 - Vessel gross tonnage",
                 self._string_value(vessel_particulars.get("grt"), default="Not available in workspace"),
                 "VesselData.grt",
             ),
             (
-                "Field 24 - Vessel deadweight",
+                "Field 23 - Vessel deadweight",
                 self._string_value(vessel_particulars.get("deadweight"), default="Not available in workspace"),
                 "VesselData.deadweight",
             ),
             (
-                "Field 25 - Cargo quantity",
+                "Field 24 - Cargo quantity",
                 self._string_value(reporting_context.get("total_cargo_weight"), default="Not available"),
                 f"{reporting_context.get('source_table') or 'Daily Report'}.TotalCargoWeight",
             ),
             (
-                "Field 26 - Voyage condition",
+                "Field 25 - Voyage condition",
                 self._string_value(reporting_context.get("voy_condition"), default="Not available"),
                 f"{reporting_context.get('source_table') or 'Daily Report'}.VoyCondition",
             ),
             (
-                "Field 27 - Weather remarks",
+                "Field 26 - Weather remarks",
                 self._string_value(reporting_context.get("weather_remarks"), default="Not available"),
                 f"{reporting_context.get('source_table') or 'Daily Report'}.WeatherRemarks",
             ),
             (
-                "Field 28 - Wind force",
+                "Field 27 - Wind force",
                 self._string_value(reporting_context.get("wind_force"), default="Not available"),
                 f"{reporting_context.get('source_table') or 'Daily Report'}.WindForce",
             ),
             (
-                "Field 29 - Sea state",
+                "Field 28 - Sea state",
                 self._string_value(reporting_context.get("sea_state"), default="Not available"),
                 f"{reporting_context.get('source_table') or 'Daily Report'}.SeaState",
             ),
             (
-                "Field 30 - Current strength",
+                "Field 29 - Current strength",
                 self._string_value(reporting_context.get("current_strength"), default="Not available"),
                 f"{reporting_context.get('source_table') or 'Daily Report'}.CurrentStrength",
             ),

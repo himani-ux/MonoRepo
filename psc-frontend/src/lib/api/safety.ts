@@ -7,7 +7,9 @@ function buildSafetyApiUrl(path: string): string {
   return `${SAFETY_API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-function buildParams(params: Record<string, string | number | boolean | null | undefined>) {
+function buildParams(
+  params: Record<string, string | number | boolean | null | undefined>
+) {
   const searchParams = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === '') {
@@ -40,6 +42,25 @@ export interface SafetyReferenceMscatOption {
 
 export type SafetyReferenceImmediateCauseOption = SafetyReferenceMscatOption;
 
+export interface SafetyNearMissCauseOption {
+  id: string;
+  factor: 'HUMAN' | 'VESSEL' | 'MANAGEMENT' | 'OTHER';
+  factor_label: string;
+  cause_stage: 'IMMEDIATE' | 'ROOT';
+  cause_stage_label: string;
+  option_code: string;
+  option_text: string;
+  display_order: number;
+  active: boolean;
+}
+
+export interface SafetyNearMissCategoryOption {
+  id: string;
+  category_name: string;
+  display_order: number;
+  active: boolean;
+}
+
 export interface SafetyReferenceLossTypeOption {
   id: string;
   legacy_int_id: number;
@@ -56,6 +77,43 @@ export interface SafetyReferenceIncidentTypeOption {
   type_name: string;
   imo_reportable: boolean;
   description: string | null;
+  active: boolean;
+}
+
+export type SafetyIncidentWeatherFieldKey =
+  | 'VISIBILITY'
+  | 'PRECIPITATION'
+  | 'SEA_STATE'
+  | 'WIND_SCALE'
+  | 'WIND_DIRECTION'
+  | 'LIGHTING_SOURCE'
+  | 'CURRENT_DIRECTION'
+  | 'ICE_CONDITION_ONBOARD'
+  | 'ICE_CONDITION_AT_SEA'
+  | 'LIGHT_CONDITION';
+
+export interface SafetyIncidentWeatherOption {
+  id: string;
+  field_key: SafetyIncidentWeatherFieldKey;
+  field_label: string;
+  option_label: string;
+  display_order: number;
+  active: boolean;
+}
+
+export type SafetyInjuryDropdownFieldKey =
+  | 'NATURE_OF_INJURY'
+  | 'SOURCE_OF_INJURY'
+  | 'AFFECTED_BODY_AREA'
+  | 'TYPE_OF_ACTIVITY'
+  | 'SAFE_WORKING_PRACTICE';
+
+export interface SafetyInjuryDropdownOption {
+  id: string;
+  field_key: SafetyInjuryDropdownFieldKey;
+  field_label: string;
+  option_label: string;
+  display_order: number;
   active: boolean;
 }
 
@@ -277,6 +335,15 @@ export interface SafetyNearMissListItem {
   near_miss_mscat_category_id?: number | null;
   near_miss_mscat_subcode_id?: string | null;
   near_miss_mscat_subcode_ids?: string[];
+  near_miss_factor_causes?: Array<{
+    factor: 'HUMAN' | 'VESSEL' | 'MANAGEMENT' | 'OTHER';
+    immediate_option_id: string;
+    immediate_option_text?: string;
+    immediate_other_text?: string;
+    root_option_id: string;
+    root_option_text?: string;
+    root_other_text?: string;
+  }>;
   near_miss_immediate_action?: string | null;
   near_miss_suggestion?: string | null;
   near_miss_root_cause_detail?: string | null;
@@ -579,15 +646,22 @@ export interface SafetyScmAttendancePayload {
   warnings: string[];
 }
 
-export interface SafetyScmCreateAttendeeRow extends Pick<
-  SafetyScmAttendanceRow,
-  "absence_reason" | "crew_id" | "display_name" | "present" | "rank_name" | "remarks" | "schema_version"
-> {
+export interface SafetyScmCreateAttendeeRow
+  extends Pick<
+    SafetyScmAttendanceRow,
+    | 'absence_reason'
+    | 'crew_id'
+    | 'display_name'
+    | 'present'
+    | 'rank_name'
+    | 'remarks'
+    | 'schema_version'
+  > {
   department: string;
   warning_codes: string[];
   warnings: string[];
   wrh_data_available: boolean;
-  wrh_flag: "GREEN" | "YELLOW" | "RED";
+  wrh_flag: 'GREEN' | 'YELLOW' | 'RED' | 'PENDING';
   wrh_non_compliance_flag: boolean;
   wrh_rest_hours_24h: number | string | null;
   wrh_rest_hours_7d: number | string | null;
@@ -628,6 +702,24 @@ export interface SafetyScmSignatureStatus {
   typed_name: string | null;
 }
 
+export interface SafetyScmWrhHostReadiness {
+  blocking_crew: Array<{
+    crew_id: string;
+    display_name: string;
+    rank_name: string;
+    warning_codes: string[];
+    warnings: string[];
+    wrh_data_available: boolean;
+    wrh_flag: 'GREEN' | 'YELLOW' | 'RED' | 'PENDING';
+    wrh_non_compliance_flag: boolean;
+  }>;
+  checked_crew_count: number;
+  message: string;
+  missing_ship_time: boolean;
+  ready: boolean;
+  warnings: string[];
+}
+
 export interface SafetyScmFormConfig {
   attendee_rows: SafetyScmCreateAttendeeRow[];
   cadence_warning: {
@@ -659,6 +751,7 @@ export interface SafetyScmFormConfig {
     vessel_code: string;
     vessel_name: string;
   };
+  wrh_host_readiness?: SafetyScmWrhHostReadiness;
 }
 
 export interface SafetyScmCreatePayload {
@@ -1103,7 +1196,11 @@ export interface SafetySoiOfficerSettingPayload {
   reason?: string | null;
 }
 
-export type SafetySearchGroupKey = 'INCIDENT' | 'NEAR_MISS' | 'SCM' | 'SOI_FINDING';
+export type SafetySearchGroupKey =
+  | 'INCIDENT'
+  | 'NEAR_MISS'
+  | 'SCM'
+  | 'SOI_FINDING';
 
 export interface SafetySearchResultItem {
   archived: boolean;
@@ -1189,16 +1286,38 @@ export interface SafetyIncidentFilters {
 export interface SafetyIncidentCreatePayload {
   awaiting_daily_report_match?: boolean;
   external_party_injury?: Record<string, unknown> | null;
-  first_hour_checklist_done?: boolean;
   incident_type_id?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  shore_assistance_required?: boolean | null;
+  vessel_location?: string;
+  onboard_location?: string;
+  last_port?: string;
+  departure_date?: string | null;
+  vessel_condition?: 'LOADED' | 'BALLAST' | '' | null;
   loss_type_primary_id?: number | null;
+  loss_type_secondary_id?: number | null;
+  loss_type_tertiary_id?: number | null;
+  loss_type_other?: string | null;
   narrative?: string;
   occurred_at?: string | null;
+  office_notification_mode?: 'ON_CALL' | 'WHATSAPP' | 'EMAIL' | null;
+  office_notified?: boolean | null;
   pic_candidate_id?: string;
   position_daily_report_id?: string | null;
   position_source?: string | null;
+  weather_visibility_id?: string | null;
+  weather_precipitation_id?: string | null;
+  weather_sea_state_id?: string | null;
+  weather_wind_scale_id?: string | null;
+  weather_wind_direction_id?: string | null;
+  weather_lighting_source_id?: string | null;
+  weather_current_direction_id?: string | null;
+  weather_current_strength_knots?: string | null;
+  weather_ambient_temperature_c?: string | null;
+  weather_ice_condition_onboard_id?: string | null;
+  weather_ice_condition_at_sea_id?: string | null;
+  weather_light_condition_id?: string | null;
   record_type?: 'INCIDENT' | 'NEAR_MISS';
   reported_at?: string | null;
   reporter_department?: string;
@@ -1206,9 +1325,32 @@ export interface SafetyIncidentCreatePayload {
   reporter_name?: string;
   reporter_rank?: string;
   reporter_user_id?: string;
+  risk_band?: 'GREEN' | 'YELLOW' | 'RED';
   schema_version?: number;
   vessel_code?: string;
   vessel_id?: string;
+}
+
+export interface SafetyIncidentPhase1Record
+  extends Omit<
+    SafetyIncidentCreatePayload,
+    'external_party_injury' | 'reporter_user_id' | 'risk_band'
+  > {
+  created_by?: string | null;
+  created_date?: string;
+  current_phase?: number;
+  external_party_injury?: Record<string, unknown> | null;
+  id: string;
+  incident_number?: string | null;
+  record_type?: 'INCIDENT';
+  reporter_email?: string | null;
+  reporter_user_id?: string | null;
+  risk_band?: 'GREEN' | 'YELLOW' | 'RED' | null;
+  state?: string;
+  updated_by?: string | null;
+  updated_date?: string;
+  vessel_display_name?: string | null;
+  vessel_name?: string | null;
 }
 
 export interface SafetyIncidentPhase1SubmitPayload {
@@ -1227,13 +1369,19 @@ export interface SafetyIncidentPhase2Payload {
   latitude?: string;
   longitude?: string;
   loss_type_primary_id?: number | null;
+  loss_type_secondary_id?: number | null;
+  loss_type_tertiary_id?: number | null;
+  loss_type_other?: string | null;
   office_notified_at?: string | null;
+  office_notification_mode?: 'ON_CALL' | 'WHATSAPP' | 'EMAIL' | null;
+  office_notified?: boolean | null;
   pic_user_id?: string | null;
   risk_band?: 'GREEN' | 'YELLOW' | 'RED';
   schema_version?: number;
 }
 
-export interface SafetyIncidentPhase2Record extends SafetyIncidentPhase2Payload {
+export interface SafetyIncidentPhase2Record
+  extends SafetyIncidentPhase2Payload {
   advisory_band: 'GREEN' | 'YELLOW' | 'RED';
   created_by: string | null;
   created_date: string;
@@ -1248,7 +1396,8 @@ export interface SafetyIncidentPhase2Record extends SafetyIncidentPhase2Payload 
   updated_date: string | null;
 }
 
-export interface SafetyIncidentPhase2SubmitResponse extends SafetyIncidentPhase2Record {
+export interface SafetyIncidentPhase2SubmitResponse
+  extends SafetyIncidentPhase2Record {
   deadline_tasks_created: number;
   notifications_emitted: number;
   transition: {
@@ -1283,6 +1432,7 @@ export interface SafetyNearMissCreatePayload {
   incident_type_id: number;
   loss_type_primary_id: number;
   narrative: string;
+  high_severity_photo_file?: File | null;
   near_miss_immediate_action: string;
   near_miss_place?: 'AT_ANCHOR' | 'AT_SEA' | 'AT_PORT' | null;
   near_miss_category_tags?: string[];
@@ -1290,6 +1440,15 @@ export interface SafetyNearMissCreatePayload {
   near_miss_mscat_category_id?: number | null;
   near_miss_mscat_subcode_id?: string | null;
   near_miss_mscat_subcode_ids?: string[];
+  near_miss_factor_causes?: Array<{
+    factor: 'HUMAN' | 'VESSEL' | 'MANAGEMENT' | 'OTHER';
+    immediate_option_id: string;
+    immediate_option_text?: string;
+    immediate_other_text?: string;
+    root_option_id: string;
+    root_option_text?: string;
+    root_other_text?: string;
+  }>;
   near_miss_severity: 'HIGH' | 'MED' | 'LOW';
   near_miss_shell_tag?: string | null;
   near_miss_suggestion?: string;
@@ -1345,7 +1504,10 @@ export interface SafetySoiFilters {
   vessel_id?: string;
 }
 
-function extractFileName(contentDisposition: string | undefined, fallback: string): string {
+function extractFileName(
+  contentDisposition: string | undefined,
+  fallback: string
+): string {
   const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
   return match?.[1] ?? fallback;
 }
@@ -1353,35 +1515,74 @@ function extractFileName(contentDisposition: string | undefined, fallback: strin
 export const safetyApi = {
   async getReferenceMscat() {
     const response = await apiClient.get<SafetyReferenceMscatOption[]>(
-      buildSafetyApiUrl('/reference/mscat/'),
+      buildSafetyApiUrl('/reference/mscat/')
     );
     return response.data;
   },
 
   async getReferenceImmediateCauses() {
     const response = await apiClient.get<SafetyReferenceImmediateCauseOption[]>(
-      buildSafetyApiUrl('/reference/immediate-causes/'),
+      buildSafetyApiUrl('/reference/immediate-causes/')
     );
     return response.data;
   },
 
+  async getNearMissCauseOptions() {
+    const response = await apiClient.get<
+      SafetyNearMissCauseOption[] | PaginatedResponse<SafetyNearMissCauseOption>
+    >(buildSafetyApiUrl('/near-miss/cause-options/'), {
+      params: { page_size: 500 },
+    });
+    return unwrapPaginatedResults(response.data);
+  },
+
+  async getNearMissCategories() {
+    const response = await apiClient.get<
+      | SafetyNearMissCategoryOption[]
+      | PaginatedResponse<SafetyNearMissCategoryOption>
+    >(buildSafetyApiUrl('/near-miss/categories/'), {
+      params: { page_size: 100 },
+    });
+    return unwrapPaginatedResults(response.data);
+  },
+
   async getReferenceLossTypes() {
     const response = await apiClient.get<SafetyReferenceLossTypeOption[]>(
-      buildSafetyApiUrl('/reference/loss-types/'),
+      buildSafetyApiUrl('/reference/loss-types/')
     );
     return response.data;
   },
 
   async getReferenceIncidentTypes() {
     const response = await apiClient.get<SafetyReferenceIncidentTypeOption[]>(
-      buildSafetyApiUrl('/reference/incident-types/'),
+      buildSafetyApiUrl('/reference/incident-types/')
     );
     return response.data;
   },
 
+  async getIncidentWeatherOptions(fieldKey?: SafetyIncidentWeatherFieldKey) {
+    const response = await apiClient.get<
+      | SafetyIncidentWeatherOption[]
+      | PaginatedResponse<SafetyIncidentWeatherOption>
+    >(buildSafetyApiUrl('/reference/incident-weather-options/'), {
+      params: buildParams({ field_key: fieldKey }),
+    });
+    return unwrapPaginatedResults(response.data);
+  },
+
+  async getInjuryDropdownOptions(fieldKey?: SafetyInjuryDropdownFieldKey) {
+    const response = await apiClient.get<
+      | SafetyInjuryDropdownOption[]
+      | PaginatedResponse<SafetyInjuryDropdownOption>
+    >(buildSafetyApiUrl('/reference/injury-dropdown-options/'), {
+      params: buildParams({ field_key: fieldKey }),
+    });
+    return unwrapPaginatedResults(response.data);
+  },
+
   async getReferenceSoiAreas() {
     const response = await apiClient.get<SafetyReferenceSoiAreaOption[]>(
-      buildSafetyApiUrl('/reference/soi-areas/'),
+      buildSafetyApiUrl('/reference/soi-areas/')
     );
     return response.data;
   },
@@ -1391,31 +1592,34 @@ export const safetyApi = {
       buildSafetyApiUrl('/reference/soi-items/'),
       {
         params: buildParams({ area_id: areaId }),
-      },
+      }
     );
     return response.data;
   },
 
   async getReferenceSoiChecklistVersions() {
-    const response = await apiClient.get<SafetyReferenceChecklistVersionOption[]>(
-      buildSafetyApiUrl('/reference/soi-checklist-versions/'),
-    );
+    const response = await apiClient.get<
+      SafetyReferenceChecklistVersionOption[]
+    >(buildSafetyApiUrl('/reference/soi-checklist-versions/'));
     return response.data;
   },
 
   async getReferenceBiasGuards() {
     const response = await apiClient.get<SafetyReferenceBiasGuardOption[]>(
-      buildSafetyApiUrl('/reference/bias-guards/'),
+      buildSafetyApiUrl('/reference/bias-guards/')
     );
     return response.data;
   },
 
-  async getDashboardComposite(period: SafetyDashboardPeriodCode, vesselId?: string | null) {
+  async getDashboardComposite(
+    period: SafetyDashboardPeriodCode,
+    vesselId?: string | null
+  ) {
     const response = await apiClient.get<SafetyDashboardCompositeResponse>(
       buildSafetyApiUrl('/dashboard/composite/'),
       {
         params: buildParams({ period, vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
@@ -1425,18 +1629,19 @@ export const safetyApi = {
       buildSafetyApiUrl('/dashboard/heinrich/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
 
   async getDashboardRepeatRoot(vesselId?: string | null) {
-    const response = await apiClient.get<SafetyDashboardRepeatRootRadarResponse>(
-      buildSafetyApiUrl('/dashboard/repeat-root-cause/'),
-      {
-        params: buildParams({ vessel_id: vesselId }),
-      },
-    );
+    const response =
+      await apiClient.get<SafetyDashboardRepeatRootRadarResponse>(
+        buildSafetyApiUrl('/dashboard/repeat-root-cause/'),
+        {
+          params: buildParams({ vessel_id: vesselId }),
+        }
+      );
     return response.data;
   },
 
@@ -1445,7 +1650,7 @@ export const safetyApi = {
       buildSafetyApiUrl('/dashboard/pareto/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
@@ -1455,7 +1660,7 @@ export const safetyApi = {
       buildSafetyApiUrl('/dashboard/soi-compliance/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
@@ -1465,171 +1670,278 @@ export const safetyApi = {
       buildSafetyApiUrl('/dashboard/ca-aging/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
 
-  async exportDashboard(request: SafetyDashboardExportRequest): Promise<SafetyDashboardExportResult> {
+  async exportDashboard(
+    request: SafetyDashboardExportRequest
+  ): Promise<SafetyDashboardExportResult> {
     const response = await apiClient.post<Blob>(
       buildSafetyApiUrl('/dashboard/export/'),
       request,
       {
         responseType: 'blob',
-      },
+      }
     );
     return {
       blob: response.data,
       fileName: extractFileName(
         response.headers['content-disposition'],
-        `safety-dashboard-${request.period}.${request.format === 'pdf' ? 'pdf' : 'xlsx'}`,
+        `safety-dashboard-${request.period}.${request.format === 'pdf' ? 'pdf' : 'xlsx'}`
       ),
     };
   },
 
   async getIncidents(filters: SafetyIncidentFilters = {}) {
-    const response = await apiClient.get<SafetyIncidentListItem[] | PaginatedResponse<SafetyIncidentListItem>>(
-      buildSafetyApiUrl('/incidents/'),
-      {
-        params: buildParams(filters),
-      },
-    );
+    const response = await apiClient.get<
+      SafetyIncidentListItem[] | PaginatedResponse<SafetyIncidentListItem>
+    >(buildSafetyApiUrl('/incidents/'), {
+      params: buildParams(filters),
+    });
     return unwrapPaginatedResults(response.data);
   },
 
   async createIncident(payload: SafetyIncidentCreatePayload) {
     const response = await apiClient.post<SafetyIncidentListItem>(
       buildSafetyApiUrl('/incidents/'),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async submitIncidentPhase1(id: number | string, payload: SafetyIncidentPhase1SubmitPayload = {}) {
-    const response = await apiClient.post<SafetyIncidentListItem & {
-      phase_2_handoff: {
-        authorized_roles: string[];
-        can_edit_phase_2: boolean;
-        message: string;
-        notifications_emitted: number;
-      };
-      transition: {
-        incident_id: number;
-        occurred_at: string;
-        phase_from: number | null;
-        phase_to: number;
-        transition_type: string;
-      };
-      self_report_conflict: {
-        conflict_detected: boolean;
-        message: string;
-        required_approver_role: string | null;
-      };
-    }>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-1/submit/`),
-      payload,
+  async getIncidentPhase1(id: number | string) {
+    const response = await apiClient.get<SafetyIncidentPhase1Record>(
+      buildSafetyApiUrl(`/incidents/${id}/phase-1/`)
     );
+    return response.data;
+  },
+
+  async updateIncidentPhase1(
+    id: number | string,
+    payload: SafetyIncidentCreatePayload
+  ) {
+    const response = await apiClient.patch<SafetyIncidentPhase1Record>(
+      buildSafetyApiUrl(`/incidents/${id}/phase-1/`),
+      payload
+    );
+    return response.data;
+  },
+
+  async submitIncidentPhase1(
+    id: number | string,
+    payload: SafetyIncidentPhase1SubmitPayload = {}
+  ) {
+    const response = await apiClient.post<
+      SafetyIncidentListItem & {
+        phase_2_handoff: {
+          authorized_roles: string[];
+          can_edit_phase_2: boolean;
+          message: string;
+          notifications_emitted: number;
+        };
+        transition: {
+          incident_id: number;
+          occurred_at: string;
+          phase_from: number | null;
+          phase_to: number;
+          transition_type: string;
+        };
+        self_report_conflict: {
+          conflict_detected: boolean;
+          message: string;
+          required_approver_role: string | null;
+        };
+      }
+    >(buildSafetyApiUrl(`/incidents/${id}/phase-1/submit/`), payload);
     return response.data;
   },
 
   async getIncidentPhase2(id: number | string) {
     const response = await apiClient.get<SafetyIncidentPhase2Record>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-2/`),
+      buildSafetyApiUrl(`/incidents/${id}/resource-handoff/`)
     );
     return response.data;
   },
 
-  async updateIncidentPhase2(id: number | string, payload: SafetyIncidentPhase2Payload) {
+  async updateIncidentPhase2(
+    id: number | string,
+    payload: SafetyIncidentPhase2Payload
+  ) {
     const response = await apiClient.patch<SafetyIncidentPhase2Record>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-2/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/resource-handoff/`),
+      payload
     );
     return response.data;
   },
 
   async submitIncidentPhase2(id: number | string) {
     const response = await apiClient.post<SafetyIncidentPhase2SubmitResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-2/submit/`),
-      {},
+      buildSafetyApiUrl(`/incidents/${id}/resource-handoff/submit/`),
+      {}
     );
     return response.data;
   },
 
   async getIncidentPhase3Evidence(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/evidence/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/`)
     );
     return response.data;
   },
 
-  async updateIncidentPhase3Evidence(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async updateIncidentPhase3Evidence(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/evidence/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/`),
+      payload
     );
     return response.data;
   },
 
-  async uploadIncidentPhase3Attachment(id: number | string, tabKey: string, file: File) {
+  async uploadIncidentPhase3Attachment(
+    id: number | string,
+    tabKey: string,
+    file: File,
+    metadata?: { description?: string; title?: string }
+  ) {
     const formData = new FormData();
     formData.append('tab_key', tabKey);
-    formData.append('photo', file);
+    formData.append('file', file);
+    if (metadata?.title) {
+      formData.append('title', metadata.title);
+    }
+    if (metadata?.description) {
+      formData.append('description', metadata.description);
+    }
     const response = await apiClient.post<{
       attachment: SafetyOfficeWorkflowResponse;
       workspace: SafetyOfficeWorkflowResponse;
     }>(
-      buildSafetyApiUrl(`/incidents/${id}/evidence/attachments/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/attachments/`),
       formData,
       {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-      },
+      }
     );
+    return response.data;
+  },
+
+  async getIncidentPhase3AttachmentBlob(
+    id: number | string,
+    attachmentPath: string
+  ) {
+    const response = await apiClient.get<Blob>(
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/attachments/`),
+      {
+        params: { path: attachmentPath },
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  },
+
+  getIncidentPhase3AttachmentPreviewUrl(
+    id: number | string,
+    attachmentPath: string
+  ) {
+    const params = new URLSearchParams({ path: attachmentPath });
+    return `${buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/attachments/`)}?${params.toString()}`;
+  },
+
+  async deleteIncidentPhase3Attachment(
+    id: number | string,
+    attachmentPath: string
+  ) {
+    const response = await apiClient.delete<{
+      workspace: SafetyOfficeWorkflowResponse;
+    }>(buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/attachments/`), {
+      params: { path: attachmentPath },
+    });
+    return response.data;
+  },
+
+  async updateIncidentPhase3AttachmentMetadata(
+    id: number | string,
+    attachmentPath: string,
+    payload: { description?: string; title: string }
+  ) {
+    const response = await apiClient.patch<{
+      attachment: SafetyOfficeWorkflowResponse;
+      workspace: SafetyOfficeWorkflowResponse;
+    }>(buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence/attachments/`), payload, {
+      params: { path: attachmentPath },
+    });
     return response.data;
   },
 
   async getIncidentPhase3ChainOfCustody(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse[]>(
-      buildSafetyApiUrl(`/incidents/${id}/chain-of-custody/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/chain-of-custody/`)
     );
     return response.data;
   },
 
-  async createIncidentPhase3ChainOfCustody(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentPhase3ChainOfCustody(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/chain-of-custody/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/chain-of-custody/`),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase3EvidenceMatrix(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse[]>(
-      buildSafetyApiUrl(`/incidents/${id}/evidence-matrix/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence-matrix/`)
     );
     return response.data;
   },
 
-  async createIncidentPhase3EvidenceMatrixRow(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentPhase3EvidenceMatrixRow(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/evidence-matrix/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/evidence-matrix/`),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase3Interviews(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse[]>(
-      buildSafetyApiUrl(`/incidents/${id}/interviews/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/interviews/`)
     );
     return response.data;
   },
 
-  async createIncidentPhase3Interview(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentPhase3Interview(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/interviews/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/interviews/`),
+      payload
+    );
+    return response.data;
+  },
+
+  async updateIncidentPhase3Interview(
+    id: number | string,
+    interviewId: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
+    const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/interviews/${interviewId}/`),
+      payload
     );
     return response.data;
   },
@@ -1637,50 +1949,57 @@ export const safetyApi = {
   async updateIncidentPhase3DeadlineTask(
     id: number | string,
     taskId: number | string,
-    payload: SafetyOfficeWorkflowPayload,
+    payload: SafetyOfficeWorkflowPayload
   ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/evidence/deadline-tasks/${taskId}/`),
-      payload,
+      buildSafetyApiUrl(
+        `/incidents/${id}/phase-4/evidence/deadline-tasks/${taskId}/`
+      ),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase4Facts(id: number | string) {
     const response = await apiClient.get<
-      SafetyOfficeWorkflowResponse[] | PaginatedResponse<SafetyOfficeWorkflowResponse>
-    >(
-      buildSafetyApiUrl(`/incidents/${id}/facts/`),
-    );
+      | SafetyOfficeWorkflowResponse[]
+      | PaginatedResponse<SafetyOfficeWorkflowResponse>
+    >(buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/`));
     return unwrapPaginatedResults(response.data);
   },
 
   async getIncidentPhase4EvidenceSources(id: number | string) {
     const response = await apiClient.get<SafetyIncidentPhase4EvidenceSource[]>(
-      buildSafetyApiUrl(`/incidents/${id}/facts/sources/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/sources/`)
     );
     return response.data;
   },
 
   async getIncidentPhase4Gate(id: number | string) {
     const response = await apiClient.get<SafetyIncidentPhase4Gate>(
-      buildSafetyApiUrl(`/incidents/${id}/facts/gate/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/gate/`)
     );
     return response.data;
   },
 
-  async transitionIncident(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async transitionIncident(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/incidents/${id}/transition/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async createIncidentPhase4Fact(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentPhase4Fact(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/facts/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/`),
+      payload
     );
     return response.data;
   },
@@ -1688,60 +2007,72 @@ export const safetyApi = {
   async updateIncidentPhase4Fact(
     id: number | string,
     factId: number | string,
-    payload: SafetyOfficeWorkflowPayload,
+    payload: SafetyOfficeWorkflowPayload
   ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/facts/${factId}/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/${factId}/`),
+      payload
     );
     return response.data;
   },
 
-  async reorderIncidentPhase4Facts(id: number | string, orderedFactIds: Array<number | string>) {
+  async reorderIncidentPhase4Facts(
+    id: number | string,
+    orderedFactIds: Array<number | string>
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse[]>(
-      buildSafetyApiUrl(`/incidents/${id}/facts/reorder/`),
-      { ordered_fact_ids: orderedFactIds },
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/reorder/`),
+      { ordered_fact_ids: orderedFactIds }
     );
     return response.data;
   },
 
-  async setIncidentPhase4FactContradiction(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async setIncidentPhase4FactContradiction(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/facts/contradictions/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-4/facts/contradictions/`),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase5Workspace(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/analysis/`)
     );
     return response.data;
   },
 
-  async updateIncidentPhase5Workspace(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async updateIncidentPhase5Workspace(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/analysis/`),
+      payload
     );
     return response.data;
   },
 
   async searchIncidentMscat(id: number | string, query: string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/mscat/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/analysis/mscat/`),
       {
         params: buildParams({ q: query }),
-      },
+      }
     );
     return response.data;
   },
 
-  async createIncidentPhase5Cause(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentPhase5Cause(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/causes/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/analysis/causes/`),
+      payload
     );
     return response.data;
   },
@@ -1749,19 +2080,22 @@ export const safetyApi = {
   async updateIncidentPhase5Cause(
     id: number | string,
     causeId: number | string,
-    payload: SafetyOfficeWorkflowPayload,
+    payload: SafetyOfficeWorkflowPayload
   ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/causes/${causeId}/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/analysis/causes/${causeId}/`),
+      payload
     );
     return response.data;
   },
 
-  async createIncidentPhase5Safeguard(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentPhase5Safeguard(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/safeguards/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/analysis/safeguards/`),
+      payload
     );
     return response.data;
   },
@@ -1769,56 +2103,67 @@ export const safetyApi = {
   async updateIncidentPhase5Safeguard(
     id: number | string,
     safeguardId: number | string,
-    payload: SafetyOfficeWorkflowPayload,
+    payload: SafetyOfficeWorkflowPayload
   ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/analysis/safeguards/${safeguardId}/`),
-      payload,
+      buildSafetyApiUrl(
+        `/incidents/${id}/phase-2/analysis/safeguards/${safeguardId}/`
+      ),
+      payload
     );
     return response.data;
   },
 
   async getIncidentBiasGuards(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse[]>(
-      buildSafetyApiUrl(`/incidents/${id}/bias-guards/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/bias-guards/`)
     );
     return response.data;
   },
 
-  async submitIncidentBiasGuards(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async submitIncidentBiasGuards(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse[]>(
-      buildSafetyApiUrl(`/incidents/${id}/bias-guards/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/bias-guards/`),
+      payload
     );
     return response.data;
   },
 
-  async overrideIncidentBlameGuard(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async overrideIncidentBlameGuard(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/override-blame/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-2/override-blame/`),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase6Workspace(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-6/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-3/`)
     );
     return response.data;
   },
 
   async getIncidentRecommendations(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/recommendations/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-3/recommendations/`)
     );
     return response.data;
   },
 
-  async createIncidentRecommendation(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createIncidentRecommendation(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/recommendations/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-3/recommendations/`),
+      payload
     );
     return response.data;
   },
@@ -1826,127 +2171,177 @@ export const safetyApi = {
   async updateIncidentRecommendation(
     id: number | string,
     recommendationId: number | string,
-    payload: SafetyOfficeWorkflowPayload,
+    payload: SafetyOfficeWorkflowPayload
   ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/recommendations/${recommendationId}/`),
-      payload,
+      buildSafetyApiUrl(
+        `/incidents/${id}/phase-3/recommendations/${recommendationId}/`
+      ),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase7Preflight(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-7/preflight/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-5/preflight/`)
     );
     return response.data;
   },
 
-  async acceptIncidentPhase7(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async acceptIncidentPhase7(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-7/accept/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-5/accept/`),
+      payload
     );
     return response.data;
   },
 
-  async signIncidentPhase7Hod(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async signIncidentPhase7Hod(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-7/hod-signature/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-5/hod-signature/`),
+      payload
     );
     return response.data;
   },
 
-  async approveRedIncidentPhase7(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async approveRedIncidentPhase7(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-7/approve-red/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-5/approve-red/`),
+      payload
     );
     return response.data;
   },
 
-  async sendBackIncidentPhase7(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async sendBackIncidentPhase7(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-7/send-back/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-5/send-back/`),
+      payload
     );
     return response.data;
   },
 
   async getIncidentPhase8Workspace(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-8/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-6/`)
     );
     return response.data;
   },
 
-  async verifyIncidentPhase8(id: number | string, payload: SafetyOfficeWorkflowPayload) {
-    const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-8/verify/`),
-      payload,
+  async saveIncidentPhase8LossEvaluation(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
+    const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
+      buildSafetyApiUrl(`/incidents/${id}/phase-6/`),
+      payload
     );
     return response.data;
   },
 
-  async closeIncidentPhase8(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async verifyIncidentPhase8(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-8/close/`),
-      payload,
+      buildSafetyApiUrl(`/incidents/${id}/phase-6/verify/`),
+      payload
+    );
+    return response.data;
+  },
+
+  async closeIncidentPhase8(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
+    const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
+      buildSafetyApiUrl(`/incidents/${id}/phase-6/close/`),
+      payload
     );
     return response.data;
   },
 
   async getIncidentClosureSummary(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/closure/`),
+      buildSafetyApiUrl(`/incidents/${id}/phase-7/closure/`)
     );
     return response.data;
   },
 
   async getIncidentAudit(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/audit/`),
+      buildSafetyApiUrl(`/incidents/${id}/audit/`)
     );
     return response.data;
   },
 
-  async reopenIncident(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async reopenIncident(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/incidents/${id}/reopen/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async downloadIncidentPdf(id: number | string): Promise<SafetyDownloadResult> {
+  async downloadIncidentPdf(
+    id: number | string,
+    sections?: readonly string[]
+  ): Promise<SafetyDownloadResult> {
+    const params = sections?.length
+      ? { sections: sections.join(',') }
+      : undefined;
     const response = await apiClient.get<Blob>(
       buildSafetyApiUrl(`/export/incident/${id}/pdf/`),
-      { responseType: 'blob' },
+      { params, responseType: 'blob' }
     );
     return {
       blob: response.data,
-      fileName: extractFileName(response.headers['content-disposition'], `incident-${id}.pdf`),
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        `incident-${id}.pdf`
+      ),
     };
   },
 
-  async downloadIncidentMscMepc3(id: number | string): Promise<SafetyDownloadResult> {
+  async downloadIncidentMscMepc3(
+    id: number | string
+  ): Promise<SafetyDownloadResult> {
     const response = await apiClient.get<Blob>(
       buildSafetyApiUrl(`/export/msc-mepc-3/${id}/`),
-      { responseType: 'blob' },
+      { responseType: 'blob' }
     );
     return {
       blob: response.data,
-      fileName: extractFileName(response.headers['content-disposition'], `incident-${id}-msc-mepc3.pdf`),
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        `incident-${id}-msc-mepc3.pdf`
+      ),
     };
   },
 
-  async getCorrectiveActions(filters: Record<string, string | number | boolean | null | undefined> = {}) {
+  async getCorrectiveActions(
+    filters: Record<string, string | number | boolean | null | undefined> = {}
+  ) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse[]>(
       buildSafetyApiUrl('/corrective-actions/'),
       {
         params: buildParams(filters),
-      },
+      }
     );
     return response.data;
   },
@@ -1954,42 +2349,50 @@ export const safetyApi = {
   async createCorrectiveAction(payload: SafetyOfficeWorkflowPayload) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl('/corrective-actions/'),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async updateCorrectiveAction(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async updateCorrectiveAction(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/corrective-actions/${id}/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async transitionCorrectiveAction(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async transitionCorrectiveAction(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/corrective-actions/${id}/transition/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async verifyCorrectiveAction(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async verifyCorrectiveAction(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/corrective-actions/${id}/verify/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getNearMisses(filters: SafetyNearMissFilters = {}) {
-    const response = await apiClient.get<SafetyNearMissListItem[] | PaginatedResponse<SafetyNearMissListItem>>(
-      buildSafetyApiUrl('/near-miss/'),
-      {
-        params: buildParams(filters),
-      },
-    );
+    const response = await apiClient.get<
+      SafetyNearMissListItem[] | PaginatedResponse<SafetyNearMissListItem>
+    >(buildSafetyApiUrl('/near-miss/'), {
+      params: buildParams(filters),
+    });
     return unwrapPaginatedResults(response.data);
   },
 
@@ -1998,94 +2401,140 @@ export const safetyApi = {
       buildSafetyApiUrl('/near-miss/rate-limit/'),
       {
         params: buildParams(filters),
-      },
+      }
     );
     return response.data;
   },
 
-  async getNearMissGuidancePrompts(filters: { category_tag?: string | null; incident_type_id?: number | null } = {}) {
-    const response = await apiClient.get<SafetyNearMissGuidancePrompt[] | PaginatedResponse<SafetyNearMissGuidancePrompt>>(
-      buildSafetyApiUrl('/near-miss/guidance-prompts/'),
-      {
-        params: buildParams(filters as Record<string, string | number | boolean | null | undefined>),
-      },
-    );
+  async getNearMissGuidancePrompts(
+    filters: {
+      category_tag?: string | null;
+      incident_type_id?: number | null;
+    } = {}
+  ) {
+    const response = await apiClient.get<
+      | SafetyNearMissGuidancePrompt[]
+      | PaginatedResponse<SafetyNearMissGuidancePrompt>
+    >(buildSafetyApiUrl('/near-miss/guidance-prompts/'), {
+      params: buildParams(
+        filters as Record<string, string | number | boolean | null | undefined>
+      ),
+    });
     return unwrapPaginatedResults(response.data);
   },
 
-  async getNearMissKpiTarget(filters: { vessel_id: string; year?: number; month?: number }) {
+  async getNearMissKpiTarget(filters: {
+    vessel_id: string;
+    year?: number;
+    month?: number;
+  }) {
     const response = await apiClient.get<SafetyNearMissKpiTarget>(
       buildSafetyApiUrl('/near-miss/kpi-target/'),
       {
         params: buildParams(filters),
-      },
+      }
     );
     return response.data;
   },
 
-  async saveNearMissKpiTarget(payload: { vessel_id: string; year: number; month: number; target_count: number }) {
+  async saveNearMissKpiTarget(payload: {
+    vessel_id: string;
+    year: number;
+    month: number;
+    target_count: number;
+  }) {
     const response = await apiClient.post<SafetyNearMissKpiTarget>(
       buildSafetyApiUrl('/near-miss/kpi-target/'),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async createNearMiss(payload: SafetyNearMissCreatePayload) {
+    const {
+      high_severity_photo_file: highSeverityPhotoFile,
+      ...nearMissPayload
+    } = payload;
+    if (typeof File !== 'undefined' && highSeverityPhotoFile instanceof File) {
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify(nearMissPayload));
+      formData.append('photo', highSeverityPhotoFile);
+      const response = await apiClient.post<SafetyNearMissListItem>(
+        buildSafetyApiUrl('/near-miss/'),
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      return response.data;
+    }
     const response = await apiClient.post<SafetyNearMissListItem>(
       buildSafetyApiUrl('/near-miss/'),
-      payload,
+      nearMissPayload
     );
     return response.data;
   },
 
   async getNearMiss(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/near-miss/${id}/`),
+      buildSafetyApiUrl(`/near-miss/${id}/`)
     );
     return response.data;
   },
 
-  async triageNearMiss(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async triageNearMiss(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/office-comments/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async reclassifyNearMiss(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async reclassifyNearMiss(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/reclassify/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async reviewNearMiss(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async reviewNearMiss(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/review/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async resubmitNearMissRework(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async resubmitNearMissRework(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/rework/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getNearMissAnalysis(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/near-miss/${id}/analysis/`),
+      buildSafetyApiUrl(`/near-miss/${id}/analysis/`)
     );
     return response.data;
   },
 
-  async createNearMissAnalysisEvidence(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createNearMissAnalysisEvidence(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const photoFile = payload.photo_file;
     if (typeof File !== 'undefined' && photoFile instanceof File) {
       const formData = new FormData();
@@ -2099,21 +2548,24 @@ export const safetyApi = {
       const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
         buildSafetyApiUrl(`/near-miss/${id}/analysis/evidence/`),
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
+        { headers: { 'Content-Type': 'multipart/form-data' } }
       );
       return response.data;
     }
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/analysis/evidence/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async createNearMissAnalysisFact(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async createNearMissAnalysisFact(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/analysis/facts/`),
-      payload,
+      payload
     );
     return response.data;
   },
@@ -2121,98 +2573,120 @@ export const safetyApi = {
   async updateNearMissAnalysisFact(
     id: number | string,
     factId: number | string,
-    payload: SafetyOfficeWorkflowPayload,
+    payload: SafetyOfficeWorkflowPayload
   ) {
     const response = await apiClient.patch<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/analysis/facts/${factId}/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async deleteNearMissAnalysisFact(id: number | string, factId: number | string) {
-    await apiClient.delete(buildSafetyApiUrl(`/near-miss/${id}/analysis/facts/${factId}/`));
+  async deleteNearMissAnalysisFact(
+    id: number | string,
+    factId: number | string
+  ) {
+    await apiClient.delete(
+      buildSafetyApiUrl(`/near-miss/${id}/analysis/facts/${factId}/`)
+    );
   },
 
   async getNearMissFleetAlert(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/near-miss/${id}/fleet-alert/`),
+      buildSafetyApiUrl(`/near-miss/${id}/fleet-alert/`)
     );
     return response.data;
   },
 
-  async issueNearMissFleetAlert(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async issueNearMissFleetAlert(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/fleet-alert/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getNearMissClosureSummary(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/near-miss/${id}/closure/`),
+      buildSafetyApiUrl(`/near-miss/${id}/closure/`)
     );
     return response.data;
   },
 
-  async closeNearMiss(id: number | string, payload: SafetyOfficeWorkflowPayload) {
+  async closeNearMiss(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
     const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
       buildSafetyApiUrl(`/near-miss/${id}/closure/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getNearMissAudit(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/near-miss/${id}/audit/`),
+      buildSafetyApiUrl(`/near-miss/${id}/audit/`)
     );
     return response.data;
   },
 
-  async downloadNearMissPdf(id: number | string): Promise<SafetyDownloadResult> {
+  async downloadNearMissPdf(
+    id: number | string
+  ): Promise<SafetyDownloadResult> {
     const response = await apiClient.get<Blob>(
       buildSafetyApiUrl(`/near-miss/${id}/pdf/`),
-      { responseType: 'blob' },
+      { responseType: 'blob' }
     );
     return {
       blob: response.data,
-      fileName: extractFileName(response.headers['content-disposition'], `near-miss-${id}.pdf`),
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        `near-miss-${id}.pdf`
+      ),
     };
   },
 
   async downloadNearMissEvidencePhoto(previewUrl: string): Promise<Blob> {
-    const url = /^https?:\/\//i.test(previewUrl) ? previewUrl : `${API_BASE_URL}${previewUrl}`;
+    const url = /^https?:\/\//i.test(previewUrl)
+      ? previewUrl
+      : `${API_BASE_URL}${previewUrl}`;
     const response = await apiClient.get<Blob>(url, { responseType: 'blob' });
     return response.data;
   },
 
-  async exportAuditorBundle(request: SafetyAuditorBundleExportRequest): Promise<SafetyDownloadResult> {
+  async exportAuditorBundle(
+    request: SafetyAuditorBundleExportRequest
+  ): Promise<SafetyDownloadResult> {
     const response = await apiClient.post<Blob>(
       buildSafetyApiUrl('/export/auditor-bundle/'),
       request,
-      { responseType: 'blob' },
+      { responseType: 'blob' }
     );
     return {
       blob: response.data,
-      fileName: extractFileName(response.headers['content-disposition'], 'safety-auditor-bundle.zip'),
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        'safety-auditor-bundle.zip'
+      ),
     };
   },
 
   async getScmMeetings(filters: SafetyScmFilters = {}) {
-    const response = await apiClient.get<SafetyScmMeeting[] | PaginatedResponse<SafetyScmMeeting>>(
-      buildSafetyApiUrl('/scm/'),
-      {
-        params: buildParams(filters),
-      },
-    );
+    const response = await apiClient.get<
+      SafetyScmMeeting[] | PaginatedResponse<SafetyScmMeeting>
+    >(buildSafetyApiUrl('/scm/'), {
+      params: buildParams(filters),
+    });
     return unwrapPaginatedResults(response.data);
   },
 
   async getScmMeeting(id: number | string) {
     const response = await apiClient.get<SafetyScmMeeting>(
-      buildSafetyApiUrl(`/scm/${id}/`),
+      buildSafetyApiUrl(`/scm/${id}/`)
     );
     return response.data;
   },
@@ -2222,7 +2696,7 @@ export const safetyApi = {
       buildSafetyApiUrl('/scm/create-regular/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
@@ -2232,7 +2706,7 @@ export const safetyApi = {
       buildSafetyApiUrl('/scm/create-adhoc/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
@@ -2240,7 +2714,7 @@ export const safetyApi = {
   async createScmMeeting(payload: SafetyScmCreatePayload) {
     const response = await apiClient.post<SafetyScmMeeting>(
       buildSafetyApiUrl('/scm/'),
-      payload,
+      payload
     );
     return response.data;
   },
@@ -2248,7 +2722,7 @@ export const safetyApi = {
   async updateScmMeeting(id: number | string, payload: SafetyScmCreatePayload) {
     const response = await apiClient.patch<SafetyScmMeeting>(
       buildSafetyApiUrl(`/scm/${id}/`),
-      payload,
+      payload
     );
     return response.data;
   },
@@ -2256,48 +2730,56 @@ export const safetyApi = {
   async submitScmMeeting(id: number | string, payload: SafetyScmSubmitPayload) {
     const response = await apiClient.post<SafetyScmMeeting>(
       buildSafetyApiUrl(`/scm/${id}/submit/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async addScmOfficeReview(id: number | string, payload: SafetyScmOfficeReviewPayload) {
+  async addScmOfficeReview(
+    id: number | string,
+    payload: SafetyScmOfficeReviewPayload
+  ) {
     const response = await apiClient.post<SafetyScmMeeting>(
       buildSafetyApiUrl(`/scm/${id}/office-comment/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getScmAgenda(
     id: number | string,
-    options: { includeCarriedForward?: boolean } = {},
+    options: { includeCarriedForward?: boolean } = {}
   ) {
-    const suffix = options.includeCarriedForward ? "?include_carried_forward=1" : "";
+    const suffix = options.includeCarriedForward
+      ? '?include_carried_forward=1'
+      : '';
     const response = await apiClient.get<SafetyScmAgendaPayload>(
-      buildSafetyApiUrl(`/scm/${id}/agenda/${suffix}`),
+      buildSafetyApiUrl(`/scm/${id}/agenda/${suffix}`)
     );
     return response.data;
   },
 
-  async updateScmAgenda(id: number | string, payload: SafetyScmAgendaUpdatePayload) {
+  async updateScmAgenda(
+    id: number | string,
+    payload: SafetyScmAgendaUpdatePayload
+  ) {
     const response = await apiClient.patch<SafetyScmAgendaPayload>(
       buildSafetyApiUrl(`/scm/${id}/agenda/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getScmClosedSinceLast(id: number | string) {
     const response = await apiClient.get<SafetyScmClosedSinceLastPayload>(
-      buildSafetyApiUrl(`/scm/${id}/closed-since-last/`),
+      buildSafetyApiUrl(`/scm/${id}/closed-since-last/`)
     );
     return response.data;
   },
 
   async getScmAutoFeed(id: number | string) {
     const response = await apiClient.get<SafetyScmAutoFeedPayload>(
-      buildSafetyApiUrl(`/scm/${id}/auto-feed/`),
+      buildSafetyApiUrl(`/scm/${id}/auto-feed/`)
     );
     return response.data;
   },
@@ -2307,14 +2789,14 @@ export const safetyApi = {
       buildSafetyApiUrl('/soi/open-findings/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
 
   async getScmAttendance(id: number | string) {
     const response = await apiClient.get<SafetyScmAttendancePayload>(
-      buildSafetyApiUrl(`/scm/${id}/attendance/`),
+      buildSafetyApiUrl(`/scm/${id}/attendance/`)
     );
     return response.data;
   },
@@ -2322,19 +2804,26 @@ export const safetyApi = {
   async acknowledgeScmAttendance(id: number | string) {
     const response = await apiClient.post(
       buildSafetyApiUrl(`/scm/${id}/attendance/acknowledge/`),
-      { acknowledged: true },
+      { acknowledged: true }
     );
-    return response.data as { acknowledged: boolean; acknowledged_at?: string; acknowledged_by?: string };
+    return response.data as {
+      acknowledged: boolean;
+      acknowledged_at?: string;
+      acknowledged_by?: string;
+    };
   },
 
   async downloadScmPdf(id: number | string): Promise<SafetyDownloadResult> {
     const response = await apiClient.get<Blob>(
       buildSafetyApiUrl(`/export/scm/${id}/pdf/`),
-      { responseType: 'blob' },
+      { responseType: 'blob' }
     );
     return {
       blob: response.data,
-      fileName: extractFileName(response.headers['content-disposition'], `scm-${id}.pdf`),
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        `scm-${id}.pdf`
+      ),
     };
   },
 
@@ -2343,12 +2832,18 @@ export const safetyApi = {
       buildSafetyApiUrl('/soi/compliance/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
 
-  async getSoiCreateConfig(options: { plannedDate?: string; safetyOfficerCrewId?: string; vesselId?: string } = {}) {
+  async getSoiCreateConfig(
+    options: {
+      plannedDate?: string;
+      safetyOfficerCrewId?: string;
+      vesselId?: string;
+    } = {}
+  ) {
     const response = await apiClient.get<SafetySoiCreateConfigResponse>(
       buildSafetyApiUrl('/soi/create/'),
       {
@@ -2356,25 +2851,24 @@ export const safetyApi = {
           planned_date: options.plannedDate,
           vessel_id: options.vesselId,
         }),
-      },
+      }
     );
     return response.data;
   },
 
   async getSoiInspections(filters: SafetySoiFilters = {}) {
-    const response = await apiClient.get<SafetySoiInspection[] | PaginatedResponse<SafetySoiInspection>>(
-      buildSafetyApiUrl('/soi/'),
-      {
-        params: buildParams(filters),
-      },
-    );
+    const response = await apiClient.get<
+      SafetySoiInspection[] | PaginatedResponse<SafetySoiInspection>
+    >(buildSafetyApiUrl('/soi/'), {
+      params: buildParams(filters),
+    });
     return unwrapPaginatedResults(response.data);
   },
 
   async createSoiInspection(payload: SafetySoiCreatePayload) {
     const response = await apiClient.post<SafetySoiInspection>(
       buildSafetyApiUrl('/soi/'),
-      payload,
+      payload
     );
     return response.data;
   },
@@ -2384,25 +2878,28 @@ export const safetyApi = {
       buildSafetyApiUrl('/soi/officer-setting/'),
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
 
-  async updateSoiOfficerSetting(payload: SafetySoiOfficerSettingPayload, vesselId?: string | null) {
+  async updateSoiOfficerSetting(
+    payload: SafetySoiOfficerSettingPayload,
+    vesselId?: string | null
+  ) {
     const response = await apiClient.patch<SafetySoiOfficerSetting>(
       buildSafetyApiUrl('/soi/officer-setting/'),
       payload,
       {
         params: buildParams({ vessel_id: vesselId }),
-      },
+      }
     );
     return response.data;
   },
 
   async getSoiInspection(id: number | string) {
     const response = await apiClient.get<SafetySoiInspection>(
-      buildSafetyApiUrl(`/soi/${id}/`),
+      buildSafetyApiUrl(`/soi/${id}/`)
     );
     return response.data;
   },
@@ -2413,78 +2910,92 @@ export const safetyApi = {
       {
         params: buildParams({ format }),
         responseType: 'blob',
-      },
+      }
     );
     return {
       blob: response.data,
       fileName: extractFileName(
         response.headers['content-disposition'],
-        `soi-${id}.${format === 'PDF' ? 'pdf' : 'xlsx'}`,
+        `soi-${id}.${format === 'PDF' ? 'pdf' : 'xlsx'}`
       ),
     };
   },
 
-  async downloadSoiSummaryPdf(id: number | string): Promise<SafetyDownloadResult> {
+  async downloadSoiSummaryPdf(
+    id: number | string
+  ): Promise<SafetyDownloadResult> {
     const response = await apiClient.get<Blob>(
       buildSafetyApiUrl(`/soi/${id}/pdf/`),
-      { responseType: 'blob' },
+      { responseType: 'blob' }
     );
     return {
       blob: response.data,
-      fileName: extractFileName(response.headers['content-disposition'], `soi-${id}-summary.pdf`),
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        `soi-${id}-summary.pdf`
+      ),
     };
   },
 
-  async recoverSoiChecklist(id: number | string, payload: { format: 'PDF' | 'XLSX'; reason: string }) {
+  async recoverSoiChecklist(
+    id: number | string,
+    payload: { format: 'PDF' | 'XLSX'; reason: string }
+  ) {
     const response = await apiClient.post<Blob>(
       buildSafetyApiUrl(`/soi/${id}/lost-paper/recover/`),
       payload,
       {
         responseType: 'blob',
-      },
+      }
     );
     return {
       blob: response.data,
       fileName: extractFileName(
         response.headers['content-disposition'],
-        `soi-${id}-recovery.${payload.format === 'PDF' ? 'pdf' : 'xlsx'}`,
+        `soi-${id}-recovery.${payload.format === 'PDF' ? 'pdf' : 'xlsx'}`
       ),
     };
   },
 
   async getSoiPickAreas(id: number | string) {
     const response = await apiClient.get<SafetySoiPickAreasResponse>(
-      buildSafetyApiUrl(`/soi/${id}/pick-areas/`),
+      buildSafetyApiUrl(`/soi/${id}/pick-areas/`)
     );
     return response.data;
   },
 
   async getSoiCloseSnapshot(id: number | string) {
     const response = await apiClient.get<SafetySoiCloseSnapshot>(
-      buildSafetyApiUrl(`/soi/${id}/close/`),
+      buildSafetyApiUrl(`/soi/${id}/close/`)
     );
     return response.data;
   },
 
-  async closeSoiInspection(id: number | string, payload: SafetySoiClosePayload) {
+  async closeSoiInspection(
+    id: number | string,
+    payload: SafetySoiClosePayload
+  ) {
     const response = await apiClient.post<SafetySoiCloseSnapshot>(
       buildSafetyApiUrl(`/soi/${id}/close/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getSoiFindings(id: number | string) {
-    const response = await apiClient.get<SafetySoiFinding[] | PaginatedResponse<SafetySoiFinding>>(
-      buildSafetyApiUrl(`/soi/${id}/findings/`),
-    );
+    const response = await apiClient.get<
+      SafetySoiFinding[] | PaginatedResponse<SafetySoiFinding>
+    >(buildSafetyApiUrl(`/soi/${id}/findings/`));
     return unwrapPaginatedResults(response.data);
   },
 
-  async createSoiFinding(id: number | string, payload: SafetySoiFindingCreatePayload) {
+  async createSoiFinding(
+    id: number | string,
+    payload: SafetySoiFindingCreatePayload
+  ) {
     const response = await apiClient.post<SafetySoiFindingCreateResponse>(
       buildSafetyApiUrl(`/soi/${id}/findings/`),
-      payload,
+      payload
     );
     return response.data;
   },
@@ -2499,7 +3010,7 @@ export const safetyApi = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-      },
+      }
     );
     return response.data;
   },
@@ -2507,85 +3018,103 @@ export const safetyApi = {
   async submitSoiAreas(id: number | string, submittedAreaIds: number[]) {
     const response = await apiClient.post<SafetySoiFindingSubmitResponse>(
       buildSafetyApiUrl(`/soi/${id}/submit/`),
-      { submitted_area_ids: submittedAreaIds },
+      { submitted_area_ids: submittedAreaIds }
     );
     return response.data;
   },
 
   async getSoiFinding(findingId: number | string) {
     const response = await apiClient.get<SafetySoiFinding>(
-      buildSafetyApiUrl(`/soi/findings/${findingId}/`),
+      buildSafetyApiUrl(`/soi/findings/${findingId}/`)
     );
     return response.data;
   },
 
   async markSoiFindingPendingClosure(
     findingId: number | string,
-    payload: SafetySoiFindingPendingClosurePayload,
+    payload: SafetySoiFindingPendingClosurePayload
   ) {
     const response = await apiClient.post<SafetySoiFindingActionResponse>(
       buildSafetyApiUrl(`/soi/findings/${findingId}/pending-closure/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async approveSoiFindingClosure(findingId: number | string, payload: SafetySoiFindingApprovalPayload) {
+  async approveSoiFindingClosure(
+    findingId: number | string,
+    payload: SafetySoiFindingApprovalPayload
+  ) {
     const response = await apiClient.post<SafetySoiFindingActionResponse>(
       buildSafetyApiUrl(`/soi/findings/${findingId}/approve-closure/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async reopenSoiFinding(findingId: number | string, payload: SafetySoiFindingReopenPayload) {
+  async reopenSoiFinding(
+    findingId: number | string,
+    payload: SafetySoiFindingReopenPayload
+  ) {
     const response = await apiClient.post<SafetySoiFindingActionResponse>(
       buildSafetyApiUrl(`/soi/findings/${findingId}/reopen/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getSoiApplicabilityRequestScreen(id: number | string) {
     const response = await apiClient.get<SafetySoiApplicabilityRequestScreen>(
-      buildSafetyApiUrl(`/soi/${id}/applicability/request/`),
+      buildSafetyApiUrl(`/soi/${id}/applicability/request/`)
     );
     return response.data;
   },
 
-  async submitSoiApplicabilityRequest(id: number | string, payload: SafetySoiApplicabilityRequestPayload) {
+  async submitSoiApplicabilityRequest(
+    id: number | string,
+    payload: SafetySoiApplicabilityRequestPayload
+  ) {
     const response = await apiClient.post<SafetySoiApplicabilityRequestResult>(
       buildSafetyApiUrl(`/soi/${id}/applicability/request/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
   async getSoiApplicabilityApprovalScreen(id: number | string) {
     const response = await apiClient.get<SafetySoiApplicabilityApprovalScreen>(
-      buildSafetyApiUrl(`/soi/${id}/applicability/approve/`),
+      buildSafetyApiUrl(`/soi/${id}/applicability/approve/`)
     );
     return response.data;
   },
 
-  async submitSoiApplicabilityApproval(id: number | string, payload: SafetySoiApplicabilityApprovalPayload) {
+  async submitSoiApplicabilityApproval(
+    id: number | string,
+    payload: SafetySoiApplicabilityApprovalPayload
+  ) {
     const response = await apiClient.post<SafetySoiApplicabilityApprovalResult>(
       buildSafetyApiUrl(`/soi/${id}/applicability/approve/`),
-      payload,
+      payload
     );
     return response.data;
   },
 
-  async searchRecords(query: string, options: { includeArchived?: boolean; recordType?: string } = {}) {
+  async searchRecords(
+    query: string,
+    options: { includeArchived?: boolean; recordType?: string } = {}
+  ) {
     const response = await apiClient.get<SafetySearchResponse>(
       buildSafetyApiUrl('/search/'),
       {
         params: buildParams({
           q: query,
           include_archived: options.includeArchived,
-          record_type: options.recordType && options.recordType !== 'ALL' ? options.recordType : undefined,
+          record_type:
+            options.recordType && options.recordType !== 'ALL'
+              ? options.recordType
+              : undefined,
         }),
-      },
+      }
     );
     return response.data;
   },

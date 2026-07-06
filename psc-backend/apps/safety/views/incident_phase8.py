@@ -6,11 +6,12 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasProcessPermission
-from apps.safety.models import Incident, RecommendationVerification, SafetyFieldHistory
+from apps.safety.models import Incident, IncidentLossEvaluation, RecommendationVerification, SafetyFieldHistory
 from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers.incident_phase8 import (
     IncidentPhase8CloseSerializer,
     IncidentPhase8VerifySerializer,
+    IncidentLossEvaluationSerializer,
     RecommendationVerificationSerializer,
     build_phase8_workspace_payload,
 )
@@ -19,7 +20,6 @@ from apps.safety.services.phase_state_machine import PhaseStateMachine
 from apps.safety.views.incident import IncidentViewMixin, _normalized_role
 
 
-FM_ROLE_CODES = {"FM", "FLEET MANAGER"}
 DPA_ROLE_CODES = {"DPA"}
 GREEN_BAND_PIC_ROLE_CODES = {
     "PIC",
@@ -28,6 +28,7 @@ GREEN_BAND_PIC_ROLE_CODES = {
     "OFFICE_SSQE",
     "OFFICE_SUPT",
 }
+OFFICE_DECISION_ROLE_CODES = DPA_ROLE_CODES | GREEN_BAND_PIC_ROLE_CODES
 
 
 class IncidentPhase8ViewMixin(IncidentViewMixin):
@@ -49,43 +50,63 @@ class IncidentPhase8ViewMixin(IncidentViewMixin):
 
     def _require_phase_eight(self, incident: Incident) -> None:
         if incident.current_phase != 8:
-            raise ValidationError("Phase 8 actions require current_phase = 8.")
+            raise ValidationError("Loss Evaluation is available after Office Review approval.")
 
     def _require_any_process_permission(self, process_ids: list[str]) -> None:
         for process_id in process_ids:
             permission = HasProcessPermission.requiring(process_id)()
             if permission.has_permission(self.request, self):
                 return
-        raise PermissionDenied("You do not have permission to perform this Phase 8 action.")
+        raise PermissionDenied("You do not have permission to update Loss Evaluation.")
 
     def _enforce_band_actor(self, incident: Incident) -> None:
         role = _normalized_role(self.request.user)
-        actor_id = resolve_actor_id(self.request.user)
-        actor_id_normalized = actor_id.strip().upper()
-        if incident.risk_band == Incident.RiskBand.GREEN:
-            assigned_pic = (incident.pic_user_id or "").strip().upper()
-            is_role_based_pic = assigned_pic in GREEN_BAND_PIC_ROLE_CODES
-            if actor_id_normalized != assigned_pic and not (
-                is_role_based_pic and role in GREEN_BAND_PIC_ROLE_CODES
-            ):
-                raise PermissionDenied("GREEN-band Phase 8 actions are restricted to the assigned PIC.")
-            return
-        if incident.risk_band == Incident.RiskBand.YELLOW:
-            if role not in DPA_ROLE_CODES:
-                raise PermissionDenied("YELLOW-band Phase 8 actions are restricted to DPA.")
-            return
-        if incident.risk_band == Incident.RiskBand.RED:
-            if role not in (DPA_ROLE_CODES | FM_ROLE_CODES):
-                raise PermissionDenied("RED-band Phase 8 actions are restricted to DPA or FM in the handover workspace.")
-            return
-        raise ValidationError("Incident risk band must be assigned before Phase 8 actions.")
+        if role not in OFFICE_DECISION_ROLE_CODES:
+            raise PermissionDenied("Loss Evaluation is restricted to PIC or DPA.")
 
 
 class IncidentPhase8WorkspaceView(IncidentPhase8ViewMixin, generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         incident = self.get_incident()
         self._require_phase_eight(incident)
+        return Response(build_phase8_workspace_payload(incident), status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        incident = self.get_incident()
+        self._require_phase_eight(incident)
         self._enforce_band_actor(incident)
+
+        try:
+            loss_evaluation = incident.loss_evaluation
+            old_state = capture_model_state(loss_evaluation)
+        except IncidentLossEvaluation.DoesNotExist:
+            loss_evaluation = None
+            old_state = {}
+
+        serializer = IncidentLossEvaluationSerializer(
+            loss_evaluation,
+            data=request.data,
+            partial=True,
+            context={"incident": incident, "user": request.user},
+        )
+        serializer.is_valid(raise_exception=True)
+        saved = serializer.save()
+
+        tracked_fields = tuple(
+            field_name
+            for field_name in IncidentLossEvaluationSerializer.Meta.fields
+            if field_name not in {"id", "updated_date"}
+        )
+        if not old_state:
+            old_state = {field_name: None for field_name in tracked_fields}
+        record_field_changes(
+            saved,
+            old_state,
+            user=request.user,
+            field_names=tracked_fields,
+            change_reason="Phase 7 Loss Evaluation saved.",
+        )
+
         return Response(build_phase8_workspace_payload(incident), status=status.HTTP_200_OK)
 
 
@@ -96,9 +117,6 @@ class IncidentPhase8VerifyView(IncidentPhase8ViewMixin, generics.GenericAPIView)
         incident = self.get_incident()
         self._require_phase_eight(incident)
         self._enforce_band_actor(incident)
-        self._require_any_process_permission(
-            ["SAF_P_004", "SAF_P_005"] if incident.risk_band == Incident.RiskBand.RED else ["SAF_P_004"]
-        )
 
         serializer = self.get_serializer(data=request.data, context={"incident": incident})
         serializer.is_valid(raise_exception=True)
@@ -169,13 +187,13 @@ class IncidentPhase8CloseView(IncidentPhase8ViewMixin, generics.GenericAPIView):
         incident = self.get_incident()
         self._require_phase_eight(incident)
         self._enforce_band_actor(incident)
-        self._require_any_process_permission(
-            ["SAF_P_004", "SAF_P_005"] if incident.risk_band == Incident.RiskBand.RED else ["SAF_P_004"]
-        )
 
-        tracker = build_phase8_workspace_payload(incident)
-        if tracker["blockers"]:
-            raise ValidationError({"blockers": tracker["blockers"]})
+        try:
+            incident.loss_evaluation
+        except IncidentLossEvaluation.DoesNotExist as exc:
+            raise ValidationError(
+                {"loss_evaluation": "Save Loss Evaluation before closing the incident."}
+            ) from exc
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -199,7 +217,7 @@ class IncidentPhase8CloseView(IncidentPhase8ViewMixin, generics.GenericAPIView):
             old_state,
             user=request.user,
             field_names=("current_phase", "state", "closed_at", "closure_reason"),
-            change_reason="Phase 8 effectiveness verification advanced the incident to Phase 9 closure.",
+            change_reason="Phase 7 Loss Evaluation closed the incident.",
         )
         return Response(
             {

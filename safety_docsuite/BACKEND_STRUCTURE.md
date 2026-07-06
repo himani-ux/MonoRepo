@@ -1,7 +1,7 @@
 # BACKEND_STRUCTURE.md — Database, APIs, Auth
 ## VIMS Safety Module — Incident / Near Miss / SCM / SOI
 
-**Version:** 1.0 | **Date:** 2026-06-09 | **Status:** INITIAL RELEASE | **Target DB:** `ksm_marine_live` (shared SQL Server)
+**Version:** 1.0 | **Date:** 2026-06-15 | **Status:** INITIAL RELEASE | **Target DB:** `ksm_marine_live` (shared SQL Server)
 
 > This document is the single source of truth for the Safety module's persistence layer, REST contracts, and authorization chain. Every `CREATE TABLE`, every `/api/safety/*` endpoint, every cross-module live-join is enumerated here. It is consumed by Django (apps.safety), React (`src/routes/safety/`), and downstream PDF/dashboard services.
 
@@ -11,6 +11,12 @@
 > **Safety test-data reset:** Migration `safety.0032_uuid_id_final_cleanup` reset and recreated Safety-owned managed tables only during the test-phase UUID cleanup. External/shared VIMS tables were not touched. Transactional integer IDs were not retained because test data was reset; Safety-owned master/reference seed tables may retain `legacy_int_id` for seed compatibility and audit of prior seeded integer values.
 > **Seed/bootstrap rule:** Safety seed and bootstrap paths must be idempotent. Reference/master seed commands match rows by natural keys and must not duplicate rows. Raw SQL seed paths must insert UUID `id` values explicitly when bypassing model defaults.
 > **External/shared table rule:** Vessel, Crew, WRH, PMS, Circular, Purchase, auth/profile, and other shared non-Safety tables are not converted by the Safety UUID identity cleanup.
+
+> **Incident backend update (2026-06-12):** The simplified incident workflow requires `vims_safety_incident.office_notified`, `office_notification_mode`, `loss_type_secondary_id`, `loss_type_tertiary_id`, and `loss_type_other`. Deploy migrations `0037_incident_office_notification_fields.py` and `0038_incident_multiple_loss_types.py` before deploying incident UI/API code that references these fields. Public incident routes follow the simplified phase contract in the Safety SSOT section 3.0; older backend class names and legacy URL aliases remain compatibility details only.
+>
+> **Incident Office Review update (2026-07-03):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields.
+
+> **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
 ---
 
@@ -118,7 +124,7 @@ Safety is a **child Django app inside the VIMS monorepo** — not a standalone s
 │           │                                 master_loss_types (7),
 │           │                                 master_soi_area (13),
 │           │                                 master_soi_area_item (329),
-│           │                                 master_safety_incident_type (11),
+│           │                                 master_safety_incident_type (32 active),
 │           │                                 master_safety_bias_guard (8) from
 │           │                                 safety-reference-data/*.csv
 │           └── 0003_seed_permission_ids.py ← Register SAF_F_001–020 + SAF_P_001–024 into
@@ -307,7 +313,7 @@ Mirror Reporting's `RPT_F_*` / `RPT_P_*` pattern. Registered in `msc_profiles` b
 | `SAF_P_001` | Create incident / near miss |
 | `SAF_P_002` | Submit phase transition |
 | `SAF_P_003` | Request phase loop-back (Phase 5→3, Phase 6→3) |
-| `SAF_P_004` | DPA accept (Phase 7) |
+| `SAF_P_004` | Office Review accept |
 | `SAF_P_005` | FM approve RED closure |
 | `SAF_P_006` | PIC close GREEN |
 | `SAF_P_007` | PDF/export and formal close actions (SOI closure, incident); SCM closure is Office Comment |
@@ -409,7 +415,7 @@ CREATE TABLE vims_safety_incident (
   phase                       TINYINT       NOT NULL,          -- 1..8; derived from state
   risk_band                   VARCHAR(8)    NULL,              -- CHECK IN ('GREEN','YELLOW','RED') §2B.3; NULL until Phase 1 classifier runs
   imo_classifier              VARCHAR(16)   NULL,              -- CHECK IN ('SMC','MC','MI','NOT_APPLICABLE') D-GAP-R08
-  incident_type_id            INT           NULL,              -- FK → master_safety_incident_type.id (11 rows §2B.5)
+  incident_type_id            INT           NULL,              -- FK → master_safety_incident_type.id (32 active rows §2B.5)
   loss_type_primary_id        INT           NULL,              -- FK → master_loss_types.id (7 rows §2B.4)
   investigation_depth         VARCHAR(8)    NULL,              -- CHECK IN ('SHALLOW','MEDIUM','DEEP') D-GAP-R14
   -- ── Phase 1 intake ─────────────────────────────────────────────────
@@ -417,11 +423,17 @@ CREATE TABLE vims_safety_incident (
   reported_at                 DATETIME2     NULL,
   latitude                    DECIMAL(9,6)  NULL,
   longitude                   DECIMAL(9,6)  NULL,
+  shore_assistance_required   BIT           NULL,              -- CR-024: main incident reporting context shared by incident/injury reporting
+  vessel_location             NVARCHAR(128) NULL,
+  onboard_location            NVARCHAR(128) NULL,
+  last_port                   NVARCHAR(128) NULL,
+  departure_date              DATE          NULL,
+  vessel_condition            VARCHAR(16)   NULL,              -- 'LOADED' | 'BALLAST'
   position_source             VARCHAR(32)   NULL,              -- 'DAILY_REPORT_AUTO' | 'MANUAL' | 'DAILY_REPORT_EDITED' (D-GAP-M09)
   position_daily_report_id    UNIQUEIDENTIFIER NULL,           -- FK → vims_noon_report / DepartureReport / ArrivalReport (live join; no hard FK — cross-module table union)
   narrative                   NVARCHAR(MAX) NULL,              -- min 200 chars at Phase 1 submit (V-INC-001)
   awaiting_daily_report_match BIT           NOT NULL DEFAULT 0,-- D-GAP-M10: flag when no DR within ±12h
-  first_hour_checklist_done   BIT           NOT NULL DEFAULT 0,-- D-GAP-R07 scene-protection (V-INC-006)
+  first_hour_checklist_done   BIT           NOT NULL DEFAULT 0,-- legacy storage only; not exposed in current Phase 1 UI/API/PDF (D-MAINT-CR018)
   -- ── Phase 2 notification + resources ──────────────────────────────
   slack_notified_at           DATETIME2     NULL,
   notification_channel_count  INT           NOT NULL DEFAULT 0,
@@ -432,9 +444,10 @@ CREATE TABLE vims_safety_incident (
   near_miss_shell_tag         VARCHAR(32)   NULL,              -- first selected category tag for compatibility
   near_miss_category_tags     NVARCHAR(MAX) NULL,              -- JSON array, up to 3 category tags
   near_miss_incident_type_ids NVARCHAR(MAX) NULL,              -- legacy compatibility only; Near Miss Type is not shown in V1 UI
-  near_miss_mscat_category_id INT           NULL,              -- first selected immediate-cause category for compatibility
-  near_miss_mscat_subcode_id  VARCHAR(16)   NULL,              -- first selected immediate-cause subcode for compatibility
-  near_miss_mscat_subcode_ids NVARCHAR(MAX) NULL,              -- JSON array, up to 3 immediate-cause subcodes
+  near_miss_mscat_category_id INT           NULL,              -- legacy compatibility only; new create/rework clears this
+  near_miss_mscat_subcode_id  VARCHAR(16)   NULL,              -- legacy compatibility only; new create/rework clears this
+  near_miss_mscat_subcode_ids NVARCHAR(MAX) NULL,              -- legacy compatibility only; new create/rework clears this
+  near_miss_factor_causes     NVARCHAR(MAX) NULL,              -- JSON factor causes: HUMAN/VESSEL/MANAGEMENT/OTHER x IMMEDIATE/ROOT
   reporter_id                 NVARCHAR(64)  NULL,              -- CrewId or user_id — visible by vessel scope + Safety permission
   reporter_name               NVARCHAR(128) NULL,
   reporter_rank               NVARCHAR(64)  NULL,
@@ -451,11 +464,12 @@ CREATE TABLE vims_safety_incident (
   alarp_attested              BIT           NOT NULL DEFAULT 0,-- D-GAP-R02 (RED/YELLOW hard gate)
   bias_guard_attestations     VARCHAR(64)   NOT NULL DEFAULT '',-- bitmask of 8 guards (D-DNV-11 + D-GAP-R12)
   blame_fixation_override_by  NVARCHAR(64)  NULL,              -- D-DNV-11 #5 override (DPA GREEN/YELLOW; FM RED)
-  -- ── Phase 7 acceptance ────────────────────────────────────────────
+  -- ── Office Review acceptance ──────────────────────────────────────
   dpa_accepted_at             DATETIME2     NULL,
   dpa_accepted_by             NVARCHAR(64)  NULL,
   fm_approved_at              DATETIME2     NULL,              -- RED-only closure per D-GAP-M06
   fm_approved_by              NVARCHAR(64)  NULL,
+  office_comment              NVARCHAR(MAX) NULL,              -- Visible Phase 6 Office Review comments; no word/character limit
   closed_at                   DATETIME2     NULL,
   closure_reason              NVARCHAR(MAX) NULL,
   -- ── Multi-vessel linkage (D-EDGE-01, D-GAP-M25) ───────────────────
@@ -490,6 +504,182 @@ CREATE INDEX IX_vims_safety_incident_linked     ON vims_safety_incident (linked_
 ```
 
 Triggers: none (use Django ORM pre/post-save signals in `apps/safety/signals.py` to write `vims_safety_incident_phase_log` and `vims_safety_field_history` rows). Trigger-free approach matches the Reporting module precedent (§3 SP Wrapper pattern) and keeps audit logic in application code testable under pytest.
+
+### 4.0A `vims_safety_external_party_injury` - Phase 1 injury record
+
+The physical table name remains `vims_safety_external_party_injury` for backwards compatibility, but the functional record now supports both crew and non-crew injuries. The discriminator is `injured_person_type`.
+
+```sql
+ALTER TABLE vims_safety_external_party_injury ADD injured_person_type VARCHAR(16) NOT NULL DEFAULT 'NON_CREW';
+ALTER TABLE vims_safety_external_party_injury ALTER COLUMN party_name NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ALTER COLUMN party_type VARCHAR(32) NULL;
+ALTER TABLE vims_safety_external_party_injury ALTER COLUMN company_name NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ALTER COLUMN severity NVARCHAR(64) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD crew_rank NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD crew_age SMALLINT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD crew_activity_type NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD shore_assistance_required BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD vessel_location NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD onboard_location NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD last_port NVARCHAR(128) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD departure_date DATE NULL;
+ALTER TABLE vims_safety_external_party_injury ADD vessel_condition VARCHAR(16) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD what_happened_narrative NVARCHAR(MAX) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD nature_of_injury NVARCHAR(255) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD source_of_injury NVARCHAR(255) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD affected_body_areas NVARCHAR(255) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD first_aid_details NVARCHAR(MAX) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD why_it_happened_analysis NVARCHAR(MAX) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD regulation_or_procedure_breach NVARCHAR(MAX) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD risk_assessment_carried_out VARCHAR(8) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD toolbox_meeting_carried_out VARCHAR(8) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD prevention_action_taken_required NVARCHAR(MAX) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_fatality BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_permanent_total_disability BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_permanent_partial_disability BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_lost_workday_case BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_restricted_workday_case BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_medical_treatment_case BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD ocimf_first_aid_case BIT NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_medicines_onboard DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_doctor_visits DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_repatriation DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_evacuation DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_off_hire DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_vessel_delays DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_man_hours_lost DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_deviation DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD cost_miscellaneous DECIMAL(12,2) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD miscellaneous_expenses_reason NVARCHAR(MAX) NULL;
+ALTER TABLE vims_safety_external_party_injury ADD total_estimated_cost DECIMAL(12,2) NULL;
+```
+
+Serializer contract: `external_party_injury` is nested in Phase 1 create/update. Non-crew requires the original fields; crew details are nullable draft fields. The old injury-row context columns `shore_assistance_required`, `vessel_location`, `onboard_location`, `last_port`, `departure_date`, and `vessel_condition` remain for backward compatibility with older injury records, but the current Phase 1 UI/API source of truth is the incident-level columns added by CR-024. On update, a populated nested payload creates or updates the injury row; a null or omitted `external_party_injury` leaves any existing injury row unchanged.
+
+### 4.0B `vims_safety_injury_dropdown_option` - Injury dropdown master
+
+This table owns the Phase 1 crew injury dropdown values for `Nature of Injury`, `Source of Injury`, `Affected Areas of the Body`, and `Type of Activity`. It also owns the Phase 7 Injury Report `Code of Safe Working Practices` dropdown category through `field_key = SAFE_WORKING_PRACTICE`; those options are nullable until seeded. The selected label, or the typed value when `Others(Specify)` is used, is still stored in the transaction row that owns the field.
+
+```sql
+CREATE TABLE vims_safety_injury_dropdown_option (
+  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+  field_key     VARCHAR(32)      NOT NULL, -- NATURE_OF_INJURY | SOURCE_OF_INJURY | AFFECTED_BODY_AREA | TYPE_OF_ACTIVITY | SAFE_WORKING_PRACTICE
+  option_label  NVARCHAR(255)    NOT NULL,
+  display_order SMALLINT         NOT NULL DEFAULT 0,
+  active        BIT              NOT NULL DEFAULT 1,
+  created_by    NVARCHAR(128)    NOT NULL DEFAULT 'system',
+  created_date  DATETIME2        NOT NULL,
+  updated_by    NVARCHAR(128)    NULL,
+  updated_date  DATETIME2        NULL
+);
+
+ALTER TABLE vims_safety_injury_dropdown_option
+  ADD CONSTRAINT uq_injury_dropdown_field_label UNIQUE (field_key, option_label);
+
+CREATE INDEX ix_injury_dropdown_lookup
+  ON vims_safety_injury_dropdown_option (active, field_key, display_order);
+```
+
+Reference API:
+
+```text
+GET /api/safety/reference/injury-dropdown-options/
+GET /api/safety/reference/injury-dropdown-options/?field_key=NATURE_OF_INJURY
+GET /api/safety/reference/injury-dropdown-options/?field_key=TYPE_OF_ACTIVITY
+GET /api/safety/reference/injury-dropdown-options/?field_key=SAFE_WORKING_PRACTICE
+```
+
+### 4.0C `vims_safety_incident_loss_evaluation` - Phase 7 Loss Evaluation
+
+This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is required before Phase 7 close. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/` and backend `current_phase = 8`, but the payload is now Loss Evaluation rather than Check Actions.
+
+```sql
+CREATE TABLE vims_safety_incident_loss_evaluation (
+  id                                            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+  incident_id                                   UNIQUEIDENTIFIER NOT NULL UNIQUE,
+  consequence                                   VARCHAR(32) NULL,
+  likelihood                                    VARCHAR(32) NULL,
+  risk_level                                    VARCHAR(32) NULL,
+  name_of_master                                NVARCHAR(128) NULL,
+  name_of_chief_engineer                        NVARCHAR(128) NULL,
+  repair_type                                   VARCHAR(32) NULL,
+  repair_details                                NVARCHAR(MAX) NULL,
+  last_overhaul_maintenance_survey_details      NVARCHAR(MAX) NULL,
+  safe_working_practice                         NVARCHAR(255) NULL,
+  man_hours_worked                              DECIMAL(10,2) NULL,
+  hours_worked_previous_day                     DECIMAL(10,2) NULL,
+  hours_rest_last_96_hours                      DECIMAL(10,2) NULL,
+  delay_to_vessel                               NVARCHAR(MAX) NULL,
+  delay_reason                                  NVARCHAR(MAX) NULL,
+  repair_man_hours_lost                         DECIMAL(10,2) NULL,
+  materials_used_repairs_onboard                NVARCHAR(MAX) NULL,
+  materials_specify_details                     NVARCHAR(MAX) NULL,
+  materials_reason                              NVARCHAR(MAX) NULL,
+  deviation                                     BIT NULL,
+  off_hire                                      BIT NULL,
+  injury_man_hours_lost                         DECIMAL(10,2) NULL,
+  injury_reasons                                NVARCHAR(MAX) NULL,
+  repatriation                                  BIT NULL,
+  hospitalization                               BIT NULL,
+  evacuation                                    BIT NULL,
+  estimated_cost_off_hire                       DECIMAL(12,2) NULL,
+  estimated_cost_delay                          DECIMAL(12,2) NULL,
+  estimated_cost_man_hours                      DECIMAL(12,2) NULL,
+  estimated_cost_deviation                      DECIMAL(12,2) NULL,
+  estimated_cost_materials                      DECIMAL(12,2) NULL,
+  estimated_cost_miscellaneous                  DECIMAL(12,2) NULL,
+  total_estimated_cost                          DECIMAL(12,2) NULL,
+  miscellaneous_expenses_reason                 NVARCHAR(MAX) NULL,
+  cost_medicines_onboard                        DECIMAL(12,2) NULL,
+  cost_doctor_visits                            DECIMAL(12,2) NULL,
+  cost_repatriation                             DECIMAL(12,2) NULL,
+  cost_evacuation                               DECIMAL(12,2) NULL,
+  cost_injury_delay                             DECIMAL(12,2) NULL,
+  cost_injury_man_hours                         DECIMAL(12,2) NULL,
+  cost_injury_deviation                         DECIMAL(12,2) NULL,
+  cost_injury_miscellaneous                     DECIMAL(12,2) NULL,
+  injury_total_estimated_cost                   DECIMAL(12,2) NULL,
+  injury_miscellaneous_expenses_reason          NVARCHAR(MAX) NULL,
+  schema_version                                INT NOT NULL DEFAULT 1,
+  created_by                                    NVARCHAR(128) NOT NULL,
+  created_date                                  DATETIME2 NOT NULL,
+  updated_by                                    NVARCHAR(128) NULL,
+  updated_date                                  DATETIME2 NULL
+);
+```
+
+Dropdown constraints:
+- `consequence`: `MINOR`, `APPRECIABLE`, `MAJOR`, `SEVERE`, `CATASTROPHIC`.
+- `likelihood`: `REMOTE`, `UNLIKELY`, `POSSIBLE`, `LIKELY`, `ALMOST_CERTAIN`.
+- `risk_level`: `VERY_LOW`, `LOW`, `MEDIUM`, `HIGH`, `VERY_HIGH`.
+- `repair_type`: `TEMPORARY`, `PERMANENT`.
+
+### 4.1A `vims_safety_near_miss_cause_option` — Near Miss cause dropdown seed table
+
+This table owns the Near Miss factor-cause dropdown values. It is separate from `master_mscat_taxonomy` because Near Miss uses a simpler crew-facing cause model.
+
+```sql
+CREATE TABLE vims_safety_near_miss_cause_option (
+  id             UNIQUEIDENTIFIER NOT NULL,
+  factor         VARCHAR(16)      NOT NULL,  -- HUMAN | VESSEL | MANAGEMENT | OTHER
+  cause_stage    VARCHAR(16)      NOT NULL,  -- IMMEDIATE | ROOT
+  option_code    NVARCHAR(64)     NOT NULL,
+  option_text    NVARCHAR(MAX)    NOT NULL,
+  display_order  SMALLINT         NOT NULL DEFAULT 0,
+  active         BIT              NOT NULL DEFAULT 1,
+  created_by     NVARCHAR(128)    NOT NULL DEFAULT 'system',
+  created_date   DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_by     NVARCHAR(128)    NULL,
+  updated_date   DATETIME2        NULL,
+  CONSTRAINT PK_vims_safety_near_miss_cause_option PRIMARY KEY CLUSTERED (id),
+  CONSTRAINT uq_nm_cause_option_factor_stage_code UNIQUE (factor, cause_stage, option_code)
+);
+
+CREATE INDEX ix_nm_cause_option_lookup
+  ON vims_safety_near_miss_cause_option (active, factor, cause_stage);
+```
+
+Seed rows: 128 active options total across four factors and two cause stages. Every factor/stage includes `Other` and `Not Applicable`. The API resolves selections by UUID `id` and stores the selected labels/codes as JSON text on `vims_safety_incident.near_miss_factor_causes`.
 
 ### 4.2 `vims_safety_incident_phase_log` — append-only state-change audit
 
@@ -828,11 +1018,11 @@ CREATE TABLE vims_safety_scm_attendance (
   display_name                NVARCHAR(128) NOT NULL,
   present                     BIT           NOT NULL DEFAULT 1,
   absence_reason              NVARCHAR(MAX) NULL,
-  -- WRH live-join snapshot (D-GAP-M11 warn-don't-block)
+  -- WRH live-join snapshot (D-GAP-M11; creation readiness gate D-MAINT-CR014)
   wrh_data_available          BIT           NOT NULL DEFAULT 1,   -- FALSE → render "WRH data unavailable" badge
   wrh_rest_hours_24h          DECIMAL(5,2)  NULL,                 -- Previous 24h rest hours from wrh_attendance
   wrh_rest_hours_7d           DECIMAL(5,2)  NULL,                 -- Previous 7d rest hours
-  wrh_non_compliance_flag     BIT           NOT NULL DEFAULT 0,   -- TRUE → warn-only; never blocks SCM workflow
+  wrh_non_compliance_flag     BIT           NOT NULL DEFAULT 0,   -- TRUE blocks new SCM hosting; warning-only after meeting exists
   remarks                     NVARCHAR(MAX) NULL,
   schema_version              INT           NOT NULL DEFAULT 1,
   CONSTRAINT PK_vims_safety_scm_attendance PRIMARY KEY (id),
@@ -965,6 +1155,8 @@ CREATE INDEX IX_vims_safety_recommendation_theme    ON vims_safety_recommendatio
   WHERE theme_code IS NOT NULL;
 CREATE INDEX IX_vims_safety_recommendation_alarp    ON vims_safety_recommendation (alarp_attested);
 ```
+
+CR-033 compatibility note: `rationale` remains nullable storage for old recommendation rows and direct API compatibility, but the current Incident Next Actions frontend does not render or send the recommendation rationale / "Why is this needed?" field for corrective, preventive, or lesson entries. Formal Incident PDF output also omits stored recommendation rationale.
 
 ---
 
@@ -1152,7 +1344,7 @@ CREATE TABLE master_soi_checklist_version (
 CREATE INDEX IX_master_soi_checklist_version_effective ON master_soi_checklist_version (effective_from, effective_to);
 ```
 
-### 5.7 `master_safety_incident_type` — 11 rows (§2B.5, D-DNV-04)
+### 5.7 `master_safety_incident_type` — 32 active rows (§2B.5, D-DNV-04 superseded by D-MAINT-CR031)
 
 ```sql
 CREATE TABLE master_safety_incident_type (
@@ -1169,7 +1361,7 @@ CREATE TABLE master_safety_incident_type (
 );
 ```
 
-**Seed rows (11 IMO reportable types per §2B.5):** Collision, Grounding, Contact, Fire/Explosion, Hull Failure, Machinery Damage, Flooding, Capsize/Listing, Missing/Loss at Sea, Occupational Accident, Pollution. Each row has `imo_reportable=1`.
+**Seed rows (32 active incident types per §2B.5):** Collision, Grounding, Stranding, Touched bottom at berth / anchorage, Touched bottom in rivers / canals, Allision with Jetty / Berth / Locks, Allision with other Vessels, Allision with ice, Allision with Navigation Aids / Buoys / Other objects, Foundering, Capsizing / Loss of Stability, Flooding, Explosion, Fire, Cargo Damage, Hull / Structural Failure, pipeline/submarine-cable fouling or damage, aid-to-navigation fouling or damage other than allision, port/terminal installation fouling or damage, equipment failure causing electrical-power loss, equipment failure causing propulsion loss, equipment failure causing steering loss, equipment failure causing cargo-operation delay over 6 hours, equipment failure rendering vessel otherwise unseaworthy, equipment or hull failure causing cargo damage, Crew Injury, Pollution, Breach of Local Regulations, Stowaway Incident, Security Incident, Breach of Cyber Security, Other. Retired earlier rows, including `IMO_MISSING_VESSEL`, are inactive or absent from new seeds and are not offered for new selection. Each active row has `imo_reportable=1`.
 
 ### 5.8 `master_safety_bias_guard` — 8 rows (Round 21 R12)
 
@@ -1227,6 +1419,7 @@ All inline index statements are already rendered with each `CREATE TABLE` above.
 | `vims_safety_incident` | `(vessel_id, occurred_at)` filtered `is_deleted=0` | List by vessel + date |
 | `vims_safety_incident` | `(state)` filtered `is_deleted=0` | Phase-workbench filter |
 | `vims_safety_incident` | `(record_type, state)` | Near-miss-only queries |
+| `vims_safety_near_miss_cause_option` | `(active, factor, cause_stage)` | Near-miss factor cause dropdown |
 | `vims_safety_incident_phase_log` | `(incident_id, occurred_at)` | Audit timeline render |
 | `vims_safety_field_history` | `(parent_table, parent_id, changed_at)` | Field-history detail render |
 | `vims_safety_soi_inspection` | `(vessel_id, state)` | SOI list per vessel |
@@ -1323,7 +1516,7 @@ List incidents/near-misses with filters + pagination.
 
 - **Auth:** `SAF_F_001`. Ship users see own vessel (`Crew_Onboarding_History`); office users filtered by `master_RoleByVessel`.
 - **Query params:** `vessel_id` (UUID), `record_type` (INCIDENT | NEAR_MISS), `state`, `risk_band`, `date_from`, `date_to`, `page`, `page_size` (max 100).
-- **Response 200:** paginated list. Near-miss rows pass through `AnonymityMixin` — reporter fields stripped for roles ∉ {DPA, FM, reporter}.
+- **Response 200:** paginated list. Near-miss rows include reporter fields for authorized users within vessel scope; anonymous/masked reporter display is not used.
 - **Response 403:** vessel out of scope.
 
 ```json
@@ -1355,13 +1548,18 @@ Create incident / near miss. `record_type` in body determines row class.
     "reported_at": "2026-04-10T03:50:00Z",
     "narrative": "at least 200 chars ...",
     "latitude": 1.25, "longitude": 103.85,
+    "shore_assistance_required": false,
+    "vessel_location": "At sea",
+    "onboard_location": "Main deck",
+    "last_port": "Singapore",
+    "departure_date": "2026-04-09",
+    "vessel_condition": "LOADED",
     "incident_type_id": 7,
-    "loss_type_primary_id": 1,
-    "first_hour_checklist_done": true
+    "loss_type_primary_id": 1
   }
   ```
 - **Response 201:** `{ "id": 123, "incident_number": "EBK/2026/DRAFT-0001", "state": "DRAFT", ... }`.
-- **Errors:** 422 V-INC-001 (narrative <200 chars), V-INC-002/003/004 (timestamp sanity), V-INC-006 (first_hour_checklist false), V-INC-005 (vessel out of scope), V-INC-012 (position missing when imo_classifier set).
+- **Errors:** 422 V-INC-001 (narrative <200 chars), V-INC-002/003/004 (timestamp sanity), V-INC-005 (vessel out of scope), V-INC-012 (position missing when imo_classifier set).
 
 #### 9.2.3 `GET /api/safety/incidents/{id}/`
 
@@ -1373,10 +1571,34 @@ Full detail. Near-miss reporter details are returned for authorized users within
 
 #### 9.2.4 `PATCH /api/safety/incidents/{id}/`
 
-Edit within allowed phase. Every field change emits a `vims_safety_field_history` row (D-EDGE-10).
+Edit within the incident edit window. Advancing to a later phase does not lock earlier phase edits. User-facing investigation save endpoints remain editable for authorized users until office approval locks the incident, even when the incident `current_phase` has not reached the legacy backend phase number for that data. This includes RCA, facts/evidence helpers, corrective action, preventive action, evidence documents, and witness statements. The former Lessons Learned screen is not a current edit surface; legacy `LESSONS_LEARNT` rows remain readable for old records/API compatibility. The lock starts when `state` is `APPROVED`, `CLOSED`, or `SUPERSEDED`. Every field change emits a `vims_safety_field_history` row (D-EDGE-10).
 
-- **Auth:** `SAF_F_001` + role-phase matrix (Draft→creator only; Phase 3→investigator per risk band; Phase 7→DPA; Phase 8→FM for RED).
-- **Errors:** 403 if not in role-phase window; 422 per VALIDATION_RULES §2.
+- **Auth:** `SAF_F_001` + role/phase matrix. User-facing Phase 2-6 save endpoints require an allowed edit role and an incident that has not been office-approved, closed, or superseded; they do not require the legacy backend phase number to have been reached. Submit/continue endpoints still enforce ordered workflow movement.
+- **Phase 1 edit:** `GET/PATCH /api/safety/incidents/{id}/phase-1/` uses the same edit window. Null `external_party_injury` does not delete saved injury details.
+- **Phase 2 edit:** explicit `imo_classifier` values (`SMC`, `MC`, `MI`) are preserved and validated. The system defaults to `NOT_APPLICABLE` only when no classifier exists. Position is required when the classifier is `SMC`, `MC`, or `MI`.
+- **Errors:** 403 if not in role-phase window; 400 if office approval has locked the incident; 422 per VALIDATION_RULES §2.
+
+#### 9.2.4a Phase 4 evidence documents (CR-012, CR-013)
+
+The current user-facing evidence screen writes new evidence to the legacy `PAPER` tab only. Legacy `PEOPLE`, `POSITION`, `PARTS`, and `ELECTRONIC` rows still exist in serializers and storage for backward compatibility with older records. Authorized evidence editors can use these endpoints before Phase 4 is reached; the endpoints still reject records locked by office approval, closure, or supersession.
+
+- `GET/PATCH /api/safety/incidents/{id}/phase-4/evidence/` returns the legacy-compatible workspace payload.
+- `POST /api/safety/incidents/{id}/phase-4/evidence/attachments/` accepts multipart fields `tab_key=paper`, `file`, `title`, and optional `description`.
+- `PATCH /api/safety/incidents/{id}/phase-4/evidence/attachments/?path={attachment_path}` updates saved attachment `title` and `description` metadata on the existing attachment record and matching `EvidenceItem`; it does not replace the uploaded file.
+- `PATCH /api/safety/incidents/{id}/phase-4/interviews/{interview_id}/` updates an existing simplified Witness Statement row instead of creating a new witness row.
+- The upload response returns `attachment` metadata and refreshed `workspace`.
+- The attachment metadata stored in `IncidentEvidence.structured_data.attachments[]` includes `attachment_path`, `file_name`, `original_name`, `content_type`, `byte_size`, `tab_key`, `title`, `description`, and `uploaded_at`.
+- A matching `EvidenceItem` row is created with `item_type=PHYSICAL`, `title`, `description`, `source_label=PAPER`, and the same metadata JSON, so exports and later analysis can display the user-facing title instead of a raw file UUID/path.
+
+#### 9.2.4b Phase 7 Loss Evaluation (CR-047)
+
+Current visible Phase 7 uses backend compatibility phase 8 and route path `/phase-6/`.
+
+- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, `report_type` (`INCIDENT` or `INJURY`), fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation`, and `ready_for_close`.
+- `PATCH /api/safety/incidents/{id}/phase-6/` creates or updates the one-to-one `vims_safety_incident_loss_evaluation` row and emits `vims_safety_field_history` rows for changed fields.
+- `POST /api/safety/incidents/{id}/phase-6/close/` requires a saved Loss Evaluation row plus `closure_reason`, then transitions backend `current_phase` 8 to 9 and sets `state=CLOSED`.
+- `POST /api/safety/incidents/{id}/phase-6/verify/` remains registered for legacy effectiveness-verification compatibility but is not the current visible Phase 7 UI.
+- PIC and DPA can save and close for every risk band after Office Review approval.
 
 #### 9.2.5 `POST /api/safety/incidents/{id}/transition/`
 
@@ -1393,12 +1615,13 @@ Forward or loop-back phase transition. Writes `vims_safety_incident_phase_log`.
     "loop_back_reason": "New witness statement changes evidence picture" }
   ```
 - **Response 200:** updated incident + appended phase_log row.
-- **Errors:** 409 PhaseTransitionDenied with current_phase; 422 V-INC-040..056 (phase-specific preconditions); 422 V-INC-061 (ALARP not attested); 422 V-INC-044 (Blame-fixation without override); 422 loop_back_reason missing.
+- **Errors:** 409 PhaseTransitionDenied with current_phase; 422 V-INC-040..056 (phase-specific preconditions, excluding legacy V-INC-043 in the current UI); 422 V-INC-061 (ALARP not attested); 422 V-INC-044 (Blame-fixation without override); 422 loop_back_reason missing.
 
-#### 9.2.6 `POST /api/safety/incidents/{id}/accept/` (DPA acceptance — Phase 7)
+#### 9.2.6 `POST /api/safety/incidents/{id}/accept/` (Office Review acceptance)
 
 - **Auth:** `SAF_P_004`. Role must be DPA for GREEN/YELLOW. For RED the endpoint is `POST /api/safety/incidents/{id}/approve-red/` requiring `SAF_P_005` (FM).
-- **Response 200:** `{"state":"PHASE_7_DPA_ACCEPTED","dpa_accepted_at":"...","dpa_accepted_by":"..."}`.
+- **Request body:** `{"typed_name":"...","device_fingerprint":"...","office_comment":"..."}`. `office_comment` is optional, unrestricted text and is saved to `vims_safety_incident.office_comment` when supplied.
+- **Response 200:** `{"state":"PHASE_7_DPA_ACCEPTED","dpa_accepted_at":"...","dpa_accepted_by":"...","office_comment":"..."}`.
 
 #### 9.2.7 `POST /api/safety/incidents/{id}/close/`
 
@@ -1419,10 +1642,11 @@ Band-gated re-open (D-EDGE-03).
 
 #### 9.2.10 `GET /api/safety/incidents/{id}/pdf/`
 
-Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter template.
+Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter template. For incident exports, the rendered title is `Injury Report` when `vims_safety_external_party_injury` has a row for the incident; otherwise the rendered title is `Incident Report`. The Estimated Cost selection prints Phase 7 Loss Evaluation blocks from `vims_safety_incident_loss_evaluation` when that row exists; older injury cost fields are used only as fallback when no Loss Evaluation row exists.
 
 - **Auth:** `SAF_P_023`.
-- **Response 200:** `application/pdf` binary. Anonymity-stripped for roles ∉ {DPA, FM, reporter}.
+- **Query:** optional `sections`, accepted as repeated values or comma-separated keys. Current frontend defaults to `summary`, `reporter_details`, `injury_details`, `estimated_cost`, `root_cause`, `evidence_documents`, `corrective_preventive_actions`, and `signature`. The legacy backend key `lessons_learned` remains accepted for old/direct exports only. Omitted or empty `sections` renders all allowed backend sections for compatibility.
+- **Response 200:** `application/pdf` binary. Near-miss PDFs show reporter details for authorized users and must not print anonymous/masked-reporter wording. Incident PDFs render required signature rows by band even when unsigned, showing `Pending` for incomplete signature slots. Incident `office_comment` and closure reason print in the final Office Review / Closure area before Signature, not in Summary.
 
 #### 9.2.11 `POST /api/safety/incidents/{id}/link/`
 
@@ -1436,6 +1660,15 @@ Return reporter identity for authorized users within vessel scope. Anonymous/mas
 
 - **Auth:** `SAF_F_002` plus vessel scope and any stricter Safety permission configured for reporter-detail access. 404 if incident is not `record_type='NEAR_MISS'`.
 
+#### 9.2.13 `GET /api/safety/near-miss/cause-options/`
+
+Return active Near Miss cause dropdown options grouped by factor and cause stage.
+
+- **Auth:** Safety access and vessel scope where configured.
+- **Source:** `vims_safety_near_miss_cause_option`.
+- **Response 200:** active rows ordered by `factor`, `cause_stage`, `display_order`, and `option_text`.
+- **Usage:** Create and rework forms load this endpoint to render Human/Vessel/Management/Other Factors with Immediate Cause and Root Cause dropdowns. Selected values are saved as JSON text in `near_miss_factor_causes`.
+
 ### 9.3 SCM endpoints
 
 #### 9.3.1 `GET /api/safety/scm/`
@@ -1446,7 +1679,7 @@ List SCM meetings. Filter by `vessel_id`, `meeting_type`, `date_from`, `date_to`
 
 #### 9.3.2 `POST /api/safety/scm/`
 
-Create SCM draft. Ship-side — both `meeting_type=REGULAR` and `meeting_type=AD_HOC` can be created by Master or Chief Officer. Ad-Hoc requires `ad_hoc_trigger_reason`. Frontend "Submit to Office" saves the draft and immediately calls the submit endpoint below.
+Create SCM draft. Ship-side — both `meeting_type=REGULAR` and `meeting_type=AD_HOC` can be created by Master or Chief Officer. Ad-Hoc requires `ad_hoc_trigger_reason`. Before insert, the backend builds WRH host readiness for the vessel/date and submitted roster; creation is rejected unless ship-time configuration exists and every roster crew member has available, compliant WRH data (D-MAINT-CR014). Frontend "Submit to Office" saves the draft and immediately calls the submit endpoint below.
 
 - **Request body:**
   ```json
@@ -1457,6 +1690,7 @@ Create SCM draft. Ship-side — both `meeting_type=REGULAR` and `meeting_type=AD
     "voyage_no": "V2026-03"
   }
   ```
+- **Blocked response:** `400` with `detail="SCM meeting cannot be hosted until all WRH warnings are cleared."` and `wrh_host_readiness` containing `ready`, `missing_ship_time`, `checked_crew_count`, `warnings`, and `blocking_crew`.
 
 #### 9.3.2A `POST /api/safety/scm/{id}/submit/`
 
@@ -1464,7 +1698,7 @@ Submit SCM to office. Master or Chief Officer can submit a `DRAFT` meeting after
 
 #### 9.3.3 `GET|POST /api/safety/scm/{id}/attendance/`
 
-Read or bulk-save attendance rows. GET is visible to office reviewers so they can see the Attendance + WRH snapshot. POST/write is restricted to Master or Chief Officer while the SCM is not closed. For each row, the backend runs a **live join on `wrh_attendance` and `wrh_ship_time_config`** (D-GAP-M11, D-GAP-M26) to populate `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing WRH → `wrh_data_available=false`, warning surfaces in response, **never blocks**.
+Read or bulk-save attendance rows. GET is visible to office reviewers so they can see the Attendance + WRH snapshot. POST/write is restricted to Master or Chief Officer while the SCM is not closed. For each row, the backend runs a **live join on `wrh_attendance` and `wrh_ship_time_config`** (D-GAP-M11, D-GAP-M26) to populate `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing WRH → `wrh_data_available=false`, warning surfaces in response and remains warning-only after the meeting exists; new hosting is blocked earlier by `POST /api/safety/scm/` readiness validation (D-MAINT-CR014).
 
 - **Request body:**
   ```json
@@ -1623,7 +1857,7 @@ Physical verification record (Q45 pattern).
 | `/api/safety/reference/soi-items/` | GET | `SAF_F_018` | 329 rows, paginated |
 | `/api/safety/reference/soi-items/{id}/` | PATCH | `SAF_P_019` | DPA-maintained updates |
 | `/api/safety/reference/bias-guards/` | GET | `SAF_F_018` | 8 rows |
-| `/api/safety/reference/incident-types/` | GET | `SAF_F_018` | 11 rows |
+| `/api/safety/reference/incident-types/` | GET | `SAF_F_018` | 32 active rows, ordered by the CR-031 business sequence |
 
 ### 9.7 Dashboard endpoints
 
@@ -1647,7 +1881,7 @@ Physical verification record (Q45 pattern).
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
-| `GET /api/safety/export/incident/{id}/pdf` | `SAF_P_023` | D-PDF-01 internal report |
+| `GET /api/safety/export/incident/{id}/pdf` | `SAF_P_023` | D-PDF-01 internal report; optional `sections` query filters printable sections |
 | `GET /api/safety/export/near-miss/{id}/pdf` | `SAF_P_023` | D-PDF-03a light template |
 | `GET /api/safety/export/scm/{id}/pdf` | `SAF_P_023` | D-PDF-03b legacy structure |
 | `POST /api/safety/export/auditor-bundle/` | `SAF_F_020` | D-PDF-02 configurable ZIP (record types + date range); attachments live in `attachments/` subfolder |
@@ -1657,7 +1891,7 @@ Physical verification record (Q45 pattern).
 
 `POST /api/safety/circular/from-incident/{id}/` — writes to **existing VIMS Circular module** (per D-GAP-R17 lock; see TECH_STACK §7). Safety module emits a draft; VIMS Circular approval chain runs independently.
 
-Near Miss Office Comments are handled through `/api/safety/near-miss/{id}/office-comments/` with the legacy `/triage/` route retained as a compatibility alias. `Accept` saves priority, category tag, immediate cause, and office comment; `Send to Rework` moves the record back to vessel rework with a required reason. PIC/office PIC accepts LOW/MEDIUM cases; DPA accepts HIGH cases.
+Near Miss Office Comments are handled through `/api/safety/near-miss/{id}/office-comments/` with the legacy `/triage/` route retained as a compatibility alias. `Accept` saves priority, category tag, factor causes, and office comment; `Send to Rework` moves the record back to vessel rework with a required reason. PIC/office PIC accepts LOW/MEDIUM cases; DPA accepts HIGH cases.
 
 Near Miss HIGH-priority fleet alerts use a UI handoff, not a Safety-owned Circular insert. `/api/safety/near-miss/{id}/fleet-alert/draft/` prepares anonymised title/body text. The frontend stores that text as a one-time Circular prefill and opens `/circular/office?safety_prefill=near_miss_fleet_alert`; DPA completes recipients/category/priority/attachments and publishes from the Circular module. The Near Miss `[Issue fleet alert]` action records Safety workflow completion separately and must not be treated as Circular publication.
 
@@ -1693,7 +1927,7 @@ User may **edit the auto-filled value** — writes `position_source='DAILY_REPOR
 
 ### 10.2 Safety ↔ WRH — SCM attendance (D-GAP-M11, D-GAP-M26)
 
-On SCM attendance save/display, a live join warms `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`. Missing rows → `wrh_data_available=0`, never blocks meeting creation, PDF export, or office closure. Timezone resolution via `wrh_ship_time_config`:
+On SCM create, the same WRH live join is used as a host-readiness gate: missing ship-time configuration, missing roster WRH data, or non-compliant roster WRH blocks meeting creation (D-MAINT-CR014). On SCM attendance save/display after creation, the join warms `wrh_rest_hours_24h` / `wrh_rest_hours_7d` / `wrh_non_compliance_flag`; missing rows → `wrh_data_available=0` remains visible but does not block PDF export or office closure. Timezone resolution via `wrh_ship_time_config`:
 
 ```sql
 -- SCM attendance WRH warm-up (executed in scm_repo.py on POST /attendance/)
@@ -1908,7 +2142,7 @@ def seed_mscat(apps, schema_editor):
     # 174 rows inserted. Verify count post-insert.
 
 # ... similar for immediate_causes.csv (52), loss_types.csv (7),
-#     soi_checklist_v1.csv (329), 13 soi_area rows, 11 incident_type rows,
+#     soi_checklist_v1.csv (329), 13 soi_area rows, 32 incident_type rows,
 #     8 bias_guard rows.
 ```
 
@@ -1954,7 +2188,7 @@ def seed_permissions(apps, schema_editor):
 | Near-miss reporter identity visibility documented | PASS | §3.4 reporter identity contract + PDF pipeline integration |
 | No `safety_X` scan-upload column on SOI | PASS | §4.4 + §11.2 explicit NOT-supported list |
 | CA ↔ Purchase hard FK present | PASS | §4.13 FK constraint + §10.4 RI contract |
-| WRH warn-don't-block + timezone reuse | PASS | §4.11 `wrh_non_compliance_flag` (warn-only); §10.2 SQL example |
+| WRH host-readiness gate + timezone reuse | PASS | §4.11 `wrh_non_compliance_flag`; §9.3.2 create readiness block; §10.2 SQL example |
 
 ### 14.1 BLOCKED stubs summary
 

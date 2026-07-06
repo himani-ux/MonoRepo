@@ -14,7 +14,10 @@ from .external_party_injury import ExternalPartyInjury
 from .fact_base import IncidentFact
 from .field_history import SafetyFieldHistory
 from .incident import Incident
-from .near_miss_config import NearMissGuidancePrompt, NearMissKpiTarget
+from .incident_weather import IncidentWeatherOption
+from .injury_dropdown import InjuryDropdownOption
+from .loss_evaluation import IncidentLossEvaluation
+from .near_miss_config import NearMissCategory, NearMissCauseOption, NearMissGuidancePrompt, NearMissKpiTarget
 from .phase_log import IncidentPhaseLog
 from .reference import (
     MasterImmediateCause,
@@ -49,6 +52,9 @@ __all__ = [
     "IncidentBiasGuardResponse",
     "IncidentBlameOverride",
     "Incident",
+    "IncidentWeatherOption",
+    "InjuryDropdownOption",
+    "IncidentLossEvaluation",
     "IncidentCauseTag",
     "IncidentEvidence",
     "IncidentFact",
@@ -63,6 +69,8 @@ __all__ = [
     "MasterSoiArea",
     "MasterSoiAreaItem",
     "NearMissGuidancePrompt",
+    "NearMissCategory",
+    "NearMissCauseOption",
     "NearMissKpiTarget",
     "Recommendation",
     "RecommendationVerification",
