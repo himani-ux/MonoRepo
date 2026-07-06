@@ -1,4 +1,4 @@
-﻿// src/components/ApprovedNotificationsLibrary.jsx
+// src/components/ApprovedNotificationsLibrary.jsx
 import React, { useState, useEffect } from "react";
 import {
     RefreshCcw,
@@ -186,7 +186,7 @@ const ApprovedNotificationsLibrary = () => {
             // console.log("ApprovedNotificationsLibrary: Fetching lookup maps (type, priority)...");
             try {
                 // Fetch Document Types
-                const typeRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
+                const typeRes = await fetch('http://localhost:8001/api/circular/api/document-types/');
                 if (!typeRes.ok) {
                     throw new Error(`Failed to fetch document types: ${typeRes.status} ${typeRes.statusText}`);
                 }
@@ -211,7 +211,7 @@ const ApprovedNotificationsLibrary = () => {
                 // console.log("ApprovedNotificationsLibrary: Built type UUID to name map:", typeMap);
 
                 // Fetch Priorities
-                const priorityRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
+                const priorityRes = await fetch('http://localhost:8001/api/circular/api/priorities/');
                 if (!priorityRes.ok) {
                     throw new Error(`Failed to fetch priorities: ${priorityRes.status} ${priorityRes.statusText}`);
                 }
@@ -254,7 +254,7 @@ const ApprovedNotificationsLibrary = () => {
         try {
             setLoading(true);
             const response = await fetch(
-                "http://localhost:8000/api/circular/api/approved-notifications/"
+                "http://localhost:8001/api/circular/api/approved-notifications/"
             );
             if (!response.ok) {
                 throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
@@ -445,8 +445,8 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             const [vesselsResponse, ranksResponse] = await Promise.all([
-                fetch("http://localhost:8000/api/circular/api/vessels/"),
-                fetch("http://localhost:8000/api/circular/api/ranks/"),
+                fetch("http://localhost:8001/api/circular/api/vessels/"),
+                fetch("http://localhost:8001/api/circular/api/ranks/"),
             ]);
 
             if (!vesselsResponse.ok) {
@@ -553,7 +553,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             const approvalResponse = await fetch(
-                `http://localhost:8000/api/circular/api/notifications/${resendNotification.sr_no}/update-status/`,
+                `http://localhost:8001/api/circular/api/notifications/${resendNotification.sr_no}/update-status/`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -574,7 +574,7 @@ const ApprovedNotificationsLibrary = () => {
 
             if (selectedVesselIds.length > 0) {
                 const vesselResponse = await fetch(
-                    "http://localhost:8000/api/circular/api/notifications/send-emails/",
+                    "http://localhost:8001/api/circular/api/notifications/send-emails/",
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -592,7 +592,7 @@ const ApprovedNotificationsLibrary = () => {
 
             if (selectedRankIds.length > 0) {
                 const rankResponse = await fetch(
-                    `http://localhost:8000/api/circular/api/notifications/${resendNotification.sr_no}/link-ranks/`,
+                    `http://localhost:8001/api/circular/api/notifications/${resendNotification.sr_no}/link-ranks/`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -628,7 +628,7 @@ const ApprovedNotificationsLibrary = () => {
         setLoadingSeenCrews(true); // Start loading
 
         try {
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -674,7 +674,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             // Call the backend endpoint to update the reminder_sent_at field for this specific crew and notification
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -729,7 +729,7 @@ const ApprovedNotificationsLibrary = () => {
         }
 
         try {
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoToDelete}/delete/`, {
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${srNoToDelete}/delete/`, {
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -787,7 +787,7 @@ const ApprovedNotificationsLibrary = () => {
         console.log("handleDownloadCSV: Query parameters for CSV download:", params.toString());
 
         // Construct the full URL for the CSV endpoint
-        const csvDownloadUrl = `http://localhost:8000/api/circular/api/approved-notifications/download-csv/?${params}`;
+        const csvDownloadUrl = `http://localhost:8001/api/circular/api/approved-notifications/download-csv/?${params}`;
 
         // Trigger the download by setting window.location.href
         // This is the standard way to trigger a file download from a link via JavaScript
@@ -1018,7 +1018,7 @@ const ApprovedNotificationsLibrary = () => {
                                             <WithPermission id="PSC_P_020">
                                                 {n.attachment_url ? (
                                                     <a
-                                                        href={/^https?:\/\//i.test(n.attachment_url) ? n.attachment_url : "http://localhost:8000" + n.attachment_url}
+                                                        href={/^https?:\/\//i.test(n.attachment_url) ? n.attachment_url : "http://localhost:8001" + n.attachment_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         process-id="PSC_P_020"

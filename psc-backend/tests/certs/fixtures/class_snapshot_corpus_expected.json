@@ -1,0 +1,62 @@
+[
+  {
+    "filename": "Class Status Report East Ayutthaya 6th May 2026.pdf",
+    "classSociety": "KR",
+    "vesselName": "EAST AYUTTHAYA",
+    "imo": "9584293",
+    "printedOnDate": "2026-05-06",
+    "minRows": 40,
+    "conditionsCount": 0,
+    "mustInclude": ["CC", "CG2", "SC", "Cargo Ship Safety Construction Renewal Survey"]
+  },
+  {
+    "filename": "Class Status Report East Bangkok 06th May 2026.pdf",
+    "classSociety": "NK",
+    "vesselName": "EAST BANGKOK",
+    "imo": "9659490",
+    "printedOnDate": "2026-05-06",
+    "minRows": 50,
+    "conditionsCount": 0,
+    "mustInclude": ["Load Line Final", "Safety Construction Final", "Special Survey", "LL Renewal Survey"]
+  },
+  {
+    "filename": "Class Status Report SF Chalisa 6th May 2026.pdf",
+    "classSociety": "KR",
+    "vesselName": "SF CHALISA",
+    "imo": "9502726",
+    "printedOnDate": "2026-05-06",
+    "minRows": 40,
+    "conditionsCount": 1,
+    "mustInclude": ["CC", "CG2", "SE", "C.0006"]
+  },
+  {
+    "filename": "Class Status Report SF Darika 6th May 2026.pdf",
+    "classSociety": "KR",
+    "vesselName": "SF DARIKA",
+    "imo": "9502752",
+    "printedOnDate": "2026-05-06",
+    "minRows": 40,
+    "conditionsCount": 1,
+    "mustInclude": ["CC", "CG2", "SC", "C.0008"]
+  },
+  {
+    "filename": "Class Status Report SFYC Araya 06th May 2026.pdf",
+    "classSociety": "NK",
+    "vesselName": "SFYC ARAYA",
+    "imo": "9487043",
+    "printedOnDate": "2026-05-06",
+    "minRows": 50,
+    "conditionsCount": 0,
+    "mustInclude": ["Load Line Final", "Safety Construction Final", "Special Survey", "LL Renewal Survey"]
+  },
+  {
+    "filename": "Class Status Report YC Fortitude 6th May 2026.pdf",
+    "classSociety": "BV",
+    "vesselName": "YC FORTITUDE",
+    "imo": "9587178",
+    "printedOnDate": "2026-05-06",
+    "minRows": 50,
+    "conditionsCount": 0,
+    "mustInclude": ["Hull - Renewal", "Load Line - Renewal", "ISM - Renewal", "MLC Renewal inspection"]
+  }
+]

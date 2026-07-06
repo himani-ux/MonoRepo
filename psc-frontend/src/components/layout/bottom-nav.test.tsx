@@ -41,7 +41,12 @@ describe('BottomNav', () => {
     bottomNavMocks.useAuth.mockReset();
 
     bottomNavMocks.useLocation.mockReturnValue({ pathname: '/inspections' });
-    bottomNavMocks.useAuth.mockReturnValue({ isVessel: true, isOffice: false, isMaster: true });
+    bottomNavMocks.useAuth.mockReturnValue({
+      hasForm: vi.fn((formId: string) => formId !== 'PSC_F_007'),
+      isVessel: true,
+      isOffice: false,
+      isMaster: true,
+    });
   });
 
   it('test_feat_auth_002_vessel_user_sees_sync_navigation_item', () => {
@@ -50,7 +55,12 @@ describe('BottomNav', () => {
   });
 
   it('test_feat_auth_002_office_user_does_not_see_sync_navigation_item', () => {
-    bottomNavMocks.useAuth.mockReturnValue({ isVessel: false, isOffice: true, isMaster: false });
+    bottomNavMocks.useAuth.mockReturnValue({
+      hasForm: vi.fn((formId: string) => formId !== 'PSC_F_006'),
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+    });
     render(<BottomNav />);
 
     expect(screen.queryByText('Sync')).not.toBeInTheDocument();
@@ -62,5 +72,34 @@ describe('BottomNav', () => {
 
     const dashboardLink = screen.getByRole('link', { name: /dashboard/i });
     expect(dashboardLink.className).toContain('text-primary-600');
+  });
+
+  it('shows_certs_navigation_item_when_user_has_any_certs_form_access', () => {
+    bottomNavMocks.useLocation.mockReturnValue({ pathname: '/certs' });
+    bottomNavMocks.useAuth.mockReturnValue({
+      hasForm: vi.fn((formId: string) => formId === 'CERT_F_002'),
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+    });
+
+    render(<BottomNav />);
+
+    const certsLink = screen.getByRole('link', { name: /certs/i });
+    expect(certsLink).toHaveAttribute('href', '/certs');
+    expect(certsLink.className).toContain('text-primary-600');
+  });
+
+  it('hides_certs_navigation_item_without_certs_form_access', () => {
+    bottomNavMocks.useAuth.mockReturnValue({
+      hasForm: vi.fn((formId: string) => formId.startsWith('PSC_F_')),
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+    });
+
+    render(<BottomNav />);
+
+    expect(screen.queryByRole('link', { name: /certs/i })).not.toBeInTheDocument();
   });
 });

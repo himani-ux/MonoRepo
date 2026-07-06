@@ -210,7 +210,7 @@ Draft edit, pending edit, supersede, and approval all persist ephemeral state in
 
 ### 5. Hard-coded backend URLs are everywhere
 
-Most requests point directly at `http://localhost:8000/api/circular/...` instead of using a shared API client. This makes environment changes and testing harder.
+Most requests point directly at `http://localhost:8001/api/circular/...` instead of using a shared API client. This makes environment changes and testing harder.
 
 ### 6. There are duplicate approval implementations
 
@@ -224,7 +224,7 @@ They do similar work but are not cleanly consolidated, so behavior can drift.
 
 ### 7. New shell integration is still only partial
 
-The circular module lives inside the modern shell, but most of the logic still uses legacy hooks, legacy routes, hard-coded URLs, ad hoc state transfer, and direct `fetch` calls to `http://localhost:8000`.
+The circular module lives inside the modern shell, but most of the logic still uses legacy hooks, legacy routes, hard-coded URLs, ad hoc state transfer, and direct `fetch` calls to `http://localhost:8001`.
 
 The newer pieces added around it are shell wrappers, not a full modernization:
 

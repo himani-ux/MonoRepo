@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'apps.sync',
     'apps.notifications',
     'apps.safety',
+    'apps.certs',
 ]
 
 MIDDLEWARE = [

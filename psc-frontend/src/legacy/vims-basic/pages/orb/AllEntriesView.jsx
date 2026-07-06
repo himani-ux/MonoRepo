@@ -1,4 +1,4 @@
-﻿// src/components/AllEntriesView.jsx
+// src/components/AllEntriesView.jsx
 import React, { useState, useEffect } from 'react';
 import { Button, Card } from "../../components/orb/OrbUI";
 import { formatDate } from '../../utils/orb/orbUtils'; 
@@ -26,7 +26,7 @@ const AllEntriesView = () => {
     setError(null);
     try {
       // this is the independent endpoint for all the non deleted entries
-      const response = await fetch(`http://localhost:8000/api/orb/api/non-deleted-entries/?vessel_id=${vesselId}`, {
+      const response = await fetch(`http://localhost:8001/api/orb/api/non-deleted-entries/?vessel_id=${vesselId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-﻿// src/components/AdminAllNotifications.jsx
+// src/components/AdminAllNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // For back button if needed
 import PageLayout from '../../components/layout/PageLayout';
@@ -46,7 +46,7 @@ const AdminAllNotifications = () => {
             }
 
             const queryParams = new URLSearchParams(params).toString();
-            const response = await fetch(`http://localhost:8000/api/circular/api/submitted/?${queryParams}`);
+            const response = await fetch(`http://localhost:8001/api/circular/api/submitted/?${queryParams}`);
 
             if (!response.ok) {
                 if (response.status === 404) {

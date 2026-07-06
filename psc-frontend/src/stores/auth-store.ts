@@ -21,6 +21,10 @@ import {
   TOKEN_EXPIRY_BUFFER_MS,
 } from '@/lib/utils/constants';
 
+export const OFFICE_IDLE_TIMEOUT_MS = 8 * 60 * 60 * 1000;
+export const VESSEL_IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+export const SESSION_WARNING_THRESHOLDS_MS = [15 * 60 * 1000, 5 * 60 * 1000] as const;
+
 const LEGACY_AUTH_STORAGE_KEYS = [
   ACCESS_TOKEN_KEY,
   REFRESH_TOKEN_KEY,
@@ -59,6 +63,29 @@ function isTokenExpired(token: string, bufferMs: number = 0): boolean {
   return Date.now() + bufferMs >= exp;
 }
 
+export interface ReauthIdentifier {
+  label: 'Crew ID' | 'Employee ID';
+  value: string;
+}
+
+export function getSessionTimeoutMs(user: AuthUser | null): number {
+  return user?.user_type === 'vessel' ? VESSEL_IDLE_TIMEOUT_MS : OFFICE_IDLE_TIMEOUT_MS;
+}
+
+export function getReauthIdentifier(user: AuthUser | null): ReauthIdentifier {
+  if (user?.user_type === 'vessel') {
+    return {
+      label: 'Crew ID',
+      value: user.crew_id || user.login_id || user.username || '',
+    };
+  }
+
+  return {
+    label: 'Employee ID',
+    value: user?.employee_id || user?.login_id || user?.username || '',
+  };
+}
+
 export interface AuthState {
   // State
   tokens: AuthTokens | null;
@@ -66,13 +93,18 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitialized: boolean;
+  isReauthRequired: boolean;
+  sessionLastActivityAt: number;
 
   // Actions
   login: (credentials: LoginRequest) => Promise<AuthUser>;
+  reauthenticate: (password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshTokens: () => Promise<AuthTokens | null>;
   setUser: (user: AuthUser | null) => void;
   setTokens: (tokens: AuthTokens | null) => void;
+  markSessionActivity: (timestamp?: number) => void;
+  requireReauth: () => void;
   initialize: () => Promise<void>;
   checkAndRefreshToken: () => Promise<boolean>;
 }
@@ -86,6 +118,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       isInitialized: false,
+      isReauthRequired: false,
+      sessionLastActivityAt: Date.now(),
 
       /**
        * Login with credentials.
@@ -106,6 +140,46 @@ export const useAuthStore = create<AuthState>()(
             user: response.user,
             isAuthenticated: true,
             isLoading: false,
+            isReauthRequired: false,
+            sessionLastActivityAt: Date.now(),
+          });
+
+          clearLegacyAuthStorage();
+
+          return response.user;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      reauthenticate: async (password: string) => {
+        const { user } = get();
+        const identifier = getReauthIdentifier(user);
+
+        if (!identifier.value) {
+          throw new Error('Unable to resolve session identifier.');
+        }
+
+        set({ isLoading: true });
+        try {
+          const response = await authApi.login({
+            username: identifier.value,
+            password,
+          });
+
+          const tokens: AuthTokens = {
+            access: response.access,
+            refresh: response.refresh,
+          };
+
+          set({
+            tokens,
+            user: response.user,
+            isAuthenticated: true,
+            isLoading: false,
+            isReauthRequired: false,
+            sessionLastActivityAt: Date.now(),
           });
 
           clearLegacyAuthStorage();
@@ -137,6 +211,7 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           isAuthenticated: false,
           isLoading: false,
+          isReauthRequired: false,
         });
 
         clearLegacyAuthStorage();
@@ -159,6 +234,7 @@ export const useAuthStore = create<AuthState>()(
             tokens: null,
             user: null,
             isAuthenticated: false,
+            isReauthRequired: false,
           });
           clearLegacyAuthStorage();
           return null;
@@ -179,6 +255,7 @@ export const useAuthStore = create<AuthState>()(
             tokens: null,
             user: null,
             isAuthenticated: false,
+            isReauthRequired: false,
           });
           clearLegacyAuthStorage();
           return null;
@@ -197,6 +274,7 @@ export const useAuthStore = create<AuthState>()(
             tokens: null,
             user: null,
             isAuthenticated: false,
+            isReauthRequired: false,
           });
           return false;
         }
@@ -227,6 +305,17 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      markSessionActivity: (timestamp = Date.now()) => {
+        if (get().isReauthRequired) {
+          return;
+        }
+        set({ sessionLastActivityAt: timestamp });
+      },
+
+      requireReauth: () => {
+        set({ isReauthRequired: true });
+      },
+
       /**
        * Initialize auth state from stored tokens.
        * Validates tokens and fetches user info if needed.
@@ -241,6 +330,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             isInitialized: true,
+            isReauthRequired: false,
           });
           return;
         }
@@ -281,6 +371,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             isInitialized: true,
+            isReauthRequired: false,
           });
           clearLegacyAuthStorage();
         }
@@ -294,6 +385,7 @@ export const useAuthStore = create<AuthState>()(
         tokens: state.tokens,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        sessionLastActivityAt: state.sessionLastActivityAt,
       }),
     }
   )

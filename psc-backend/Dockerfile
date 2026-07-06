@@ -49,11 +49,11 @@ RUN mkdir -p /app/staticfiles /app/media && \
 USER appuser
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl --fail http://localhost:8000/api/psc/health/ || exit 1
+    CMD curl --fail http://localhost:8001/api/psc/health/ || exit 1
 
 # Run gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--threads", "2", "--timeout", "120", "core.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "4", "--threads", "2", "--timeout", "120", "core.wsgi:application"]

@@ -1,4 +1,4 @@
-﻿// // src/hooks/usePDFGenerator.js
+// // src/hooks/usePDFGenerator.js
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatDate } from "../../utils/orb/orbUtils";
@@ -106,7 +106,7 @@ export const usePDFGenerator = () => {
       let lastPageNumber = 0;
       try {
         const lastPageResponse = await fetch(
-          `http://localhost:8000/api/orb/api/get_last_page_number/?vessel_id=${vesselId}`,
+          `http://localhost:8001/api/orb/api/get_last_page_number/?vessel_id=${vesselId}`,
           { cache: "no-store" }
         );
         const raw = await lastPageResponse.text();
@@ -122,7 +122,7 @@ export const usePDFGenerator = () => {
       // Fetch server IP
       let serverLocalIP = 'Unknown IP';
       try {
-        const ipResponse = await fetch('http://localhost:8000/api/orb/api/get-internal-ip/');
+        const ipResponse = await fetch('http://localhost:8001/api/orb/api/get-internal-ip/');
         const ipData = await ipResponse.json();
         serverLocalIP = ipData.internal_ip;
         console.log("Django Server's Local IP address:", serverLocalIP);
@@ -328,7 +328,7 @@ export const usePDFGenerator = () => {
 //       // âœ… IMPORTANT â€” USE PROXY URL (OLD WORKING WAY)
 //       let lastPageNumber = 0;
 //       try {
-//         const res = await fetch(`http://localhost:8000/api/orb/api/get_last_page_number/?vessel_id=${vesselId}`);
+//         const res = await fetch(`http://localhost:8001/api/orb/api/get_last_page_number/?vessel_id=${vesselId}`);
 //         const data = await res.json();
 //         lastPageNumber = data.last_page || 0;
 //       } catch (err) {
@@ -339,7 +339,7 @@ export const usePDFGenerator = () => {
 //       const printTimestamp = new Date();
 
 //       try {
-//         const ipResponse = await fetch("http://localhost:8000/api/orb/api/get-internal-ip/");
+//         const ipResponse = await fetch("http://localhost:8001/api/orb/api/get-internal-ip/");
 //         const ipData = await ipResponse.json();
 //         serverLocalIP = ipData.internal_ip;
 //       } catch (err) {

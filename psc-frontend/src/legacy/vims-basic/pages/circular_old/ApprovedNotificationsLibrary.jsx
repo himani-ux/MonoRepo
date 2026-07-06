@@ -1,4 +1,4 @@
-﻿// src/components/ApprovedNotificationsLibrary.jsx
+// src/components/ApprovedNotificationsLibrary.jsx
 import React, { useState, useEffect } from "react";
 import {
     ArrowDownUp,
@@ -58,7 +58,7 @@ const ApprovedNotificationsLibrary = () => {
             // console.log("ApprovedNotificationsLibrary: Fetching lookup maps (type, priority)...");
             try {
                 // Fetch Document Types
-                const typeRes = await fetch('http://localhost:8000/api/circular/api/document-types/');
+                const typeRes = await fetch('http://localhost:8001/api/circular/api/document-types/');
                 if (!typeRes.ok) {
                     throw new Error(`Failed to fetch document types: ${typeRes.status} ${typeRes.statusText}`);
                 }
@@ -83,7 +83,7 @@ const ApprovedNotificationsLibrary = () => {
                 // console.log("ApprovedNotificationsLibrary: Built type UUID to name map:", typeMap);
 
                 // Fetch Priorities
-                const priorityRes = await fetch('http://localhost:8000/api/circular/api/priorities/');
+                const priorityRes = await fetch('http://localhost:8001/api/circular/api/priorities/');
                 if (!priorityRes.ok) {
                     throw new Error(`Failed to fetch priorities: ${priorityRes.status} ${priorityRes.statusText}`);
                 }
@@ -139,7 +139,7 @@ const ApprovedNotificationsLibrary = () => {
                 setLoading(true);
                 // console.log("ApprovedNotificationsLibrary: Fetching approved notifications...");
                 const response = await fetch(
-                    "http://localhost:8000/api/circular/api/approved-notifications/"
+                    "http://localhost:8001/api/circular/api/approved-notifications/"
                 );
                 if (!response.ok) {
                     throw new Error(`Failed to fetch notifications: ${response.status} ${response.statusText}`);
@@ -275,7 +275,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             // Call the backend endpoint to update the reminder_sent_at field
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoForReminder}/send-reminder/`, { // Use your new reminder endpoint
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${srNoForReminder}/send-reminder/`, { // Use your new reminder endpoint
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -311,7 +311,7 @@ const ApprovedNotificationsLibrary = () => {
         setLoadingSeenCrews(true); // Start loading
 
         try {
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${notificationSrNo}/crew-delivery-status/`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -356,7 +356,7 @@ const ApprovedNotificationsLibrary = () => {
 
         try {
             // Call the backend endpoint to update the reminder_sent_at field for this specific crew and notification
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${notificationSrNo}/send-individual-reminder/`, { // Use your new endpoint
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -410,7 +410,7 @@ const ApprovedNotificationsLibrary = () => {
         }
 
         try {
-            const response = await fetch(`http://localhost:8000/api/circular/api/notifications/${srNoToDelete}/delete/`, {
+            const response = await fetch(`http://localhost:8001/api/circular/api/notifications/${srNoToDelete}/delete/`, {
                 method: 'POST', // Use POST for state-changing actions
                 headers: {
                     'Content-Type': 'application/json',
@@ -468,7 +468,7 @@ const ApprovedNotificationsLibrary = () => {
         console.log("handleDownloadCSV: Query parameters for CSV download:", params.toString());
 
         // Construct the full URL for the CSV endpoint
-        const csvDownloadUrl = `http://localhost:8000/api/circular/api/approved-notifications/download-csv/?${params}`;
+        const csvDownloadUrl = `http://localhost:8001/api/circular/api/approved-notifications/download-csv/?${params}`;
 
         // Trigger the download by setting window.location.href
         // This is the standard way to trigger a file download from a link via JavaScript

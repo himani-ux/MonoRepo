@@ -1,4 +1,4 @@
-﻿// src/components/PDFArchive.jsx
+// src/components/PDFArchive.jsx
 import React, { useState, useEffect } from 'react';
 import { Card, Button as OrbUIButton } from '../../components/orb/OrbUI';
 import { useAuth } from '../../hooks/auth/useAuth';
@@ -19,7 +19,7 @@ const PDFArchive = () => {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch("http://localhost:8000/api/orb/api/vessels/")
+    fetch("http://localhost:8001/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -60,7 +60,7 @@ const PDFArchive = () => {
       // Use the vesselId from state or sessionStorage (it should be available now)
       // const vesselId = sessionStorage.getItem("selectedVesselId"); // Already defined above
 
-      let url = `http://localhost:8000/api/orb/api/list-pdfs/?page=${page}&page_size=10`;
+      let url = `http://localhost:8001/api/orb/api/list-pdfs/?page=${page}&page_size=10`;
       if (vesselId) {
         url += `&vessel_id=${vesselId}`;
       }

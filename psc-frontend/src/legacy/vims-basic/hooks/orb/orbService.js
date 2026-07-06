@@ -1,5 +1,5 @@
-﻿// src/services/orbService.js
-const API_BASE_URL = "http://localhost:8000/api/orb/api";
+// src/services/orbService.js
+const API_BASE_URL = "http://localhost:8001/api/orb/api";
 
 export const orbService = {
   // Fetch operations
@@ -134,7 +134,7 @@ export const orbService = {
 
   // Get last page number
   async getLastPageNumber(vesselId) {
-    const response = await fetch(`http://localhost:8000/api/get_last_page_number/?vessel_id=${vesselId}`);
+    const response = await fetch(`http://localhost:8001/api/get_last_page_number/?vessel_id=${vesselId}`);
     const data = await response.json();
     return data.last_page || 0;
   }

@@ -53,6 +53,9 @@ const CircularModulePage = lazy(() =>
 const ORBModulePage = lazy(() =>
   import('@/routes/orb/page').then((m) => ({ default: m.ORBModulePage }))
 );
+const CertsDashboardStubPage = lazy(() =>
+  import('@/routes/certs').then((m) => ({ default: m.CertsDashboardStubPage }))
+);
 
 /**
  * Page-level loading fallback for lazy-loaded routes.
@@ -161,6 +164,7 @@ function AppShell() {
       <Routes>
         {/* Public routes */}
         <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        <Route path="/auditor/*" element={<CertsDashboardStubPage />} />
 
         {/* Default redirect — crew → /cars, master/office → /dashboard */}
         <Route path="/" element={<AuthGuard><DefaultRedirect /></AuthGuard>} />
@@ -327,6 +331,14 @@ function AppShell() {
           element={
             <AuthGuard>
               <ORBModulePage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path={ROUTES.CERTS + '/*'}
+          element={
+            <AuthGuard>
+              <CertsDashboardStubPage />
             </AuthGuard>
           }
         />

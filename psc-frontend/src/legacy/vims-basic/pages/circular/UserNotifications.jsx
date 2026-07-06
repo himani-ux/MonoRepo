@@ -1,4 +1,4 @@
-﻿// src/components/UserNotifications.jsx
+// src/components/UserNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
@@ -39,7 +39,7 @@ const UserNotifications = ({ currentUser }) => {
                 sort_order: order,
             }).toString();
 
-            const response = await fetch(`http://localhost:8000/api/circular/api/user-notifications/?${queryParams}`);
+            const response = await fetch(`http://localhost:8001/api/circular/api/user-notifications/?${queryParams}`);
             if (!response.ok) {
                 if (response.status === 404) {
                     console.warn("User notifications endpoint not found (404).");

@@ -1,4 +1,4 @@
-﻿// src/components/ApprovedEntriesView.jsx
+// src/components/ApprovedEntriesView.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Card } from "../../components/orb/OrbUI";
 import { formatDate } from '../../utils/orb/orbUtils'; // Import your date formatting helper
@@ -24,7 +24,7 @@ const ApprovedEntriesView = () => {
     setError(null);
     try {
       // Call the NEW independent backend endpoint for approved entries
-      const response = await fetch(`http://localhost:8000/api/orb/api/approved-entries/?vessel_id=${vesselId}`, {
+      const response = await fetch(`http://localhost:8001/api/orb/api/approved-entries/?vessel_id=${vesselId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -62,7 +62,7 @@ const ApprovedEntriesView = () => {
   useEffect(() => {
     if (!vesselId) return;
 
-    fetch("http://localhost:8000/api/orb/api/vessels/")
+    fetch("http://localhost:8001/api/orb/api/vessels/")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);

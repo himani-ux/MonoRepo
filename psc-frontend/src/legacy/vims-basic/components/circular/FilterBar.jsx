@@ -1,4 +1,4 @@
-﻿// src/components/FilterBar.jsx
+// src/components/FilterBar.jsx
 import React from 'react';
 import { LuSearch } from 'react-icons/lu';
 import { Button } from "./ui/button";
@@ -42,7 +42,7 @@ const FilterBar = ({
       only_unread: onlyUnread.toString(),
     });
 
-    window.open(`http://localhost:8000/api/circular/api/reports/download-pdf/?${params.toString()}`, '_blank');
+    window.open(`http://localhost:8001/api/circular/api/reports/download-pdf/?${params.toString()}`, '_blank');
   };
 
   return (

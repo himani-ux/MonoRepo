@@ -23,6 +23,7 @@ import {
   LayoutDashboard,
   BookText,
   BookOpenCheck,
+  FileCheck2,
   X,
   ChevronDown,
   ChevronRight,
@@ -129,6 +130,17 @@ const safetyNavItems: SafetyNavItem[] = [
   { formId: 'SAF_F_020', href: '/safety/admin/auditor-export', label: 'Auditor Export' },
 ];
 
+const certsFormIds = [
+  FORM_IDS.CERTS_CATALOG,
+  FORM_IDS.CERTS_TRACKED_ITEMS,
+  FORM_IDS.CERTS_RECONCILIATION,
+  FORM_IDS.CERTS_PRINT_EXPORT,
+  FORM_IDS.CERTS_ONBOARDING,
+  FORM_IDS.CERTS_NOTIFICATION_CONFIG,
+  FORM_IDS.CERTS_AUDITOR_ACCESS,
+  FORM_IDS.CERTS_AUDIT_LOG,
+] as const;
+
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
   const { hasForm, user, isVessel } = useAuth();
@@ -170,7 +182,14 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const hasSafetyAccess = visibleSafetyItems.length > 0;
   const hasActiveSafetyItem = location.pathname.startsWith('/safety');
   const hasActiveInspectionItem = hasActivePscItem || hasActiveSafetyItem;
+  const hasCertsAccess = certsFormIds.some((formId) => hasForm(formId));
   const legacyModuleItems = [
+    {
+      label: 'Certs',
+      href: ROUTES.CERTS,
+      icon: FileCheck2,
+      visible: hasCertsAccess,
+    },
     {
       label: 'Circular',
       href: ROUTES.CIRCULAR,

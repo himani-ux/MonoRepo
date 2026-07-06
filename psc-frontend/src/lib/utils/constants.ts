@@ -4,7 +4,7 @@
  */
 
 // API Configuration
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 function normalizeApiBaseUrl(value: string): string {
   return value
@@ -176,6 +176,30 @@ export const ROUTES = {
   CAR_EDIT: (id: string | number) => `/cars/${id}/edit`,
   NOTIFICATIONS: '/notifications',
   SYNC: '/sync',
+  CERTS: '/certs',
+  CERTS_CATALOG: '/certs/catalog',
+  CERTS_CATALOG_DETAIL: (id: string) => `/certs/catalog/${id}`,
+  CERTS_VESSEL_DASHBOARD: (imo: string) => `/certs/vessels/${imo}`,
+  CERTS_VESSEL_PROFILE: (imo: string) => `/certs/vessels/${imo}/profile`,
+  CERTS_TRACKED_ITEM_DETAIL: (imo: string, id: string) => `/certs/vessels/${imo}/cert/${id}`,
+  CERTS_RECONCILIATION: '/certs/reconciliation',
+  CERTS_PARSER_OPS: '/certs/reconciliation/parser-ops',
+  CERTS_RECONCILIATION_RUN: (id: string) => `/certs/reconciliation/${id}`,
+  CERTS_PRINT: '/certs/print',
+  CERTS_PRINT_HISTORY: '/certs/print/history',
+  CERTS_SHARE_BUNDLE: '/certs/share-bundle',
+  CERTS_AUDIT_LOG: '/certs/audit-log',
+  CERTS_SETTINGS: '/certs/settings',
+  CERTS_AUDITOR_ACCESS: '/certs/auditor-access',
+  CERTS_AUDITOR_ACCESS_DETAIL: (id: string) => `/certs/auditor-access/${id}`,
+  CERTS_AUDITOR_PORTAL: (token: string) => `/auditor/${token}`,
+  CERTS_AUDITOR_VESSEL: (token: string, imo: string) => `/auditor/${token}/vessels/${imo}`,
+  CERTS_AUDITOR_CERT: (token: string, id: string) => `/auditor/${token}/cert/${id}`,
+  CERTS_AUDITOR_PRINT: (token: string) => `/auditor/${token}/print`,
+  CERTS_ONBOARDING: '/certs/onboarding',
+  CERTS_ONBOARDING_NEW: '/certs/onboarding/new',
+  CERTS_ONBOARDING_WIZARD: (imo: string) => `/certs/onboarding/${imo}`,
+  CERTS_ONBOARDING_GAP_FILL: (imo: string, batchId: string) => `/certs/onboarding/${imo}/batch/${batchId}/gap-fill`,
   CIRCULAR: '/circular',
   ORB: '/orb',
 } as const;

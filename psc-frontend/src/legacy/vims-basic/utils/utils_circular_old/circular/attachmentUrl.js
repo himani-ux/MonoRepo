@@ -1,4 +1,4 @@
-const CIRCULAR_FILE_BASE_URL = "http://localhost:8000";
+const CIRCULAR_FILE_BASE_URL = "http://localhost:8001";
 
 export const buildCircularAttachmentUrl = (attachmentUrl) => {
     if (!attachmentUrl) {

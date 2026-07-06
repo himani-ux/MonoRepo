@@ -562,7 +562,8 @@ export type NotificationType =
   | 'CIRCULAR_CREATED'
   | 'CIRCULAR_PENDING_APPROVAL'
   | 'CIRCULAR_APPROVED'
-  | 'CIRCULAR_REJECTED';
+  | 'CIRCULAR_REJECTED'
+  | 'CERT_ALERT';
 
 /** Notification matching backend NotificationListSerializer (12 fields) */
 export interface Notification {
@@ -578,6 +579,16 @@ export interface Notification {
   is_read: boolean;
   read_at: string | null;
   created_date: string;
+  triggerEvent?: string;
+  certRowId?: string | null;
+  vesselId?: string | null;
+  channels?: Array<{
+    userId: string;
+    role: string;
+    side: 'vessel' | 'office';
+    channels: Array<'in_app' | 'email' | 'slack'>;
+  }>;
+  escalationLevel?: number;
 }
 
 // ============================================================================

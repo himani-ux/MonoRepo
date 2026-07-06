@@ -180,7 +180,43 @@ describe('Sidebar', () => {
 
     render(<Sidebar isOpen />);
 
-    expect(screen.getByRole('link', { name: /safety/i })).toHaveAttribute('href', '/safety/scm');
+    expect(screen.getByRole('link', { name: /committee meetings/i })).toHaveAttribute('href', '/safety/scm');
+  });
+
+  it('shows_certs_link_when_user_has_any_certs_form_access', () => {
+    sidebarMocks.useLocation.mockReturnValue({ pathname: '/certs' });
+    sidebarMocks.useAuth.mockReturnValue({
+      user: {
+        user_type: 'office',
+      },
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      canAccessReports: false,
+      hasForm: vi.fn((formId: string) => formId === 'CERT_F_002'),
+    });
+
+    render(<Sidebar isOpen />);
+
+    expect(screen.getByRole('link', { name: /certs/i })).toHaveAttribute('href', '/certs');
+  });
+
+  it('hides_certs_link_when_user_has_no_certs_form_access', () => {
+    sidebarMocks.useLocation.mockReturnValue({ pathname: '/dashboard' });
+    sidebarMocks.useAuth.mockReturnValue({
+      user: {
+        user_type: 'office',
+      },
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      canAccessReports: false,
+      hasForm: vi.fn((formId: string) => formId.startsWith('PSC_F_')),
+    });
+
+    render(<Sidebar isOpen />);
+
+    expect(screen.queryByRole('link', { name: /certs/i })).not.toBeInTheDocument();
   });
 
   it('marks_help_entry_as_active_on_help_route', () => {

@@ -1,10 +1,10 @@
 ================================================================================
-PROGRESS.TXT — Session State Tracking
-Inspection Module — PSC/RS/Audit Close-out System
+PROGRESS.TXT â€” Session State Tracking
+Inspection Module â€” PSC/RS/Audit Close-out System
 ================================================================================
 
 LAST UPDATED: 2026-02-11
-LAST SESSION: Session 94 — PV Due Operational Enforcement (List + Dashboard + Quick Close)
+LAST SESSION: Session 94 â€” PV Due Operational Enforcement (List + Dashboard + Quick Close)
 CURRENT PHASE: UAT / Manual Testing
 CURRENT STEP: Session 94 closed. CAR list now exposes `pv_due`, supports `?pv_due=true` filtering, shows PV Due badge/toggle, dashboard shows clickable PV Due count tile (derived from list pagination metadata), and PV Due list supports direct Close Verification via existing PV close modal/API without opening CAR detail.
 
@@ -30,46 +30,46 @@ COMPLETED
 ================================================================================
 
 Documentation Suite (Phase 0):
-✅ PRD.md — 51 features defined with IDs (FEAT-INS-*, FEAT-DEF-*, FEAT-CAR-*, etc.)
-✅ APP_FLOW.md — 15+ screen specifications with layouts
-✅ TECH_STACK.md — Exact versions locked (React 18.3.1, Django 5.2.7, etc.)
-✅ DESIGN_SYSTEM.md — Complete token system (colors, spacing, typography)
-✅ FRONTEND_GUIDELINES.md — Component architecture, patterns, file structure
-✅ BACKEND_STRUCTURE.md — Database schema (17 tables), API contracts, stored procedures
-✅ VALIDATION_RULES.md — Consolidated validation rules with Zod schemas
-✅ IMPLEMENTATION_PLAN.md — 8 phases, 50+ steps
-✅ CLAUDE.md — AI agent instructions
-✅ progress.txt — This file
-✅ LESSONS.md — Learning file (initialized)
+âœ… PRD.md â€” 51 features defined with IDs (FEAT-INS-*, FEAT-DEF-*, FEAT-CAR-*, etc.)
+âœ… APP_FLOW.md â€” 15+ screen specifications with layouts
+âœ… TECH_STACK.md â€” Exact versions locked (React 18.3.1, Django 5.2.7, etc.)
+âœ… DESIGN_SYSTEM.md â€” Complete token system (colors, spacing, typography)
+âœ… FRONTEND_GUIDELINES.md â€” Component architecture, patterns, file structure
+âœ… BACKEND_STRUCTURE.md â€” Database schema (17 tables), API contracts, stored procedures
+âœ… VALIDATION_RULES.md â€” Consolidated validation rules with Zod schemas
+âœ… IMPLEMENTATION_PLAN.md â€” 8 phases, 50+ steps
+âœ… CLAUDE.md â€” AI agent instructions
+âœ… progress.txt â€” This file
+âœ… LESSONS.md â€” Learning file (initialized)
 
 Phase 1 - Project Foundation:
-✅ Step 1.1: Initialize Frontend Project (psc-frontend/)
-✅ Step 1.2: Initialize Backend Project (psc-backend/)
-✅ Step 1.3: Set Up Project Structure (all folders, path aliases, utilities)
-✅ Step 1.4: Install & Configure shadcn/ui (components.json, all required components)
-✅ Step 1.5: Set Up CI/CD (GitHub workflows, Dockerfiles, docker-compose.yml)
+âœ… Step 1.1: Initialize Frontend Project (psc-frontend/)
+âœ… Step 1.2: Initialize Backend Project (psc-backend/)
+âœ… Step 1.3: Set Up Project Structure (all folders, path aliases, utilities)
+âœ… Step 1.4: Install & Configure shadcn/ui (components.json, all required components)
+âœ… Step 1.5: Set Up CI/CD (GitHub workflows, Dockerfiles, docker-compose.yml)
 
 Phase 2 - Authentication & Core Layout:
-✅ Step 2.1: Implement Authentication Backend (apps/accounts/)
-✅ Step 2.2: Implement Auth Store & Hooks (auth-store.ts, use-auth.ts, api/client.ts, api/auth.ts)
-✅ Step 2.3: Build Login Page (routes/login.tsx, components/auth/login-form.tsx)
-✅ Step 2.4: Build App Shell & Navigation (header.tsx, sidebar.tsx, bottom-nav.tsx, page-header.tsx, root-layout.tsx)
-✅ Step 2.5: Implement Route Protection (auth-guard.tsx, role-guard.tsx)
+âœ… Step 2.1: Implement Authentication Backend (apps/accounts/)
+âœ… Step 2.2: Implement Auth Store & Hooks (auth-store.ts, use-auth.ts, api/client.ts, api/auth.ts)
+âœ… Step 2.3: Build Login Page (routes/login.tsx, components/auth/login-form.tsx)
+âœ… Step 2.4: Build App Shell & Navigation (header.tsx, sidebar.tsx, bottom-nav.tsx, page-header.tsx, root-layout.tsx)
+âœ… Step 2.5: Implement Route Protection (auth-guard.tsx, role-guard.tsx)
 
 Phase 3 - Master Data & Core Components:
-✅ Step 3.1: Implement Master Data API (apps/masters/ - MOU, PSC action codes, PSC def codes, CLC, PIC)
-✅ Step 3.2: Implement Masters Hooks & Caching (use-masters.ts, api/masters.ts, 24h stale time)
-✅ Step 3.3: Build Shared Components (status-badge, date-picker, file-upload, search-input, empty-state, error-state, loading-skeleton, confirm-dialog, def-code-select)
+âœ… Step 3.1: Implement Master Data API (apps/masters/ - MOU, PSC action codes, PSC def codes, CLC, PIC)
+âœ… Step 3.2: Implement Masters Hooks & Caching (use-masters.ts, api/masters.ts, 24h stale time)
+âœ… Step 3.3: Build Shared Components (status-badge, date-picker, file-upload, search-input, empty-state, error-state, loading-skeleton, confirm-dialog, def-code-select)
 
 Phase 6 - Reports & Physical Verification:
-✅ Step 6.1: CAR PDF Export Backend (apps/car/reports.py, report_views.py)
-✅ Step 6.2: Deficiency Excel Export Backend (apps/inspection/reports.py, report_views.py)
-✅ Step 6.3: Physical Verification Backend (from Phase 5.1 — models, views, URLs)
-✅ Step 6.4: Physical Verification UI + Export Integration
+âœ… Step 6.1: CAR PDF Export Backend (apps/car/reports.py, report_views.py)
+âœ… Step 6.2: Deficiency Excel Export Backend (apps/inspection/reports.py, report_views.py)
+âœ… Step 6.3: Physical Verification Backend (from Phase 5.1 â€” models, views, URLs)
+âœ… Step 6.4: Physical Verification UI + Export Integration
    - PV section, PV create/close modals integrated into CAR detail page
    - PDF export button in CAR detail dropdown
    - Excel export button in Inspection list header
-   - DPA Close → auto-open PV Create wired
+   - DPA Close â†’ auto-open PV Create wired
    - Session 93 patch:
      - CLOSE_CAR workflow auto-creates OPEN PV if no OPEN PV exists (idempotent)
      - Auto-created PV triggers existing PHYSICAL_VERIFICATION_CREATED notification helper
@@ -85,7 +85,7 @@ Phase 6 - Reports & Physical Verification:
      - Focused backend/frontend tests and type-check passed
 
 Phase 5 - CAR Module:
-✅ Step 5.1: Implement CAR Backend (apps/car/)
+âœ… Step 5.1: Implement CAR Backend (apps/car/)
    - 6 models: CarClcMapping, CorrectiveAction, Evidence, PhysicalVerification, ActivityHistory, AuditLog
    - 11 permission classes for full RBAC matrix
    - 19 serializers for all CAR operations
@@ -94,7 +94,7 @@ Phase 5 - CAR Module:
    - Migration applied, 6 tables created
    - All endpoints verified
 
-✅ Step 5.2: Build CAR List Page (Frontend)
+âœ… Step 5.2: Build CAR List Page (Frontend)
    - src/types/index.ts - Updated CARListItem to match CARListSerializer backend response (22 fields)
    - src/lib/api/cars.ts - CAR API layer with CARPaginatedResponse type, getCARs() function
    - src/hooks/use-cars.ts - carKeys query key factory, useCARs() hook with TanStack Query
@@ -106,7 +106,7 @@ Phase 5 - CAR Module:
    - App.tsx updated: CARListPage replaces placeholder
    - TypeScript compiles, build successful (611kb bundle)
 
-✅ Step 5.3: Build CAR Detail Page (Frontend)
+âœ… Step 5.3: Build CAR Detail Page (Frontend)
    - src/types/index.ts - Added CARDetail, CARDetailDeficiency, CARDetailInspection, CarClcMapping, AuditLogEntry types
    - src/types/index.ts - Fixed CorrectiveAction (action_type_display, owner_crew_id, due_date, etc.)
    - src/types/index.ts - Fixed Evidence (file_path not file_url, evidence_type_display)
@@ -124,10 +124,10 @@ Phase 5 - CAR Module:
    - src/routes/cars/[id].tsx - Page route with status/role action matrix, sticky bottom bar
    - src/components/car/index.ts - 7 new barrel exports
    - App.tsx updated: CARDetailPage replaces placeholder
-   - Also fixed: inspection-detail.tsx event.description → event.event_description
+   - Also fixed: inspection-detail.tsx event.description â†’ event.event_description
    - TypeScript compiles, build successful (632kb bundle)
 
-✅ Step 5.4: Build Edit CAR Page (Frontend)
+âœ… Step 5.4: Build Edit CAR Page (Frontend)
    - src/lib/api/cars.ts - Added createAction(), updateAction(), completeAction(), deleteEvidence()
    - src/hooks/use-cars.ts - Added useCreateAction(), useUpdateAction(), useCompleteAction(), useDeleteEvidence()
    - src/lib/validations/car.ts - Zod schemas: updateCarSchema, addActionSchema, validateCarSubmission()
@@ -138,13 +138,13 @@ Phase 5 - CAR Module:
    - App.tsx updated: /cars/:id/edit route with AuthGuard
    - TypeScript compiles, build successful (655kb bundle)
 
-✅ Step 5.5: Build Evidence Upload Modal (Frontend)
+âœ… Step 5.5: Build Evidence Upload Modal (Frontend)
    - src/lib/validations/evidence.ts - Zod schema, file validation, evidence type options
    - src/components/car/evidence-upload-modal.tsx - Full upload modal with type select, FileUpload, description
    - Already integrated into [id].tsx and [id].edit.tsx
    - TypeScript compiles, build successful
 
-✅ Step 5.6: Build Office Review Modals (Frontend)
+âœ… Step 5.6: Build Office Review Modals (Frontend)
    - src/lib/api/cars.ts - Added picAcceptCAR(), requestReworkCAR(), dpaCloseCAR(), reopenCAR()
    - src/hooks/use-cars.ts - Added usePICAccept(), useRequestRework(), useDPAClose(), useReopenCAR()
    - src/components/car/pic-accept-modal.tsx - PIC accept with comment (min 10 chars)
@@ -155,15 +155,15 @@ Phase 5 - CAR Module:
    - TypeScript compiles, build successful (666kb bundle)
 
 Phase 8 - Notifications & Polish:
-✅ Step 8.1: Implement Notification System (Backend)
-✅ Step 8.2: Build Notification UI (Frontend)
-✅ Step 8.3: Implement Service Worker (PWA)
-✅ Step 8.4: Performance Optimization
-✅ Step 8.5: Accessibility Audit
-✅ Step 8.6: Final Testing & Documentation
+âœ… Step 8.1: Implement Notification System (Backend)
+âœ… Step 8.2: Build Notification UI (Frontend)
+âœ… Step 8.3: Implement Service Worker (PWA)
+âœ… Step 8.4: Performance Optimization
+âœ… Step 8.5: Accessibility Audit
+âœ… Step 8.6: Final Testing & Documentation
 
 Phase 7 - Offline & Sync:
-✅ Step 7.1: Implement Sync Backend
+âœ… Step 7.1: Implement Sync Backend
    - apps/sync/ Django app: 4 models, 22 serializers, sync_service, conflict_resolver
    - 3 endpoints: POST pull/, push/, resolve-conflict/ at /api/psc/sync/
    - 2 permission classes: IsVesselUser, CanResolveConflict
@@ -171,51 +171,51 @@ Phase 7 - Offline & Sync:
    - Delta sync, conflict detection, 3 resolution strategies
    - Django check passes
 
-✅ Step 7.2: Set Up IndexedDB
-   - src/lib/db/index.ts — DB schema (5 stores), getDB(), storage utilities (150MB limit, 10MB warning)
-   - src/lib/db/inspections.ts — Inspection + Deficiency CRUD (16 functions)
-   - src/lib/db/cars.ts — CAR CRUD (8 functions)
-   - src/lib/db/sync-queue.ts — Sync queue management (11 functions)
-   - src/lib/db/masters.ts — Master data key-value store (6 functions)
+âœ… Step 7.2: Set Up IndexedDB
+   - src/lib/db/index.ts â€” DB schema (5 stores), getDB(), storage utilities (150MB limit, 10MB warning)
+   - src/lib/db/inspections.ts â€” Inspection + Deficiency CRUD (16 functions)
+   - src/lib/db/cars.ts â€” CAR CRUD (8 functions)
+   - src/lib/db/sync-queue.ts â€” Sync queue management (11 functions)
+   - src/lib/db/masters.ts â€” Master data key-value store (6 functions)
    - idb@8.0.0 used for IndexedDB wrapper
    - TypeScript compiles, build passes
 
-✅ Step 7.3: Implement Offline Data Layer
-   - src/stores/sync-store.ts — Zustand store with persist (9 actions, localStorage persistence)
-   - src/hooks/use-offline.ts — Online/offline detection hook (window events → sync store)
-   - src/hooks/use-offline-inspections.ts — Offline inspection queries + mutation queueing
-   - src/hooks/use-offline-cars.ts — Offline CAR queries + mutation queueing
+âœ… Step 7.3: Implement Offline Data Layer
+   - src/stores/sync-store.ts â€” Zustand store with persist (9 actions, localStorage persistence)
+   - src/hooks/use-offline.ts â€” Online/offline detection hook (window events â†’ sync store)
+   - src/hooks/use-offline-inspections.ts â€” Offline inspection queries + mutation queueing
+   - src/hooks/use-offline-cars.ts â€” Offline CAR queries + mutation queueing
    - TanStack Query hooks with staleTime: Infinity for IndexedDB reads
    - Mutation helpers queue to sync queue + update pending count
    - TypeScript compiles, build passes (675kb)
 
-✅ Step 7.4: Implement Sync Service (Frontend)
-   - src/lib/api/sync.ts — 17 types + 3 API functions (pullChanges, pushChanges, resolveConflict)
-   - src/lib/sync/sync-service.ts — pullFromServer(), pushToServer(), fullSync()
+âœ… Step 7.4: Implement Sync Service (Frontend)
+   - src/lib/api/sync.ts â€” 17 types + 3 API functions (pullChanges, pushChanges, resolveConflict)
+   - src/lib/sync/sync-service.ts â€” pullFromServer(), pushToServer(), fullSync()
      - Delta sync pull: merge into IndexedDB, handle is_deleted, save sync_token/server_version
      - Push: read FIFO sync queue, build events + attachments, generate UUID + SHA-256 checksum
      - Process id_mappings, conflicts, attachment_upload_urls
      - fullSync(): pull-then-push orchestration with sync store state management
-   - src/lib/sync/attachment-uploader.ts — uploadAttachments() with retry
+   - src/lib/sync/attachment-uploader.ts â€” uploadAttachments() with retry
      - 3 attempts, exponential backoff (1s, 2s, 4s) per FEAT-SYNC-006
      - registerFileForUpload() for offline evidence queueing
      - Expired URL detection, pending file count tracking
    - TypeScript compiles, build passes (675kb), lint clean
 
-✅ Step 7.5: Build Sync Status Page (Frontend)
-   - src/components/sync/sync-status.tsx — Connection indicator (online/offline), last sync time, sync error display
-   - src/components/sync/storage-indicator.tsx — Storage progress bar (X MB / 150 MB), low storage warning
-   - src/components/sync/pending-changes.tsx — Pending queue items list, failed uploads with retry, "All changes synced" empty state
-   - src/components/sync/conflict-list.tsx — Conflict list with entity info, "Waiting for office to resolve" for vessel users
-   - src/components/sync/offline-banner.tsx — "Offline — Showing cached data" banner for root layout
-   - src/components/sync/index.ts — Barrel exports for all sync components
-   - src/routes/sync/page.tsx — Sync Status page with Sync Now + Clear Old Data buttons
+âœ… Step 7.5: Build Sync Status Page (Frontend)
+   - src/components/sync/sync-status.tsx â€” Connection indicator (online/offline), last sync time, sync error display
+   - src/components/sync/storage-indicator.tsx â€” Storage progress bar (X MB / 150 MB), low storage warning
+   - src/components/sync/pending-changes.tsx â€” Pending queue items list, failed uploads with retry, "All changes synced" empty state
+   - src/components/sync/conflict-list.tsx â€” Conflict list with entity info, "Waiting for office to resolve" for vessel users
+   - src/components/sync/offline-banner.tsx â€” "Offline â€” Showing cached data" banner for root layout
+   - src/components/sync/index.ts â€” Barrel exports for all sync components
+   - src/routes/sync/page.tsx â€” Sync Status page with Sync Now + Clear Old Data buttons
    - Updated App.tsx: replaced sync placeholder with SyncStatusPage
    - Updated root-layout.tsx: integrated OfflineBanner (shown when offline)
    - TypeScript compiles, build passes (705kb), lint clean
 
-✅ Step 7.6: Implement Conflict Resolution UI (Frontend)
-   - src/components/sync/conflict-resolution-modal.tsx — Side-by-side vessel vs server comparison
+âœ… Step 7.6: Implement Conflict Resolution UI (Frontend)
+   - src/components/sync/conflict-resolution-modal.tsx â€” Side-by-side vessel vs server comparison
      - Highlights conflicting fields in 3-column grid
      - 3 resolution options: KEEP_SERVER, KEEP_VESSEL, REOPEN_FOR_MERGE
      - Optional notes field
@@ -224,7 +224,7 @@ Phase 7 - Offline & Sync:
    - Wired in sync page with resolveConflict() API call
 
 Phase 4 - Inspection Module (COMPLETE):
-✅ Step 4.1: Implement Inspection Backend (apps/inspection/)
+âœ… Step 4.1: Implement Inspection Backend (apps/inspection/)
    - Inspection model with all fields per BACKEND_STRUCTURE.md
    - InspectionReport model for file attachments
    - 9 serializers (List, Detail, Create, Update, Submit, PICReview, DPAClose, Report, ReportUpload)
@@ -233,7 +233,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - All endpoints wired up and responding
    - Tables created via migration
 
-✅ Step 4.2: Implement Deficiency Backend
+âœ… Step 4.2: Implement Deficiency Backend
    - Deficiency model per BACKEND_STRUCTURE.md Part 4.3
    - DeficiencyActionHistory model per Part 4.4
    - CAR placeholder model for auto-creation
@@ -245,7 +245,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - Endpoints: POST /inspections/{id}/deficiencies/, PUT /deficiencies/{id}/action-code/
    - Tables created via migration (psc_car, psc_deficiency, psc_deficiency_action_history)
 
-✅ Step 4.3: Implement PSC Follow-up Backend
+âœ… Step 4.3: Implement PSC Follow-up Backend
    - PSCFollowUpRegisterSerializer with validation
    - PSCFollowUpRegisterView for follow-up registration
    - IsVesselMaster permission class
@@ -254,7 +254,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - Batch updates deficiency action codes with history
    - Auto-clears deficiencies when action code is 10
 
-✅ Step 4.4: Build Inspection List Page (Frontend)
+âœ… Step 4.4: Build Inspection List Page (Frontend)
    - src/lib/api/inspections.ts - API layer with all CRUD functions
    - src/hooks/use-inspections.ts - TanStack Query hooks with query keys
    - src/components/inspection/inspection-card.tsx - Card with detention highlighting
@@ -264,7 +264,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - Updated App.tsx routing
    - TypeScript compiles, build successful
 
-✅ Step 4.5: Build Create Inspection Page (Frontend)
+âœ… Step 4.5: Build Create Inspection Page (Frontend)
    - src/lib/validations/inspection.ts - Zod schema with conditional PSC validation
    - src/components/inspection/inspection-form.tsx - Full form with react-hook-form
    - src/routes/inspections/new.tsx - Page route with create mutation
@@ -274,7 +274,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - Updated App.tsx routing
    - TypeScript compiles, build successful (564kb bundle)
 
-✅ Step 4.6: Build Add Deficiency Modal (Frontend)
+âœ… Step 4.6: Build Add Deficiency Modal (Frontend)
    - src/lib/validations/deficiency.ts - Zod schema (def_code required, def_text 10-4000 chars, target_date today+)
    - src/components/inspection/deficiency-modal.tsx - Modal with DefCodeSelect, form validation
    - src/lib/api/inspections.ts - Added createDeficiency() function
@@ -285,7 +285,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - Target date picker with disablePast (optional)
    - TypeScript compiles, build successful (564kb bundle)
 
-✅ Step 4.7: Build Inspection Detail Page (Frontend)
+âœ… Step 4.7: Build Inspection Detail Page (Frontend)
    - src/routes/inspections/[id].tsx - InspectionDetailPage with state management
      - Submit, PIC Review, DPA Close, Delete dialogs
      - Conditional action buttons per status/role
@@ -306,7 +306,7 @@ Phase 4 - Inspection Module (COMPLETE):
    - All routes wired in App.tsx
    - TypeScript compiles, build successful
 
-✅ Step 4.8: Build Edit Inspection & Follow-up Pages (Frontend)
+âœ… Step 4.8: Build Edit Inspection & Follow-up Pages (Frontend)
    - src/routes/inspections/[id].edit.tsx - EditInspectionPage
      - canEditInspection() permission check by status/role
      - Reuses InspectionForm with initial values from fetched data
@@ -334,7 +334,7 @@ IN PROGRESS
 
 Integration Testing with Live Backend (Session 28+):
 - [x] Vessel master login flow
-- [x] Inspection list page (fixed pagination type mismatch — Session 26)
+- [x] Inspection list page (fixed pagination type mismatch â€” Session 26)
 - [x] Inspection detail page
 - [x] CAR list page
 - [x] CAR detail page
@@ -342,49 +342,49 @@ Integration Testing with Live Backend (Session 28+):
 - [x] Sync page
 - [x] Settings page
 - [x] BUG #1: DRF active_reports serializer source (fixed Session 28)
-- [x] BUG #2: InspectionReport type (file_url → file_path) (fixed Session 28)
+- [x] BUG #2: InspectionReport type (file_url â†’ file_path) (fixed Session 28)
 - [x] BUG #3: CarClcMapping field types (fixed Session 28)
 - [x] BUG #4: PaginatedResponse inspection/CAR double-unwrap (fixed Session 28)
-- [x] BUG #5: user_type case mismatch VESSEL→vessel (fixed Session 28)
+- [x] BUG #5: user_type case mismatch VESSELâ†’vessel (fixed Session 28)
 - [x] BUG #5b: CanEditCAR REWORK_REQUESTED permission (fixed Session 28)
 - [x] BUG #6: parseInt on UUID vessel_id (fixed Session 28)
 - [x] BUG #7: Frontend API URL mismatches /create/ /update/ /delete/ (fixed Session 28)
-- [x] Office user login + flows (PIC, SSQE, DPA) — Session 77
-- [x] Create inspection end-to-end — Session 77 (HTTP 201, all fields correct)
-- [x] Edit inspection flow — Session 77 (PATCH update confirmed)
-- [x] Submit inspection flow — Session 77 (DRAFT→SUBMITTED, requires report upload)
-- [x] CAR edit end-to-end — Session 77 (root cause, CLC, actions, auto-start ALLOTTED→IN_PROGRESS)
-- [x] CAR state transitions (submit, PIC accept, rework, DPA close) — Session 76 (21/21 E2E tests)
-- [x] Evidence upload flow — Session 77 (BEFORE + AFTER, HTTP 201, files saved)
-- [x] Deficiency creation flow — Session 77 (HTTP 201, CAR auto-created PSC-2026-026)
-- [x] PSC follow-up registration — Session 77 (HTTP 201, 2 deficiencies updated)
-- [x] Report export (PDF, Excel) — Session 77 (PDF: application/pdf, Excel: spreadsheetml.sheet)
+- [x] Office user login + flows (PIC, SSQE, DPA) â€” Session 77
+- [x] Create inspection end-to-end â€” Session 77 (HTTP 201, all fields correct)
+- [x] Edit inspection flow â€” Session 77 (PATCH update confirmed)
+- [x] Submit inspection flow â€” Session 77 (DRAFTâ†’SUBMITTED, requires report upload)
+- [x] CAR edit end-to-end â€” Session 77 (root cause, CLC, actions, auto-start ALLOTTEDâ†’IN_PROGRESS)
+- [x] CAR state transitions (submit, PIC accept, rework, DPA close) â€” Session 76 (21/21 E2E tests)
+- [x] Evidence upload flow â€” Session 77 (BEFORE + AFTER, HTTP 201, files saved)
+- [x] Deficiency creation flow â€” Session 77 (HTTP 201, CAR auto-created PSC-2026-026)
+- [x] PSC follow-up registration â€” Session 77 (HTTP 201, 2 deficiencies updated)
+- [x] Report export (PDF, Excel) â€” Session 77 (PDF: application/pdf, Excel: spreadsheetml.sheet)
 
 ================================================================================
 COMPLETED THIS SESSION
 ================================================================================
 
-✅ Session 28 — Integration Testing with Live Backend:
+âœ… Session 28 â€” Integration Testing with Live Backend:
    Tested all pages via Playwright browser against running backend (port 8000) + frontend (port 5173).
 
-   BUG #1 — DRF active_reports serializer source:
+   BUG #1 â€” DRF active_reports serializer source:
    - InspectionDetailSerializer used `source='active_reports'` but model has no such attribute
    - Fixed: changed source to use correct queryset or removed invalid source
 
-   BUG #2 — InspectionReport type mismatch:
+   BUG #2 â€” InspectionReport type mismatch:
    - Frontend type had `file_url` but backend returns `file_path`
    - Fixed: Updated types/index.ts
 
-   BUG #3 — CarClcMapping field types:
+   BUG #3 â€” CarClcMapping field types:
    - Frontend type had wrong field types for CLC mapping data
    - Fixed: Updated types/index.ts to match backend serializer
 
-   BUG #4 — PaginatedResponse double-unwrap:
+   BUG #4 â€” PaginatedResponse double-unwrap:
    - Inspection and CAR list pages were double-unwrapping `response.data.data`
-   - Backend returns `{data: [...], pagination: {...}}` — apiClient already unwraps Axios response
+   - Backend returns `{data: [...], pagination: {...}}` â€” apiClient already unwraps Axios response
    - Fixed: Corrected response handling in API layer
 
-   BUG #5 — user_type case mismatch (CRITICAL):
+   BUG #5 â€” user_type case mismatch (CRITICAL):
    - Backend sends `user_type: 'VESSEL'` (uppercase) in JWT token claims
    - Frontend compares with `'vessel'` (lowercase) in edit page permission checks
    - ALL vessel master permission checks failed (CAR edit, inspection edit, follow-up)
@@ -392,21 +392,21 @@ COMPLETED THIS SESSION
    - Applied to both `login` and `me` API responses
    - User reported: "master acts as admin onboard and can make and edit CAR?"
 
-   BUG #5b — CanEditCAR missing REWORK_REQUESTED:
+   BUG #5b â€” CanEditCAR missing REWORK_REQUESTED:
    - `apps/car/permissions.py` CanEditCAR only allowed DRAFT status for vessel master
    - Should also allow REWORK_REQUESTED (as `accounts/permissions.py` version correctly does)
    - Fixed: Added `CARStatus.REWORK_REQUESTED` to allowed statuses tuple
 
-   BUG #6 — parseInt on UUID vessel_id (CRITICAL):
+   BUG #6 â€” parseInt on UUID vessel_id (CRITICAL):
    - `routes/inspections/new.tsx` did `parseInt(user.vessel_id, 10)` on a UUID string
-   - UUID like "e2e7ff0d-ab6d-4485-afb8-aa45aa537d73" → parseInt returns NaN
+   - UUID like "e2e7ff0d-ab6d-4485-afb8-aa45aa537d73" â†’ parseInt returns NaN
    - Triggered "Unable to determine vessel" error toast
    - Fixed: Removed parseInt, pass string directly
    - Changed CreateInspectionInput.vessel_id type from `number` to `string`
    - Changed createdInspectionId state type from `number | null` to `string | null`
    - User reported: "master cannot create CAR Error unable to determine vessel"
 
-   BUG #7 — Frontend API URL mismatches (CRITICAL):
+   BUG #7 â€” Frontend API URL mismatches (CRITICAL):
    - Frontend POSTed to `/inspections/` but backend expects `/inspections/create/`
    - Frontend PUT to `/inspections/{id}/` but backend expects `/inspections/${id}/update/`
    - Frontend DELETE to `/inspections/{id}/` but backend expects `/inspections/${id}/delete/`
@@ -415,20 +415,20 @@ COMPLETED THIS SESSION
    - Not yet re-tested (deferred to next session)
 
    Files Modified:
-   - psc-frontend/src/lib/api/auth.ts — normalizeUser() for user_type case fix
-   - psc-frontend/src/lib/api/inspections.ts — Fixed 3 API URLs (/create/, /update/, /delete/)
-   - psc-frontend/src/types/index.ts — CreateInspectionInput.vessel_id: number → string
-   - psc-frontend/src/routes/inspections/new.tsx — Removed parseInt, fixed state type
-   - psc-backend/apps/car/permissions.py — CanEditCAR allows REWORK_REQUESTED
+   - psc-frontend/src/lib/api/auth.ts â€” normalizeUser() for user_type case fix
+   - psc-frontend/src/lib/api/inspections.ts â€” Fixed 3 API URLs (/create/, /update/, /delete/)
+   - psc-frontend/src/types/index.ts â€” CreateInspectionInput.vessel_id: number â†’ string
+   - psc-frontend/src/routes/inspections/new.tsx â€” Removed parseInt, fixed state type
+   - psc-backend/apps/car/permissions.py â€” CanEditCAR allows REWORK_REQUESTED
 
-✅ Session 27 — Known Issue Fixes:
-   Issue #2 — Sync Conflict Loading (was mock data, now real):
+âœ… Session 27 â€” Known Issue Fixes:
+   Issue #2 â€” Sync Conflict Loading (was mock data, now real):
    - Backend: Added GET /api/psc/sync/conflicts/ endpoint (SyncConflictListView)
      - Returns unresolved conflicts, filtered by vessel_id for vessel users
      - Added route in apps/sync/urls.py
    - Frontend: Fixed SyncConflict type alignment in types/index.ts
-     - vessel_version → vessel_data, server_version → server_data
-     - conflict_fields → conflicting_fields, added missing fields
+     - vessel_version â†’ vessel_data, server_version â†’ server_data
+     - conflict_fields â†’ conflicting_fields, added missing fields
    - Frontend: Removed duplicate SyncConflict interface from lib/api/sync.ts
      - Now imports from @/types (single source of truth)
      - Added getConflicts() API function + ConflictListResponse type
@@ -442,15 +442,15 @@ COMPLETED THIS SESSION
    - Frontend: Fixed conflict-list.tsx + conflict-resolution-modal.tsx field names
    - Verification: tsc PASS, ESLint 0 errors 0 warnings, Build PASS (38 chunks)
 
-   Issue #3 — Token Blacklist Migration:
+   Issue #3 â€” Token Blacklist Migration:
    - Re-enabled 'rest_framework_simplejwt.token_blacklist' in INSTALLED_APPS
    - Set BLACKLIST_AFTER_ROTATION: True in SIMPLE_JWT config
-   - Ran migrate token_blacklist --fake (5 migrations faked — tables already existed)
+   - Ran migrate token_blacklist --fake (5 migrations faked â€” tables already existed)
    - Uncommented token.blacklist() in LogoutView.post()
    - Verification: Django check PASS, no system issues
 
-✅ Session 26 — Bug Fixes / QA:
-   Frontend (0 errors, 0 warnings — down from 0 errors, 8 warnings):
+âœ… Session 26 â€” Bug Fixes / QA:
+   Frontend (0 errors, 0 warnings â€” down from 0 errors, 8 warnings):
    - Fixed 4 react-hooks/exhaustive-deps warnings:
      - car-form.tsx: watchedClcIds wrapped in useMemo
      - cars/[id].edit.tsx: editPermission wrapped in useMemo
@@ -461,7 +461,7 @@ COMPLETED THIS SESSION
      - Updated barrel exports in shared/index.ts
    - Fixed PaginatedResponse<T> type mismatch (RUNTIME BUG):
      - Changed from DRF format {count, next, results} to actual backend format {data, pagination}
-     - Fixed inspection-list.tsx: data.results→data.data, data.next→pagination check, data.count→data.pagination.total_count
+     - Fixed inspection-list.tsx: data.resultsâ†’data.data, data.nextâ†’pagination check, data.countâ†’data.pagination.total_count
    - Fixed inspection PIC Review and DPA Close dialogs (BROKEN):
      - Were navigating to non-existent routes (/pic-review, /dpa-close)
      - Now call usePICReviewInspection/useDPACloseInspection hooks directly
@@ -470,13 +470,13 @@ COMPLETED THIS SESSION
    Backend:
    - Fixed vessel_name resolution (was returning empty strings):
      - inspection/views.py: Added Subquery annotation for vessel_name/vessel_code from VesselData
-     - car/views.py: Added Subquery annotation for vessel_name/vessel_code via deficiency→inspection→VesselData
+     - car/views.py: Added Subquery annotation for vessel_name/vessel_code via deficiencyâ†’inspectionâ†’VesselData
      - inspection/report_views.py: Fixed Excel export to resolve vessel_name from VesselData lookup
    - Cleaned stale TODO comments in followup_views.py (notifications already wired in Phase 8)
 
    Verification: TypeScript PASS, ESLint 0 errors 0 warnings, Build PASS, Django check PASS
 
-✅ Step 8.5: Accessibility Audit — Sessions 24 + 25
+âœ… Step 8.5: Accessibility Audit â€” Sessions 24 + 25
    Session 24 fixes:
    - src/components/auth/login-form.tsx: Password toggle keyboard-focusable + accessible label
    - src/components/layout/sidebar.tsx: Mobile close icon accessible label
@@ -491,7 +491,7 @@ COMPLETED THIS SESSION
    - src/components/layout/bottom-nav.tsx: aria-label on nav element (MINOR)
    Validation: type-check clean, build passes (38 chunks, largest 156.85kb)
 
-✅ Step 8.6: Final Testing & Documentation — Session 25
+âœ… Step 8.6: Final Testing & Documentation â€” Session 25
    - README.md created at project root: architecture, prerequisites, setup (backend + frontend),
      env vars, available scripts, project structure, API endpoints, key features, documentation index
    - Docs/USER_GUIDE.md created: login, inspections, deficiencies, CARs (full lifecycle),
@@ -500,7 +500,7 @@ COMPLETED THIS SESSION
    - Final QA: type-check PASS, build PASS (38 chunks), lint 0 errors (8 pre-existing warnings),
      Django check PASS
 
-✅ Step 8.4: Performance Optimization — Session 23
+âœ… Step 8.4: Performance Optimization â€” Session 23
    - src/App.tsx: Converted 10 page imports to React.lazy() with Suspense
      - LoginPage kept as eager import (first screen users see)
      - Added PageLoadingFallback component with Skeleton UI
@@ -517,13 +517,13 @@ COMPLETED THIS SESSION
    - After: 38 chunks, largest 156.85 kB (no warnings)
    - TypeScript clean, build passes
 
-✅ Step 8.3: Implement Service Worker (PWA) — Session 22
+âœ… Step 8.3: Implement Service Worker (PWA) â€” Session 22
    - vite.config.ts: Added VitePWA plugin (injectManifest mode, prompt registerType)
    - src/sw.ts: Custom service worker with Workbox 7.1.0
      - precacheAndRoute for app shell (11 entries, 751 KiB)
-     - NavigationRoute → NetworkFirst (3s timeout, offline fallback to cached shell)
-     - Static assets (images, fonts) → CacheFirst
-     - API requests → NetworkOnly (IndexedDB handles offline data)
+     - NavigationRoute â†’ NetworkFirst (3s timeout, offline fallback to cached shell)
+     - Static assets (images, fonts) â†’ CacheFirst
+     - API requests â†’ NetworkOnly (IndexedDB handles offline data)
      - SKIP_WAITING message handler for prompt-for-update pattern
    - src/lib/pwa/register-sw.ts: SW registration via virtual:pwa-register
      - Update detection with user prompt (confirm dialog)
@@ -541,7 +541,7 @@ NEXT UP
 ================================================================================
 
 All integration testing COMPLETE. Remaining items:
-1. master_RoleByVessel filtering (Known Issue #3 — office users see all vessels)
+1. master_RoleByVessel filtering (Known Issue #3 â€” office users see all vessels)
 2. Edge case testing: detention inspections, concurrent edits
 3. Performance testing under load (optional)
 4. User acceptance testing with real users
@@ -556,10 +556,10 @@ No blockers currently.
 KNOWN ISSUES / BUGS
 ================================================================================
 
-1. token_blacklist migration conflict — RESOLVED (Session 27)
+1. token_blacklist migration conflict â€” RESOLVED (Session 27)
    - Re-enabled token_blacklist app, faked migrations, uncommented blacklist()
 
-2. Bundle size warning — RESOLVED (Step 8.4)
+2. Bundle size warning â€” RESOLVED (Step 8.4)
    - Was 717kb single bundle, now 38 chunks (largest 156.85kb)
    - Code splitting + vendor chunking eliminated Vite warning
 
@@ -572,26 +572,26 @@ KNOWN ISSUES / BUGS
 
 4. Forgot password flow NOT IMPLEMENTED (out of scope)
    - login-form.tsx has TODO placeholder
-   - Not in PRD.md feature list — would need new FEAT-AUTH-xxx
+   - Not in PRD.md feature list â€” would need new FEAT-AUTH-xxx
 
-5. Sync conflict loading — RESOLVED (Session 27)
+5. Sync conflict loading â€” RESOLVED (Session 27)
    - Added GET /api/psc/sync/conflicts/ backend endpoint
    - Frontend now fetches real conflicts via useConflicts() TanStack Query hook
    - Fixed SyncConflict type alignment (field names matched to backend)
 
-6. user_type case mismatch — RESOLVED (Session 28)
+6. user_type case mismatch â€” RESOLVED (Session 28)
    - Backend sends VESSEL/OFFICE (uppercase), frontend expects vessel/office (lowercase)
    - Fixed with normalizeUser() in auth.ts
 
-7. parseInt on UUID vessel_id — RESOLVED (Session 28)
+7. parseInt on UUID vessel_id â€” RESOLVED (Session 28)
    - vessel_id is UUID string, parseInt returns NaN
    - Fixed: pass string directly, updated type from number to string
 
-8. Frontend API URL mismatches — RESOLVED (Session 28)
+8. Frontend API URL mismatches â€” RESOLVED (Session 28)
    - Backend uses /create/, /update/, /delete/ sub-paths (not RESTful convention)
    - Fixed: Updated inspections.ts to use correct URLs
 
-9. CanEditCAR REWORK_REQUESTED — RESOLVED (Session 28)
+9. CanEditCAR REWORK_REQUESTED â€” RESOLVED (Session 28)
    - car/permissions.py didn't allow REWORK_REQUESTED for vessel master
    - Fixed: Added to allowed statuses tuple
 
@@ -609,76 +609,76 @@ DECISIONS LOG
 - Decision: Flat API style (/api/psc/inspections/, /api/psc/cars/)
 - Rationale: Matches BACKEND_STRUCTURE.md (canonical API source) and APP_FLOW.md
 - Alternative considered: Namespaced modules (/api/psc/inspection/inspections/)
-- Status: CONFIRMED — IMPLEMENTATION_PLAN.md updated to match
+- Status: CONFIRMED â€” IMPLEMENTATION_PLAN.md updated to match
 
 2026-02-05:
 - Decision: Master endpoint naming uses psc- prefix (psc-action-codes, psc-def-codes)
 - Rationale: More specific, avoids collision with other modules sharing the database
-- Status: CONFIRMED — BACKEND_STRUCTURE.md updated to match APP_FLOW.md and IMPLEMENTATION_PLAN.md
+- Status: CONFIRMED â€” BACKEND_STRUCTURE.md updated to match APP_FLOW.md and IMPLEMENTATION_PLAN.md
 
 2026-02-05:
 - Decision: Inspection report uploads accept PDF, JPG, JPEG (not PDF-only)
 - Rationale: Vessel users sometimes receive reports as scanned images
-- Status: CONFIRMED — PRD.md, VALIDATION_RULES.md, APP_FLOW.md all updated
+- Status: CONFIRMED â€” PRD.md, VALIDATION_RULES.md, APP_FLOW.md all updated
 
 2026-02-05:
 - Decision: mssql-django version 1.6 instead of 1.4
 - Rationale: TECH_STACK.md specifies 1.4, but it requires Django<5.1 (incompatible with Django 5.2.7)
-- Status: CONFIRMED — mssql-django 1.6 supports Django 5.2
+- Status: CONFIRMED â€” mssql-django 1.6 supports Django 5.2
 
 2026-02-05:
 - Decision: Monkey-patch mssql-django for SQL Server 2025 support
 - Rationale: User has SQL Server 2025 (v17), mssql-django 1.6 only supports up to SQL Server 2022 (v16)
-- Status: CONFIRMED — Added patch in settings.py
+- Status: CONFIRMED â€” Added patch in settings.py
 
 2026-02-05:
 - Decision: Inspection tables managed by Django (migrations create tables)
 - Rationale: User confirmed tables don't exist in database yet
-- Status: CONFIRMED — psc_inspection and psc_inspection_report tables created via migration
+- Status: CONFIRMED â€” psc_inspection and psc_inspection_report tables created via migration
 
 2026-02-06:
 - Decision: CAR model stays in apps/inspection/deficiency_models.py for Phase 5
 - Rationale: Already migrated with FK to Deficiency, moving would require complex migration surgery
 - Alternative considered: Move to apps/car/models.py (risky migration changes)
-- Status: CONFIRMED — New models (CorrectiveAction, Evidence, etc.) created in apps/car/models.py with FK refs to CAR
+- Status: CONFIRMED â€” New models (CorrectiveAction, Evidence, etc.) created in apps/car/models.py with FK refs to CAR
 
 ================================================================================
 NOTES FOR NEXT SESSION
 ================================================================================
 
-PROJECT STATUS: ALL 8 PHASES COMPLETE (100%) — Integration testing COMPLETE (Session 77)
-CAR SUBMISSION VALIDATION: Implemented (Session 78) + E2E Verified (Session 79) — 31/31 pass
-FOLLOW-UP WIZARD: Implemented (Session 80) — 5-step wizard on same inspection (no new inspection)
-COMPUTED OPERATIONAL_STATUS: Implemented (Session 80) — OPEN/CLOSED derived from action_code_id annotations
-DEF_REPORTED FIELD: Implemented (Session 81) — YES/NO/NULL on Inspection, drives operational_status + gates deficiency creation
+PROJECT STATUS: ALL 8 PHASES COMPLETE (100%) â€” Integration testing COMPLETE (Session 77)
+CAR SUBMISSION VALIDATION: Implemented (Session 78) + E2E Verified (Session 79) â€” 31/31 pass
+FOLLOW-UP WIZARD: Implemented (Session 80) â€” 5-step wizard on same inspection (no new inspection)
+COMPUTED OPERATIONAL_STATUS: Implemented (Session 80) â€” OPEN/CLOSED derived from action_code_id annotations
+DEF_REPORTED FIELD: Implemented (Session 81) â€” YES/NO/NULL on Inspection, drives operational_status + gates deficiency creation
 
 Remaining known issue:
 - None blocking. RoleByVessel filtering implemented (Session 75). Forgot password out of scope.
 
 Key technical notes (preserved for maintenance/integration):
 1. CAR model lives in apps/inspection/deficiency_models.py (FK to Deficiency)
-2. Backend server runs at localhost:8000, frontend at localhost:5173
+2. Backend server runs at localhost:8001, frontend at localhost:5173
 3. Backend uses {data, pagination} response format (not DRF standard)
 4. ActivityEvent uses event_description (not description)
-5. ConfirmDialog has NO loading prop — use confirmDisabled instead
-6. DatePicker onChange expects (value: string) => void — don't use register()
-7. PV status (OPEN/CLOSED) is NOT in StatusType — use Badge directly
+5. ConfirmDialog has NO loading prop â€” use confirmDisabled instead
+6. DatePicker onChange expects (value: string) => void â€” don't use register()
+7. PV status (OPEN/CLOSED) is NOT in StatusType â€” use Badge directly
 8. Bundle: 38 chunks, largest 156.85kb (code-split with vendor chunking)
 9. 5 list-item components wrapped in React.memo()
 10. PWA: Workbox service worker with precache (44 entries, 770kb)
 11. Lint baseline: 0 errors, 0 warnings
 12. README.md at project root, USER_GUIDE.md in Docs/
-13. Token blacklist enabled — logout properly blacklists refresh tokens
+13. Token blacklist enabled â€” logout properly blacklists refresh tokens
 14. Sync conflicts fetched via GET /api/psc/sync/conflicts/ + useConflicts() hook
-15. auth.ts normalizeUser() lowercases user_type from backend (VESSEL→vessel)
+15. auth.ts normalizeUser() lowercases user_type from backend (VESSELâ†’vessel)
 16. Backend inspection URLs use explicit sub-paths: /create/, /update/, /delete/
-17. vessel_id is a UUID string — NEVER parseInt() on it
-18. CanEditCAR exists in TWO files: accounts/permissions.py and car/permissions.py — car views use car/
+17. vessel_id is a UUID string â€” NEVER parseInt() on it
+18. CanEditCAR exists in TWO files: accounts/permissions.py and car/permissions.py â€” car views use car/
 19. FEAT-CAR-002 validation now enforces target_date/due_date non-past, owner required on action create, and master CLC existence check on update
 20. Inspection operational_status is COMPUTED from deficiency action_code_id annotations (not stored field)
 21. Follow-up wizard: 5 steps, same inspection, multipart POST, optional report upload with report_type=FOLLOW_UP
-22. ActionCode is independent of CAR.status — setting action_code=10 (Rectified) does NOT change CAR.status
-23. Inspection workflow buttons (Submit/PIC Review/DPA Close) REMOVED — status is now computed OPEN/CLOSED
+22. ActionCode is independent of CAR.status â€” setting action_code=10 (Rectified) does NOT change CAR.status
+23. Inspection workflow buttons (Submit/PIC Review/DPA Close) REMOVED â€” status is now computed OPEN/CLOSED
 24. Legacy /psc-follow-up/register/ endpoint preserved as backward-compat alias
 
 ================================================================================
@@ -716,19 +716,19 @@ SESSION HISTORY
 2026-02-07 - Session 28:
 - Integration Testing with Live Backend via Playwright browser
 - Fixed 7 bugs discovered during testing:
-  - BUG #5: user_type case mismatch (VESSEL→vessel) — normalizeUser() in auth.ts
+  - BUG #5: user_type case mismatch (VESSELâ†’vessel) â€” normalizeUser() in auth.ts
   - BUG #5b: CanEditCAR REWORK_REQUESTED missing in car/permissions.py
-  - BUG #6: parseInt on UUID vessel_id — removed, pass string directly
-  - BUG #7: Frontend API URL mismatches (/inspections/ → /inspections/create/ etc.)
+  - BUG #6: parseInt on UUID vessel_id â€” removed, pass string directly
+  - BUG #7: Frontend API URL mismatches (/inspections/ â†’ /inspections/create/ etc.)
   - BUGs #1-4: Type mismatches, serializer source, double-unwrap (earlier in session)
 - Tested: Login, inspections list/detail, CARs list/detail/edit, notifications, sync, settings
 - Verified PIC login works with correct nav items
 - Still pending: Create inspection re-test, office flows, state transitions, exports
 
 2026-02-07 - Session 27:
-- Fixed Known Issue #2: Sync conflict loading (mock → real data)
+- Fixed Known Issue #2: Sync conflict loading (mock â†’ real data)
   - Added GET /api/psc/sync/conflicts/ backend endpoint
-  - Fixed SyncConflict type alignment (vessel_version→vessel_data, etc.)
+  - Fixed SyncConflict type alignment (vessel_versionâ†’vessel_data, etc.)
   - Created use-sync.ts hook (useConflicts, useInvalidateConflicts)
   - Rewired sync/page.tsx to use real conflict data
   - Fixed conflict-list.tsx + conflict-resolution-modal.tsx field names
@@ -741,7 +741,7 @@ SESSION HISTORY
 
 2026-02-06 - Session 26:
 - Bug Fixes / QA pass
-  - Fixed all 8 ESLint warnings → 0 errors, 0 warnings
+  - Fixed all 8 ESLint warnings â†’ 0 errors, 0 warnings
   - Fixed PaginatedResponse type mismatch (runtime bug for inspection list)
   - Fixed broken PIC Review / DPA Close dialogs on inspection detail
   - Fixed vessel_name resolution in inspection + CAR list/detail views + Excel export
@@ -774,7 +774,7 @@ SESSION HISTORY
   - App.tsx: 10 lazy routes via React.lazy() + Suspense with PageLoadingFallback
   - vite.config.ts: 4 vendor chunks (react, ui, query, utils) via manualChunks
   - 5 list-item components wrapped in React.memo()
-  - Before: 717.36kb single bundle → After: 38 chunks, largest 156.85kb
+  - Before: 717.36kb single bundle â†’ After: 38 chunks, largest 156.85kb
   - No Vite warnings, tsc clean, build passes
 - Status: Step 8.4 COMPLETE. Ready for Step 8.5
 
@@ -856,11 +856,11 @@ SESSION HISTORY
 - Completed Phase 6: Reports & Physical Verification
   - Steps 6.1-6.3 verified as already complete from prior sessions
   - Step 6.4: Integrated PV section + modals into CAR detail page
-  - Wired DPA Close → auto-open PV Create (resolved TODO)
+  - Wired DPA Close â†’ auto-open PV Create (resolved TODO)
   - Added PDF Export button to CAR detail dropdown
   - Added exportDeficiencyExcel() API function
   - Added Export Excel button to Inspection list page header
-  - Fixed StatusBadge → Badge for PV status type mismatch
+  - Fixed StatusBadge â†’ Badge for PV status type mismatch
   - Build passes (675kb)
 - Status: Phase 6 FULLY COMPLETE. Ready for Phase 7
 
@@ -917,8 +917,8 @@ SESSION HISTORY
     - `psc-backend/apps/car/tests.py`
       - Hardened FEAT-HIST-001 status-change assertion to locate `CAR_SUBMITTED` event by type (instead of assuming first position after timeline expansion).
   - Verification:
-    - `python -m py_compile psc-backend/apps/car/serializers.py psc-backend/apps/car/tests.py` ✅
-    - `python manage.py test apps.car.tests.TestFEAT_HIST_001_ActivityHistory --settings=core.settings_test -v 2` → 3 passed, 0 failed ✅
+    - `python -m py_compile psc-backend/apps/car/serializers.py psc-backend/apps/car/tests.py` âœ…
+    - `python manage.py test apps.car.tests.TestFEAT_HIST_001_ActivityHistory --settings=core.settings_test -v 2` â†’ 3 passed, 0 failed âœ…
   - Documentation sync:
     - Updated `Docs/LESSONS.md` with FEAT-HIST-001 root-cause prevention rule.
 - Status: FEAT-HIST-001 CAR detail timeline gap fixed and verified in scoped test suite.
@@ -942,8 +942,8 @@ SESSION HISTORY
       - Added `TestFEAT_CAR_011_AddCorrectiveAction` (+5 tests).
       - Added `TestFEAT_CAR_012_CompleteCorrectiveAction` (+5 tests).
   - Verification:
-    - Targeted: `python manage.py test apps.car.tests.TestFEAT_CAR_011_AddCorrectiveAction apps.car.tests.TestFEAT_CAR_012_CompleteCorrectiveAction --settings=core.settings_test -v 2` → 10 passed, 0 failed
-    - Regression: `python manage.py test apps.car.tests --settings=core.settings_test -v 2` → 117 passed, 0 failed
+    - Targeted: `python manage.py test apps.car.tests.TestFEAT_CAR_011_AddCorrectiveAction apps.car.tests.TestFEAT_CAR_012_CompleteCorrectiveAction --settings=core.settings_test -v 2` â†’ 10 passed, 0 failed
+    - Regression: `python manage.py test apps.car.tests --settings=core.settings_test -v 2` â†’ 117 passed, 0 failed
 - Documentation sync:
   - Updated `Docs/test_progress.txt` (coverage totals + Session 21 entry; FEAT-CAR-011/012 moved to complete).
   - Added `psc-backend/tests/reports/FEAT_CAR_011_012_report.md`.
@@ -1123,7 +1123,7 @@ SESSION HISTORY
     - Added `data.masters` object in pull response
     - Updated pull record counting to handle nested `masters` dict safely
 - Verification:
-  - `python -m py_compile apps/sync/serializers.py apps/sync/sync_service.py` ✅
+  - `python -m py_compile apps/sync/serializers.py apps/sync/sync_service.py` âœ…
   - Targeted `manage.py test` run blocked by local SQL Server test DB/migration state:
     - Existing `test_ksm_cms_dev` prompt in non-interactive run
     - Keepdb migration failure on `token_id` alter (`UQ__token_bl__...` dependency)
@@ -1160,11 +1160,11 @@ SESSION HISTORY
   - `psc-frontend/src/lib/sync/sync-service.test.ts`
     - Updated queue/uploader mocks to match retryable queue + file registration wiring
 - Verification:
-  - Frontend: `npm run type-check` ✅
+  - Frontend: `npm run type-check` âœ…
   - Frontend targeted tests:
     - `npm run test -- src/lib/sync/sync-service.test.ts src/components/sync/pending-changes.test.ts`
     - Result: FEAT-SYNC-006 failed-upload persistence case passes; one unrelated pre-existing failure remains (`pull_should_persist_master_data_bucket_to_indexeddb`)
-  - Backend syntax: `python -m py_compile psc-backend/apps/sync/sync_service.py psc-backend/apps/sync/views.py psc-backend/apps/sync/urls.py psc-backend/apps/sync/tests.py` ✅
+  - Backend syntax: `python -m py_compile psc-backend/apps/sync/sync_service.py psc-backend/apps/sync/views.py psc-backend/apps/sync/urls.py psc-backend/apps/sync/tests.py` âœ…
  - Backend targeted tests blocked by local SQL Server test DB/migration state:
     - existing `test_ksm_cms_dev` and interactive prompt in non-interactive run
     - `--keepdb` run fails on token blacklist migration dependency (`UQ__token_bl__...` on `token_id`)
@@ -1187,9 +1187,9 @@ SESSION HISTORY
   - `psc-backend/apps/sync/serializers.py`
     - Added `notes` max length enforcement (`max_length=1000`) with explicit validation message
 - Verification:
-  - `cd psc-backend; python manage.py test apps.sync.tests -v 2 --noinput` -> `Ran 44 tests ... OK` ✅
- - `cd psc-backend; pytest -q apps/sync/tests.py` -> `44 passed in 0.87s` ✅
-  - `cd psc-backend; python -m py_compile manage.py apps/sync/serializers.py conftest.py` ✅
+  - `cd psc-backend; python manage.py test apps.sync.tests -v 2 --noinput` -> `Ran 44 tests ... OK` âœ…
+ - `cd psc-backend; pytest -q apps/sync/tests.py` -> `44 passed in 0.87s` âœ…
+  - `cd psc-backend; python -m py_compile manage.py apps/sync/serializers.py conftest.py` âœ…
 - Status: backend sync tests now run end-to-end on isolated test DB via both manage.py and pytest paths.
 
 2026-02-07 - Session 39 (Frontend Sync Masters Persistence Fix):
@@ -1210,8 +1210,8 @@ SESSION HISTORY
   - `psc-frontend/src/lib/api/sync.ts`
     - Added optional `masters` bucket to `SyncPullData` type contract
 - Verification:
-  - `cd psc-frontend; npm run test -- src/lib/sync/sync-service.test.ts` -> `4 passed` ✅
-  - `cd psc-frontend; npm run test -- src/lib/sync/sync-service.test.ts src/lib/sync/attachment-uploader.test.ts src/components/sync/pending-changes.test.tsx` -> `11 passed` ✅
+  - `cd psc-frontend; npm run test -- src/lib/sync/sync-service.test.ts` -> `4 passed` âœ…
+  - `cd psc-frontend; npm run test -- src/lib/sync/sync-service.test.ts src/lib/sync/attachment-uploader.test.ts src/components/sync/pending-changes.test.tsx` -> `11 passed` âœ…
 - Status: cited FEAT-SYNC-001/006 frontend gaps now closed; targeted sync frontend tests fully green.
 
 2026-02-07 - Session 40 (Inspection Edit/Delete Gap Fixes):
@@ -1240,9 +1240,9 @@ SESSION HISTORY
       - soft-delete linked `CAR` rows
       - increment inspection `sync_version`
 - Verification:
-  - `cd psc-backend; pytest -q apps/inspection/tests.py -k "feat_ins_007_gap_office_edit_assist_should_create_audit_log or feat_ins_008_gap_revision_no_should_increment_on_post_submit_edit or feat_ins_008_gap_post_submit_edit_should_create_audit_log or feat_ins_009_gap_delete_should_soft_delete_related_deficiencies_and_car"` -> `4 passed` ✅
-  - `cd psc-backend; pytest -q apps/inspection/tests.py -k "TestFEAT_INS_007 or TestFEAT_INS_008 or TestFEAT_INS_009"` -> `25 passed` ✅
-  - `cd psc-frontend; npm run test -- src/lib/sync/sync-service.test.ts` -> `4 passed` ✅
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k "feat_ins_007_gap_office_edit_assist_should_create_audit_log or feat_ins_008_gap_revision_no_should_increment_on_post_submit_edit or feat_ins_008_gap_post_submit_edit_should_create_audit_log or feat_ins_009_gap_delete_should_soft_delete_related_deficiencies_and_car"` -> `4 passed` âœ…
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k "TestFEAT_INS_007 or TestFEAT_INS_008 or TestFEAT_INS_009"` -> `25 passed` âœ…
+  - `cd psc-frontend; npm run test -- src/lib/sync/sync-service.test.ts` -> `4 passed` âœ…
 - Status: FEAT-INS-007/008/009 gap tests closed; sync regression checks remain green.
 
 2026-02-07 - Session 41 (Physical Verification Validation Gap Fixes):
@@ -1263,7 +1263,7 @@ SESSION HISTORY
     - Rejects values greater than `date.today()` with: "Visit date cannot be in the future"
 - Verification:
   - `cd psc-backend; python manage.py test apps.car.tests.TestFEAT_PV_001_CreatePhysicalVerification apps.car.tests.TestFEAT_PV_002_ClosePhysicalVerification -v 2`
-  - Result: `14 passed` ✅
+  - Result: `14 passed` âœ…
 - Status: FEAT-PV-001 and FEAT-PV-002 backend validation gaps closed.
 
 2026-02-08 - Session 42 (Inspection Create/Submit Contract Gap Fixes):
@@ -1294,8 +1294,8 @@ SESSION HISTORY
     - Added root-endpoint create regression test
     - Updated submit orphan-CAR gap test setup to force a real orphan deficiency state after auto-CAR signal
 - Verification:
-  - `python -m py_compile psc-backend/apps/inspection/serializers.py psc-backend/apps/inspection/permissions.py psc-backend/apps/inspection/views.py psc-backend/apps/inspection/models.py psc-backend/apps/inspection/tests.py` ✅
-  - `cd psc-backend; python manage.py test apps.inspection.tests.TestFEAT_INS_001_CreateInspection apps.inspection.tests.TestFEAT_INS_004_SubmitInspection -v 2` ✅ (`21 passed`)
+  - `python -m py_compile psc-backend/apps/inspection/serializers.py psc-backend/apps/inspection/permissions.py psc-backend/apps/inspection/views.py psc-backend/apps/inspection/models.py psc-backend/apps/inspection/tests.py` âœ…
+  - `cd psc-backend; python manage.py test apps.inspection.tests.TestFEAT_INS_001_CreateInspection apps.inspection.tests.TestFEAT_INS_004_SubmitInspection -v 2` âœ… (`21 passed`)
 - Status: FEAT-INS-001 and FEAT-INS-004 cited backend gaps closed; root create contract now supported.
 
 2026-02-08 - Session 43 (INS-002 Description-Mandatory Gap Fix):
@@ -1310,8 +1310,8 @@ SESSION HISTORY
   - `Docs/VALIDATION_RULES.md`
     - Section 8.1 updated: upload report `description` marked required.
 - Verification:
-  - `cd psc-backend; pytest -q apps/inspection/tests.py -k test_gap_validation_description_should_be_mandatory` ✅ (`1 passed`)
-  - `cd psc-backend; pytest -q apps/inspection/tests.py -k TestFEAT_INS_002_UploadInspectionReport` ✅ (`10 passed`)
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k test_gap_validation_description_should_be_mandatory` âœ… (`1 passed`)
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k TestFEAT_INS_002_UploadInspectionReport` âœ… (`10 passed`)
 - Status: FEAT-INS-002 description-mandatory backend gap closed.
 
 2026-02-08 - Session 44 (Session Close-Out):
@@ -1343,7 +1343,7 @@ SESSION HISTORY
     - Added submitted-status gate: if inspection is `SUBMITTED`, allow only `OFFICE` user type.
     - Added `ActivityHistory` creation (`entity_type='DEFICIENCY'`, `event_type='DEFICIENCY_ADDED'`) after successful create.
 - Verification:
-  - `cd psc-backend; pytest -q apps/inspection/tests.py -k TestFEAT_INS_003_AddDeficiency` -> `14 passed` ✅
+  - `cd psc-backend; pytest -q apps/inspection/tests.py -k TestFEAT_INS_003_AddDeficiency` -> `14 passed` âœ…
   - Full `apps/inspection/tests.py` run attempted twice but timed out in current environment.
   - Broad follow-up selector run confirmed remaining unrelated failures still in FEAT-INS-005/006 activity-event gaps.
 - Status:
@@ -1380,9 +1380,9 @@ SESSION HISTORY
     - Added `notify_inspection_dpa_closed(...)` helper.
     - Added fallback recipient path (`inspection.created_by` or `vessel_id`) when vessel-master lookup yields no rows (test DB compatibility).
 - Verification:
-  - Targeted regression set: `3 passed` ✅
+  - Targeted regression set: `3 passed` âœ…
   - Full FEAT class recheck:
-    - `cd psc-backend; pytest -q apps/inspection/tests.py -k "TestFEAT_INS_005_PICReviewInspection or TestFEAT_INS_006_DPACloseInspection"` -> `25 passed` ✅
+    - `cd psc-backend; pytest -q apps/inspection/tests.py -k "TestFEAT_INS_005_PICReviewInspection or TestFEAT_INS_006_DPACloseInspection"` -> `25 passed` âœ…
 - Status:
   - FEAT-INS-005 and FEAT-INS-006 cited backend gaps are closed.
   - Coverage state: 26 complete + 12 partial / 41 total.
@@ -1424,12 +1424,12 @@ SESSION HISTORY
     - Added `psc-frontend/src/components/sync/offline-banner.test.tsx`.
 - Verification:
   - Targeted suite run:
-    - `cd psc-frontend; npm run test -- src/components/inspection/deficiency-modal.test.tsx src/components/inspection/deficiency-list.test.tsx src/components/inspection/deficiency-card.test.tsx src/components/car/car-filters.test.tsx src/components/sync/sync-status.test.tsx src/components/sync/storage-indicator.test.tsx src/components/sync/offline-banner.test.tsx` ✅ (`25 passed`)
+    - `cd psc-frontend; npm run test -- src/components/inspection/deficiency-modal.test.tsx src/components/inspection/deficiency-list.test.tsx src/components/inspection/deficiency-card.test.tsx src/components/car/car-filters.test.tsx src/components/sync/sync-status.test.tsx src/components/sync/storage-indicator.test.tsx src/components/sync/offline-banner.test.tsx` âœ… (`25 passed`)
   - Type-check:
-    - `cd psc-frontend; npm run type-check` ✅
+    - `cd psc-frontend; npm run type-check` âœ…
   - Lint:
-    - `cd psc-frontend; npm run lint` ⚠️ fails on pre-existing unrelated files.
-    - `cd psc-frontend; npx eslint <changed files>` ✅
+    - `cd psc-frontend; npm run lint` âš ï¸ fails on pre-existing unrelated files.
+    - `cd psc-frontend; npx eslint <changed files>` âœ…
 - Status:
   - DeficiencyModal dialog a11y warning resolved and guarded by regression assertions.
   - Depth-audit coverage extended for deficiency list/card and car filters.
@@ -1450,9 +1450,9 @@ SESSION HISTORY
     - `psc-frontend/src/components/sync/offline-banner.test.tsx`
   - `psc-frontend/src/components/sync/sync-status.test.tsx` now covers SyncStatus only.
 - Verification (latest run):
-  - `cd psc-frontend; npm run test -- src/components/inspection/deficiency-modal.test.tsx src/components/inspection/deficiency-list.test.tsx src/components/inspection/deficiency-card.test.tsx src/components/car/car-filters.test.tsx src/components/sync/sync-status.test.tsx src/components/sync/storage-indicator.test.tsx src/components/sync/offline-banner.test.tsx` ✅ (`25 passed`)
-  - `cd psc-frontend; npm run type-check` ✅
-  - `cd psc-frontend; npm run lint` ⚠️ pre-existing unrelated lint failures remain outside this scope.
+  - `cd psc-frontend; npm run test -- src/components/inspection/deficiency-modal.test.tsx src/components/inspection/deficiency-list.test.tsx src/components/inspection/deficiency-card.test.tsx src/components/car/car-filters.test.tsx src/components/sync/sync-status.test.tsx src/components/sync/storage-indicator.test.tsx src/components/sync/offline-banner.test.tsx` âœ… (`25 passed`)
+  - `cd psc-frontend; npm run type-check` âœ…
+  - `cd psc-frontend; npm run lint` âš ï¸ pre-existing unrelated lint failures remain outside this scope.
 - Status:
   - Documentation synced for current frontend debug session.
   - Coverage state unchanged: 41 complete + 0 partial / 41 total (100%).
@@ -1472,7 +1472,7 @@ SESSION HISTORY
     - Renamed test to `test_feat_sync_005_happy_path_reopen_for_merge_sets_car_to_rework_requested`.
     - Updated expected status assertion to `CARStatus.REWORK_REQUESTED`.
 - Verification:
-  - `cd psc-backend; pytest -q apps/sync/tests.py` ✅ (`44 passed`)
+  - `cd psc-backend; pytest -q apps/sync/tests.py` âœ… (`44 passed`)
 - Status:
   - FEAT-SYNC-005 CAR reopen behavior is now aligned with `Docs/PRD.md` acceptance criteria.
 
@@ -1492,9 +1492,9 @@ SESSION HISTORY
     - `apps/notifications/*` (optional typing and recipient type annotations)
     - report modules (`apps/car/reports.py`, `apps/inspection/reports.py`) for mypy compatibility.
 - Verification:
-  - `cd psc-backend; pytest -q apps/accounts/tests.py apps/car/tests.py apps/inspection/tests.py apps/notifications/tests.py apps/sync/tests.py` ✅ (`388 passed`)
-  - `cd psc-backend; uvx ruff check .` ✅ (`All checks passed`)
-  - `cd psc-backend; venv\\Scripts\\python.exe -m mypy` ✅ (`Success: no issues found in 80 source files`)
+  - `cd psc-backend; pytest -q apps/accounts/tests.py apps/car/tests.py apps/inspection/tests.py apps/notifications/tests.py apps/sync/tests.py` âœ… (`388 passed`)
+  - `cd psc-backend; uvx ruff check .` âœ… (`All checks passed`)
+  - `cd psc-backend; venv\\Scripts\\python.exe -m mypy` âœ… (`Success: no issues found in 80 source files`)
 - Status:
   - Backend verification gate is now green for test/lint/type checks using project-local commands.
 
@@ -1532,9 +1532,9 @@ SESSION HISTORY
     - Replaced `Coverage:` with `Report:` links for FEAT-SYNC-005, FEAT-CAR-008, FEAT-RPT-001.
     - Updated FEAT-RPT-001 count from 8 to 10 tests.
 - Verification:
-  - `cd psc-backend; pytest -q apps/car/tests.py -k feat_rpt_001` ✅ (`10 passed`)
-  - `cd psc-backend; pytest -q apps/accounts/tests.py apps/car/tests.py apps/inspection/tests.py apps/notifications/tests.py apps/sync/tests.py` ✅ (`390 passed`)
-  - `python -m py_compile psc-backend/apps/car/reports.py psc-backend/apps/car/tests.py` ✅
+  - `cd psc-backend; pytest -q apps/car/tests.py -k feat_rpt_001` âœ… (`10 passed`)
+  - `cd psc-backend; pytest -q apps/accounts/tests.py apps/car/tests.py apps/inspection/tests.py apps/notifications/tests.py apps/sync/tests.py` âœ… (`390 passed`)
+  - `python -m py_compile psc-backend/apps/car/reports.py psc-backend/apps/car/tests.py` âœ…
 - Status:
   - FEAT-RPT-001 company-logo criterion: CLOSED.
   - FEAT-RPT-001 section-completeness assertion gap: CLOSED (test-depth gap resolved).
@@ -1560,9 +1560,9 @@ SESSION HISTORY
   - `psc-frontend/src/components/car/evidence-upload-modal.tsx`
     - Added `DialogDescription` import and explanatory description under `DialogTitle` to close sibling-modal gap.
 - Verification:
-  - `cd psc-frontend; npm run test -- src/components/car/dpa-close-modal.test.tsx src/components/car/pic-accept-modal.test.tsx src/components/car/rework-modal.test.tsx` ✅ (`12 passed`)
+  - `cd psc-frontend; npm run test -- src/components/car/dpa-close-modal.test.tsx src/components/car/pic-accept-modal.test.tsx src/components/car/rework-modal.test.tsx` âœ… (`12 passed`)
   - Re-run static scan for dialog contract:
-    - `rg -l "<DialogContent" psc-frontend/src/components` + content check for `DialogDescription|aria-describedby` ✅ (no remaining offenders)
+    - `rg -l "<DialogContent" psc-frontend/src/components` + content check for `DialogDescription|aria-describedby` âœ… (no remaining offenders)
 - Status:
   - Radix dialog a11y warning gap in CAR modal family: CLOSED.
   - Existing modal behavior unchanged; no test regressions in targeted CAR modal suites.
@@ -1576,8 +1576,8 @@ SESSION HISTORY
   - `Docs/LESSONS.md`
   - `Docs/test_progress.txt`
 - Verification reference:
-  - `cd psc-frontend; npm run test -- src/components/car/dpa-close-modal.test.tsx src/components/car/pic-accept-modal.test.tsx src/components/car/rework-modal.test.tsx` ✅ (`12 passed`)
-  - `cd psc-frontend; npm run test -- src/components/car` ✅ (`37 passed`)
+  - `cd psc-frontend; npm run test -- src/components/car/dpa-close-modal.test.tsx src/components/car/pic-accept-modal.test.tsx src/components/car/rework-modal.test.tsx` âœ… (`12 passed`)
+  - `cd psc-frontend; npm run test -- src/components/car` âœ… (`37 passed`)
 - Status:
   - CAR modal Radix a11y source gap remains CLOSED.
   - Session closed on user request.
@@ -1600,7 +1600,7 @@ SESSION HISTORY
   - Added report:
     - `psc-frontend/tests/reports/FEAT_PV_HIST_INS_ROUTE_frontend_report.md`
 - Verification:
-  - `cd psc-frontend; npm run test -- src/components/car/activity-history.test.tsx src/components/car/audit-log.test.tsx src/components/car/physical-verification-section.test.tsx src/components/car/pv-create-modal.test.tsx src/components/car/pv-close-modal.test.tsx src/routes/inspections/[id].edit.test.tsx src/routes/inspections/[id].test.tsx` ✅ (`21 passed`)
+  - `cd psc-frontend; npm run test -- src/components/car/activity-history.test.tsx src/components/car/audit-log.test.tsx src/components/car/physical-verification-section.test.tsx src/components/car/pv-create-modal.test.tsx src/components/car/pv-close-modal.test.tsx src/routes/inspections/[id].edit.test.tsx src/routes/inspections/[id].test.tsx` âœ… (`21 passed`)
 - Status:
   - Frontend depth improved across PV/history and inspection route surfaces.
   - Two route-level audit gaps identified for follow-up (mandatory inspection comments, assigned-verifier PV close guard).
@@ -1625,7 +1625,7 @@ SESSION HISTORY
   - Updated:
     - `psc-frontend/src/routes/inspections/[id].test.tsx` mocks to include new inspection modal components.
 - Verification:
-  - `cd psc-frontend; npm run test -- src/components/inspection/inspection-pic-review-modal.test.tsx src/components/inspection/inspection-dpa-close-modal.test.tsx src/routes/inspections/[id].test.tsx src/routes/inspections/[id].edit.test.tsx src/routes/cars/[id].test.tsx` ✅ (`12 passed`)
+  - `cd psc-frontend; npm run test -- src/components/inspection/inspection-pic-review-modal.test.tsx src/components/inspection/inspection-dpa-close-modal.test.tsx src/routes/inspections/[id].test.tsx src/routes/inspections/[id].edit.test.tsx src/routes/cars/[id].test.tsx` âœ… (`12 passed`)
 - Status:
   - Session 60 frontend audit gaps are CLOSED.
 
@@ -1636,55 +1636,55 @@ SESSION HISTORY
 
 2026-02-09 - Session 63 (CLC Hierarchical Selector + Seed Data + Action Code Fix):
 - Action:
-  1. CLC Seed Data — Added 82 new CLC items across all 22 remaining categories (92 total):
+  1. CLC Seed Data â€” Added 82 new CLC items across all 22 remaining categories (92 total):
      - Updated `psc-backend/seed_data.sql` (single INSERT for fresh deployments)
      - Created `psc-backend/seed_data_clc_update.sql` (incremental for existing DBs)
-     - Seeded to ksm_cms_dev — all 23 leaf categories confirmed populated
-  2. CLC Hierarchical Accordion — Rebuilt CLCMultiSelect in `car-form.tsx`:
+     - Seeded to ksm_cms_dev â€” all 23 leaf categories confirmed populated
+  2. CLC Hierarchical Accordion â€” Rebuilt CLCMultiSelect in `car-form.tsx`:
      - Replaced flat dropdown with accordion-based hierarchical selector
      - 4 sections: Immediate Actions, Immediate Conditions, Root Personal, Root Job
      - Expandable/collapsible categories with checkboxes, count badges, search
      - Switched from `useCLCItems()` to `useCLCHierarchy()`
-  3. CLC Type Fix — Updated `types/index.ts`:
+  3. CLC Type Fix â€” Updated `types/index.ts`:
      - Fixed `CLCHierarchyCategory` to match API: `{ name: string, items: Record<string, string> }`
      - Fixed `CLCHierarchy` to match nested backend structure (actions/conditions/personal_factors/job_factors)
      - Removed unused `CLCHierarchyItem` interface
-  4. Improvement Guidance Callout — Added in `car-form.tsx`:
+  4. Improvement Guidance Callout â€” Added in `car-form.tsx`:
      - Blue info callout between Immediate and Long-term Actions sections
      - Shows contextual hints based on selected CLC cause category types
      - Dynamically updates as codes are added/removed
-  5. Deficiency Display Enhancement — Enhanced deficiency section in CAR form:
+  5. Deficiency Display Enhancement â€” Enhanced deficiency section in CAR form:
      - Now shows action code badge, open/cleared status, cleared date, deficiency target date
-  6. Target Date Auto-set — CAR target date defaults to 7 days from CAR creation:
+  6. Target Date Auto-set â€” CAR target date defaults to 7 days from CAR creation:
      - Computed in `defaultTargetDate` useMemo; PIC/DPA can override via DatePicker
-  7. Action Code Fix — Fixed blank-after-selection bug in `deficiency-modal.tsx`:
+  7. Action Code Fix â€” Fixed blank-after-selection bug in `deficiency-modal.tsx`:
      - Root cause: DB `Action_Code` is INT, API returns number, Radix Select needs string
      - Fix: Wrapped all values with `String()` in SelectItem and field value
      - Fixed `PSCActionCode.action_code` type from `string` to `number`
-  8. Action Code Made Mandatory — Updated validation in `deficiency.ts`:
+  8. Action Code Made Mandatory â€” Updated validation in `deficiency.ts`:
      - Changed from `z.string().nullable().optional()` to `z.string().min(1, 'Action code is required')`
      - Updated `CreateDeficiencyInput.action_code` to required (not optional)
      - Added red asterisk to label in modal UI
 - Files modified:
-  - `psc-backend/seed_data.sql` — CLC items for all 23 categories
-  - `psc-backend/seed_data_clc_update.sql` — NEW incremental seed file
-  - `psc-frontend/src/types/index.ts` — CLCHierarchy types, PSCActionCode, CreateDeficiencyInput
-  - `psc-frontend/src/components/car/car-form.tsx` — CLCMultiSelect rebuild, deficiency display, target date, guidance
-  - `psc-frontend/src/components/inspection/deficiency-modal.tsx` — Action code String() fix, mandatory
-  - `psc-frontend/src/lib/validations/deficiency.ts` — action_code required
-  - `psc-frontend/src/components/car/car-form.test.tsx` — Updated mock to useCLCHierarchy
-  - `psc-frontend/src/components/inspection/deficiency-modal.test.tsx` — Updated for required action_code
-  - `psc-frontend/src/lib/validations/deficiency.test.ts` — Updated validDeficiency helper
+  - `psc-backend/seed_data.sql` â€” CLC items for all 23 categories
+  - `psc-backend/seed_data_clc_update.sql` â€” NEW incremental seed file
+  - `psc-frontend/src/types/index.ts` â€” CLCHierarchy types, PSCActionCode, CreateDeficiencyInput
+  - `psc-frontend/src/components/car/car-form.tsx` â€” CLCMultiSelect rebuild, deficiency display, target date, guidance
+  - `psc-frontend/src/components/inspection/deficiency-modal.tsx` â€” Action code String() fix, mandatory
+  - `psc-frontend/src/lib/validations/deficiency.ts` â€” action_code required
+  - `psc-frontend/src/components/car/car-form.test.tsx` â€” Updated mock to useCLCHierarchy
+  - `psc-frontend/src/components/inspection/deficiency-modal.test.tsx` â€” Updated for required action_code
+  - `psc-frontend/src/lib/validations/deficiency.test.ts` â€” Updated validDeficiency helper
 - Verification:
-  - `npx tsc --noEmit` ✅ (no errors)
-  - `npx vitest run src/components/car/car-form.test.tsx` ✅ (5/5 passed)
-  - `npx vitest run src/components/inspection/deficiency-modal.test.tsx` ✅ (5/5 passed)
-  - `npx vitest run src/lib/validations/deficiency.test.ts` ✅ (12/13 passed — 1 pre-existing date timezone failure)
+  - `npx tsc --noEmit` âœ… (no errors)
+  - `npx vitest run src/components/car/car-form.test.tsx` âœ… (5/5 passed)
+  - `npx vitest run src/components/inspection/deficiency-modal.test.tsx` âœ… (5/5 passed)
+  - `npx vitest run src/lib/validations/deficiency.test.ts` âœ… (12/13 passed â€” 1 pre-existing date timezone failure)
   - SQL seed verified: all 23 categories have items (92 total)
 - Status: Session 63 complete. CLC selector fully hierarchical, action code works and is mandatory.
 
 ================================================================================
-Session 64 — Integration Testing + Bug Fixes (State Transitions, Cache, Rework/Reopen)
+Session 64 â€” Integration Testing + Bug Fixes (State Transitions, Cache, Rework/Reopen)
 Date: 2026-02-09
 ================================================================================
 - Scope: Live integration testing of full inspection lifecycle + CAR workflow UX fixes
@@ -1695,44 +1695,44 @@ Date: 2026-02-09
      - Integrated into both `InspectionCreateSerializer` and `PSCFollowUpRegisterSerializer`
      - Removed manual `report_reference` input from all frontend forms
      - Verified: KSM001-2026-04 auto-generated correctly
-  2. Field name mismatch fixes (frontend → backend):
-     - `picReviewInspection()`: Changed `{ comments }` → `{ comment: comments }` (backend expects `comment` singular)
-     - `dpaCloseInspection()`: Same fix — `{ comments }` → `{ comment: comments }`
-  3. Cache invalidation fix — All 3 inspection mutation hooks:
+  2. Field name mismatch fixes (frontend â†’ backend):
+     - `picReviewInspection()`: Changed `{ comments }` â†’ `{ comment: comments }` (backend expects `comment` singular)
+     - `dpaCloseInspection()`: Same fix â€” `{ comments }` â†’ `{ comment: comments }`
+  3. Cache invalidation fix â€” All 3 inspection mutation hooks:
      - `useSubmitInspection`, `usePICReviewInspection`, `useDPACloseInspection`
      - Changed from `setQueryData` to `invalidateQueries` for detail query
-     - Root cause: Action endpoints return basic `Inspection`, not `InspectionDetail` — setQueryData replaced rich data with simple object, showing "Invalid Date" / empty fields
+     - Root cause: Action endpoints return basic `Inspection`, not `InspectionDetail` â€” setQueryData replaced rich data with simple object, showing "Invalid Date" / empty fields
   4. CAR rework/reopen UX improvements:
      - Added "Request Rework" button (orange outline) to CAR detail sticky bottom bar
      - Added "Reopen CAR" button (outline) to CAR detail sticky bottom bar
-     - Previously these were only in the dropdown menu — not discoverable enough
+     - Previously these were only in the dropdown menu â€” not discoverable enough
   5. CAR Reopen flow fix (critical bug):
-     - Backend `CARReopenView` was setting status to `REWORK_REQUESTED` — vessel couldn't resubmit (canSubmit requires DRAFT)
+     - Backend `CARReopenView` was setting status to `REWORK_REQUESTED` â€” vessel couldn't resubmit (canSubmit requires DRAFT)
      - Fixed: Now sets status to `DRAFT` (consistent with rework)
-     - Added `notify_car_rework_requested()` call — vessel now gets notification on reopen
+     - Added `notify_car_rework_requested()` call â€” vessel now gets notification on reopen
      - Fixed audit log to record DRAFT (not REWORK_REQUESTED)
      - Fixed frontend reopen dialog description text (was "PIC_ACCEPTED", now "DRAFT")
   6. Full Inspection Lifecycle Tested End-to-End:
-     - Create inspection (vessel master, master001) ✅
-     - Add deficiency ✅
-     - Upload report ✅
-     - Submit (DRAFT → SUBMITTED) ✅
-     - PIC Review (SUBMITTED → PIC_REVIEWED, as pic001) ✅
-     - DPA Close (PIC_REVIEWED → CLOSED, as dpa001) ✅
-     - All data intact after reload at each step ✅
+     - Create inspection (vessel master, master001) âœ…
+     - Add deficiency âœ…
+     - Upload report âœ…
+     - Submit (DRAFT â†’ SUBMITTED) âœ…
+     - PIC Review (SUBMITTED â†’ PIC_REVIEWED, as pic001) âœ…
+     - DPA Close (PIC_REVIEWED â†’ CLOSED, as dpa001) âœ…
+     - All data intact after reload at each step âœ…
 - Files modified:
-  - `psc-backend/apps/inspection/utils.py` — NEW: generate_report_reference()
-  - `psc-backend/apps/inspection/serializers.py` — Removed report_reference from create fields, auto-gen in create()
-  - `psc-backend/apps/inspection/followup_serializers.py` — Auto-gen report_reference for follow-ups
-  - `psc-backend/apps/car/views.py` — CARReopenView: REWORK_REQUESTED→DRAFT, added notification
-  - `psc-frontend/src/lib/api/inspections.ts` — Field name fixes (comment), removed report_reference from follow-up
-  - `psc-frontend/src/hooks/use-inspections.ts` — Cache invalidation fix (setQueryData→invalidateQueries)
-  - `psc-frontend/src/routes/cars/[id].tsx` — Added Rework + Reopen buttons to bottom bar, fixed dialog text
-  - `psc-frontend/src/components/inspection/inspection-form.tsx` — Removed report_reference field
-  - `psc-frontend/src/routes/inspections/new.tsx` — Removed report_reference from submission
-  - `psc-frontend/src/routes/inspections/[id].edit.tsx` — Removed report_reference from edit
-  - `psc-frontend/src/routes/inspections/[id].follow-up.tsx` — Removed report_reference from follow-up
-  - `psc-frontend/src/types/index.ts` — Removed report_reference from CreateInspectionInput
+  - `psc-backend/apps/inspection/utils.py` â€” NEW: generate_report_reference()
+  - `psc-backend/apps/inspection/serializers.py` â€” Removed report_reference from create fields, auto-gen in create()
+  - `psc-backend/apps/inspection/followup_serializers.py` â€” Auto-gen report_reference for follow-ups
+  - `psc-backend/apps/car/views.py` â€” CARReopenView: REWORK_REQUESTEDâ†’DRAFT, added notification
+  - `psc-frontend/src/lib/api/inspections.ts` â€” Field name fixes (comment), removed report_reference from follow-up
+  - `psc-frontend/src/hooks/use-inspections.ts` â€” Cache invalidation fix (setQueryDataâ†’invalidateQueries)
+  - `psc-frontend/src/routes/cars/[id].tsx` â€” Added Rework + Reopen buttons to bottom bar, fixed dialog text
+  - `psc-frontend/src/components/inspection/inspection-form.tsx` â€” Removed report_reference field
+  - `psc-frontend/src/routes/inspections/new.tsx` â€” Removed report_reference from submission
+  - `psc-frontend/src/routes/inspections/[id].edit.tsx` â€” Removed report_reference from edit
+  - `psc-frontend/src/routes/inspections/[id].follow-up.tsx` â€” Removed report_reference from follow-up
+  - `psc-frontend/src/types/index.ts` â€” Removed report_reference from CreateInspectionInput
 - Remaining integration test items:
   - Office user flows (SSQE role testing)
   - Evidence upload + CAR edit + export testing
@@ -1740,7 +1740,7 @@ Date: 2026-02-09
 - Status: Session 64 complete. Full inspection lifecycle working end-to-end. Critical bugs fixed.
 
 ================================================================================
-Session 65 — Integration Testing + Bug Fixes (Crew Assignment, VESSEL_CREW Filtering, CAR Reopen/Rework)
+Session 65 â€” Integration Testing + Bug Fixes (Crew Assignment, VESSEL_CREW Filtering, CAR Reopen/Rework)
 Date: 2026-02-09
 ================================================================================
 - Scope: Code review of remaining integration test items, live bug fixes, crew assignment feature, VESSEL_CREW role filtering
@@ -1755,17 +1755,17 @@ Date: 2026-02-09
      - Added `CAR_REOPENED` NotificationType + `notify_car_reopened()` signal
      - Migration: `notifications/0002_add_car_reopened_notification_type`
   3. Live testing bug fixes:
-     - 405 on Save Draft: Frontend `updateCAR()` sent PUT to `/cars/{id}/` but backend expects `/cars/{id}/update/` — fixed URL
-     - 400 on Create Action: Backend required owner+due_date on create (too strict) — removed strict validation, enforce at submit
-     - 400 on Create Action: Status check blocked office users on SUBMITTED/PIC_ACCEPTED — updated allowed statuses for office users
+     - 405 on Save Draft: Frontend `updateCAR()` sent PUT to `/cars/{id}/` but backend expects `/cars/{id}/update/` â€” fixed URL
+     - 400 on Create Action: Backend required owner+due_date on create (too strict) â€” removed strict validation, enforce at submit
+     - 400 on Create Action: Status check blocked office users on SUBMITTED/PIC_ACCEPTED â€” updated allowed statuses for office users
   4. Crew list API endpoint (for crew assignment):
-     - Backend: Added `CrewListView` at `GET /api/psc/auth/crew/?vessel_id={uuid}` — returns HRM501 crew with rank, name, department
+     - Backend: Added `CrewListView` at `GET /api/psc/auth/crew/?vessel_id={uuid}` â€” returns HRM501 crew with rank, name, department
      - Backend: Added URL route in `accounts/urls.py`
      - Backend: Added `owner_name` SerializerMethodField to `CorrectiveActionSerializer` (resolves from HRM501 or OfficeUser)
      - Frontend: Added `CrewMember` interface, `getVesselCrew()` API function, `useVesselCrew()` hook
   5. Crew assignment moved to deficiency level (per user clarification):
      - User clarified: crew assignment is at deficiency registration, NOT at corrective action level
-     - Master assigns a crew member (CE, 2E, CO) when registering a deficiency — that person is responsible for the CAR
+     - Master assigns a crew member (CE, 2E, CO) when registering a deficiency â€” that person is responsible for the CAR
      - Backend: Added `assigned_crew_id` (UUIDField) to Deficiency model
      - Migration: `inspection/0003_add_assigned_crew_id_to_deficiency`
      - Backend: Updated DeficiencyListSerializer, DeficiencyDetailSerializer, DeficiencyCreateSerializer with `assigned_crew_id` + `assigned_crew_name`
@@ -1781,39 +1781,39 @@ Date: 2026-02-09
      - VESSEL_MASTER (admin on vessel) can see/edit all CARs for their vessel
 - Files modified:
   Backend:
-  - `psc-backend/apps/car/views.py` — CARReworkView audit log, CARReopenView notification, CorrectiveActionCreateView status check, VESSEL_CREW filtering in list+detail
-  - `psc-backend/apps/car/serializers.py` — Removed strict owner+due_date validation, added owner_name SerializerMethodField
-  - `psc-backend/apps/notifications/models.py` — Added CAR_REOPENED NotificationType
-  - `psc-backend/apps/notifications/signals.py` — Added notify_car_reopened()
-  - `psc-backend/apps/notifications/migrations/0002_add_car_reopened_notification_type.py` — NEW
-  - `psc-backend/apps/accounts/views.py` — Added CrewListView
-  - `psc-backend/apps/accounts/urls.py` — Added crew/ URL route
-  - `psc-backend/apps/inspection/deficiency_models.py` — Added assigned_crew_id field + index
-  - `psc-backend/apps/inspection/deficiency_serializers.py` — Added assigned_crew_id, assigned_crew_name to list/detail/create serializers
-  - `psc-backend/apps/inspection/views.py` — VESSEL_CREW filtering in list+detail
-  - `psc-backend/apps/inspection/migrations/0003_add_assigned_crew_id_to_deficiency.py` — NEW
+  - `psc-backend/apps/car/views.py` â€” CARReworkView audit log, CARReopenView notification, CorrectiveActionCreateView status check, VESSEL_CREW filtering in list+detail
+  - `psc-backend/apps/car/serializers.py` â€” Removed strict owner+due_date validation, added owner_name SerializerMethodField
+  - `psc-backend/apps/notifications/models.py` â€” Added CAR_REOPENED NotificationType
+  - `psc-backend/apps/notifications/signals.py` â€” Added notify_car_reopened()
+  - `psc-backend/apps/notifications/migrations/0002_add_car_reopened_notification_type.py` â€” NEW
+  - `psc-backend/apps/accounts/views.py` â€” Added CrewListView
+  - `psc-backend/apps/accounts/urls.py` â€” Added crew/ URL route
+  - `psc-backend/apps/inspection/deficiency_models.py` â€” Added assigned_crew_id field + index
+  - `psc-backend/apps/inspection/deficiency_serializers.py` â€” Added assigned_crew_id, assigned_crew_name to list/detail/create serializers
+  - `psc-backend/apps/inspection/views.py` â€” VESSEL_CREW filtering in list+detail
+  - `psc-backend/apps/inspection/migrations/0003_add_assigned_crew_id_to_deficiency.py` â€” NEW
   Frontend:
-  - `psc-frontend/src/components/car/reopen-modal.tsx` — NEW: Reopen modal with reason input
-  - `psc-frontend/src/components/car/car-form.tsx` — Removed crew selector from AddActionInline
-  - `psc-frontend/src/components/inspection/deficiency-modal.tsx` — Added crew selector dropdown
-  - `psc-frontend/src/components/inspection/deficiency-card.tsx` — Shows assigned crew name
-  - `psc-frontend/src/routes/cars/[id].tsx` — ReopenModal replaces ConfirmDialog
-  - `psc-frontend/src/routes/inspections/[id].tsx` — Passes vesselId to DeficiencyModal
-  - `psc-frontend/src/lib/api/cars.ts` — Fixed updateCAR URL (/cars/{id}/ → /cars/{id}/update/)
-  - `psc-frontend/src/lib/api/inspections.ts` — Added assigned_crew_id to payload
-  - `psc-frontend/src/lib/api/masters.ts` — Added getVesselCrew()
-  - `psc-frontend/src/lib/validations/deficiency.ts` — Added assigned_crew_id field
-  - `psc-frontend/src/hooks/use-masters.ts` — Added useVesselCrew() hook
-  - `psc-frontend/src/types/index.ts` — Added CrewMember, assigned_crew_id/name to DeficiencyDetail, CreateDeficiencyInput
+  - `psc-frontend/src/components/car/reopen-modal.tsx` â€” NEW: Reopen modal with reason input
+  - `psc-frontend/src/components/car/car-form.tsx` â€” Removed crew selector from AddActionInline
+  - `psc-frontend/src/components/inspection/deficiency-modal.tsx` â€” Added crew selector dropdown
+  - `psc-frontend/src/components/inspection/deficiency-card.tsx` â€” Shows assigned crew name
+  - `psc-frontend/src/routes/cars/[id].tsx` â€” ReopenModal replaces ConfirmDialog
+  - `psc-frontend/src/routes/inspections/[id].tsx` â€” Passes vesselId to DeficiencyModal
+  - `psc-frontend/src/lib/api/cars.ts` â€” Fixed updateCAR URL (/cars/{id}/ â†’ /cars/{id}/update/)
+  - `psc-frontend/src/lib/api/inspections.ts` â€” Added assigned_crew_id to payload
+  - `psc-frontend/src/lib/api/masters.ts` â€” Added getVesselCrew()
+  - `psc-frontend/src/lib/validations/deficiency.ts` â€” Added assigned_crew_id field
+  - `psc-frontend/src/hooks/use-masters.ts` â€” Added useVesselCrew() hook
+  - `psc-frontend/src/types/index.ts` â€” Added CrewMember, assigned_crew_id/name to DeficiencyDetail, CreateDeficiencyInput
 - Remaining integration test items:
   - Office user flows (SSQE role testing)
   - Evidence upload + CAR edit + export testing
   - CAR rework/reopen flow live testing
   - VESSEL_CREW role live testing (login as crew, verify filtering)
-- Known issue from Session 63: #3 master_RoleByVessel filtering for office users (security gap — office users see all vessels)
+- Known issue from Session 63: #3 master_RoleByVessel filtering for office users (security gap â€” office users see all vessels)
 - Status: Session 65 complete. Crew assignment at deficiency level, VESSEL_CREW filtering, and multiple bug fixes all implemented and verified.
 
-Session 66 — DEF-Level Vessel Workflow Implementation
+Session 66 â€” DEF-Level Vessel Workflow Implementation
 =====================================================
 2026-02-09
 
@@ -1828,10 +1828,10 @@ Backend changes:
      - Added DefStatus choices: ALLOCATED, IN_PROGRESS, COMPLETED, UNDER_REVIEW, APPROVED, SUBMITTED
      - Added fields to Deficiency: def_status, reviewer_crew_id, owner_rank, owner_name, reviewer_rank, reviewer_name
   3. New module: apps/inspection/workflow.py
-     - classify_rank() — Maps rank string to MASTER/CE/CO/2E category
-     - determine_reviewer() — Auto-routes: 2E→CE, CE→Master, CO→Master
-     - VALID_TRANSITIONS — State machine dict with actor requirements
-     - validate_transition() — Checks user is allowed actor (owner/reviewer/master)
+     - classify_rank() â€” Maps rank string to MASTER/CE/CO/2E category
+     - determine_reviewer() â€” Auto-routes: 2Eâ†’CE, CEâ†’Master, COâ†’Master
+     - VALID_TRANSITIONS â€” State machine dict with actor requirements
+     - validate_transition() â€” Checks user is allowed actor (owner/reviewer/master)
      - UUID normalization helpers for char(32) vs hyphenated comparison
   4. Serializer updates:
      - DeficiencyListSerializer + DeficiencyDetailSerializer: Added all workflow fields
@@ -1855,9 +1855,9 @@ Frontend changes:
      - New: hooks/use-deficiencies.ts (useDeficiencies, useTransitionDeficiency, useAllocateDeficiency)
   10. Components:
      - deficiency-card.tsx: Updated with DEF status badge, owner/reviewer display, actions slot
-     - New: deficiency-workflow-actions.tsx — Context-sensitive buttons (Start Work, Mark Completed, Approve, Return for Rework, Submit to Office)
+     - New: deficiency-workflow-actions.tsx â€” Context-sensitive buttons (Start Work, Mark Completed, Approve, Return for Rework, Submit to Office)
      - deficiency-modal.tsx: Added reviewer preview when crew member is selected
-     - New: routes/deficiencies/index.tsx — Dashboard page with filter bar, pagination
+     - New: routes/deficiencies/index.tsx â€” Dashboard page with filter bar, pagination
   11. Navigation:
      - Added ROUTES.DEFICIENCIES = '/deficiencies' to constants
      - Added route in App.tsx with AuthGuard
@@ -1872,11 +1872,11 @@ Verification:
 
 Remaining / Next steps:
   - Live browser E2E testing of full workflow cycle
-  - Batch submission (deferred — each DEF submitted individually for now)
+  - Batch submission (deferred â€” each DEF submitted individually for now)
   - master_RoleByVessel filtering for office users (known gap from Session 63)
 - Status: Session 66 complete. Full DEF-level vessel workflow implemented across backend and frontend.
 
-Session 67 — Bulk DEF Submit + Bulk CAR Download
+Session 67 â€” Bulk DEF Submit + Bulk CAR Download
 =================================================
 2026-02-09
 
@@ -1891,7 +1891,7 @@ Backend changes (3 files):
   2. deficiency_views.py:
      - Added BulkDeficiencySubmitView with atomic transaction
      - Validates all IDs exist and are in APPROVED status
-     - Updates DEF → SUBMITTED, linked CAR → SUBMITTED
+     - Updates DEF â†’ SUBMITTED, linked CAR â†’ SUBMITTED
      - Bulk-creates ActivityHistory entries with "(bulk submit)" tag
      - Added `from django.db import transaction` import
      - Added BulkSubmitSerializer to serializer import
@@ -1927,8 +1927,8 @@ Backend changes (2 files):
       - Added BulkCARExportView (GET endpoint)
       - Fetches all CARs linked to inspection's deficiencies
       - Uses existing generate_car_pdf() + CARDetailSerializer for each CAR
-      - Single CAR → returns PDF directly (no zip overhead)
-      - Multiple CARs → generates ZIP using zipfile.ZipFile in-memory
+      - Single CAR â†’ returns PDF directly (no zip overhead)
+      - Multiple CARs â†’ generates ZIP using zipfile.ZipFile in-memory
       - Proper vessel access control via HasVesselAccess permission
       - Added imports: io, zipfile, CAR model, CARDetailSerializer, generate_car_pdf
   11. apps/inspection/urls.py: Added GET /api/psc/inspections/{inspection_id}/cars/export-pdf/
@@ -1938,13 +1938,13 @@ Frontend changes (2 files):
   13. routes/inspections/[id].tsx:
       - Added "Download All CARs" item in dropdown menu (shown when hasCARs)
       - Loading state (isDownloadingCARs) with "Downloading..." text
-      - Standard blob download pattern: createObjectURL → click → revokeObjectURL
+      - Standard blob download pattern: createObjectURL â†’ click â†’ revokeObjectURL
       - Auto-detects content type for file extension (PDF vs ZIP)
 
 Verification:
   - Django system check: 0 issues
   - TypeScript compilation (tsc --noEmit): 0 errors
-  - Pre-existing build errors in test files (unrelated) — no new errors introduced
+  - Pre-existing build errors in test files (unrelated) â€” no new errors introduced
 
 Files modified (13 total):
   psc-backend/apps/inspection/deficiency_serializers.py
@@ -1965,7 +1965,7 @@ Remaining / Next steps:
   - master_RoleByVessel filtering for office users (known gap from Session 63)
 - Status: Session 67 complete. Bulk DEF submission and bulk CAR download features implemented.
 
-Session 68 — E2E Testing: Bulk DEF Submit + Bulk CAR Download
+Session 68 â€” E2E Testing: Bulk DEF Submit + Bulk CAR Download
 ==============================================================
 2026-02-09
 
@@ -1976,24 +1976,24 @@ Test 1: Bulk DEF Submission
 Setup: Updated 5 deficiencies to APPROVED via Django shell for testing.
 Steps tested:
   1. Navigated to inspection detail (PSC-Expanded, 20 DEFs)
-  2. Verified "Select All Approved (5)" checkbox appears — PASS
-  3. Verified only APPROVED defs show checkboxes (15 ALLOCATED have none) — PASS
-  4. Clicked "Select All Approved" → all 5 checked, button shows "Submit Selected (5)" — PASS
-  5. Clicked "Submit Selected" → confirmation dialog appeared — PASS
-  6. Confirmed → toast "5 deficiencies submitted to office" — PASS
-  7. UI refreshed: all 5 DEFs show SUBMITTED badge, CARs show SUBMITTED badge — PASS
-  8. Checkboxes and Select All disappeared (no more APPROVED to select) — PASS
-  9. Database verified: all 5 DEF=SUBMITTED, CAR=SUBMITTED — PASS
+  2. Verified "Select All Approved (5)" checkbox appears â€” PASS
+  3. Verified only APPROVED defs show checkboxes (15 ALLOCATED have none) â€” PASS
+  4. Clicked "Select All Approved" â†’ all 5 checked, button shows "Submit Selected (5)" â€” PASS
+  5. Clicked "Submit Selected" â†’ confirmation dialog appeared â€” PASS
+  6. Confirmed â†’ toast "5 deficiencies submitted to office" â€” PASS
+  7. UI refreshed: all 5 DEFs show SUBMITTED badge, CARs show SUBMITTED badge â€” PASS
+  8. Checkboxes and Select All disappeared (no more APPROVED to select) â€” PASS
+  9. Database verified: all 5 DEF=SUBMITTED, CAR=SUBMITTED â€” PASS
 
 Test 2: Bulk CAR PDF Download
 ------------------------------
 Steps tested:
-  1. Opened three-dot dropdown menu on inspection detail — PASS
-  2. "Download All CARs" menu item visible — PASS
-  3. Clicked → ZIP file downloaded (CARs_58ae2384.zip) — PASS
-  4. ZIP contains exactly 20 PDF files (one per CAR) — PASS
-  5. File naming correct: PSC_2026_005_Report.pdf through PSC_2026_024_Report.pdf — PASS
-  6. All files have valid sizes (3.2-4.8 KB each) — PASS
+  1. Opened three-dot dropdown menu on inspection detail â€” PASS
+  2. "Download All CARs" menu item visible â€” PASS
+  3. Clicked â†’ ZIP file downloaded (CARs_58ae2384.zip) â€” PASS
+  4. ZIP contains exactly 20 PDF files (one per CAR) â€” PASS
+  5. File naming correct: PSC_2026_005_Report.pdf through PSC_2026_024_Report.pdf â€” PASS
+  6. All files have valid sizes (3.2-4.8 KB each) â€” PASS
 
 Result: ALL TESTS PASSED (15/15)
 
@@ -2002,7 +2002,7 @@ Remaining / Next steps:
   - User has additional issues to report (deferred to next session)
 - Status: Session 68 complete. Both bulk features fully E2E verified.
 
-Session 69 — Crew Role Restrictions & DEF Assignment Notifications
+Session 69 â€” Crew Role Restrictions & DEF Assignment Notifications
 ==================================================================
 2026-02-09
 
@@ -2013,17 +2013,17 @@ Goal: Restrict crew UI visibility and add DEF assignment notifications.
 - Added `isMaster` and `isCrew` boolean computed values to UseAuthReturn
 - Foundation for all frontend crew/master role checks
 
-2. Nav Filtering — masterOnly Flag
+2. Nav Filtering â€” masterOnly Flag
 -----------------------------------
 - Added `masterOnly?: boolean` to NavItem interface in sidebar.tsx and bottom-nav.tsx
 - Set `masterOnly: true` on Sync and Settings nav items
 - Filter logic: masterOnly items hidden from VESSEL_CREW, visible to VESSEL_MASTER + office
 - Both sidebar (desktop) and bottom-nav (mobile) updated
 
-3. Inspection List — Hide Create + Export for Crew
+3. Inspection List â€” Hide Create + Export for Crew
 ---------------------------------------------------
 - Wrapped FAB (Create New Inspection) in `{!isCrew && ...}` conditional
-- Wrapped Export Excel button — returns `undefined` for crew (no header action)
+- Wrapped Export Excel button â€” returns `undefined` for crew (no header action)
 - Backend already blocks via CanCreateInspection permission (defense-in-depth)
 
 4. Backend DEF Filtering for VESSEL_CREW
@@ -2036,7 +2036,7 @@ Files changed:
 5. DEF_ASSIGNED Notification
 -----------------------------
 - Added DEF_ASSIGNED to NotificationType choices (notifications/models.py)
-- Created notify_def_assigned() in signals.py — includes target date in message
+- Created notify_def_assigned() in signals.py â€” includes target date in message
 - Wired into DeficiencyAllocateView.post() (explicit allocate path)
 - Wired into DeficiencyCreateView._set_workflow_fields() (create-with-assignment path)
 - Generated + applied migration 0003_add_def_assigned_notification_type
@@ -2045,16 +2045,16 @@ Files changed:
 ---------------------------------
 - Added 'DEF_ASSIGNED' to NotificationType union in types/index.ts
 - Added UserCheck icon mapping in notification-item.tsx
-- Added DEFICIENCY entity_type navigation → /deficiencies
+- Added DEFICIENCY entity_type navigation â†’ /deficiencies
 
 7. Bug Fix (Pre-existing)
 --------------------------
 - deficiency-workflow-actions.tsx: Fixed broken import `useAuthStore` from use-auth.ts
-  (should use `useAuth` hook — useAuthStore lives in stores/auth-store)
+  (should use `useAuth` hook â€” useAuthStore lives in stores/auth-store)
 
 Build Verification:
-  - `npx tsc --noEmit` — PASS (0 errors)
-  - `npx vite build` — PASS
+  - `npx tsc --noEmit` â€” PASS (0 errors)
+  - `npx vite build` â€” PASS
   - Django migration applied successfully
 
 Remaining / Next steps:
@@ -2063,26 +2063,26 @@ Remaining / Next steps:
   - Manual E2E testing of DEF assignment notification (allocate as master001, check crew001 notifications)
 - Status: Session 69 complete. Crew restrictions + DEF notifications implemented.
 
-Session 70 — E2E Testing & Crew Restriction Bug Fixes
+Session 70 â€” E2E Testing & Crew Restriction Bug Fixes
 ======================================================
 2026-02-09
 
 Goal: E2E test Session 69 changes (crew restrictions + DEF notifications) and fix discovered bugs.
 
-1. E2E Test: Crew Restrictions (crew001 login) — PASS
+1. E2E Test: Crew Restrictions (crew001 login) â€” PASS
 ------------------------------------------------------
 Verified on both desktop and mobile (375x812):
-  - Sidebar nav: Sync and Settings HIDDEN for crew ✓
-  - Bottom nav (mobile): Sync and Settings HIDDEN ✓
-  - Inspections page: Export Excel button HIDDEN ✓
-  - Inspections page: Create FAB HIDDEN ✓
-  - Deficiencies page: Filtered to crew's assigned DEFs only ✓
-  - CARs page: Filtered correctly ✓
+  - Sidebar nav: Sync and Settings HIDDEN for crew âœ“
+  - Bottom nav (mobile): Sync and Settings HIDDEN âœ“
+  - Inspections page: Export Excel button HIDDEN âœ“
+  - Inspections page: Create FAB HIDDEN âœ“
+  - Deficiencies page: Filtered to crew's assigned DEFs only âœ“
+  - CARs page: Filtered correctly âœ“
 
-2. E2E Test: DEF Assignment Notification — PARTIAL
+2. E2E Test: DEF Assignment Notification â€” PARTIAL
 ----------------------------------------------------
 - Created deficiency on Draft inspection (PSC-2024-001), assigned to CO001 (Mike Wilson)
-- CAR PSC-2026-025 auto-created ✓
+- CAR PSC-2026-025 auto-created âœ“
 - Seed data gap found: crew001's crew_id (CRW0002, Able Seaman) is NOT in HRM501 table
   - HRM501 only has CE001, 2E001, CO001
   - Cannot test DEF_ASSIGNED notification for crew001 specifically
@@ -2093,33 +2093,33 @@ Verified on both desktop and mobile (375x812):
 Problem: Crew could access /sync and /settings by typing URL directly (nav hidden but routes unguarded).
 Fix: Added MasterOnlyGuard component in App.tsx that checks isCrew and redirects to /inspections.
 Files changed:
-  - psc-frontend/src/App.tsx — Added MasterOnlyGuard component, wrapped /sync and /settings routes
-E2E verified: crew001 navigating to /sync → redirected to /inspections ✓
+  - psc-frontend/src/App.tsx â€” Added MasterOnlyGuard component, wrapped /sync and /settings routes
+E2E verified: crew001 navigating to /sync â†’ redirected to /inspections âœ“
 
 4. Bug Fix: Empty state "Create First Inspection" button visible to crew
 --------------------------------------------------------------------------
 Problem: When no inspections match, EmptyStateInspections showed "Create First Inspection" button to crew.
 Fix: Conditionally pass onCreateFirst prop based on isCrew (undefined hides the button).
 Files changed:
-  - psc-frontend/src/components/inspection/inspection-list.tsx — Added useAuth check, conditional prop
-E2E verified: crew001 sees empty state without button ✓
+  - psc-frontend/src/components/inspection/inspection-list.tsx â€” Added useAuth check, conditional prop
+E2E verified: crew001 sees empty state without button âœ“
 
 Build Verification:
-  - `npx tsc --noEmit` — PASS (0 errors)
-  - `npx vite build` — PASS
+  - `npx tsc --noEmit` â€” PASS (0 errors)
+  - `npx vite build` â€” PASS
 
-5. Crew Nav Scoping — Hide Inspections & Deficiencies
+5. Crew Nav Scoping â€” Hide Inspections & Deficiencies
 -------------------------------------------------------
-Per BACKEND_STRUCTURE.md §11.1 permission matrix, VESSEL_CREW has ❌ on ALL inspection
+Per BACKEND_STRUCTURE.md Â§11.1 permission matrix, VESSEL_CREW has âŒ on ALL inspection
 and deficiency actions (create, edit, submit, delete, add). Crew can only upload evidence
 and complete actions on assigned CARs. Therefore:
 
 Files changed:
-  - psc-frontend/src/components/layout/sidebar.tsx — Added `masterOnly: true` to Inspections and Deficiencies nav items
-  - psc-frontend/src/components/layout/bottom-nav.tsx — Same change for mobile bottom nav
+  - psc-frontend/src/components/layout/sidebar.tsx â€” Added `masterOnly: true` to Inspections and Deficiencies nav items
+  - psc-frontend/src/components/layout/bottom-nav.tsx â€” Same change for mobile bottom nav
   - psc-frontend/src/App.tsx:
     - MasterOnlyGuard now redirects to /cars (crew landing page)
-    - Added DefaultRedirect component — crew→/cars, others→/inspections
+    - Added DefaultRedirect component â€” crewâ†’/cars, othersâ†’/inspections
     - Wrapped all /inspections/* and /deficiencies routes with MasterOnlyGuard
     - Default `/` route uses DefaultRedirect inside AuthGuard
 
@@ -2127,26 +2127,26 @@ Crew now sees ONLY: CARs + Notifications
 Master/Office see: Inspections + Deficiencies + CARs + Notifications + Sync + Settings (+ Reports for office)
 
 E2E verified (crew001):
-  - /inspections → redirected to /cars ✓
-  - /deficiencies → redirected to /cars ✓
-  - / → redirected to /cars ✓
-  - Sidebar: only CARs + Notifications ✓
+  - /inspections â†’ redirected to /cars âœ“
+  - /deficiencies â†’ redirected to /cars âœ“
+  - / â†’ redirected to /cars âœ“
+  - Sidebar: only CARs + Notifications âœ“
 E2E verified (master001):
-  - All 6 nav items visible ✓
-  - Inspections/Deficiencies pages accessible ✓
+  - All 6 nav items visible âœ“
+  - Inspections/Deficiencies pages accessible âœ“
 
 Build Verification:
-  - `npx tsc --noEmit` — PASS (0 errors)
-  - `npx vite build` — PASS
+  - `npx tsc --noEmit` â€” PASS (0 errors)
+  - `npx vite build` â€” PASS
 
 Remaining / Known Issues:
-  - Seed data gap: crew001 not in HRM501 — cannot fully E2E test DEF_ASSIGNED notification
+  - Seed data gap: crew001 not in HRM501 â€” cannot fully E2E test DEF_ASSIGNED notification
   - master_RoleByVessel filtering for office users (known gap from Session 63)
   - VIMS Home logo link still points to /inspections (works via redirect for crew, cosmetic only)
   - Integration test suite (pending)
 - Status: Session 70 complete. E2E testing, 2 bug fixes, crew nav scoping done.
 
-Session 71 — Fix Remaining Known Issues
+Session 71 â€” Fix Remaining Known Issues
 ========================================
 2026-02-09
 
@@ -2158,7 +2158,7 @@ Problem: Header logo always linked to /inspections. Crew users land on /cars, so
 the logo would redirect them through MasterOnlyGuard back to /cars (cosmetic but confusing).
 Fix: Logo link now uses `isCrew ? ROUTES.CARS : ROUTES.INSPECTIONS`.
 Files changed:
-  - psc-frontend/src/components/layout/header.tsx — Added isCrew to useAuth destructure, conditional link target
+  - psc-frontend/src/components/layout/header.tsx â€” Added isCrew to useAuth destructure, conditional link target
 
 2. Fix: Seed Data Gap (2e001 Second Engineer)
 ----------------------------------------------
@@ -2167,48 +2167,48 @@ Fix: Added CRW0006 / 2e001 (Second Engineer, Engine dept) to main HRM501 insert 
      Added idempotent IF NOT EXISTS gap-fill blocks at end for both crew001 and 2e001 so
      re-running seed_data.sql against a live DB is safe.
 Files changed:
-  - psc-backend/seed_data.sql — Added CRW0006 row + gap-fill guards
+  - psc-backend/seed_data.sql â€” Added CRW0006 row + gap-fill guards
 
 3. Fix: Office User Vessel Filtering (security gap)
 -----------------------------------------------------
 Problem: Office users (PIC, SSQE, Supt, PV) saw ALL vessels' data regardless of their
          master_RoleByVessel assignments. DPA should see all (exempt), others restricted.
 Fix: Created core/vessel_access.py with two utility functions:
-  - get_office_user_vessel_ids(employee_id) — queries MasterRoleByVessel for active assignments
-  - apply_office_vessel_filter(queryset, user, vessel_id_field) — DPA passes through,
-    other office users filtered to assigned vessels, empty assignments → queryset.none()
+  - get_office_user_vessel_ids(employee_id) â€” queries MasterRoleByVessel for active assignments
+  - apply_office_vessel_filter(queryset, user, vessel_id_field) â€” DPA passes through,
+    other office users filtered to assigned vessels, empty assignments â†’ queryset.none()
 Updated 4 list views to replace TODO/pass with apply_office_vessel_filter() calls:
-  - apps/inspection/views.py (InspectionListView) — vessel_id_field='vessel_id'
-  - apps/car/views.py (CARListView) — vessel_id_field='deficiency__inspection__vessel_id'
-  - apps/inspection/deficiency_views.py (DeficiencyListFilteredView) — vessel_id_field='inspection__vessel_id'
-  - apps/inspection/report_views.py (DeficiencyExcelExportView) — vessel_id_field='vessel_id'
+  - apps/inspection/views.py (InspectionListView) â€” vessel_id_field='vessel_id'
+  - apps/car/views.py (CARListView) â€” vessel_id_field='deficiency__inspection__vessel_id'
+  - apps/inspection/deficiency_views.py (DeficiencyListFilteredView) â€” vessel_id_field='inspection__vessel_id'
+  - apps/inspection/report_views.py (DeficiencyExcelExportView) â€” vessel_id_field='vessel_id'
 Updated object-level permission:
-  - apps/inspection/permissions.py (HasVesselAccess) — office users now checked against
+  - apps/inspection/permissions.py (HasVesselAccess) â€” office users now checked against
     get_office_user_vessel_ids() with UUID normalization for safe comparison
 Files changed:
-  - psc-backend/core/vessel_access.py — NEW FILE (office vessel access utilities)
-  - psc-backend/apps/inspection/views.py — replaced TODO with apply_office_vessel_filter
-  - psc-backend/apps/car/views.py — replaced TODO with apply_office_vessel_filter
-  - psc-backend/apps/inspection/deficiency_views.py — replaced TODO with apply_office_vessel_filter
-  - psc-backend/apps/inspection/report_views.py — replaced TODO with apply_office_vessel_filter
-  - psc-backend/apps/inspection/permissions.py — replaced placeholder with vessel assignment check
+  - psc-backend/core/vessel_access.py â€” NEW FILE (office vessel access utilities)
+  - psc-backend/apps/inspection/views.py â€” replaced TODO with apply_office_vessel_filter
+  - psc-backend/apps/car/views.py â€” replaced TODO with apply_office_vessel_filter
+  - psc-backend/apps/inspection/deficiency_views.py â€” replaced TODO with apply_office_vessel_filter
+  - psc-backend/apps/inspection/report_views.py â€” replaced TODO with apply_office_vessel_filter
+  - psc-backend/apps/inspection/permissions.py â€” replaced placeholder with vessel assignment check
 
 Build Verification:
-  - `python manage.py check` — PASS (0 issues)
-  - `npx tsc --noEmit` — PASS (0 errors)
-  - `npx vite build` — PASS
+  - `python manage.py check` â€” PASS (0 issues)
+  - `npx tsc --noEmit` â€” PASS (0 errors)
+  - `npx vite build` â€” PASS
 
 Remaining / Known Issues:
   - Integration test suite (pending)
 - Status: Session 71 complete. All 3 known issues from Session 70 resolved.
 
 --------------------------------------------------------------------------------
-Session 72 — User-Reported Fixes (Due Date, Action CRUD, Logo Upload, Soft-Delete)
+Session 72 â€” User-Reported Fixes (Due Date, Action CRUD, Logo Upload, Soft-Delete)
 --------------------------------------------------------------------------------
 Date: 2026-02-09
 
 User-Reported Issues Fixed:
-  1. No Due Date needed for action items — only Target Date at CAR level
+  1. No Due Date needed for action items â€” only Target Date at CAR level
      - Removed Due Date from AddActionInline create form (car-form.tsx)
      - Removed Due Date from ActionItemRow edit form (car-form.tsx)
      - Removed due_date display from action row view
@@ -2216,7 +2216,7 @@ User-Reported Issues Fixed:
      - Backend serializer already had due_date optional (Session 71 fix)
 
   2. Action items not editable/deletable in Draft mode
-     - Added CorrectiveActionDeleteView to backend (views.py) — soft-delete
+     - Added CorrectiveActionDeleteView to backend (views.py) â€” soft-delete
      - Added deleteAction API function to frontend (cars.ts)
      - Added useDeleteAction hook to frontend (use-cars.ts)
      - Added Edit inline form + Delete with ConfirmDialog to ActionItemRow
@@ -2261,7 +2261,7 @@ Files Created (Frontend):
   - psc-frontend/src/routes/settings/page.tsx (Settings page with logo upload)
 
 Browser Test Results:
-  - CAR action Create → Edit → Delete cycle: PASS
+  - CAR action Create â†’ Edit â†’ Delete cycle: PASS
   - Add Immediate Action form: No Due Date field, only Description: PASS
   - Edit action form: No Due Date field, only textarea: PASS
   - Soft-deleted actions filtered from API response: PASS
@@ -2269,13 +2269,13 @@ Browser Test Results:
   - Settings page (office user): upload button visible: PASS
 
 Build Verification:
-  - `python manage.py check` — PASS (0 issues)
-  - TypeScript compilation — PASS (0 errors)
+  - `python manage.py check` â€” PASS (0 issues)
+  - TypeScript compilation â€” PASS (0 errors)
 
 - Status: Session 72 complete. All 3 user-reported issues fixed + soft-delete bug resolved.
 
 --------------------------------------------------------------------------------
-Session 73 — CAR Submit Fix + Full CAR Lifecycle E2E Verification
+Session 73 â€” CAR Submit Fix + Full CAR Lifecycle E2E Verification
 --------------------------------------------------------------------------------
 Date: 2026-02-09
 
@@ -2284,15 +2284,15 @@ Bug Fix:
      - CARSubmitSerializer validation required corrective actions to have BOTH
        owner AND due_date, but Session 72 removed due_date from action forms
      - Error: "At least 1 immediate corrective action with owner and due date is required."
-     - Fixed: Changed validation to count-based — just checks that at least 1 IMMEDIATE
+     - Fixed: Changed validation to count-based â€” just checks that at least 1 IMMEDIATE
        and 1 LONG_TERM action exist (no owner/due_date requirement)
      - File: psc-backend/apps/car/serializers.py (CARSubmitSerializer lines 713-738)
 
 Full CAR Lifecycle E2E Testing (all PASS):
-  1. DRAFT → SUBMITTED (master001 on PSC-2026-025): API 200, status updated
-  2. SUBMITTED → PIC_ACCEPTED (pic001/Alice J.): Accept dialog with mandatory comment,
+  1. DRAFT â†’ SUBMITTED (master001 on PSC-2026-025): API 200, status updated
+  2. SUBMITTED â†’ PIC_ACCEPTED (pic001/Alice J.): Accept dialog with mandatory comment,
      toast "CAR accepted - forwarded for DPA review"
-  3. PIC_ACCEPTED → CLOSED (dpa001/Carol W.): DPA Close dialog with mandatory comment +
+  3. PIC_ACCEPTED â†’ CLOSED (dpa001/Carol W.): DPA Close dialog with mandatory comment +
      optional PV scheduling, toast "CAR closed by DPA"
   4. Physical Verification section appeared after close with "Schedule Verification" button
   5. "Reopen CAR" button available for DPA on closed CAR
@@ -2301,7 +2301,7 @@ Full CAR Lifecycle E2E Testing (all PASS):
 CLC Library Verification:
   - Database: 27 total categories (4 parent groups + 23 child categories), 105 items
   - API /masters/clc/hierarchy/ returns all 23 categories with items
-  - CAR edit form accordion shows all 23 categories — confirmed visible and functional
+  - CAR edit form accordion shows all 23 categories â€” confirmed visible and functional
 
 Files Modified:
   - psc-backend/apps/car/serializers.py (CARSubmitSerializer validation relaxed)
@@ -2309,11 +2309,11 @@ Files Modified:
 - Status: Session 73 complete. CAR submit fixed, full lifecycle verified E2E.
 
 --------------------------------------------------------------------------------
-Session 74 — Master Dashboard + DEF Detail Dialog
+Session 74 â€” Master Dashboard + DEF Detail Dialog
 --------------------------------------------------------------------------------
 Date: 2026-02-09
 
-Part A — Deficiency Detail Dialog:
+Part A â€” Deficiency Detail Dialog:
   1. Created DeficiencyDetailDialog component
      - Full-detail scrollable body: status, target date, def code, description,
        owner, reviewer, linked CAR, action code
@@ -2325,15 +2325,15 @@ Part A — Deficiency Detail Dialog:
      - Added selectedDef state + DeficiencyDetailDialog
      - File: psc-frontend/src/routes/deficiencies/index.tsx
 
-Part B — Dashboard:
+Part B â€” Dashboard:
   3. Backend dashboard API endpoint
      - GET /api/psc/dashboard/?vessel_id=<uuid>
      - Returns 11 metrics in one request: inspections by type (12mo),
        open/overdue CARs, detentions (3yr), top 10 def codes, pending DEFs,
        CARs missing evidence, overdue actions, CAR status distribution,
        monthly DEF trend (12mo), vessels list (office only)
-     - Vessel scoping: vessel users → their vessel, office → assigned vessels,
-       DPA → all vessels, vessel_id param → drill-down
+     - Vessel scoping: vessel users â†’ their vessel, office â†’ assigned vessels,
+       DPA â†’ all vessels, vessel_id param â†’ drill-down
      - File: psc-backend/apps/inspection/dashboard_views.py
   4. Registered dashboard URL in core/urls.py
   5. Installed recharts charting library (npm install recharts)
@@ -2358,7 +2358,7 @@ Part B — Dashboard:
   10. Updated routing + navigation:
       - ROUTES.DASHBOARD changed from '/' to '/dashboard'
       - Added STALE_TIME.DASHBOARD (5 min) to constants
-      - DefaultRedirect: master/office → /dashboard, crew → /cars
+      - DefaultRedirect: master/office â†’ /dashboard, crew â†’ /cars
       - Dashboard route with AuthGuard + MasterOnlyGuard
       - Dashboard added as FIRST nav item in sidebar + bottom-nav
       - isActive logic updated for Dashboard vs Inspections
@@ -2384,14 +2384,14 @@ Files Modified (6):
   - psc-frontend/src/routes/deficiencies/index.tsx (dialog integration)
 
 Verification:
-  - TypeScript compiles clean (tsc --noEmit — 0 errors)
+  - TypeScript compiles clean (tsc --noEmit â€” 0 errors)
   - Vite production build passes (44.54s)
-  - Backend import verified (django.setup() + import DashboardView — OK)
+  - Backend import verified (django.setup() + import DashboardView â€” OK)
 
 - Status: Session 74 complete. Dashboard + DEF detail dialog implemented.
 
 --------------------------------------------------------------------------------
-Session 75 — E2E Testing: Dashboard + DEF Detail Dialog + Bug Fixes
+Session 75 â€” E2E Testing: Dashboard + DEF Detail Dialog + Bug Fixes
 --------------------------------------------------------------------------------
 Date: 2026-02-10
 
@@ -2408,21 +2408,21 @@ Fix: Replaced `id__in=vessel_ids` with `extra(where=[CAST(...AS uniqueidentifier
   - Converts UUIDs to hyphenated strings and uses CAST for safe SQL Server comparison
 File changed:
   - psc-backend/apps/inspection/dashboard_views.py (lines 233-238)
-Verified: master001 (vessel), pic001 (PIC), ssqe001 (SSQE), dpa001 (DPA) — all PASS
+Verified: master001 (vessel), pic001 (PIC), ssqe001 (SSQE), dpa001 (DPA) â€” all PASS
 
 Bug Fix #2: Deficiency Description Never Rendered
 --------------------------------------------------
 Problem: API returns `description` but frontend types + components used `def_text`.
   - DeficiencyCard showed empty description text
   - DeficiencyDetailDialog showed empty description section
-  - Mismatch existed since original implementation — never caught because
+  - Mismatch existed since original implementation â€” never caught because
     the inspection detail page used a different code path
 Root cause: Backend model field is `description`, serializer returns `description`,
   but frontend types were written with `def_text` (possibly from spec doc naming).
 Fix: Aligned frontend types and components to match API field names:
-  - `Deficiency.def_text` → `Deficiency.description`
-  - `DeficiencyDetail.def_text` → `DeficiencyDetail.description`
-  - `CAR.def_text` → `CAR.deficiency_description` (matches CARListSerializer)
+  - `Deficiency.def_text` â†’ `Deficiency.description`
+  - `DeficiencyDetail.def_text` â†’ `DeficiencyDetail.description`
+  - `CAR.def_text` â†’ `CAR.deficiency_description` (matches CARListSerializer)
   - Updated DeficiencyCard + DeficiencyDetailDialog to destructure `description`
   - Left CreateDeficiencyInput.def_text unchanged (internal form field, mapped in API layer)
 Files changed:
@@ -2435,89 +2435,89 @@ Files changed:
 
 E2E Test Results:
   Dashboard API:
-    - master001 (vessel): PASS — all 11 metrics returned, no vessels list
-    - pic001 (PIC): PASS — 3 vessels, all metrics
-    - ssqe001 (SSQE): PASS — 2 vessels, all metrics
-    - dpa001 (DPA): PASS — 3 vessels, all metrics
+    - master001 (vessel): PASS â€” all 11 metrics returned, no vessels list
+    - pic001 (PIC): PASS â€” 3 vessels, all metrics
+    - ssqe001 (SSQE): PASS â€” 2 vessels, all metrics
+    - dpa001 (DPA): PASS â€” 3 vessels, all metrics
     - vessel_id drill-down (pic001): PASS
   Deficiencies API:
-    - master001: PASS — 25 defs, description field populated
+    - master001: PASS â€” 25 defs, description field populated
     - All fields present: def_code, description, def_status, owner/reviewer, car, action_code
 
 Build Verification:
-  - `python manage.py check` — PASS (0 issues)
-  - `npx tsc --noEmit` — PASS (0 errors)
-  - `npx vite build` — PASS (14s, 49 precache entries)
+  - `python manage.py check` â€” PASS (0 issues)
+  - `npx tsc --noEmit` â€” PASS (0 errors)
+  - `npx vite build` â€” PASS (14s, 49 precache entries)
 
 - Status: Session 75 complete. 2 bugs fixed, full E2E verification of Dashboard + DEF dialog.
 
 ================================================================================
-SESSION 76 — Unified CAR Workflow Overhaul (Phase 1)
+SESSION 76 â€” Unified CAR Workflow Overhaul (Phase 1)
 ================================================================================
 Date: 2026-02-10
 Goal: Replace dual-status system (DefStatus + CARStatus) with unified CAR.status workflow
 
 WHAT WAS DONE (12 Steps):
 
-Step 1: Backend — Updated CARStatus enum in deficiency_models.py
-  - 5 old statuses → 9 new: ALLOTTED, IN_PROGRESS, PENDING_CE_REVIEW,
+Step 1: Backend â€” Updated CARStatus enum in deficiency_models.py
+  - 5 old statuses â†’ 9 new: ALLOTTED, IN_PROGRESS, PENDING_CE_REVIEW,
     PENDING_MASTER_REVIEW, SUBMITTED_TO_PIC, PIC_REVIEW, SUBMITTED_TO_DPA,
     CLOSED, RETURNED_FOR_REWORK
-  - CAR default: DRAFT → ALLOTTED
+  - CAR default: DRAFT â†’ ALLOTTED
   - Added fields: verification_pending, last_action, last_action_by, last_action_at, last_action_comment
   - DefStatus marked deprecated
 
-Step 2: Backend — Migration 0005_workflow_overhaul.py
-  - Data mapping: DRAFT→ALLOTTED, SUBMITTED→SUBMITTED_TO_PIC, PIC_ACCEPTED→PIC_REVIEW,
-    REWORK_REQUESTED→PENDING_MASTER_REVIEW, DPA_CLOSED→CLOSED
+Step 2: Backend â€” Migration 0005_workflow_overhaul.py
+  - Data mapping: DRAFTâ†’ALLOTTED, SUBMITTEDâ†’SUBMITTED_TO_PIC, PIC_ACCEPTEDâ†’PIC_REVIEW,
+    REWORK_REQUESTEDâ†’PENDING_MASTER_REVIEW, DPA_CLOSEDâ†’CLOSED
   - Reversible migration included
 
-Step 3: Backend — Rewrote workflow.py (state machine)
+Step 3: Backend â€” Rewrote workflow.py (state machine)
   - WorkflowAction class with 12 named actions
-  - TRANSITIONS dict: (status, action) → {target, allowed_roles, comment_required}
+  - TRANSITIONS dict: (status, action) â†’ {target, allowed_roles, comment_required}
   - validate_workflow_transition(), get_available_actions(), auto_start_if_allotted()
   - Legacy DEF workflow functions preserved for backward compat
 
-Step 4: Backend — New views + URLs
+Step 4: Backend â€” New views + URLs
   - CARWorkflowView: POST /cars/{id}/workflow/ (unified endpoint for all 12 transitions)
   - CARAvailableActionsView: GET /cars/{id}/available-actions/
   - Updated CARUpdateView with auto_start_if_allotted()
   - Updated all status references in existing views
   - 2 new URL patterns added
 
-Step 5: Backend — Serializer updates
+Step 5: Backend â€” Serializer updates
   - CARWorkflowTransitionSerializer (action + comment)
   - CARDetailSerializer: added verification_pending, last_action*, available_actions
-  - CARListSerializer: DPA_CLOSED → CLOSED in overdue check
+  - CARListSerializer: DPA_CLOSED â†’ CLOSED in overdue check
 
-Step 6: Backend — Updated deficiency views
+Step 6: Backend â€” Updated deficiency views
   - DeficiencyListFilteredView: added car_status filter
-  - BulkDeficiencySubmitView: APPROVED → PENDING_MASTER_REVIEW precondition
+  - BulkDeficiencySubmitView: APPROVED â†’ PENDING_MASTER_REVIEW precondition
 
-Step 7: Backend — Updated permissions, dashboard, signals
+Step 7: Backend â€” Updated permissions, dashboard, signals
   - CanEditCAR: expanded to 5 vessel-editable statuses
   - Dashboard: all status references updated
   - Signals: auto_create_car now sets ALLOTTED
 
-Step 8: Frontend — Updated types + constants
+Step 8: Frontend â€” Updated types + constants
   - CAR_STATUS: 9 new values
   - WORKFLOW_ACTIONS: 12 named actions
   - CARDetail type: added new fields + AvailableAction interface
 
-Step 9: Frontend — Updated format-status.ts
+Step 9: Frontend â€” Updated format-status.ts
   - Variant + label mappings for all 9 new CAR statuses
 
-Step 10: Frontend — API + hooks
+Step 10: Frontend â€” API + hooks
   - transitionCAR(), getCARAvailableActions() API functions
   - useTransitionCAR(), useCARAvailableActions() hooks
   - DeficiencyFilters: added car_status
 
-Step 11: Frontend — Rewrote deficiency-workflow-actions.tsx
+Step 11: Frontend â€” Rewrote deficiency-workflow-actions.tsx
   - Switches on car.status (not def_status)
   - Role-based action buttons (owner/reviewer/master/pic/dpa)
   - Comment dialog for mandatory-comment actions
 
-Step 12: Frontend — Updated cards/lists/filters/pages
+Step 12: Frontend â€” Updated cards/lists/filters/pages
   - deficiency-card.tsx: car.status as primary badge
   - deficiency-detail-dialog.tsx: car.status prominently shown
   - deficiency-list.tsx: bulk submit uses PENDING_MASTER_REVIEW
@@ -2570,27 +2570,27 @@ E2E TEST RESULTS (21 tests, ALL PASS):
   CAR List & Detail:
     #1  CAR list shows new statuses (ALLOTTED, CLOSED, SUBMITTED_TO_PIC)     PASS
     #2  CAR list filter by ALLOTTED (19 results)                              PASS
-    #3  CAR detail — new fields (verification_pending, last_action, available_actions) PASS
+    #3  CAR detail â€” new fields (verification_pending, last_action, available_actions) PASS
 
   Available Actions Endpoint:
-    #4  master + ALLOTTED → [START_WORK]                                      PASS
-    #7  master + PENDING_CE_REVIEW → [APPROVE_AND_FORWARD, RETURN_FOR_REWORK] PASS
-    #10 pic001 + SUBMITTED_TO_PIC → [START_PIC_REVIEW, REQUEST_REWORK]        PASS
-    #13 dpa001 + SUBMITTED_TO_DPA → [CLOSE_CAR, REQUEST_REWORK]              PASS
+    #4  master + ALLOTTED â†’ [START_WORK]                                      PASS
+    #7  master + PENDING_CE_REVIEW â†’ [APPROVE_AND_FORWARD, RETURN_FOR_REWORK] PASS
+    #10 pic001 + SUBMITTED_TO_PIC â†’ [START_PIC_REVIEW, REQUEST_REWORK]        PASS
+    #13 dpa001 + SUBMITTED_TO_DPA â†’ [CLOSE_CAR, REQUEST_REWORK]              PASS
 
   Full Workflow Chain (happy path):
-    #5  START_WORK: ALLOTTED → IN_PROGRESS                                    PASS
-    #6  MARK_COMPLETED: IN_PROGRESS → PENDING_CE_REVIEW                       PASS
-    #8  APPROVE_AND_FORWARD: PENDING_CE_REVIEW → PENDING_MASTER_REVIEW        PASS
-    #9  SUBMIT_TO_PIC: PENDING_MASTER_REVIEW → SUBMITTED_TO_PIC               PASS
-    #11 START_PIC_REVIEW: SUBMITTED_TO_PIC → PIC_REVIEW                       PASS
-    #12 SUBMIT_TO_DPA: PIC_REVIEW → SUBMITTED_TO_DPA                          PASS
-    #14 CLOSE_CAR: SUBMITTED_TO_DPA → CLOSED (comment persisted)              PASS
+    #5  START_WORK: ALLOTTED â†’ IN_PROGRESS                                    PASS
+    #6  MARK_COMPLETED: IN_PROGRESS â†’ PENDING_CE_REVIEW                       PASS
+    #8  APPROVE_AND_FORWARD: PENDING_CE_REVIEW â†’ PENDING_MASTER_REVIEW        PASS
+    #9  SUBMIT_TO_PIC: PENDING_MASTER_REVIEW â†’ SUBMITTED_TO_PIC               PASS
+    #11 START_PIC_REVIEW: SUBMITTED_TO_PIC â†’ PIC_REVIEW                       PASS
+    #12 SUBMIT_TO_DPA: PIC_REVIEW â†’ SUBMITTED_TO_DPA                          PASS
+    #14 CLOSE_CAR: SUBMITTED_TO_DPA â†’ CLOSED (comment persisted)              PASS
 
   Rework & Reopen Paths:
-    #15 REOPEN_CAR: CLOSED → PENDING_MASTER_REVIEW                            PASS
-    #16 RETURN_FOR_REWORK: PENDING_CE_REVIEW → IN_PROGRESS (comment persisted) PASS
-    #21 REQUEST_REWORK (PIC): SUBMITTED_TO_PIC → PENDING_MASTER_REVIEW        PASS
+    #15 REOPEN_CAR: CLOSED â†’ PENDING_MASTER_REVIEW                            PASS
+    #16 RETURN_FOR_REWORK: PENDING_CE_REVIEW â†’ IN_PROGRESS (comment persisted) PASS
+    #21 REQUEST_REWORK (PIC): SUBMITTED_TO_PIC â†’ PENDING_MASTER_REVIEW        PASS
 
   Deficiency Integration:
     #17 Deficiency list car_status filter (1 CLOSED)                          PASS
@@ -2599,7 +2599,7 @@ E2E TEST RESULTS (21 tests, ALL PASS):
     #18 Invalid transition rejected (400 error)                               PASS
 
   Auto-Start:
-    #20 CAR edit in ALLOTTED → auto-transitions to IN_PROGRESS                PASS
+    #20 CAR edit in ALLOTTED â†’ auto-transitions to IN_PROGRESS                PASS
 
   Status Checks:
     #19 Status verification after reopen                                      PASS
@@ -2611,40 +2611,40 @@ E2E TEST RESULTS (21 tests, ALL PASS):
 - Status: Session 76 complete. Full unified CAR workflow implemented + migrated + E2E verified (21/21 pass).
 
 ================================================================================
-SESSION 77 — Integration Testing (All Remaining Flows)
+SESSION 77 â€” Integration Testing (All Remaining Flows)
 ================================================================================
 Date: 2026-02-10
 Goal: Complete all remaining integration testing items from Session 28 checklist
 
 BACKEND API TESTS (15 tests via curl, ALL PASS):
-  #1  Create Inspection (master001)           PASS — HTTP 201, PSC type, ID returned
-  #2  Get Inspection Detail                   PASS — HTTP 200, all fields correct
-  #3  Edit Inspection (PATCH)                 PASS — HTTP 200, port_place updated
-  #4  Add Deficiency                          PASS — HTTP 201, CAR auto-created (PSC-2026-026)
-  #5  Submit Inspection                       PASS — HTTP 200, status=SUBMITTED (requires report)
-  #6  PIC Review Inspection (pic001)          PASS — HTTP 200, status=PIC_REVIEWED
-  #7  DPA Close Inspection (dpa001)           PASS — HTTP 200, status=DPA_CLOSED
-  #8  PIC Inspections List                    PASS — HTTP 200, 14 items
-  #9  DPA Inspections List                    PASS — HTTP 200, 14 items
-  #10 CAR Auto-Created Check                  PASS — PSC-2026-026, status=ALLOTTED
-  #11 CAR Edit Root Cause + Auto-Start        PASS — ALLOTTED→IN_PROGRESS confirmed
-  #12 Add Corrective Action                   PASS — HTTP 201
-  #13 CAR PDF Export                          PASS — Content-Type: application/pdf
-  #14 Deficiency Excel Export                 PASS — Content-Type: spreadsheetml.sheet
-  #15 Crew Access Restrictions                PASS — HTTP 200, 0 items (filtered)
+  #1  Create Inspection (master001)           PASS â€” HTTP 201, PSC type, ID returned
+  #2  Get Inspection Detail                   PASS â€” HTTP 200, all fields correct
+  #3  Edit Inspection (PATCH)                 PASS â€” HTTP 200, port_place updated
+  #4  Add Deficiency                          PASS â€” HTTP 201, CAR auto-created (PSC-2026-026)
+  #5  Submit Inspection                       PASS â€” HTTP 200, status=SUBMITTED (requires report)
+  #6  PIC Review Inspection (pic001)          PASS â€” HTTP 200, status=PIC_REVIEWED
+  #7  DPA Close Inspection (dpa001)           PASS â€” HTTP 200, status=DPA_CLOSED
+  #8  PIC Inspections List                    PASS â€” HTTP 200, 14 items
+  #9  DPA Inspections List                    PASS â€” HTTP 200, 14 items
+  #10 CAR Auto-Created Check                  PASS â€” PSC-2026-026, status=ALLOTTED
+  #11 CAR Edit Root Cause + Auto-Start        PASS â€” ALLOTTEDâ†’IN_PROGRESS confirmed
+  #12 Add Corrective Action                   PASS â€” HTTP 201
+  #13 CAR PDF Export                          PASS â€” Content-Type: application/pdf
+  #14 Deficiency Excel Export                 PASS â€” Content-Type: spreadsheetml.sheet
+  #15 Crew Access Restrictions                PASS â€” HTTP 200, 0 items (filtered)
 
 EVIDENCE UPLOAD TESTS (2 tests, ALL PASS):
-  #16 Upload BEFORE evidence                  PASS — HTTP 201, file saved
-  #17 Upload AFTER evidence                   PASS — HTTP 201, file saved
+  #16 Upload BEFORE evidence                  PASS â€” HTTP 201, file saved
+  #17 Upload AFTER evidence                   PASS â€” HTTP 201, file saved
 
 PSC FOLLOW-UP TEST (1 test, PASS):
-  #18 Register PSC Follow-up                  PASS — HTTP 201, 2 deficiencies updated
+  #18 Register PSC Follow-up                  PASS â€” HTTP 201, 2 deficiencies updated
 
 FRONTEND API URL AUDIT:
-  52 API functions across 10 files — ALL URLS MATCH backend patterns
+  52 API functions across 10 files â€” ALL URLS MATCH backend patterns
   Zero mismatches found (Session 28 BUG #7 fixes are holding)
 
-ESLINT CLEANUP (10 errors → 0 errors):
+ESLINT CLEANUP (10 errors â†’ 0 errors):
   - car-form.tsx: Removed unused useId, useRef, watch, setValue imports
   - deficiency-card.tsx: Removed unused def_status destructuring
   - deficiency-detail-dialog.tsx: Removed unused def_status destructuring
@@ -2662,30 +2662,30 @@ BUILD VERIFICATION:
 - Status: Session 77 complete. ALL integration testing items verified. 18/18 API tests pass.
 
 ================================================================================
-SESSION 78 — CAR Submission Validation Bypass Fix (2026-02-10)
+SESSION 78 â€” CAR Submission Validation Bypass Fix (2026-02-10)
 ================================================================================
 
 PROBLEM:
   The unified workflow endpoint POST /cars/{id}/workflow/ with action=SUBMIT_TO_PIC
-  performed ZERO content/evidence validation — only role and status transition checks.
+  performed ZERO content/evidence validation â€” only role and status transition checks.
   This allowed Master to submit incomplete CARs to PIC. The legacy submit endpoint
   had proper validation via CARSubmitSerializer, but the workflow path bypassed it.
 
 FILES CHANGED (6 modified, 1 new):
 
   Backend:
-  [NEW] psc-backend/apps/car/validators.py — Shared validate_car_submission()
-  [MOD] psc-backend/apps/car/serializers.py — CARSubmitSerializer delegates to shared validator;
+  [NEW] psc-backend/apps/car/validators.py â€” Shared validate_car_submission()
+  [MOD] psc-backend/apps/car/serializers.py â€” CARSubmitSerializer delegates to shared validator;
         CARDetailSerializer.get_available_actions() gates SUBMIT_TO_PIC
-  [MOD] psc-backend/apps/car/views.py — CARWorkflowView.post() gates SUBMIT_TO_PIC with
+  [MOD] psc-backend/apps/car/views.py â€” CARWorkflowView.post() gates SUBMIT_TO_PIC with
         VALIDATION_ERROR response; CARAvailableActionsView.get() filters SUBMIT_TO_PIC
 
   Frontend:
-  [MOD] psc-frontend/src/lib/validations/car.ts — .trim() on root cause check;
+  [MOD] psc-frontend/src/lib/validations/car.ts â€” .trim() on root cause check;
         added ACTION_DESCRIPTION_MIN_FOR_SUBMIT=50; per-category description length checks
-  [MOD] psc-frontend/src/components/car/car-workflow-actions.tsx — Client-side validation
+  [MOD] psc-frontend/src/components/car/car-workflow-actions.tsx â€” Client-side validation
         before SUBMIT_TO_PIC using cached CAR data; validation error dialog
-  [MOD] psc-frontend/src/components/inspection/deficiency-workflow-actions.tsx — Catches
+  [MOD] psc-frontend/src/components/inspection/deficiency-workflow-actions.tsx â€” Catches
         backend 400 VALIDATION_ERROR; shows validation error dialog
 
 NEW VALIDATION RULES (added to existing checks):
@@ -2705,27 +2705,27 @@ BUILD VERIFICATION:
   - python manage.py check: PASS (0 issues)
 
 PENDING E2E TESTING (Session 79):
-  [ ] Incomplete CAR → SUBMIT_TO_PIC should return 400 VALIDATION_ERROR
-  [ ] Incomplete CAR → available-actions should omit SUBMIT_TO_PIC
-  [ ] Complete CAR → SUBMIT_TO_PIC should succeed (200)
+  [ ] Incomplete CAR â†’ SUBMIT_TO_PIC should return 400 VALIDATION_ERROR
+  [ ] Incomplete CAR â†’ available-actions should omit SUBMIT_TO_PIC
+  [ ] Complete CAR â†’ SUBMIT_TO_PIC should succeed (200)
   [ ] Other workflow actions unaffected (START_WORK, MARK_COMPLETED, etc.)
-  [ ] Action description < 50 chars → should fail even if other checks pass
-  [ ] Root cause 60 spaces → should fail (trimmed length < 50)
+  [ ] Action description < 50 chars â†’ should fail even if other checks pass
+  [ ] Root cause 60 spaces â†’ should fail (trimmed length < 50)
   [ ] Legacy POST /cars/{id}/submit/ still works with shared validator
-  [ ] CAR detail page — "Submit to PIC" hidden when CAR incomplete
-  [ ] Deficiency page — SUBMIT_TO_PIC on incomplete CAR shows error dialog from 400
+  [ ] CAR detail page â€” "Submit to PIC" hidden when CAR incomplete
+  [ ] Deficiency page â€” SUBMIT_TO_PIC on incomplete CAR shows error dialog from 400
 
 - Status: Session 78 code changes complete. E2E testing deferred to Session 79.
 
 ================================================================================
-SESSION 79 — E2E Testing of CAR Submission Validation Fix (2026-02-10)
+SESSION 79 â€” E2E Testing of CAR Submission Validation Fix (2026-02-10)
 ================================================================================
 
 OBJECTIVE: Verify all 9 test scenarios from Session 78's PENDING E2E TESTING checklist.
 
 APPROACH:
   - Python E2E test script using Django ORM for data setup + HTTP requests for API testing
-  - Django dev server running on localhost:8000
+  - Django dev server running on localhost:8001
   - Test data created/cleaned per test for isolation
 
 RESULTS: 31/31 assertions passed across 8 test functions.
@@ -2783,19 +2783,19 @@ CHECKLIST (all items from Session 78):
   [x] Action description < 50 chars -> should fail even if other checks pass
   [x] Root cause 60 spaces -> should fail (trimmed length < 50)
   [x] Legacy POST /cars/{id}/submit/ still works with shared validator
-  [x] CAR detail page — "Submit to PIC" hidden when CAR incomplete
-  [x] Deficiency page — SUBMIT_TO_PIC on incomplete CAR shows error dialog from 400
+  [x] CAR detail page â€” "Submit to PIC" hidden when CAR incomplete
+  [x] Deficiency page â€” SUBMIT_TO_PIC on incomplete CAR shows error dialog from 400
 
 - Status: Session 79 complete. All 9 E2E test scenarios VERIFIED. Defense-in-depth validation working correctly.
 
 ================================================================================
-SESSION 80 — Follow-up Wizard + Computed operational_status (2026-02-10)
+SESSION 80 â€” Follow-up Wizard + Computed operational_status (2026-02-10)
 ================================================================================
 
 OBJECTIVE: Replace stored 4-stage inspection workflow with computed OPEN/CLOSED status,
            rewrite follow-up flow as 5-step wizard on same inspection (no new inspection).
 
-PART B — Computed operational_status (OPEN/CLOSED):
+PART B â€” Computed operational_status (OPEN/CLOSED):
 
 Backend changes:
   - views.py: Changed open_deficiency_count from is_cleared=0 to action_code_id-based
@@ -2819,14 +2819,14 @@ Frontend changes:
   - [id].tsx: REMOVED Submit/PIC Review/DPA Close buttons and workflow states. Simplified
     permissions (canEdit=isVessel, canAddDeficiency=isVessel||isOffice).
 
-PART A — Follow-up Wizard (same inspection):
+PART A â€” Follow-up Wizard (same inspection):
 
 Backend changes:
   - models.py: Added report_type field to InspectionReport (ORIGINAL/FOLLOW_UP)
   - migrations/0006_add_report_type_to_inspectionreport.py: Created and applied
-  - followup_serializers.py: Complete rewrite — validates action_code_ids, reinspection_date,
+  - followup_serializers.py: Complete rewrite â€” validates action_code_ids, reinspection_date,
     deficiency ownership. No new inspection creation.
-  - followup_views.py: Complete rewrite — FollowUpView updates deficiencies in-place,
+  - followup_views.py: Complete rewrite â€” FollowUpView updates deficiencies in-place,
     creates action history, optional report upload. LegacyFollowUpView as alias.
   - urls.py: Added canonical /inspections/<id>/follow-up/ endpoint
   - urls_followup.py: Kept legacy /psc-follow-up/register/ as alias
@@ -2845,19 +2845,19 @@ Frontend changes:
   - inspection-detail.tsx: Reports grouped by type (Original/Follow-up)
   - index.ts barrel: Added FollowUpWizard export
 
-PART C — UI Layout:
+PART C â€” UI Layout:
   - Built into wizard: flex flex-col + overflow-y-auto content + sticky bottom buttons
   - Tested conceptually at 1366x768 and 1440x900 viewports
 
 VERIFICATION:
-  - python manage.py check: 0 issues ✅
-  - npx tsc --noEmit: 0 errors ✅
+  - python manage.py check: 0 issues âœ…
+  - npx tsc --noEmit: 0 errors âœ…
 
 - Status: Session 80 complete. Follow-up wizard + computed operational_status implemented.
   20 files modified across backend and frontend. All type checks pass.
 
 ================================================================================
-SESSION 81 — Add def_reported Field to Inspections
+SESSION 81 â€” Add def_reported Field to Inspections
 ================================================================================
 
 GOAL: Add def_reported (YES/NO) field to inspections to explicitly capture
@@ -2894,13 +2894,13 @@ operational_status logic:
   - YES + any open defs: OPEN
 
 VERIFICATION:
-  - python manage.py check: 0 issues ✅
-  - npx tsc --noEmit: 0 errors ✅
+  - python manage.py check: 0 issues âœ…
+  - npx tsc --noEmit: 0 errors âœ…
 
 - Status: Session 81 complete. def_reported field fully integrated across stack.
 
 ================================================================================
-SESSION 82 — UAT Bug Fixes (Create Inspection + Report Upload)
+SESSION 82 â€” UAT Bug Fixes (Create Inspection + Report Upload)
 ================================================================================
 Date: 2026-02-10
 
@@ -2912,7 +2912,7 @@ BUGS FOUND & FIXED:
 
 1. Chrome file upload "click to browse" not working:
    - Problem: Chrome blocks programmatic .click() on hidden file inputs
-   - Fix: file-upload.tsx — overlay native <input> over drop zone using
+   - Fix: file-upload.tsx â€” overlay native <input> over drop zone using
      absolute positioning (inset-0, full width/height, opacity-0)
    - File: psc-frontend/src/components/shared/file-upload.tsx
 
@@ -2920,7 +2920,7 @@ BUGS FOUND & FIXED:
    - Problem: useUploadInspectionReport(createdInspectionId ?? '') captured
      empty string at render time. When setCreatedInspectionId(id) was called
      in the same async function, the mutation still used the old empty ID.
-     Caused POST /inspections//upload-report/ (double slash → 404)
+     Caused POST /inspections//upload-report/ (double slash â†’ 404)
    - Fix: Removed hook, call inspectionsApi.uploadInspectionReport(id, file)
      directly with the freshly-created inspection ID
    - File: psc-frontend/src/routes/inspections/new.tsx
@@ -2949,19 +2949,19 @@ CLEANUP:
 
 VERIFICATION:
   - Full E2E flow verified: Create inspection (201) + Upload report (201) +
-    Navigate to detail page with report attached ✅
-  - Dashboard API returns all zeros after cleanup ✅
+    Navigate to detail page with report attached âœ…
+  - Dashboard API returns all zeros after cleanup âœ…
 
 - Status: Session 82 complete. UAT bugs fixed. Database cleaned for fresh testing.
 
 ================================================================================
-SESSION 83 — E2E Manual Testing Bug Fixes
+SESSION 83 â€” E2E Manual Testing Bug Fixes
 ================================================================================
 Date: 2026-02-10
 
 CONTEXT:
-  User began manual E2E testing flow: login → create inspection → add
-  deficiencies → assign crew → crew edits CAR. Multiple bugs found and fixed.
+  User began manual E2E testing flow: login â†’ create inspection â†’ add
+  deficiencies â†’ assign crew â†’ crew edits CAR. Multiple bugs found and fixed.
 
 BUGS FOUND & FIXED:
 
@@ -2980,7 +2980,7 @@ BUGS FOUND & FIXED:
 3. Detention remark not stored:
    - Problem: Frontend captures detention_reason but backend had no storage
    - Fix: Record detention remark as ActivityHistory entry (event_type=
-     DETENTION_REMARK) on create and update — no model change needed
+     DETENTION_REMARK) on create and update â€” no model change needed
    - Files: views.py (create + update), new.tsx, [id].edit.tsx (send
      detention_reason in API payload)
 
@@ -2995,7 +2995,7 @@ BUGS FOUND & FIXED:
      not VESSEL_CREW
    - Fix: Added VESSEL_CREW check comparing user.id (UUID) against
      deficiency.assigned_crew_id (UUID)
-   - Note: user.crew_id is CrewID string (e.g. CRW0002), NOT the UUID —
+   - Note: user.crew_id is CrewID string (e.g. CRW0002), NOT the UUID â€”
      must use user.id for comparison with assigned_crew_id
    - Files: car/permissions.py (CanEditCAR)
 
@@ -3031,20 +3031,20 @@ FILES MODIFIED:
   - psc-frontend/src/routes/cars/[id].edit.tsx (allow crew edit)
 
 VERIFICATION:
-  - TypeScript compiles with 0 errors ✅
-  - API create inspection returns 201 with correct subtypes ✅
-  - Crew user (crew001) can log in and see assigned CARs ✅
+  - TypeScript compiles with 0 errors âœ…
+  - API create inspection returns 201 with correct subtypes âœ…
+  - Crew user (crew001) can log in and see assigned CARs âœ…
 
 - Status: Session 83 complete. Multiple UAT bugs fixed. Continuing E2E testing next session.
 
 ================================================================================
-SESSION 84 — Crew Workflow & UUID Matching Fixes
+SESSION 84 â€” Crew Workflow & UUID Matching Fixes
 ================================================================================
 Date: 2026-02-10
 
 CONTEXT:
   Continuing E2E testing. Crew member (crew001/Able Seaman) edited CAR but
-  could not submit — got 403 error. Root cause was multiple UUID matching bugs
+  could not submit â€” got 403 error. Root cause was multiple UUID matching bugs
   and the edit page calling the wrong endpoint.
 
 BUGS FOUND & FIXED:
@@ -3105,14 +3105,14 @@ FILES MODIFIED:
   - psc-frontend/src/components/car/car-form.tsx (dynamic submit label/props)
 
 VERIFICATION:
-  - TypeScript compiles with 0 errors ✅
-  - Backend: crew001 gets 'owner' role, sees MARK_COMPLETED action ✅
-  - Backend auto-reload confirmed ✅
+  - TypeScript compiles with 0 errors âœ…
+  - Backend: crew001 gets 'owner' role, sees MARK_COMPLETED action âœ…
+  - Backend auto-reload confirmed âœ…
 
 - Status: Session 84 complete. Crew workflow fully fixed. Continuing E2E testing.
 
 ================================================================================
-SESSION 85 — Notification Debug (CAR_SUBMITTED + Rework Recipient Reliability)
+SESSION 85 â€” Notification Debug (CAR_SUBMITTED + Rework Recipient Reliability)
 ================================================================================
 Date: 2026-02-10
 
@@ -3175,7 +3175,7 @@ TEST RESULTS:
 - Status: Session 85 complete. Notification pipeline now resolves PIC/SSQE and assigned crew correctly.
 
 ================================================================================
-SESSION 86 — CAR PDF/Print Template Corrections + Stale Export Elimination
+SESSION 86 â€” CAR PDF/Print Template Corrections + Stale Export Elimination
 ================================================================================
 Date: 2026-02-10
 
@@ -3243,7 +3243,7 @@ TEST/VERIFICATION:
 - Status: Session 86 complete. CAR PDF print mapping now aligned to current UI model and stale export path addressed.
 
 ================================================================================
-SESSION 87 — CAR PDF PIC/DPA Comment Placement + History Comment Sanitization
+SESSION 87 â€” CAR PDF PIC/DPA Comment Placement + History Comment Sanitization
 ================================================================================
 Date: 2026-02-10
 
@@ -3286,7 +3286,7 @@ TEST/VERIFICATION:
   history rendering is comment-free for PIC/DPA actions.
 
 ================================================================================
-SESSION 88 — CAR Workflow SUBMIT_TO_DPA Missing DPA Notification
+SESSION 88 â€” CAR Workflow SUBMIT_TO_DPA Missing DPA Notification
 ================================================================================
 Date: 2026-02-10
 
@@ -3331,7 +3331,7 @@ TEST RESULTS:
 - Status: Session 88 complete. SUBMIT_TO_DPA now triggers DPA notification pipeline.
 
 ================================================================================
-SESSION 89 — Notification Visibility Scope Leak (Duplicate Perception)
+SESSION 89 â€” Notification Visibility Scope Leak (Duplicate Perception)
 ================================================================================
 Date: 2026-02-10
 
@@ -3383,7 +3383,7 @@ VERIFICATION:
 - Status: Session 89 complete. Duplicate-looking notifications caused by scope leakage are resolved.
 
 ================================================================================
-SESSION 90 — Master Re-Submit Confirmation (Send to PIC)
+SESSION 90 â€” Master Re-Submit Confirmation (Send to PIC)
 ================================================================================
 Date: 2026-02-10
 
@@ -3421,7 +3421,7 @@ TEST/VERIFICATION:
 - Status: Session 90 complete. Master send/re-send to PIC actions now require explicit confirmation before transition execution.
 
 ================================================================================
-SESSION 91 — Notifications Missing Until Refresh After Login
+SESSION 91 â€” Notifications Missing Until Refresh After Login
 ================================================================================
 Date: 2026-02-10
 
@@ -3464,7 +3464,7 @@ TEST/VERIFICATION:
 - Status: Session 91 complete. Notifications now fetch correctly on first post-login render.
 
 ================================================================================
-SESSION 92 — CAR PDF External Sanitization Tightening + CAR List 500 Recovery
+SESSION 92 â€” CAR PDF External Sanitization Tightening + CAR List 500 Recovery
 ================================================================================
 Date: 2026-02-11
 

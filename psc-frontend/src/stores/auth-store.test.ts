@@ -30,7 +30,13 @@ vi.mock('@/lib/api/client', () => ({
 }));
 
 // Now import the store after mocks
-import { useAuthStore } from './auth-store';
+import {
+  getReauthIdentifier,
+  getSessionTimeoutMs,
+  OFFICE_IDLE_TIMEOUT_MS,
+  useAuthStore,
+  VESSEL_IDLE_TIMEOUT_MS,
+} from './auth-store';
 
 // ============================================================================
 // HELPERS
@@ -60,6 +66,8 @@ function resetStore() {
     isAuthenticated: false,
     isLoading: false,
     isInitialized: false,
+    isReauthRequired: false,
+    sessionLastActivityAt: Date.now(),
   });
 }
 
@@ -136,6 +144,64 @@ describe('auth-store — login', () => {
     expect(state.isLoading).toBe(false);
     expect(state.isAuthenticated).toBe(false);
     expect(state.tokens).toBeNull();
+  });
+});
+
+// ============================================================================
+// SESSION RE-AUTH
+// ============================================================================
+
+describe('auth-store — D-CERT-082 session re-auth', () => {
+  it('test_feat_cert_rbac_011_uses_8h_office_and_24h_vessel_idle_windows', () => {
+    expect(getSessionTimeoutMs({ ...mockUser(), user_type: 'office' })).toBe(OFFICE_IDLE_TIMEOUT_MS);
+    expect(getSessionTimeoutMs({ ...mockUser(), user_type: 'vessel' })).toBe(VESSEL_IDLE_TIMEOUT_MS);
+  });
+
+  it('test_feat_cert_rbac_012_prefills_crew_id_for_vessel_and_employee_id_for_office', () => {
+    expect(getReauthIdentifier(mockUser())).toEqual({
+      label: 'Crew ID',
+      value: 'crew-1',
+    });
+    expect(
+      getReauthIdentifier({
+        ...mockUser(),
+        user_type: 'office',
+        employee_id: 'EMP-44',
+        crew_id: null,
+      })
+    ).toEqual({
+      label: 'Employee ID',
+      value: 'EMP-44',
+    });
+  });
+
+  it('test_feat_cert_rbac_012_reauthenticates_with_prefilled_identifier_and_preserves_user_state', async () => {
+    const user = mockUser();
+    authApiMock.login.mockResolvedValue({
+      access: 'new-access-token',
+      refresh: 'new-refresh-token',
+      user,
+    });
+    useAuthStore.setState({
+      tokens: { access: 'old-access-token', refresh: 'old-refresh-token' },
+      user,
+      isAuthenticated: true,
+      isReauthRequired: true,
+      sessionLastActivityAt: Date.now() - VESSEL_IDLE_TIMEOUT_MS,
+    });
+
+    await useAuthStore.getState().reauthenticate('secret-password');
+
+    expect(authApiMock.login).toHaveBeenCalledWith({
+      username: 'crew-1',
+      password: 'secret-password',
+    });
+    expect(useAuthStore.getState().tokens).toEqual({
+      access: 'new-access-token',
+      refresh: 'new-refresh-token',
+    });
+    expect(useAuthStore.getState().user).toEqual(user);
+    expect(useAuthStore.getState().isReauthRequired).toBe(false);
   });
 });
 

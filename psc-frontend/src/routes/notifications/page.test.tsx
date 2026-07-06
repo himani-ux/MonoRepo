@@ -7,6 +7,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 const notificationsPageMocks = vi.hoisted(() => ({
   useNotifications: vi.fn(),
@@ -140,7 +141,7 @@ describe('NotificationsPage', () => {
       }
     );
 
-    render(<NotificationsPage />);
+    render(<NotificationsPage />, { wrapper: MemoryRouter });
     fireEvent.click(screen.getByRole('button', { name: 'Mark All Read' }));
 
     await waitFor(() => {
@@ -154,7 +155,7 @@ describe('NotificationsPage', () => {
   });
 
   it('test_feat_notif_001_mark_read_passes_selected_notification_id', () => {
-    render(<NotificationsPage />);
+    render(<NotificationsPage />, { wrapper: MemoryRouter });
 
     fireEvent.click(screen.getByRole('button', { name: 'Trigger Mark Read' }));
 
@@ -162,7 +163,7 @@ describe('NotificationsPage', () => {
   });
 
   it('test_feat_notif_001_load_more_requests_next_page', async () => {
-    render(<NotificationsPage />);
+    render(<NotificationsPage />, { wrapper: MemoryRouter });
     fireEvent.click(screen.getByRole('button', { name: 'Trigger Load More' }));
 
     await waitFor(() => {
@@ -184,8 +185,20 @@ describe('NotificationsPage', () => {
       refetch: vi.fn(),
     });
 
-    render(<NotificationsPage />);
+    render(<NotificationsPage />, { wrapper: MemoryRouter });
 
     expect(screen.queryByRole('button', { name: 'Mark All Read' })).not.toBeInTheDocument();
+  });
+
+  it('passes the Certs module filter from the shared inbox URL', () => {
+    render(
+      <MemoryRouter initialEntries={['/notifications?module=certs']}>
+        <NotificationsPage />
+      </MemoryRouter>
+    );
+
+    expect(notificationsPageMocks.useNotifications).toHaveBeenCalledWith(
+      expect.objectContaining({ module: 'certs' })
+    );
   });
 });

@@ -1,5 +1,5 @@
-# TECH_STACK.md — Locked Technology Versions
-## Inspection Module — PSC/RS/Audit Close-out System
+# TECH_STACK.md â€” Locked Technology Versions
+## Inspection Module â€” PSC/RS/Audit Close-out System
 **Version:** 1.1 | **Date:** 2026-03-26 | **Status:** UPDATED TO MATCH CURRENT IMPLEMENTATION
 
 ---
@@ -16,7 +16,7 @@ Key corrections:
 - the frontend currently includes `recharts`, `vitest`, `@testing-library/*`, and `jsdom`
 - the Circular and ORB merge did not introduce any additional database package dependency or schema-specific runtime requirement
 
-## ⚠️ VERSION LOCK POLICY
+## âš ï¸ VERSION LOCK POLICY
 
 **DO NOT** install any package not listed in this document without explicit approval.
 **DO NOT** upgrade versions without testing and approval.
@@ -352,7 +352,7 @@ pip install -r requirements.txt
 ### 7.1 Frontend (.env)
 ```env
 # API Configuration
-VITE_API_BASE_URL=http://localhost:8000/api/psc
+VITE_API_BASE_URL=http://localhost:8001/api/psc
 
 # PWA Configuration
 VITE_APP_NAME=PSC Inspection Module
@@ -404,7 +404,7 @@ SIMPLE_JWT = {
 
 | Frontend | Backend | Database | Status |
 |----------|---------|----------|--------|
-| React 18.3.1 + Vite 5.4.0 | Django 5.2.7 + DRF 3.14.0 | SQL Server 2019 | ✅ Tested |
+| React 18.3.1 + Vite 5.4.0 | Django 5.2.7 + DRF 3.14.0 | SQL Server 2019 | âœ… Tested |
 
 ---
 

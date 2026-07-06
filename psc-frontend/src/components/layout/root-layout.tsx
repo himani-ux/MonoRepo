@@ -16,6 +16,7 @@ import { Header } from './header';
 import { Sidebar } from './sidebar';
 import { BottomNav } from './bottom-nav';
 import { OfflineBanner } from '@/components/sync/offline-banner';
+import { SessionReauthGate } from '@/components/auth/session-reauth-gate';
 import { useRequireAuth } from '@/hooks/use-auth';
 import { useOffline } from '@/hooks/use-offline';
 
@@ -52,6 +53,7 @@ export function RootLayout({
         <Header showMenuButton={false} />
         <OfflineBanner isOnline={isOnline} lastSyncTime={lastSyncTime} />
         <main className={cn('px-4 py-4 md:px-6', className)}>{children}</main>
+        <SessionReauthGate />
       </div>
     );
   }
@@ -90,6 +92,7 @@ export function RootLayout({
 
       {/* Mobile bottom navigation */}
       <BottomNav />
+      <SessionReauthGate />
     </div>
   );
 }

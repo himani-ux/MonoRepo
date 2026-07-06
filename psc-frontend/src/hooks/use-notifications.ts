@@ -23,8 +23,8 @@ import { useAuth } from '@/hooks/use-auth';
 export const notificationKeys = {
   all: ['notifications'] as const,
   lists: () => [...notificationKeys.all, 'list'] as const,
-  list: (scopeKey: string, page: number, pageSize: number, isRead?: boolean) =>
-    [...notificationKeys.lists(), scopeKey, { page, pageSize, isRead }] as const,
+  list: (scopeKey: string, page: number, pageSize: number, isRead?: boolean, module?: 'certs') =>
+    [...notificationKeys.lists(), scopeKey, { page, pageSize, isRead, module }] as const,
   unreadCount: (scopeKey: string) => [...notificationKeys.all, 'unread-count', scopeKey] as const,
 };
 
@@ -54,6 +54,7 @@ export interface UseNotificationsOptions {
   page?: number;
   pageSize?: number;
   isRead?: boolean;
+  module?: 'certs';
   enabled?: boolean;
 }
 
@@ -66,14 +67,15 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     page = 1,
     pageSize = DEFAULT_PAGE_SIZE,
     isRead,
+    module,
     enabled = true,
   } = options;
   const scopeKey = getNotificationScopeKey(user);
   const queryEnabled = enabled && isInitialized && isAuthenticated && Boolean(scopeKey);
 
   return useQuery<NotificationPaginatedResponse>({
-    queryKey: notificationKeys.list(scopeKey ?? 'anonymous', page, pageSize, isRead),
-    queryFn: () => getNotifications(page, pageSize, isRead),
+    queryKey: notificationKeys.list(scopeKey ?? 'anonymous', page, pageSize, isRead, module),
+    queryFn: () => getNotifications(page, pageSize, isRead, module),
     staleTime: STALE_TIME.NOTIFICATIONS,
     refetchOnMount: 'always',
     enabled: queryEnabled,

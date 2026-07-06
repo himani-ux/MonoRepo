@@ -1,4 +1,4 @@
-﻿// src/components/PdfViewerPage.jsx
+// src/components/PdfViewerPage.jsx
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
@@ -47,7 +47,7 @@ export default function PdfViewerPage() {
         console.log("crew_id:", currentUser.crew_id)
         console.log("crew_role:", currentUser.role)
         const res = await fetch(
-          `http://localhost:8000/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notificationId)}&crew_id=${currentUser.crew_id}`
+          `http://localhost:8001/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notificationId)}&crew_id=${currentUser.crew_id}`
         );
         console.log("Fetch response:", res.status);
 
@@ -160,7 +160,7 @@ export default function PdfViewerPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/api/msc/read-ack/", {
+      const response = await fetch("http://localhost:8001/api/msc/read-ack/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RootLayout } from '@/components/layout/root-layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { NotificationList } from '@/components/notification/notification-list';
@@ -27,14 +28,18 @@ import type { Notification } from '@/types';
 const PAGE_SIZE = 20;
 
 export default function NotificationsPage() {
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [accumulated, setAccumulated] = useState<Notification[]>([]);
   const prevDataRef = useRef<Notification[] | null>(null);
   const { toast } = useToast();
 
+  const moduleFilter = searchParams.get('module') === 'certs' ? 'certs' : undefined;
+
   const { data, isLoading, isError, error, refetch } = useNotifications({
     page,
     pageSize: PAGE_SIZE,
+    module: moduleFilter,
   });
 
   // Accumulate notifications across pages

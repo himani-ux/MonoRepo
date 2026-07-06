@@ -127,7 +127,7 @@ If the project is being built against a fresh database copy, run migrations only
 ### Step 4.5: Start Backend
 
 ```bash
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:8001
 ```
 
 ## 5. Frontend Setup

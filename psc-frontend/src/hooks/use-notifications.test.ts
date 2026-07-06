@@ -88,12 +88,12 @@ describe('notificationKeys factory', () => {
     expect(notificationKeys.lists()).toEqual(['notifications', 'list']);
   });
 
-  it('list includes scopeKey, page, pageSize, isRead', () => {
+  it('list includes scopeKey, page, pageSize, isRead, and module', () => {
     expect(notificationKeys.list('office:EMP001', 1, 20, true)).toEqual([
       'notifications',
       'list',
       'office:EMP001',
-      { page: 1, pageSize: 20, isRead: true },
+      { page: 1, pageSize: 20, isRead: true, module: undefined },
     ]);
   });
 
@@ -123,7 +123,22 @@ describe('useNotifications', () => {
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(notifApiMock.getNotifications).toHaveBeenCalledWith(2, 10, false);
+    expect(notifApiMock.getNotifications).toHaveBeenCalledWith(2, 10, false, undefined);
+  });
+
+  it('passes module=certs to the API when requested', async () => {
+    notifApiMock.getNotifications.mockResolvedValue({
+      data: [],
+      pagination: { page: 1, page_size: 20, total_count: 0, total_pages: 1 },
+    });
+
+    const { result } = renderHook(
+      () => useNotifications({ module: 'certs' }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(notifApiMock.getNotifications).toHaveBeenCalledWith(1, 20, undefined, 'certs');
   });
 
   it('is disabled when enabled=false', () => {

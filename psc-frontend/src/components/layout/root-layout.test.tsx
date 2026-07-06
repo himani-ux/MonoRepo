@@ -51,6 +51,7 @@ vi.mock('@/components/sync/offline-banner', () => ({
 }));
 
 import { RootLayout } from './root-layout';
+import { useAuthStore } from '@/stores/auth-store';
 
 describe('RootLayout', () => {
   beforeEach(() => {
@@ -63,6 +64,15 @@ describe('RootLayout', () => {
     rootLayoutMocks.useOffline.mockReturnValue({
       isOnline: true,
       lastSyncTime: null,
+    });
+    useAuthStore.setState({
+      tokens: null,
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      isInitialized: true,
+      isReauthRequired: false,
+      sessionLastActivityAt: Date.now(),
     });
   });
 
@@ -104,6 +114,39 @@ describe('RootLayout', () => {
     expect(screen.getAllByText(/Sidebar:/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('BottomNav')).toBeInTheDocument();
     expect(screen.getByText('Page Body')).toBeInTheDocument();
+  });
+
+  it('test_feat_cert_rbac_012_reauth_modal_overlays_without_unmounting_page_content', () => {
+    useAuthStore.setState({
+      tokens: { access: 'access', refresh: 'refresh' },
+      user: {
+        id: 'office-1',
+        user_type: 'office',
+        full_name: 'DPA User',
+        role: 'DPA',
+        vessel_id: null,
+        vessel_code: null,
+        email: 'dpa@example.com',
+        employee_id: 'EMP-44',
+        crew_id: null,
+        rank: null,
+        form_ids: [],
+        process_ids: [],
+      },
+      isAuthenticated: true,
+      isReauthRequired: true,
+    });
+
+    render(
+      <RootLayout>
+        <label htmlFor="draft-field">Draft field</label>
+        <input id="draft-field" defaultValue="unsaved form value" />
+      </RootLayout>
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Session expired' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Employee ID')).toHaveValue('EMP-44');
+    expect(screen.getByLabelText('Draft field')).toHaveValue('unsaved form value');
   });
 });
 

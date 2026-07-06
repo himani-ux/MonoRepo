@@ -54,7 +54,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-Backend runs at `http://localhost:8000`.
+Backend runs at `http://localhost:8001`.
 
 ### 3. Frontend Setup
 
@@ -94,7 +94,7 @@ Frontend runs at `http://localhost:5173`.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000/api/v1` |
+| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8001/api/v1` |
 | `VITE_APP_ENV` | Environment name | `development` |
 
 ## Available Scripts

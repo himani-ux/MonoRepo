@@ -42,7 +42,8 @@ export interface MarkReadResponse {
 export async function getNotifications(
   page = 1,
   pageSize = DEFAULT_PAGE_SIZE,
-  isRead?: boolean
+  isRead?: boolean,
+  module?: 'certs'
 ): Promise<NotificationPaginatedResponse> {
   const params = new URLSearchParams();
   params.set('page', page.toString());
@@ -51,9 +52,13 @@ export async function getNotifications(
   if (isRead !== undefined) {
     params.set('is_read', isRead.toString());
   }
+  if (module) {
+    params.set('module', module);
+  }
 
+  const path = module === 'certs' ? '/certs/notifications/' : '/notifications/';
   const response = await apiClient.get<NotificationPaginatedResponse>(
-    `/notifications/?${params.toString()}`
+    `${path}?${params.toString()}`
   );
   return response.data;
 }
