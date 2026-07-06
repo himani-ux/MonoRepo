@@ -2592,6 +2592,21 @@ Implementation impact:
 - The old `/phase-6/verify/` effectiveness-verification endpoint remains registered as a compatibility endpoint but is not the current visible Phase 7 UI.
 - The Incident PDF Estimated Cost selection prints Loss Evaluation blocks when a Loss Evaluation record exists.
 
+## Amendment 23 - 2026-07-06
+
+The Phase 7 Injury Report Loss Evaluation Safe Working Practice dropdown is seeded under CR-048. The field already existed from CR-047; this amendment supplies the requested Code of Safe Working Practices master data.
+
+Triggering discovery: post-shipment field configuration review provided the actual dropdown list for `Code of Safe Working Practices to which the Incident relates`.
+
+Supersedes:
+- Amendment 22 only where it says `SAFE_WORKING_PRACTICE` options are future options.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says the Safe Working Practice dropdown is unseeded or options are unavailable.
+
+Implementation impact:
+- Migration `0055_seed_safe_working_practice_options` seeds the user-provided Code of Safe Working Practices list into `vims_safety_injury_dropdown_option` with `field_key = SAFE_WORKING_PRACTICE`.
+- Exact duplicate labels from the provided list are stored once to honor the master table unique key and keep the dropdown clean.
+- Existing active `SAFE_WORKING_PRACTICE` choices outside the new list are deactivated so the dropdown reflects the approved list.
+
 **Document Control:**
 - Created: 2026-04-17
 - Author: Wave 3 docsuite generation agent (Implementation Plan)

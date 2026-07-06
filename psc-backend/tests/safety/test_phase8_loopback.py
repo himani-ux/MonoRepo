@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import importlib
 from types import SimpleNamespace
 import unittest
+
+from django.apps import apps as django_apps
 
 from tests.safety.support import bootstrap_django, recreate_incident_table
 
@@ -15,6 +18,7 @@ from apps.safety.models import (
     Incident,
     IncidentLossEvaluation,
     IncidentPhaseLog,
+    InjuryDropdownOption,
     Recommendation,
 )
 from apps.safety.serializers.incident_phase8 import build_phase8_workspace_payload
@@ -282,3 +286,43 @@ class Phase8LoopbackTests(unittest.TestCase):
         self.assertTrue(payload["has_loss_evaluation"])
         self.assertEqual(payload["loss_evaluation"]["safe_working_practice"], "Code A")
         self.assertEqual(payload["loss_evaluation"]["injury_total_estimated_cost"], "25.00")
+
+    def test_workspace_uses_seeded_safe_working_practice_dropdown_options(self) -> None:
+        migration = importlib.import_module(
+            "apps.safety.migrations.0055_seed_safe_working_practice_options"
+        )
+        InjuryDropdownOption.objects.create(
+            field_key=InjuryDropdownOption.FieldKey.SAFE_WORKING_PRACTICE,
+            option_label="Code A",
+            display_order=1,
+            active=True,
+            created_by="test",
+        )
+        migration.seed_safe_working_practice_options(django_apps, None)
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/P8INJ2",
+            vessel_id="7",
+            state="APPROVED",
+            current_phase=8,
+            risk_band=Incident.RiskBand.YELLOW,
+            pic_user_id="pic-1",
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+        ExternalPartyInjury.objects.create(
+            incident=incident,
+            injured_person_type=ExternalPartyInjury.InjuredPersonType.CREW,
+            created_by="dpa-1",
+            schema_version=1,
+        )
+
+        options = build_phase8_workspace_payload(incident)["choices"]["safe_working_practice"]
+        labels = [option["label"] for option in options]
+
+        self.assertEqual(labels[:3], ["Health and hygiene", "Good housekeeping", "Fitness, health and hygiene"])
+        self.assertIn("Painting", labels)
+        self.assertNotIn("Code A", labels)
+        self.assertEqual(labels.count("Health and hygiene"), 1)
+        self.assertEqual(labels.count("Lighting"), 1)
+        self.assertEqual(labels.count("Electrical equipment"), 1)

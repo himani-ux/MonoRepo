@@ -645,7 +645,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - Risk Assessment shows Consequence, Likelihood, and Risk level dropdowns using the fixed values requested in CR-047.
 - Incident Report records show master/chief engineer, repair type, repair details, last overhaul/maintenance/survey details, delay/material/deviation/off-hire fields, and incident estimated-cost fields.
-- Injury Report records show master/chief engineer, Code of Safe Working Practices dropdown-ready field, man-hour/rest fields, delay/man-hour/repatriation/hospitalization/deviation/evacuation fields, and injury estimated-cost fields.
+- Injury Report records show master/chief engineer, a seeded Code of Safe Working Practices dropdown, man-hour/rest fields, delay/man-hour/repatriation/hospitalization/deviation/evacuation fields, and injury estimated-cost fields.
 - Loss Evaluation saves as one editable row per incident in `vims_safety_incident_loss_evaluation`.
 - Incident closure requires a saved Loss Evaluation row and a closure note; PIC or DPA can perform this for any risk band.
 - The existing `/phase-6/verify/` endpoint remains compatibility-only and is not the current visible Phase 7 UI.

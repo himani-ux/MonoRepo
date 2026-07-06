@@ -558,7 +558,7 @@ Serializer contract: `external_party_injury` is nested in Phase 1 create/update.
 
 ### 4.0B `vims_safety_injury_dropdown_option` - Injury dropdown master
 
-This table owns the Phase 1 crew injury dropdown values for `Nature of Injury`, `Source of Injury`, `Affected Areas of the Body`, and `Type of Activity`. It also owns the Phase 7 Injury Report `Code of Safe Working Practices` dropdown category through `field_key = SAFE_WORKING_PRACTICE`; those options are nullable until seeded. The selected label, or the typed value when `Others(Specify)` is used, is still stored in the transaction row that owns the field.
+This table owns the Phase 1 crew injury dropdown values for `Nature of Injury`, `Source of Injury`, `Affected Areas of the Body`, and `Type of Activity`. It also owns the Phase 7 Injury Report `Code of Safe Working Practices` dropdown category through `field_key = SAFE_WORKING_PRACTICE`; migration `0055_seed_safe_working_practice_options` seeds the active Code of Safe Working Practices list and deactivates stale safe-working-practice choices outside that list. The selected label, or the typed value when `Others(Specify)` is used, is still stored in the transaction row that owns the field.
 
 ```sql
 CREATE TABLE vims_safety_injury_dropdown_option (

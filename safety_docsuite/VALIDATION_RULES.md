@@ -206,7 +206,7 @@ Sequencing is **Reporter → Master → HOD → DPA → FM**. Each next signatur
 | V-INC-091 | User closes an incident from Phase 7 before saving Loss Evaluation | server | "Save Loss Evaluation before closing the incident." | D-MAINT-CR047 |
 | V-INC-092 | User closes an incident without a closure note | server | `closure_reason` required | D-MAINT-CR047 |
 | V-INC-093 | Consequence, Likelihood, Risk level, or Type of Repairs submitted outside the configured fixed dropdown values | server serializer | field-level choice validation | D-MAINT-CR047 |
-| V-INC-094 | Code of Safe Working Practices options are unavailable | UI/API | field remains nullable; options are loaded from `vims_safety_injury_dropdown_option` where `field_key = SAFE_WORKING_PRACTICE` when seeded later | D-MAINT-CR047 |
+| V-INC-094 | Code of Safe Working Practices dropdown loads | UI/API | active options are loaded from `vims_safety_injury_dropdown_option` where `field_key = SAFE_WORKING_PRACTICE`; CR-048 seeds the requested list and deactivates stale choices outside it | D-MAINT-CR048 |
 
 ### 2.7 Timeline-Extension (D-GAP-B2)
 
