@@ -293,7 +293,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - Current user-facing evidence capture shows Documents as the primary evidence entry surface. Legacy People / Position / Parts / Electronic evidence types remain backend-compatible for older records and routes.
 - Documents capture uses Attachment, Title, and Description; saved document cards expose **Edit** for Title/Description metadata without replacing the uploaded file.
-- Witness Statement can be opened when needed and shows crew/Other witness selection, What the witness said, Remark, and optional signature image upload. Saved Witness Statement cards expose **Edit** and update the existing witness row. Evidence Check / Evidence Matrix is not part of the current Phase 4 user interface.
+- Witness Statement can be opened when needed and shows crew/Other witness selection, Remark, and Upload witness statement. Saved Witness Statement cards expose **Edit** and update the existing witness row. Evidence Check / Evidence Matrix is not part of the current Phase 4 user interface.
 - Position: legacy compatibility only in current user-facing evidence capture.
 - People: legacy witness/interview records remain readable for compatibility; the current user-facing evidence capture is Documents plus simplified Witness Statement.
 - Parts: damaged equipment ID, samples, wear/tear notes; equipment history reference is **manual** (PMS decoupled per D-GAP-I1).
@@ -301,7 +301,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 - Electronic: VDR / ECDIS / GPS / UMS / VTS / fire-system / CCTV / email / AIS fields.
 - Perishable-evidence prompt on YELLOW/RED if Phase 3 has no People or Electronic entries within 24h of Phase 2 submit.
 **Dependencies:** FEAT-SAF-INC-008, FEAT-SAF-INC-011, FEAT-SAF-INC-012, FEAT-SAF-XMOD-005.
-**Decisions:** D-DNV-07, D-GAP-I1, D-GAP-R05, D-GAP-R06, D-MAINT-CR012, D-MAINT-CR036, D-MAINT-CR041.
+**Decisions:** D-DNV-07, D-GAP-I1, D-GAP-R05, D-GAP-R06, D-MAINT-CR012, D-MAINT-CR036, D-MAINT-CR041, D-MAINT-CR049.
 **SSOT refs:** see SSOT §2B.8.
 
 ### FEAT-SAF-INC-006 — Legacy Evidence Matrix Compatibility
@@ -383,11 +383,11 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Priority:** V1
 **User story:** As an investigator, I need a short Witness Statement form so I can record a witness account without navigating formal interview protocol fields.
 **Acceptance criteria:**
-- Current Phase 4 Witness Statement shows vessel crew/Other witness selection, What the witness said, Remark, and optional signature image upload.
+- Current Phase 4 Witness Statement shows vessel crew/Other witness selection, Remark, and Upload witness statement.
 - Saved witness statements display the same user-facing values.
-- The frontend submits a legacy-compatible informal interview payload with a system reason and stores the optional signature image in the existing witness-signature field; users do not choose formal/informal mode in the current UI.
+- The frontend submits a legacy-compatible informal interview payload with a system reason and stores the uploaded witness statement in the existing witness-signature storage field; users do not choose formal/informal mode in the current UI.
 **Dependencies:** FEAT-SAF-INC-005.
-**Decisions:** D-MAINT-CR016, D-MAINT-CR036.
+**Decisions:** D-MAINT-CR016, D-MAINT-CR036, D-MAINT-CR049.
 **SSOT refs:** see SSOT §2B.9.
 
 ### FEAT-SAF-INC-013 — Legacy Formal vs Informal Interview API
@@ -408,7 +408,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **User story:** As the system, I need older formal interview records to keep their read-back/sign-off validation while the current UI stays simple.
 **Acceptance criteria:**
 - Backend formal interview validation still requires read-back, witness signature, and copy-to-witness for `FORMAL` API payloads.
-- The current Phase 4 Witness Statement UI does not show read-back or copy-to-witness controls; it does allow an optional signature image upload for the simplified statement.
+- The current Phase 4 Witness Statement UI does not show read-back, copy-to-witness controls, or the old text statement field; it does allow Upload witness statement for the simplified statement.
 - Historical records that contain those fields remain readable.
 **Dependencies:** FEAT-SAF-INC-013.
 **Decisions:** D-GAP-R19, D-GAP-M15, D-MAINT-CR016.
@@ -589,14 +589,14 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - The visible phase tabs split action capture into **Corrective Action** (`/phase-3/`) and **Preventive Action** (`/phase-3/preventive/`).
 - Corrective Action shows Description and Due date only; the previous "Who Will Do and Check This?" owner/checker card is not shown.
-- Preventive Action does not show Remaining risk or the "I confirm this will reduce risk" checkbox.
+- Preventive Action shows Description, Due date, and **How much will this reduce risk?** only; it does not show Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording.
 - The former **Lessons Learned** screen is not shown in current workflow tabs; `/phase-3/lessons/` is a legacy redirect to Office Review.
 - The action screens do not expose Type, Title, or "Why is this needed?" as separate user inputs.
 - Save acknowledgement appears after each action save and the page scrolls to the saved item.
 - Saved Corrective Action and Preventive Action cards expose **Edit**. Editing loads the saved values into the same form and updates the existing row instead of creating a duplicate.
 - Existing backend recommendation/corrective-action storage remains compatible; legacy `LESSONS_LEARNT` rows remain readable for old records but are not a current screen.
 **Dependencies:** FEAT-SAF-INC-028, FEAT-SAF-XMOD-004.
-**Decisions:** D-DNV-06, D-GAP-R13, D-MAINT-CR038, D-MAINT-CR041.
+**Decisions:** D-DNV-06, D-GAP-R13, D-MAINT-CR038, D-MAINT-CR041, D-MAINT-CR049.
 **SSOT refs:** see SSOT §2B.7; §6 D-GAP-R13.
 
 ### FEAT-SAF-INC-028 — Preventive Action Compatibility Risk Fields
@@ -604,12 +604,12 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Priority:** V1
 **User story:** As an investigator, I need the Preventive Action screen to stay simple and avoid extra risk-confirmation wording while preserving stored compatibility values needed by existing backend checks.
 **Acceptance criteria:**
-- Current Preventive Action UI does not show Remaining risk.
+- Current Preventive Action UI does not show Remaining risk, theme, effort, or "Prevent It Happening Again" wording.
 - Current Preventive Action UI does not show the "I confirm this will reduce risk" checkbox.
-- Frontend supplies backend compatibility values where required by the existing recommendation contract.
+- Frontend supplies the due date through the existing linked-action storage and preserves legacy recommendation compatibility fields as nullable data.
 - Incident PDF does not print hidden compatibility risk-confirmation fields as separate user-entered content.
 **Dependencies:** FEAT-SAF-INC-027.
-**Decisions:** D-GAP-R02, D-MAINT-CR038.
+**Decisions:** D-GAP-R02, D-MAINT-CR038, D-MAINT-CR049.
 **SSOT refs:** see SSOT §6 D-GAP-R02.
 
 ### FEAT-SAF-INC-029 — Tolerable-Failure Filter (GREEN only)
@@ -1900,7 +1900,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 ### Action Phases
 - Corrective Action and Preventive Action are separate visible screens.
 - Corrective Action shows Description and Due date only; owner/checker fields are not user-facing.
-- Preventive Action hides Remaining risk and the risk-confirmation checkbox while preserving backend compatibility values.
+- Preventive Action shows Description, Due date, and risk reduction only while preserving backend compatibility storage.
 - The former Lessons Learned route is legacy-only and redirects to Office Review; legacy `LESSONS_LEARNT` rows remain readable for old records/API compatibility.
 
 ### Paper-first SOI

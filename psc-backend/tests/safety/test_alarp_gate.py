@@ -67,7 +67,7 @@ class AlarpGateTests(unittest.TestCase):
             )
         )
 
-    def test_yellow_preventive_row_rejects_missing_alarp_fields(self) -> None:
+    def test_yellow_preventive_row_rejects_missing_risk_reduction_and_due_date(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/ALARP1",
             vessel_id="7",
@@ -82,9 +82,8 @@ class AlarpGateTests(unittest.TestCase):
             f"/api/safety/incidents/{incident.pk}/recommendations/",
             {
                 "tier": Recommendation.Tier.PREVENTIVE,
-                "theme_code": "EQUIPMENT_MANAGEMENT",
                 "title": "Revise fleet crane maintenance standard",
-                "description": "System action without ALARP fields should be blocked on YELLOW.",
+                "description": "System action without risk reduction should be blocked on YELLOW.",
             },
             format="json",
         )
@@ -93,11 +92,10 @@ class AlarpGateTests(unittest.TestCase):
         response = self.view(request, id=incident.pk)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("estimated_effort", response.data)
         self.assertIn("estimated_likelihood_reduction", response.data)
-        self.assertIn("residual_risk_statement", response.data)
+        self.assertIn("corrective_action", response.data)
 
-    def test_green_preventive_row_can_save_without_alarp_fields(self) -> None:
+    def test_green_preventive_row_can_save_without_theme_effort_or_residual_fields(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/ALARP2",
             vessel_id="7",
@@ -112,9 +110,13 @@ class AlarpGateTests(unittest.TestCase):
             f"/api/safety/incidents/{incident.pk}/recommendations/",
             {
                 "tier": Recommendation.Tier.PREVENTIVE,
-                "theme_code": "TRAINING_COMPETENCE",
                 "title": "Refresh toolbox talk content",
                 "description": "GREEN-band preventive row may save without ALARP attestation.",
+                "estimated_likelihood_reduction": Recommendation.LikelihoodReduction.LOW,
+                "corrective_action": {
+                    "verifier_user_id": "dpa-1",
+                    "due_date": "2026-07-20",
+                },
             },
             format="json",
         )

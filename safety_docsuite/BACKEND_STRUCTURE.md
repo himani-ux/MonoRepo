@@ -14,7 +14,7 @@
 
 > **Incident backend update (2026-06-12):** The simplified incident workflow requires `vims_safety_incident.office_notified`, `office_notification_mode`, `loss_type_secondary_id`, `loss_type_tertiary_id`, and `loss_type_other`. Deploy migrations `0037_incident_office_notification_fields.py` and `0038_incident_multiple_loss_types.py` before deploying incident UI/API code that references these fields. Public incident routes follow the simplified phase contract in the Safety SSOT section 3.0; older backend class names and legacy URL aliases remain compatibility details only.
 >
-> **Incident Office Review update (2026-07-03):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields.
+> **Incident Office Review update (2026-07-06):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments/lesson learnt captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields. Current send-for-rework UI sends a fixed action-rework target with the comment; it does not expose a target-phase picker.
 
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
@@ -1129,7 +1129,7 @@ CREATE TABLE vims_safety_recommendation (
   title                       NVARCHAR(256) NOT NULL,
   description                 NVARCHAR(MAX) NOT NULL,
   rationale                   NVARCHAR(MAX) NULL,
-  -- ALARP fields (D-GAP-R02) — mandatory on RED/YELLOW System-Actions
+  -- ALARP/compatibility fields (current UI requires likelihood reduction; effort/residual text are legacy-compatible)
   estimated_effort            NVARCHAR(MAX) NULL,
   estimated_likelihood_reduction VARCHAR(24) NULL,            -- 'LOW' | 'MED' | 'HIGH' | 'QUANTIFIED'
   residual_risk_statement     NVARCHAR(MAX) NULL,
@@ -1156,7 +1156,7 @@ CREATE INDEX IX_vims_safety_recommendation_theme    ON vims_safety_recommendatio
 CREATE INDEX IX_vims_safety_recommendation_alarp    ON vims_safety_recommendation (alarp_attested);
 ```
 
-CR-033 compatibility note: `rationale` remains nullable storage for old recommendation rows and direct API compatibility, but the current Incident Next Actions frontend does not render or send the recommendation rationale / "Why is this needed?" field for corrective, preventive, or lesson entries. Formal Incident PDF output also omits stored recommendation rationale.
+CR-049 compatibility note: `rationale`, `theme_code`, and `estimated_effort` remain nullable storage for old recommendation rows and direct API compatibility, but the current Incident action frontend does not render or send recommendation rationale / "Why is this needed?", theme, or effort. Preventive Action now sends Description, Due date, and risk reduction; the due date is stored through the existing linked `vims_safety_corrective_action` row for the preventive recommendation. Formal Incident PDF output also omits stored recommendation rationale.
 
 ---
 

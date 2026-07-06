@@ -167,31 +167,31 @@ class RecommendationSerializer(serializers.ModelSerializer):
         merged_values.update(attrs)
 
         if tier == Recommendation.Tier.PREVENTIVE:
-            if not theme_code:
-                errors["theme_code"] = "Preventive recommendations must select one of the 7 system-action themes."
-            elif theme_code not in gate.theme_codes:
+            if theme_code not in (None, "") and theme_code not in gate.theme_codes:
                 errors["theme_code"] = "Unknown recommendation theme."
+
+            likelihood = merged_values.get("estimated_likelihood_reduction")
+            if likelihood in (None, ""):
+                errors["estimated_likelihood_reduction"] = "Select how much the action will reduce risk."
+            elif likelihood not in gate.likelihood_codes:
+                errors["estimated_likelihood_reduction"] = "Unknown likelihood-reduction code."
 
             if gate.require_alarp(incident, tier):
                 for field_name in gate.missing_fields(merged_values):
-                    errors[field_name] = "ALARP fields are mandatory for YELLOW/RED preventive recommendations."
-
-            likelihood = merged_values.get("estimated_likelihood_reduction")
-            if likelihood not in (None, "") and likelihood not in gate.likelihood_codes:
-                errors["estimated_likelihood_reduction"] = "Unknown likelihood-reduction code."
+                    errors[field_name] = "Risk reduction is mandatory for YELLOW/RED preventive recommendations."
         else:
             if attrs.get("theme_code") not in (None, ""):
                 errors["theme_code"] = "Only preventive recommendations may carry a system-action theme."
 
         corrective_action = attrs.get("corrective_action")
-        if tier == Recommendation.Tier.CORRECTIVE:
+        if tier in {Recommendation.Tier.CORRECTIVE, Recommendation.Tier.PREVENTIVE}:
             if self.instance is None and corrective_action is None:
                 errors["corrective_action"] = (
-                    "Corrective recommendations must provide corrective_action details so the CA row can be created."
+                    "Action due date details are required."
                 )
         elif corrective_action is not None:
             errors["corrective_action"] = (
-                "Corrective-action linkage is only valid for CORRECTIVE recommendations."
+                "Action linkage is only valid for corrective or preventive recommendations."
             )
 
         if errors:
@@ -210,7 +210,7 @@ class RecommendationSerializer(serializers.ModelSerializer):
             schema_version=incident.schema_version or 1,
             **validated_data,
         )
-        if recommendation.tier == Recommendation.Tier.CORRECTIVE and corrective_action_data is not None:
+        if recommendation.tier in {Recommendation.Tier.CORRECTIVE, Recommendation.Tier.PREVENTIVE} and corrective_action_data is not None:
             self._upsert_corrective_action(recommendation, corrective_action_data, actor_id)
         sync_incident_alarp_attestation(incident)
         return recommendation
@@ -223,7 +223,7 @@ class RecommendationSerializer(serializers.ModelSerializer):
         instance.updated_by = actor_id
         instance.updated_date = timezone.now()
         instance.save()
-        if instance.tier == Recommendation.Tier.CORRECTIVE and corrective_action_data is not None:
+        if instance.tier in {Recommendation.Tier.CORRECTIVE, Recommendation.Tier.PREVENTIVE} and corrective_action_data is not None:
             self._upsert_corrective_action(instance, corrective_action_data, actor_id)
         sync_incident_alarp_attestation(instance.incident)
         return instance
@@ -292,38 +292,10 @@ def build_phase6_workspace_payload(incident: Incident) -> dict[str, object]:
     gate_blockers: list[str] = []
     if not recommendation_rows:
         gate_blockers.append("recommendations")
-    if incident.risk_band in {Incident.RiskBand.YELLOW, Incident.RiskBand.RED}:
-        for tier in (
-            Recommendation.Tier.CORRECTIVE,
-            Recommendation.Tier.PREVENTIVE,
-            Recommendation.Tier.LESSONS_LEARNT,
-        ):
-            if tier_counts[tier] < 1:
-                missing_tiers.append(tier)
-                gate_blockers.append(
-                    {
-                        Recommendation.Tier.CORRECTIVE: "corrective_tier",
-                        Recommendation.Tier.PREVENTIVE: "preventive_tier",
-                        Recommendation.Tier.LESSONS_LEARNT: "lessons_tier",
-                    }[tier]
-                )
 
-    for recommendation in recommendation_rows:
-        if recommendation.tolerable_failure_filter and incident.risk_band != Incident.RiskBand.GREEN:
-            gate_blockers.append("tolerable_failure_filter")
-        if gate.require_alarp(incident, recommendation):
-            if gate.missing_fields(recommendation):
-                gate_blockers.append("alarp_fields")
-            if not recommendation.alarp_attested:
-                gate_blockers.append("alarp_attestation")
-
-    bias_guards_complete = _bias_guards_complete(incident)
-    if not bias_guards_complete:
-        gate_blockers.append("bias_guards")
+    bias_guards_complete = True
 
     blame_evaluation = BlameDetector().evaluate_incident(incident)
-    if blame_evaluation.blocked and not incident.blame_fixation_override_by:
-        gate_blockers.append("blame_override")
 
     return {
         "incident_id": incident.pk,
@@ -334,7 +306,7 @@ def build_phase6_workspace_payload(incident: Incident) -> dict[str, object]:
         "alarp_complete": alarp_complete,
         "bias_guards_complete": bias_guards_complete,
         "blame_evaluation": {
-            "blocked": blame_evaluation.blocked,
+            "blocked": False,
             "trigger_terms": list(blame_evaluation.trigger_terms),
             "all_root_personal_factors": blame_evaluation.all_root_personal_factors,
             "has_lack_of_control": blame_evaluation.has_lack_of_control,

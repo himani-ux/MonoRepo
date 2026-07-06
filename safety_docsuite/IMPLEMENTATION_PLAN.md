@@ -2607,6 +2607,24 @@ Implementation impact:
 - Exact duplicate labels from the provided list are stored once to honor the master table unique key and keep the dropdown clean.
 - Existing active `SAFE_WORKING_PRACTICE` choices outside the new list are deactivated so the dropdown reflects the approved list.
 
+## Amendment 24 - 2026-07-06
+
+Incident action, witness, and Office Review UI are simplified under CR-049. The current screens remove redundant technical wording while keeping the existing workflow and compatibility storage.
+
+Triggering discovery: post-shipment UI review found that users were still seeing unnecessary preventive-action headings/fields, witness statement text fields, Office Review counters, approval-role explanations, and send-back target choices that confused the current ship/office workflow.
+
+Supersedes:
+- D-MAINT-CR036 only where it says current Witness Statement captures "What the witness said" and optional signature image.
+- D-MAINT-CR038 only where it says current Preventive Action keeps compatibility theme/effort fields visible or lacks a preventive due date.
+- D-MAINT-CR042 and D-MAINT-CR044 only where Office Review UI descriptions imply root/action counters, pre-approval summary cards, approval-role wording, or a user-selected send-back target are current visible controls.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that describes those superseded visible controls as current behavior.
+
+Implementation impact:
+- Preventive Action now shows Description, Due date, and How much will this reduce risk? only. It sends risk reduction and a linked due-date action; theme/effort/rationale remain nullable legacy compatibility storage.
+- Witness Statement now shows Witness name, Other typed name when selected, Remark, and Upload witness statement. The old text statement field is not current UI.
+- Office Review removes root/action counters, pre-approval summary cards, approval-role wording, and the send-back target picker. Office-side users see Accept / Close and Send for rework cards; ship-side users see Office Comments/lesson learnt only when a comment exists.
+- Send for rework submits the comment with the fixed action-rework target phase through the existing endpoint. No database migration or new endpoint is required.
+
 **Document Control:**
 - Created: 2026-04-17
 - Author: Wave 3 docsuite generation agent (Implementation Plan)

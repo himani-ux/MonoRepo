@@ -102,7 +102,7 @@ class RecommendationTierTests(unittest.TestCase):
         self.assertIn("corrective_action", response.data)
         self.assertEqual(CorrectiveAction.objects.count(), 0)
 
-    def test_preventive_recommendation_requires_theme_code(self) -> None:
+    def test_preventive_recommendation_requires_due_date_and_risk_reduction(self) -> None:
         request = self.factory.post(
             f"/api/safety/incidents/{self.incident.pk}/recommendations/",
             {
@@ -117,7 +117,34 @@ class RecommendationTierTests(unittest.TestCase):
         response = self.list_view(request, id=self.incident.pk)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("theme_code", response.data)
+        self.assertIn("corrective_action", response.data)
+        self.assertIn("estimated_likelihood_reduction", response.data)
+
+    def test_preventive_recommendation_creates_due_date_action(self) -> None:
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/recommendations/",
+            {
+                "tier": Recommendation.Tier.PREVENTIVE,
+                "title": "Revise crane maintenance governance",
+                "description": "Fleet-wide system action to standardise maintenance controls.",
+                "estimated_likelihood_reduction": Recommendation.LikelihoodReduction.HIGH,
+                "corrective_action": {
+                    "verifier_user_id": "master-7",
+                    "due_date": "2026-07-30",
+                },
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        response = self.list_view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["tier"], Recommendation.Tier.PREVENTIVE)
+        self.assertEqual(CorrectiveAction.objects.count(), 1)
+        action = CorrectiveAction.objects.get()
+        self.assertEqual(action.recommendation.tier, Recommendation.Tier.PREVENTIVE)
+        self.assertEqual(action.due_date.isoformat(), "2026-07-30")
 
     def test_corrective_action_fields_can_be_updated_through_recommendation_detail(self) -> None:
         recommendation = Recommendation.objects.create(

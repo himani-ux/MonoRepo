@@ -184,7 +184,7 @@ You will receive a `master_notification` when state changes materially (triage c
 
 You see a draft incident notification at 07:10. The Master opened it at 06:40 after a crane-wire pre-tension parted on #3 cargo hold. By 08:00 you are at your workstation reviewing evidence documents and witness statements. The Master records Corrective Action and Preventive Action on separate action screens; you counter-sign the HOD signature block once the Master has signed and before the DPA closes. Your name + timestamp + device fingerprint lock the HOD signature (D-GAP-D1).
 
-Current Witness Statement update: the Phase 4 Witness Statement screen no longer asks users to flag statements as FORMAL or complete read-back/copy-to-witness controls. Choose a crew witness from the vessel list or select Other and type the name, then enter What the witness said, Remark, and an optional signature image.
+Current Witness Statement update: the Phase 4 Witness Statement screen no longer asks users to flag statements as FORMAL, type a separate witness-statement text field, or complete read-back/copy-to-witness controls. Choose a crew witness from the vessel list or select Other and type the name, enter a Remark, and use Upload witness statement when a statement file/image is available.
 
 ### 4.2 Reviewing Incoming Incident Reports
 
@@ -206,7 +206,7 @@ Entry point: Safety sidebar → **Incidents** (`/safety/incidents/`).
 **Current action phases (CR-038, superseded by CR-042 for Lessons Learned):**
 
 1. **Phase 3 - Corrective Action** (`/safety/incidents/:id/phase-3/`) captures the corrective action description and due date. The old owner/checker card is not shown.
-2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures the preventive action without asking for Remaining risk or the "I confirm this will reduce risk" checkbox.
+2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures Description, Due date, and **How much will this reduce risk?** It does not ask for Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording.
 3. The former **Lessons Learned** screen is removed from current navigation. Its old URL redirects to Office Review.
 4. Each save shows a success message and moves to the saved item so users can review what was saved.
 5. To correct a saved corrective or preventive action, use **Edit** on that saved card. The form is filled with the saved values; **Update** changes that existing item instead of adding a duplicate.
@@ -217,7 +217,7 @@ Entry point: Safety sidebar → **Incidents** (`/safety/incidents/`).
 2. Add one evidence entry with **Attachment**, **Title**, and **Description**. Repeat the same form for as many attachments as needed.
 3. Use the title to name what the attachment is, and use the description to explain why it matters.
 4. After a document or witness statement saves, the page shows a success message and moves to the saved-content area so you can immediately review the saved entry.
-5. Click **Witness Statement** when a statement needs to be recorded; it opens the witness statement page directly with no extra **Open Witness Statement** step. Choose a crew witness from the incident vessel list or select **Other** and type the name, enter What the witness said, add a Remark, and optionally upload a signature image. Evidence Check is not part of the current Phase 4 screen.
+5. Click **Witness Statement** when a statement needs to be recorded; it opens the witness statement page directly with no extra **Open Witness Statement** step. Choose a crew witness from the incident vessel list or select **Other** and type the name, add a Remark, and upload the witness statement when available. Evidence Check is not part of the current Phase 4 screen.
 6. To correct a saved document title/description or saved Witness Statement, use **Edit** on that saved card. Document Edit keeps the original file and updates only the metadata; Witness Statement Edit updates the same witness row.
 7. Every fact you record must link to ≥1 evidence row (assumption-bias guard `V-INC-041` / D-DNV-11 #2).
 
@@ -497,7 +497,7 @@ The DPA is a lead authority at every Incident investigation phase. Under the cur
 | Legacy Lessons route | Redirects to Office Review; not a current DPA work step |
 | Legacy analysis tools | Background compatibility only; not a current visible phase |
 | Phase 7 — Loss Evaluation | Save final risk, loss, repair/injury, and cost evaluation before closure |
-| **Phase 6 — Office Review (YELLOW closer)** | **Enter Office Comments, accept, or send back** at `/safety/incidents/:id/phase-5/` |
+| **Phase 6 — Office Review** | **Enter Office Comments/lesson learnt, accept, or send for rework** at `/safety/incidents/:id/phase-5/` |
 | Legacy follow-up verification | Compatibility route only; current visible Phase 7 is Loss Evaluation |
 | Closure | YELLOW band — sign and close. RED band — hand to FM. |
 
@@ -524,13 +524,13 @@ Near Miss reporter identity is visible to authorized users within vessel scope. 
 
 ### 7.5 Closing Incidents — ALARP Attestation
 
-Office Review preflight returns `{bias_guards_resolved, root_count, recommendation_tier_count, alarp_complete, signature_chain_status}`. Before you tap **Accept**:
+Office Review runs the required readiness checks in the background. The visible page does not show root/action counters, pre-approval summary cards, approval-role wording, or a send-back phase picker. Before you tap **Accept / Close**:
 
 1. Confirm all 8 bias guards are attested (5 DNV + 3 organisational defence-traps per Round 21 R12).
 2. Confirm ≥1 **Root** layer cause (no artificial cap — Round 21 R03).
 3. Confirm at least one action recommendation is recorded.
 4. Confirm ALARP attestation on every RED/YELLOW System-Action (Round 21 R02).
-5. Enter **Office Comments** if the office review needs a note. There is no word limit.
+5. Enter **Office Comments/lesson learnt** if the office review needs a note. There is no word limit.
 6. Before previewing or downloading the PDF, review the **Select PDF content** checklist. All items are selected by default: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature.
 7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8, writes closure event to `vims_safety_incident_phase_log`.
 8. Open `/safety/incidents/:id/phase-6/`, complete **Loss Evaluation**, and save it. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds.
@@ -538,6 +538,7 @@ Office Review preflight returns `{bias_guards_resolved, root_count, recommendati
 If **Record injury** was saved on Phase 1, the PDF prints the title `Injury Report`. If no injury was recorded, it prints `Incident Report`. Office Comments and closure reason appear near the end of the PDF before Signature, not in Summary. Evidence documents appear as separate document blocks with Description and File rows instead of numbered attachment rows; internal evidence notes are not printed. Action descriptions appear once inside their detail box without recommendation rationale / "Why is this needed?" text. Required signature rows remain visible in the PDF even when unsigned; unsigned rows show as `Pending`.
 
 Under the current CR-044 authority model, PIC or DPA can complete Office Review and later closure for any risk band.
+When sending the incident back, enter only the rework comment and tap **Send for rework**. The current UI sends the incident back to the action rework target; it does not ask the office user to choose a phase. Ship-side users do not see Accept / Close or Send for rework cards on Office Review; they see Office Comments/lesson learnt only when a comment exists.
 
 ### 7.6 Overseeing M-SCAT Root-Cause Analysis
 

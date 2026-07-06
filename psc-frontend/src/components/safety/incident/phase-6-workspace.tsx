@@ -1,63 +1,72 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { getErrorMessage } from "../../../lib/api/client";
-import { safetyApi } from "../../../lib/api/safety";
+import { useAuth } from '../../../hooks/use-auth';
+import { getErrorMessage } from '../../../lib/api/client';
+import { safetyApi } from '../../../lib/api/safety';
 import {
   safetyIncidentPhase6WorkspaceSchema,
   type SafetyIncidentPhase6Workspace,
   type SafetyRecommendation,
-} from "../../../schemas/safety/incident-phase6";
-import SafetyAlarpGateModal from "./alarp-gate-modal";
-import SafetyRecommendationEditor from "./recommendation-editor";
+} from '../../../schemas/safety/incident-phase6';
+import SafetyRecommendationEditor from './recommendation-editor';
 
-const TIERS = ["CORRECTIVE", "PREVENTIVE", "LESSONS_LEARNT"] as const;
-const LIKELIHOOD = ["LOW", "MED", "HIGH", "QUANTIFIED"] as const;
+const TIERS = ['CORRECTIVE', 'PREVENTIVE'] as const;
+const LIKELIHOOD = ['LOW', 'MED', 'HIGH'] as const;
 const MAX_RECOMMENDATION_TITLE_LENGTH = 256;
-const MAX_CORRECTIVE_ACTION_USER_ID_LENGTH = 64;
-const MIN_BLAME_OVERRIDE_JUSTIFICATION_LENGTH = 200;
 
 type Tier = (typeof TIERS)[number];
 
 interface RecommendationDraft {
   alarp_attested: boolean;
-  assigned_crew_id: string;
-  assigned_office_user_id: string;
   description: string;
   due_date: string;
   estimated_effort: string;
-  estimated_likelihood_reduction: "" | (typeof LIKELIHOOD)[number];
-  rationale: string;
+  estimated_likelihood_reduction: '' | (typeof LIKELIHOOD)[number];
   residual_risk_statement: string;
   theme_code: string;
   tier: Tier;
-  title: string;
   tolerable_failure_filter: boolean;
-  verifier_user_id: string;
 }
 
-const emptyDraft: RecommendationDraft = {
-  alarp_attested: false,
-  assigned_crew_id: "",
-  assigned_office_user_id: "",
-  description: "",
-  due_date: "",
-  estimated_effort: "",
-  estimated_likelihood_reduction: "",
-  rationale: "",
-  residual_risk_statement: "",
-  theme_code: "",
-  tier: "CORRECTIVE",
-  title: "",
-  tolerable_failure_filter: false,
-  verifier_user_id: "",
-};
+interface SafetyIncidentPhase6Props {
+  fixedTier?: Tier;
+  formTitle?: string;
+  nextLabel?: string;
+  nextPath?: string;
+  previousLabel?: string;
+  previousPath?: string;
+  savedHeading?: string;
+  transitionTargetPhase?: number | null;
+}
+
+function emptyDraftForTier(tier: Tier): RecommendationDraft {
+  return {
+    alarp_attested: false,
+    description: '',
+    due_date: '',
+    estimated_effort: '',
+    estimated_likelihood_reduction: '',
+    residual_risk_statement: '',
+    theme_code: '',
+    tier,
+    tolerable_failure_filter: false,
+  };
+}
 
 function emptyWorkspace(): SafetyIncidentPhase6Workspace {
   return {
     alarp_complete: false,
     corrective_actions: [],
-    incident_id: 0,
+    incident_id: '',
     missing_tiers: [],
     bias_guards_complete: false,
     blame_evaluation: {
@@ -82,30 +91,92 @@ function emptyWorkspace(): SafetyIncidentPhase6Workspace {
 }
 
 function tierLabel(tier: Tier) {
-  if (tier === "LESSONS_LEARNT") {
-    return "Lessons Learnt";
-  }
   return tier.charAt(0) + tier.slice(1).toLowerCase();
 }
 
-function recommendationNeedsAlarp(row: SafetyRecommendation) {
-  return row.tier === "PREVENTIVE";
+function deriveTitleFromDescription(description: string) {
+  const normalized = description.trim().replace(/\s+/g, ' ');
+  return normalized.slice(0, MAX_RECOMMENDATION_TITLE_LENGTH);
 }
 
-export function SafetyIncidentPhase6() {
+function resolveCurrentActorId(user: ReturnType<typeof useAuth>['user']) {
+  if (!user) {
+    return 'system';
+  }
+  const userWithBackendIds = user as typeof user & {
+    user_id?: string | number | null;
+  };
+  return String(
+    user.username ||
+      user.employee_id ||
+      user.crew_id ||
+      userWithBackendIds.user_id ||
+      user.id ||
+      'system'
+  ).trim();
+}
+
+function defaultFormTitle(tier?: Tier) {
+  if (tier === 'CORRECTIVE') {
+    return 'Add Corrective Action';
+  }
+  if (tier === 'PREVENTIVE') {
+    return 'Add Preventive Action';
+  }
+  return 'Add Action';
+}
+
+function defaultSavedHeading(tier?: Tier) {
+  if (tier === 'CORRECTIVE') {
+    return 'Saved Corrective Action';
+  }
+  if (tier === 'PREVENTIVE') {
+    return 'Saved Preventive Action';
+  }
+  return 'Summary';
+}
+
+export function SafetyIncidentPhase6({
+  fixedTier,
+  formTitle = defaultFormTitle(fixedTier),
+  nextLabel = 'Continue to Office Review',
+  nextPath,
+  previousLabel = 'Back to Phase 2',
+  previousPath,
+  savedHeading = defaultSavedHeading(fixedTier),
+  transitionTargetPhase,
+}: SafetyIncidentPhase6Props = {}) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [workspace, setWorkspace] = useState<SafetyIncidentPhase6Workspace>(emptyWorkspace());
-  const [draft, setDraft] = useState<RecommendationDraft>(emptyDraft);
+  const { user } = useAuth();
+  const actorId = resolveCurrentActorId(user);
+  const resolvedTransitionTargetPhase =
+    transitionTargetPhase === undefined
+      ? nextPath
+        ? null
+        : 7
+      : transitionTargetPhase;
+  const [workspace, setWorkspace] =
+    useState<SafetyIncidentPhase6Workspace>(emptyWorkspace());
+  const [draft, setDraft] = useState<RecommendationDraft>(() =>
+    emptyDraftForTier(fixedTier ?? 'CORRECTIVE')
+  );
   const [error, setError] = useState<string | null>(null);
-  const [phaseAdvanceError, setPhaseAdvanceError] = useState<string | null>(null);
-  const [blameOverrideJustification, setBlameOverrideJustification] = useState("");
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [phaseAdvanceError, setPhaseAdvanceError] = useState<string | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
+  const [editingRecommendationId, setEditingRecommendationId] = useState<
+    string | null
+  >(null);
+  const recommendationFormRef = useRef<HTMLFormElement>(null);
+  const savedRecommendationsRef = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(async () => {
     if (!id) {
-      setError("Invalid incident id.");
+      setError('Invalid incident id.');
       setIsLoading(false);
       return;
     }
@@ -125,111 +196,163 @@ export function SafetyIncidentPhase6() {
     void reload();
   }, [reload]);
 
-  const flatRecommendations = useMemo(
-    () => TIERS.flatMap((tier) => workspace.recommendations[tier]),
-    [workspace.recommendations],
-  );
+  useEffect(() => {
+    if (fixedTier) {
+      setDraft((current) => ({ ...current, tier: fixedTier }));
+    }
+  }, [fixedTier]);
 
-  const availableTiers = useMemo(
-    () => TIERS.filter((tier) => (workspace.recommendations[tier]?.length ?? 0) === 0),
-    [workspace.recommendations],
+  const visibleTiers = useMemo(
+    () => (fixedTier ? [fixedTier] : TIERS),
+    [fixedTier]
   );
-  const selectedTierAlreadyExists = (workspace.recommendations[draft.tier]?.length ?? 0) > 0;
+  const availableTiers = useMemo(
+    () =>
+      visibleTiers.filter(
+        (tier) => (workspace.recommendations[tier]?.length ?? 0) === 0
+      ),
+    [visibleTiers, workspace.recommendations]
+  );
+  const isEditingRecommendation = Boolean(editingRecommendationId);
+  const editingRecommendation = useMemo(
+    () =>
+      TIERS.flatMap((tier) => workspace.recommendations[tier] ?? []).find(
+        (recommendation) => recommendation.id === editingRecommendationId
+      ) ?? null,
+    [editingRecommendationId, workspace.recommendations]
+  );
+  const selectedTierAlreadyExists = (
+    workspace.recommendations[draft.tier] ?? []
+  ).some((recommendation) => recommendation.id !== editingRecommendationId);
 
   useEffect(() => {
-    if (!isLoading && selectedTierAlreadyExists && availableTiers.length > 0) {
+    if (
+      !fixedTier &&
+      !isLoading &&
+      selectedTierAlreadyExists &&
+      availableTiers.length > 0
+    ) {
       setDraft((current) => ({ ...current, tier: availableTiers[0] }));
     }
-  }, [availableTiers, isLoading, selectedTierAlreadyExists]);
-
-  const alarpBlockingRows = flatRecommendations.filter(
-    (row) =>
-      recommendationNeedsAlarp(row) &&
-      (!row.estimated_effort ||
-        !row.estimated_likelihood_reduction ||
-        !row.residual_risk_statement ||
-        !row.alarp_attested),
-  ).length;
+  }, [availableTiers, fixedTier, isLoading, selectedTierAlreadyExists]);
 
   const gateHints = useMemo(() => {
     const hints: string[] = [];
-    if (workspace.missing_tiers.length > 0) {
-      hints.push(`Add missing tier(s): ${workspace.missing_tiers.map(tierLabel).join(", ")}.`);
-    }
-    if (alarpBlockingRows > 0) {
-      hints.push("Complete effort, likelihood reduction, residual risk, and confirmation for preventive system actions.");
-    }
-    if (workspace.gate_blockers.includes("bias_guards")) {
-      hints.push("Complete all Phase 5 review checks before Phase 7.");
-    }
-    if (workspace.gate_blockers.includes("blame_override")) {
-      hints.push("DPA analysis review approval is required before Phase 7.");
+    if (workspace.gate_blockers.includes('recommendations')) {
+      hints.push('Add at least one action before office review.');
     }
     return hints;
-  }, [alarpBlockingRows, workspace.gate_blockers, workspace.missing_tiers]);
+  }, [workspace.gate_blockers]);
 
-  async function submitBlameOverride() {
-    if (!id) {
-      return;
-    }
-    setIsMutating(true);
-    setError(null);
-    try {
-      await safetyApi.overrideIncidentBlameGuard(id, {
-        justification: blameOverrideJustification.trim(),
+  function showSaveNotice(
+    message: string,
+    targetRef?: RefObject<HTMLDivElement>
+  ) {
+    setSaveNotice(message);
+    window.setTimeout(() => {
+      targetRef?.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
       });
-      setBlameOverrideJustification("");
-      await reload();
-    } catch (caught) {
-      setError(getErrorMessage(caught));
-    } finally {
-      setIsMutating(false);
-    }
+    }, 100);
   }
 
-  async function createRecommendation(event: FormEvent) {
+  function resetRecommendationForm() {
+    setEditingRecommendationId(null);
+    setDraft(emptyDraftForTier(fixedTier ?? 'CORRECTIVE'));
+  }
+
+  function startEditingRecommendation(recommendation: SafetyRecommendation) {
+    if (!recommendation.id) {
+      return;
+    }
+    const linkedAction = recommendation.corrective_actions[0];
+    setError(null);
+    setSaveNotice(null);
+    setEditingRecommendationId(recommendation.id);
+    setDraft({
+      alarp_attested: recommendation.alarp_attested,
+      description: recommendation.description,
+      due_date: linkedAction?.due_date ?? '',
+      estimated_effort: recommendation.estimated_effort ?? '',
+      estimated_likelihood_reduction:
+        recommendation.estimated_likelihood_reduction ?? '',
+      residual_risk_statement: recommendation.residual_risk_statement ?? '',
+      theme_code: recommendation.theme_code ?? '',
+      tier: recommendation.tier,
+      tolerable_failure_filter: recommendation.tolerable_failure_filter,
+    });
+    window.setTimeout(() => {
+      recommendationFormRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 100);
+  }
+
+  async function saveRecommendation(event: FormEvent) {
     event.preventDefault();
     if (!id) {
       return;
     }
     if (selectedTierAlreadyExists) {
-      setError(`${tierLabel(draft.tier)} recommendation already exists for this incident.`);
+      setError(
+        `${tierLabel(draft.tier)} recommendation already exists for this incident.`
+      );
       return;
     }
-    const title = draft.title.trim();
     const description = draft.description.trim();
-    const rationale = draft.rationale.trim();
+    const title = deriveTitleFromDescription(description);
     const payload: Record<string, unknown> = {
       description,
-      rationale,
       tier: draft.tier,
       title,
     };
-    if (draft.tier === "PREVENTIVE") {
-      payload.theme_code = draft.theme_code || null;
-      payload.estimated_effort = draft.estimated_effort || null;
-      payload.estimated_likelihood_reduction = draft.estimated_likelihood_reduction || null;
-      payload.residual_risk_statement = draft.residual_risk_statement || null;
-      payload.alarp_attested = draft.alarp_attested;
-    }
-    if (draft.tier === "CORRECTIVE") {
+    const existingVerifier =
+      editingRecommendation?.corrective_actions[0]?.verifier_user_id;
+    if (draft.tier === 'PREVENTIVE') {
+      payload.theme_code = null;
+      payload.estimated_effort = null;
+      payload.estimated_likelihood_reduction =
+        draft.estimated_likelihood_reduction || null;
+      payload.residual_risk_statement = description;
+      payload.alarp_attested = true;
       payload.corrective_action = {
-        assigned_crew_id: draft.assigned_crew_id.trim() || undefined,
-        assigned_office_user_id: draft.assigned_office_user_id.trim() || undefined,
         due_date: draft.due_date,
-        verifier_user_id: draft.verifier_user_id.trim(),
+        verifier_user_id: existingVerifier || actorId || 'system',
+      };
+    }
+    if (draft.tier === 'CORRECTIVE') {
+      payload.corrective_action = {
+        due_date: draft.due_date,
+        verifier_user_id: existingVerifier || actorId || 'system',
       };
     }
     if (workspace.tolerable_failure_allowed) {
       payload.tolerable_failure_filter = draft.tolerable_failure_filter;
     }
 
+    const savedTier = draft.tier;
     setIsMutating(true);
     setError(null);
+    setSaveNotice(null);
     try {
-      await safetyApi.createIncidentRecommendation(id, payload);
-      setDraft(emptyDraft);
+      if (editingRecommendationId) {
+        await safetyApi.updateIncidentRecommendation(
+          id,
+          editingRecommendationId,
+          payload
+        );
+      } else {
+        await safetyApi.createIncidentRecommendation(id, payload);
+      }
+      const savedMode = editingRecommendationId ? 'updated' : 'saved';
+      resetRecommendationForm();
       await reload();
+      showSaveNotice(
+        `${tierLabel(savedTier)} ${savedMode}. Review it under saved actions.`,
+        savedRecommendationsRef
+      );
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -237,15 +360,25 @@ export function SafetyIncidentPhase6() {
     }
   }
 
-  async function continueToPhase7() {
+  async function continueToNextStep() {
     if (!id) {
+      return;
+    }
+    if (nextPath && resolvedTransitionTargetPhase == null) {
+      navigate(nextPath);
       return;
     }
     setPhaseAdvanceError(null);
     setIsMutating(true);
     try {
-      await safetyApi.transitionIncident(id, { target_phase: 7 });
-      navigate(`/safety/incidents/${id}/phase-7`);
+      if (resolvedTransitionTargetPhase == null) {
+        navigate(nextPath ?? `/safety/incidents/${id}/phase-5`);
+        return;
+      }
+      await safetyApi.transitionIncident(id, {
+        target_phase: resolvedTransitionTargetPhase,
+      });
+      navigate(nextPath ?? `/safety/incidents/${id}/phase-5`);
     } catch (caught) {
       setPhaseAdvanceError(getErrorMessage(caught));
     } finally {
@@ -253,253 +386,284 @@ export function SafetyIncidentPhase6() {
     }
   }
 
+  const preventiveMissingRequiredFields =
+    draft.tier === 'PREVENTIVE' &&
+    (!draft.due_date || !draft.estimated_likelihood_reduction);
+  const saveDisabled =
+    isMutating ||
+    (!isEditingRecommendation && availableTiers.length === 0) ||
+    selectedTierAlreadyExists ||
+    !draft.description.trim() ||
+    ((draft.tier === 'CORRECTIVE' || draft.tier === 'PREVENTIVE') &&
+      !draft.due_date) ||
+    preventiveMissingRequiredFields;
+
   return (
     <section className="space-y-6">
-      <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Incident / Phase 6
-        </p>
-        <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Recommendations and Risk Reduction</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Create corrective, preventive, and lessons-learnt actions, link corrective action ownership, and complete risk-reduction details where required.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            {TIERS.map((tier) => (
-              <div key={tier} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{tierLabel(tier)}</div>
-                <div className="mt-1 font-semibold text-slate-900">{workspace.tier_counts[tier] ?? 0}</div>
+      {!fixedTier ? (
+        <section className="grid grid-cols-3 gap-3 text-sm">
+          {TIERS.map((tier) => (
+            <div
+              key={tier}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+            >
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {tierLabel(tier)}
               </div>
-            ))}
-          </div>
-        </div>
-      </header>
+              <div className="mt-1 font-semibold text-slate-900">
+                {workspace.tier_counts[tier] ?? 0}
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
-      {error ? <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{error}</section> : null}
+      {error ? (
+        <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          {error}
+        </section>
+      ) : null}
+      {saveNotice ? (
+        <section
+          className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900"
+          role="status"
+        >
+          {saveNotice}
+        </section>
+      ) : null}
 
       {isLoading ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading Phase 6...</section>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+          Loading...
+        </section>
       ) : (
         <>
-          {alarpBlockingRows > 0 ? (
-            <SafetyAlarpGateModal blockingRows={alarpBlockingRows} thresholdHint={workspace.threshold_hint} />
-          ) : null}
+          <div
+            className="scroll-mt-24 outline-none"
+            ref={savedRecommendationsRef}
+            tabIndex={-1}
+          >
+            <SafetyRecommendationEditor
+              heading={savedHeading}
+              onEditRecommendation={startEditingRecommendation}
+              tiers={visibleTiers}
+              workspace={workspace}
+            />
+          </div>
 
-          <SafetyRecommendationEditor workspace={workspace} />
-
-          {workspace.blame_evaluation.blocked ? (
-            <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 shadow-sm">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Analysis review</p>
-                  <h2 className="mt-2 text-lg font-semibold text-slate-950">
-                    {workspace.blame_evaluation.override_by ? "Approval recorded" : "DPA approval required"}
-                  </h2>
-                  <p className="mt-2 leading-6">
-                    {workspace.blame_evaluation.all_root_personal_factors && !workspace.blame_evaluation.has_lack_of_control
-                      ? "Root causes are currently concentrated in personal-factor categories without a lack-of-control/system cause."
-                      : "The investigation text contains blame-focused language."}
-                  </p>
-                  {workspace.blame_evaluation.trigger_terms.length > 0 ? (
-                    <p className="mt-2 text-amber-800">Words to review: {workspace.blame_evaluation.trigger_terms.join(", ")}</p>
-                  ) : null}
-                  {workspace.blame_evaluation.override_by ? (
-                    <p className="mt-2 font-semibold">Approved by {workspace.blame_evaluation.override_by}</p>
-                  ) : null}
-                </div>
-              </div>
-              {!workspace.blame_evaluation.override_by ? (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-slate-800">
-                    DPA approval reason
-                    <textarea
-                      className="mt-2 min-h-28 w-full rounded-2xl border border-amber-300 bg-white p-3 text-slate-900"
-                      onChange={(event) => setBlameOverrideJustification(event.target.value)}
-                      value={blameOverrideJustification}
-                    />
-                  </label>
-                  <button
-                    className="mt-3 min-h-11 rounded-full bg-amber-900 px-5 text-sm font-semibold text-white disabled:bg-amber-300"
-                    disabled={isMutating || blameOverrideJustification.trim().length < MIN_BLAME_OVERRIDE_JUSTIFICATION_LENGTH}
-                    onClick={submitBlameOverride}
-                    type="button"
-                  >
-                    {isMutating ? "Saving approval..." : "Record DPA approval"}
-                  </button>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={createRecommendation}>
-            <h2 className="text-xl font-semibold text-slate-900">Add Recommendation</h2>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <label className="block text-sm font-medium text-slate-700">
-                Tier
-                <select
-                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
-                  onChange={(event) => setDraft((current) => ({ ...current, tier: event.target.value as Tier }))}
-                  value={draft.tier}
+          <form
+            className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+            onSubmit={saveRecommendation}
+            ref={recommendationFormRef}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <h2 className="text-xl font-semibold text-slate-900">
+                {isEditingRecommendation
+                  ? `Edit ${tierLabel(draft.tier)}`
+                  : formTitle}
+              </h2>
+              {isEditingRecommendation ? (
+                <button
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                  onClick={resetRecommendationForm}
+                  type="button"
                 >
-                  {TIERS.map((tier) => (
-                    <option disabled={(workspace.recommendations[tier]?.length ?? 0) > 0} key={tier} value={tier}>
-                      {tierLabel(tier)}{(workspace.recommendations[tier]?.length ?? 0) > 0 ? " (already added)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-sm font-medium text-slate-700 lg:col-span-2">
-                Title
-                <input
-                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
-                  maxLength={MAX_RECOMMENDATION_TITLE_LENGTH}
-                  onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-                  value={draft.title}
-                />
-              </label>
+                  Cancel edit
+                </button>
+              ) : null}
             </div>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {!fixedTier ? (
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  Type
+                  <select
+                    className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
+                    onChange={(event) => {
+                      const nextTier = event.target.value as Tier;
+                      setDraft((current) => ({
+                        ...current,
+                        tier: nextTier,
+                      }));
+                    }}
+                    value={draft.tier}
+                  >
+                    {TIERS.map((tier) => (
+                      <option
+                        disabled={
+                          (workspace.recommendations[tier]?.length ?? 0) > 0
+                        }
+                        key={tier}
+                        value={tier}
+                      >
+                        {tierLabel(tier)}
+                        {(workspace.recommendations[tier]?.length ?? 0) > 0
+                          ? ' (already added)'
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+            <div className="mt-4 grid gap-4">
               <label className="block text-sm font-medium text-slate-700">
                 Description
                 <textarea
                   className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 p-3"
-                  onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
                   value={draft.description}
-                />
-              </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Rationale
-                <textarea
-                  className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 p-3"
-                  onChange={(event) => setDraft((current) => ({ ...current, rationale: event.target.value }))}
-                  value={draft.rationale}
                 />
               </label>
             </div>
 
-            {draft.tier === "CORRECTIVE" ? (
-              <section className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <h3 className="text-sm font-semibold text-slate-900">Corrective Action Owner / Verifier</h3>
-                <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Crew assignee ID
-                    <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" maxLength={MAX_CORRECTIVE_ACTION_USER_ID_LENGTH} onChange={(event) => setDraft((current) => ({ ...current, assigned_crew_id: event.target.value }))} value={draft.assigned_crew_id} />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Office assignee ID
-                    <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" maxLength={MAX_CORRECTIVE_ACTION_USER_ID_LENGTH} onChange={(event) => setDraft((current) => ({ ...current, assigned_office_user_id: event.target.value }))} value={draft.assigned_office_user_id} />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Verifier user ID
-                    <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" maxLength={MAX_CORRECTIVE_ACTION_USER_ID_LENGTH} onChange={(event) => setDraft((current) => ({ ...current, verifier_user_id: event.target.value }))} value={draft.verifier_user_id} />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Due date
-                    <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setDraft((current) => ({ ...current, due_date: event.target.value }))} type="date" value={draft.due_date} />
-                  </label>
-                </div>
-              </section>
+            {draft.tier === 'CORRECTIVE' || draft.tier === 'PREVENTIVE' ? (
+              <label className="mt-4 block max-w-sm text-sm font-medium text-slate-700">
+                Due date
+                <input
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      due_date: event.target.value,
+                    }))
+                  }
+                  type="date"
+                  value={draft.due_date}
+                />
+              </label>
             ) : null}
 
-            {draft.tier === "PREVENTIVE" ? (
+            {draft.tier === 'PREVENTIVE' ? (
               <section className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <h3 className="text-sm font-semibold text-slate-900">System Action / Risk Reduction</h3>
-                <div className="mt-3 grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    Theme
-                    <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setDraft((current) => ({ ...current, theme_code: event.target.value }))} value={draft.theme_code}>
-                      <option value="">Select theme</option>
-                      {workspace.themes.map((theme) => (
-                        <option key={theme.code} value={theme.code}>{theme.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Likelihood reduction
-                    <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setDraft((current) => ({ ...current, estimated_likelihood_reduction: event.target.value as RecommendationDraft["estimated_likelihood_reduction"] }))} value={draft.estimated_likelihood_reduction}>
+                    How much will this reduce risk?
+                    <select
+                      className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          estimated_likelihood_reduction: event.target
+                            .value as RecommendationDraft['estimated_likelihood_reduction'],
+                        }))
+                      }
+                      value={draft.estimated_likelihood_reduction}
+                    >
                       <option value="">Select reduction</option>
                       {LIKELIHOOD.map((option) => (
-                        <option key={option} value={option}>{option}</option>
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
                       ))}
                     </select>
                   </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Estimated effort
-                    <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setDraft((current) => ({ ...current, estimated_effort: event.target.value }))} value={draft.estimated_effort} />
-                  </label>
-                  <label className="block text-sm font-medium text-slate-700">
-                    Residual-risk statement
-                    <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setDraft((current) => ({ ...current, residual_risk_statement: event.target.value }))} value={draft.residual_risk_statement} />
-                  </label>
                 </div>
-                <label className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <input checked={draft.alarp_attested} onChange={(event) => setDraft((current) => ({ ...current, alarp_attested: event.target.checked }))} type="checkbox" />
-                  Risk reduction confirmed
-                </label>
               </section>
             ) : null}
 
             {workspace.tolerable_failure_allowed ? (
               <label className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
-                <input checked={draft.tolerable_failure_filter} onChange={(event) => setDraft((current) => ({ ...current, tolerable_failure_filter: event.target.checked }))} type="checkbox" />
-                Mark as tolerable failure
+                <input
+                  checked={draft.tolerable_failure_filter}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      tolerable_failure_filter: event.target.checked,
+                    }))
+                  }
+                  type="checkbox"
+                />
+                Mark as acceptable exception
               </label>
             ) : null}
 
             <button
               className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400"
-              disabled={isMutating || availableTiers.length === 0 || selectedTierAlreadyExists || !draft.title.trim() || !draft.description.trim() || (draft.tier === "CORRECTIVE" && (!draft.verifier_user_id.trim() || !draft.due_date))}
+              disabled={saveDisabled}
               type="submit"
             >
-              {isMutating ? "Saving..." : "Create recommendation"}
+              {isMutating
+                ? 'Saving...'
+                : `${isEditingRecommendation ? 'Update' : 'Save'} ${fixedTier ? tierLabel(draft.tier).toLowerCase() : 'action'}`}
             </button>
           </form>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900">Corrective Actions</h2>
-            <div className="mt-4 grid gap-3">
-              {workspace.corrective_actions.length > 0 ? (
-                workspace.corrective_actions.map((action) => (
-                  <article key={action.id ?? action.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h3 className="font-semibold text-slate-900">{action.title}</h3>
-                      <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">{action.status}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">{action.description}</p>
-                    <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
-                      <p>Owner: {action.assigned_crew_id || action.assigned_office_user_id || "Unassigned"}</p>
-                      <p>Verifier: {action.verifier_user_id || "Pending"}</p>
-                      <p>Due: {action.due_date || "Pending"}</p>
-                      <p>Purchase: {action.purchase_req_id ? `PR ${action.purchase_req_id}` : "Not linked"}</p>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">No corrective actions created yet.</p>
-              )}
-            </div>
-          </section>
+          {!fixedTier || fixedTier === 'CORRECTIVE' ? (
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Actions To Complete
+              </h2>
+              <div className="mt-4 grid gap-3">
+                {workspace.corrective_actions.length > 0 ? (
+                  workspace.corrective_actions.map((action) => (
+                    <article
+                      key={action.id ?? action.title}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
+                          {action.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">
+                        {action.description}
+                      </p>
+                      <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                        <p>Due: {action.due_date || 'Pending'}</p>
+                        <p>Status: {action.status}</p>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    No corrective actions created yet.
+                  </p>
+                )}
+              </div>
+            </section>
+          ) : null}
         </>
       )}
 
       {gateHints.length > 0 ? (
         <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">Phase 7 gate still needs:</p>
+          <p className="font-semibold">Still needed:</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            {gateHints.map((hint) => <li key={hint}>{hint}</li>)}
+            {gateHints.map((hint) => (
+              <li key={hint}>{hint}</li>
+            ))}
           </ul>
         </section>
       ) : null}
-      {phaseAdvanceError ? <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{phaseAdvanceError}</section> : null}
+      {phaseAdvanceError ? (
+        <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          {phaseAdvanceError}
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap gap-3">
-        <Link className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700" to={`/safety/incidents/${id}/phase-5`}>
-          Back to Phase 5
+        <Link
+          className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+          to={previousPath ?? `/safety/incidents/${id}/phase-2`}
+        >
+          {previousLabel}
         </Link>
-        <button className="inline-flex min-h-11 items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || workspace.gate_blockers.length > 0} onClick={continueToPhase7} type="button">
-          {isMutating ? "Checking gate..." : "Continue to Phase 7"}
+        <button
+          className="inline-flex min-h-11 items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400"
+          disabled={
+            isMutating ||
+            (resolvedTransitionTargetPhase != null &&
+              workspace.gate_blockers.length > 0)
+          }
+          onClick={continueToNextStep}
+          type="button"
+        >
+          {isMutating ? 'Checking...' : nextLabel}
         </button>
       </div>
     </section>

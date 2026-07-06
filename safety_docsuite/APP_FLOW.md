@@ -14,15 +14,15 @@ This document is the **screen contract** for every route the Safety Module expos
 
 > **Incident save-feedback update (2026-07-03):** Phase 2 RCA cause saves, Corrective Action / Preventive Action saves, and Phase 5 Evidence document/witness saves show an inline success message and automatically scroll to the saved-content area. This is a frontend acknowledgement/focus rule only; API payloads, validation, persistence, and workflow transitions are unchanged.
 
-> **Incident RCA/action simplification update (2026-07-03):** Current Phase 2 RCA exposes Immediate Cause and Root Cause only. New Intermediate Cause submissions are rejected, and legacy Intermediate rows are displayed under Root Cause instead of as a separate current category. Current action capture is split into Corrective Action and Preventive Action screens. Corrective Action shows Description and Due date only, without the owner/checker card. Preventive Action does not show Remaining risk or the "I confirm this will reduce risk" checkbox. The action screens do not show or send the "Why is this needed?" recommendation-rationale field.
+> **Incident RCA/action simplification update (2026-07-06):** Current Phase 2 RCA exposes Immediate Cause and Root Cause only. New Intermediate Cause submissions are rejected, and legacy Intermediate rows are displayed under Root Cause instead of as a separate current category. Current action capture is split into Corrective Action and Preventive Action screens. Corrective Action shows Description and Due date only, without the owner/checker card. Preventive Action shows Description, Due date, and **How much will this reduce risk?** only; it does not show Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording. The action screens do not show or send the "Why is this needed?" recommendation-rationale field.
 
-> **Incident phase-header and witness statement update (2026-07-03):** Incident phase tabs are the single visible phase number/name indicator; phase content areas do not repeat separate Phase X/phase-title header cards. Phase 4 supporting witness capture is labelled **Witness Statement**, opens `/phase-4/interviews/` directly, loads the incident vessel crew list with an **Other** typed-name option, captures What the witness said, **Remark**, and an optional signature image.
+> **Incident phase-header and witness statement update (2026-07-06):** Incident phase tabs are the single visible phase number/name indicator; phase content areas do not repeat separate Phase X/phase-title header cards. Phase 4 supporting witness capture is labelled **Witness Statement**, opens `/phase-4/interviews/` directly, loads the incident vessel crew list with an **Other** typed-name option, captures **Remark**, and offers **Upload witness statement**.
 
 > **Incident RCA edit update (2026-07-03):** Phase 2 saved Immediate Cause and Root Cause cards include an **Edit** action. Edit loads the saved cause into the RCA form and saves back to that existing cause row; users should not add a duplicate cause just to correct factor, cause, Other text, or reason.
 
 > **Incident action/evidence edit update (2026-07-03):** Phase 3 Corrective Action, Phase 4 Preventive Action, and Phase 5 Add Evidence saved cards include **Edit**. Edit loads the saved action, document metadata, or Witness Statement into the same form and saves back to the existing row; users should not add duplicate rows just to correct saved content.
 
-> **Incident Office Review update (2026-07-06):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. The comment is separate from the later closure reason and prints near the signature area in the incident PDF when present. Under D-MAINT-CR044, PIC and DPA can accept, close, or send rework for every incident risk band; the old RED/FM closer gate is legacy-only.
+> **Incident Office Review update (2026-07-06):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments/lesson learnt** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. The comment is separate from the later closure reason and prints near the signature area in the incident PDF when present. Under D-MAINT-CR044 and D-MAINT-CR049, PIC and DPA can accept, close, or send rework for every incident risk band; the old RED/FM closer gate is legacy-only. Office-side users see Accept / Close and Send for rework cards; ship-side users see only Office Comments/lesson learnt when present.
 
 > **Incident Loss Evaluation update (2026-07-06):** Visible Phase 7 is **Loss Evaluation**, served on the existing compatibility route `/safety/incidents/:id/phase-6/`. It saves one editable `vims_safety_incident_loss_evaluation` row through `PATCH /api/safety/incidents/:id/phase-6/`. Incident Report and Injury Report records show different Other Details, Cost Evaluation, and Estimated Costs fields. Closure through `/phase-6/close/` requires a saved Loss Evaluation row and a closure note.
 
@@ -258,7 +258,7 @@ Incident flow follows the simplified current workflow recorded in SSOT section 3
 | Phase 7 | Loss Evaluation | `/safety/incidents/:id/phase-6/` |
 | Legacy redirect | Removed Lessons Learned path | `/safety/incidents/:id/phase-3/lessons/` redirects to Office Review |
 
-Current action screens use the existing recommendation/corrective-action backend contract for compatibility. Corrective Action shows Description and Due date only. Preventive Action hides Remaining risk and the risk-confirmation checkbox. The owner/checker card is removed from the current action UI. Saved action cards show **Edit**, load the existing row into the form, and update that row instead of adding a duplicate.
+Current action screens use the existing recommendation/corrective-action backend contract for compatibility. Corrective Action shows Description and Due date only. Preventive Action shows Description, Due date, and **How much will this reduce risk?** only. The owner/checker card, theme, effort, Remaining risk, risk-confirmation checkbox, and "Prevent It Happening Again" wording are removed from the current action UI. Saved action cards show **Edit**, load the existing row into the form, and update that row instead of adding a duplicate.
 
 ### 4.0 Incident List — `/safety/incidents/`
 
@@ -361,14 +361,14 @@ Current action screens use the existing recommendation/corrective-action backend
 **Signature transition:**
 - Current Office Review captures a PIC or DPA office decision signature for every risk band. FM-specific RED signature is no longer required by the current implemented Office Review path.
 - Chain-of-Custody items capture **collector + witness** paper signatures (wet-sign or digital per D-GAP-D1, FEAT-SAF-INC-007).
-- The current Witness Statement UI captures an optional signature image but does not expose read-back/copy-to-witness controls; legacy formal interview API validation remains compatible for older clients (D-MAINT-CR016, D-MAINT-CR036).
+- The current Witness Statement UI captures a witness-statement upload but does not expose the old text statement, read-back/copy-to-witness controls, or formal/informal selector; legacy formal interview API validation remains compatible for older clients (D-MAINT-CR016, D-MAINT-CR036, D-MAINT-CR049).
 
 **Sub-routes:**
 | Route | Content |
 |-------|---------|
 | `/phase-4/paper/` | Documents evidence capture. Each entry has Attachment, Title, and Description. Users can add as many attachments as required. |
 | `/phase-4/people/`, `/phase-4/places/`, `/phase-4/parts/`, `/phase-4/photos/` | Legacy routes retained for bookmarks and redirected to `/phase-4/paper/`. |
-| `/phase-4/interviews/` | Witness Statement, opened only when needed. The form has vessel crew/Other witness selection, What the witness said, Remark, and optional signature image upload. |
+| `/phase-4/interviews/` | Witness Statement, opened only when needed. The form has vessel crew/Other witness selection, Remark, and Upload witness statement. |
 
 **Current UI simplification (CR-012):**
 - The screen shows one **Documents** evidence section, not People / Place / Equipment / Photos category cards.
@@ -376,7 +376,7 @@ Current action screens use the existing recommendation/corrective-action backend
 - Saved document cards show **Edit** for `Title` and `Description`. Editing metadata does not require reuploading or replacing the original attachment file.
 - Existing backend tab codes (`PEOPLE`, `POSITION`, `PARTS`, `PAPER`, `ELECTRONIC`) are kept for compatibility, but the current user-facing capture writes new attachments to `PAPER`.
 - Evidence Check / Evidence Matrix is removed from the current Phase 4 UI under CR-015; legacy matrix data remains backend-compatible only.
-- Witness Statement is simplified under CR-016 and CR-036; formal/informal selection, read-back, copy-to-witness, and 4-phase interview fields are legacy compatibility only. Optional signature image upload writes to the existing witness-signature field. Saved Witness Statement cards show **Edit**, load the existing statement into the form, and update the same witness row.
+- Witness Statement is simplified under CR-016, CR-036, and CR-049; formal/informal selection, read-back, copy-to-witness, old statement textarea, and 4-phase interview fields are legacy compatibility only. Upload witness statement writes to the existing witness-signature storage field. Saved Witness Statement cards show **Edit**, load the existing statement into the form, and update the same witness row.
 
 **States (Documents section):**
 - **Loaded:** Documents renders with the add-document form and saved attachment list first. Saved documents and Witness Statements include Edit actions. Supporting tools stay collapsed until opened. The phase tabs show phase number/name, and the content area does not repeat a separate Phase X title card.
@@ -1108,7 +1108,7 @@ Every PRD V1 feature must map to ≥1 screen or route. `R` = referenced on scree
 | FEAT-SAF-INC-012 | P: `/phase-3/interview/:intId/` | R: People tab |
 | FEAT-SAF-INC-013 | R: interview detail picklist | — |
 | FEAT-SAF-INC-014 | R: interview detail checklist | — |
-Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current user-facing Phase 4 Witness Statement route by D-MAINT-CR016 and D-MAINT-CR036. Current users open `/phase-4/interviews/`, choose a crew witness or Other typed name, enter What the witness said and Remark, and may upload a signature image; formal/informal and read-back/copy-to-witness controls remain legacy API compatibility.
+Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current user-facing Phase 4 Witness Statement route by D-MAINT-CR016, D-MAINT-CR036, and D-MAINT-CR049. Current users open `/phase-4/interviews/`, choose a crew witness or Other typed name, enter Remark, and may upload a witness statement; formal/informal, text statement, and read-back/copy-to-witness controls remain legacy API compatibility.
 
 | FEAT-SAF-INC-015 | P: `/phase-4/` | R: Phase 5 analyses |
 | FEAT-SAF-INC-016 | P: `/phase-5/` (loop-back CTA) | R: Phase 4/6 |

@@ -23,7 +23,6 @@ class AlarpGate:
         Recommendation.LikelihoodReduction.LOW,
         Recommendation.LikelihoodReduction.MED,
         Recommendation.LikelihoodReduction.HIGH,
-        Recommendation.LikelihoodReduction.QUANTIFIED,
     }
 
     def require_alarp(self, incident: Incident, recommendation_or_tier: Any) -> bool:
@@ -35,9 +34,7 @@ class AlarpGate:
     def missing_fields(self, recommendation_or_payload: Any) -> list[str]:
         missing: list[str] = []
         for field_name in (
-            "estimated_effort",
             "estimated_likelihood_reduction",
-            "residual_risk_statement",
         ):
             value = self._read_field(recommendation_or_payload, field_name)
             if value in (None, ""):
