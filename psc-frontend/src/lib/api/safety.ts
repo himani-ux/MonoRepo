@@ -2184,7 +2184,7 @@ export const safetyApi = {
 
   async getIncidentPhase7Preflight(id: number | string) {
     const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
-      buildSafetyApiUrl(`/incidents/${id}/phase-5/preflight/`)
+      buildSafetyApiUrl(`/incidents/${id}/phase-7/preflight/`)
     );
     return response.data;
   },
