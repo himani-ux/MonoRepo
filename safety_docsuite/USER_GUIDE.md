@@ -99,6 +99,7 @@ You see a near miss during routine cargo watch. Before the end of the watch you 
 Step-by-step:
 
 1. On `/safety/incidents/create/` (Phase 1 — Intake + Scene Control), fill:
+   - **Vessel identity** — Vessel and Vessel code are filled by the system from your vessel assignment or the saved report. They are disabled so users cannot manually change the vessel identity.
    - **What happened** — free-text narrative (minimum 200 characters; enforced by `V-INC-001`).
    - **When and position** — date, time, Latitude, and Longitude. Report time appears beside Shore Assistance Required. Latitude and Longitude appear together on their own row.
    - **Office communication** — answer **Was office informed?**. If Yes, select how it was informed: On call or On email.

@@ -233,6 +233,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 - The current Phase 1 UI does not render or require the former first-check checklist; frontend payloads and incident API serializers do not expose it.
 - Auto-save to IndexedDB every 30s; reconnect resumes from last saved state.
 - Draft reference series issued on first save (`DRAFT-{VslCode}/{YYYY}/T{nnn}`); formal number assigned only at Phase 2 submit-to-office.
+- Vessel and Vessel code are system-derived identity fields: ship/single-vessel users see them auto-filled and disabled, saved incidents keep them disabled, and Phase 1 GET returns resolved `vessel_code` for display.
 - Report time and Shore Assistance Required are visible together on one Phase 1 row.
 - Latitude and Longitude fields are visible together on their own Phase 1 row and save to the existing incident-level coordinate columns. These coordinates support both incident and injury reporting; no separate injury coordinate table/columns are introduced.
 - The main Phase 1 Incident Report section captures Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition as incident-level context fields shared by incident and injury reporting. Last Port remains legacy storage only and is not shown by the current Phase 1 frontend.
@@ -241,7 +242,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 - Incident type (32-option picklist from `master_safety_incident_type`; retired earlier options, including `Missing vessel`, are not offered under D-MAINT-CR031) mandatory.
 - Free-text narrative minimum 150 characters (configurable per validation layer).
 **Dependencies:** FEAT-SAF-AUDIT-006 (auto-save), FEAT-SAF-XMOD-001 (position auto-fill), FEAT-SAF-INC-040 (numbering), FEAT-SAF-AUDIT-002 (field history).
-**Decisions:** D-MAINT-CR018, D-MAINT-CR024, D-GAP-C1, D-GAP-F1, D-GAP-M09.
+**Decisions:** D-MAINT-CR018, D-MAINT-CR024, D-MAINT-CR054, D-GAP-C1, D-GAP-F1, D-GAP-M09.
 **SSOT refs:** see SSOT §2B.6 Phase 1; §3.1.
 
 ### FEAT-SAF-INC-002 — IMO SMC/MC/MI Regulatory Classifier

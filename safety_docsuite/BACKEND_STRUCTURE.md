@@ -22,6 +22,8 @@
 
 > **Incident Loss Evaluation report-type update (2026-07-07):** Deploy migration `0056_incident_loss_evaluation_report_type.py` before using the CR-053 Phase 7 selector. It adds nullable `vims_safety_incident_loss_evaluation.report_type` with `INCIDENT` and `INJURY` choices. `PATCH /api/safety/incidents/{id}/phase-6/` persists the selected type, `GET` returns `choices.report_type`, and PDF Loss Evaluation cost/detail blocks use the saved type. Existing rows without a saved type keep the previous injury-record fallback.
 
+> **Incident Phase 1 vessel identity update (2026-07-07):** No migration is required for CR-054. `GET /api/safety/incidents/{id}/phase-1/` returns resolved `vessel_code` together with `vessel_name` and `vessel_display_name` using the existing VesselData/auth resolver. `vessel_code` remains accepted on create for draft-number allocation and is ignored on Phase 1 update; `vessel_id` plus vessel-scope validation remain the persisted authority.
+
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
 ---
@@ -1581,7 +1583,7 @@ Full detail. Near-miss reporter details are returned for authorized users within
 Edit within the incident edit window. Advancing to a later phase does not lock earlier phase edits. User-facing investigation save endpoints remain editable for authorized users until office approval locks the incident, even when the incident `current_phase` has not reached the legacy backend phase number for that data. This includes RCA, facts/evidence helpers, corrective action, preventive action, evidence documents, and witness statements. The former Lessons Learned screen is not a current edit surface; legacy `LESSONS_LEARNT` rows remain readable for old records/API compatibility. The lock starts when `state` is `APPROVED`, `CLOSED`, or `SUPERSEDED`. Every field change emits a `vims_safety_field_history` row (D-EDGE-10).
 
 - **Auth:** `SAF_F_001` + role/phase matrix. User-facing Phase 2-6 save endpoints require an allowed edit role and an incident that has not been office-approved, closed, or superseded; they do not require the legacy backend phase number to have been reached. Submit/continue endpoints still enforce ordered workflow movement.
-- **Phase 1 edit:** `GET/PATCH /api/safety/incidents/{id}/phase-1/` uses the same edit window. Null `external_party_injury` does not delete saved injury details.
+- **Phase 1 edit:** `GET/PATCH /api/safety/incidents/{id}/phase-1/` uses the same edit window. GET returns resolved `vessel_code`, `vessel_name`, and `vessel_display_name` for the locked Vessel/Vessel code UI. Create accepts `vessel_code` only for draft-number allocation; update ignores display-only code changes and validates persisted `vessel_id` against scope. Null `external_party_injury` does not delete saved injury details.
 - **Phase 2 edit:** explicit `imo_classifier` values (`SMC`, `MC`, `MI`) are preserved and validated. The system defaults to `NOT_APPLICABLE` only when no classifier exists. Position is required when the classifier is `SMC`, `MC`, or `MI`.
 - **Errors:** 403 if not in role-phase window; 400 if office approval has locked the incident; 422 per VALIDATION_RULES §2.
 

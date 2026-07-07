@@ -294,12 +294,13 @@ Current action screens use the existing recommendation/corrective-action backend
 - `GET /api/safety/reference/incident-types/` — 32 active rows from `master_safety_incident_type`; retired earlier rows, including `Missing vessel`, are not offered for new selection.
 - `GET /api/safety/master/loss-types/` — 7 rows from `master_loss_types`.
 - On first save: `POST /api/safety/incidents/` → issues `DRAFT-{VslCode}/{YYYY}/T{nnn}` per D-GAP-C1.
-- On resume/edit: `GET /api/safety/incidents/:id/phase-1/` loads the saved Phase 1 record and `PATCH /api/safety/incidents/:id/phase-1/` persists changes while the incident remains before office approval.
+- On resume/edit: `GET /api/safety/incidents/:id/phase-1/` loads the saved Phase 1 record, including resolved `vessel_code`, and `PATCH /api/safety/incidents/:id/phase-1/` persists changes while the incident remains before office approval.
 - Live join (position auto-fill): `GET /api/safety/incidents/position-prefill/?vessel_id={id}&timestamp={ts}` → joins `vims_reporting_daily_report` for ±12h window (D-GAP-M09, FEAT-SAF-XMOD-001).
 **Signature transition:** None on Phase 1. Draft state; no sign-off until Phase 2 submit.
 **States:**
 - **Loaded:** Form renders with:
   - Incident type picker (32 active options in the CR-031 business order; retired earlier options are hidden).
+  - Vessel and Vessel code are auto-filled from the logged-in vessel context, single-vessel scope, or saved incident. Vessel identity fields are disabled after autofill/save; office users with more than one vessel option may select the vessel during new-report creation before it is locked.
   - Narrative free-text (≥150 chars — enforced in VALIDATION_RULES §4).
   - Office communication fields labelled **Was office informed?** and **How was office informed?**. The current communication-mode dropdown offers On call and On email; WhatsApp is not offered.
   - Report time and Shore Assistance Required together on one incident-report row.
@@ -323,7 +324,7 @@ Current action screens use the existing recommendation/corrective-action backend
 - `[Save Draft]` → stays on screen; amber "Draft saved 14:32 LT" chip.
 - `[Continue to Phase 2]` → enforces all Phase 1 mandatory fields, transitions state, routes to `/safety/incidents/:id/phase-2/`.
 - `[Cancel]` → confirm modal; discards new record.
-**Decisions:** D-MAINT-CR018 (first-check removal), D-MAINT-CR024 (incident-level reporting context fields), D-GAP-C1 (draft series), D-GAP-F1 (auto-save), D-GAP-M09 (position), D-EDGE-08 (partial save).
+**Decisions:** D-MAINT-CR018 (first-check removal), D-MAINT-CR024 (incident-level reporting context fields), D-MAINT-CR054 (locked vessel identity), D-GAP-C1 (draft series), D-GAP-F1 (auto-save), D-GAP-M09 (position), D-EDGE-08 (partial save).
 **Cross-module join:** **Reporting** (Daily Report position, FEAT-SAF-XMOD-001); **CMS** (reporter name / rank via live join, FEAT-SAF-XMOD-003).
 
 ### 4.2 Phase 2 — Notifications + Resource Allocation — `FEAT-SAF-INC-004`, `FEAT-SAF-INC-002`, `FEAT-SAF-INC-003`
