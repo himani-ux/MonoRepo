@@ -127,6 +127,7 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 | FEAT-SAF-INC-039 | Self-Report Conflict Guard | INC | V1 | D-GAP-A5 |
 | FEAT-SAF-INC-040 | Incident Number `{VslCode}/{YYYY}/{NNN}` with Draft Series | INC | V1 | D-GAP-C1 |
 | FEAT-SAF-INC-041 | MSC-MEPC.3 Position Auto-Fill (±12h tolerance) | INC | V1 | D-DNV-12, D-GAP-M09, D-GAP-M10 |
+| FEAT-SAF-INC-042 | Incident Fleet Alert from Office Review | INC | V1 | D-MAINT-CR051 |
 | FEAT-SAF-NM-001 | Near Miss Creation (Any Rank) | NM | V1 | D-RBAC-11 |
 | FEAT-SAF-NM-002 | Reporter Identity Visibility | NM | V1 | D-GAP-J1 revised |
 | FEAT-SAF-NM-003 | Near Miss Office Comments + Priority Decision | NM | V1 | D-GAP-R22 |
@@ -634,10 +635,11 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 - On accept: generates the selected-section PDF (FEAT-SAF-PDF-001); state transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8.
 - Manual selected-section PDF preview/download is available for incident records before Phase 7 acceptance; the screen must not display Phase 7 acceptance-only PDF warning text.
 - Ship-side users see the Office Comments/lesson learnt card; when office has not added a note, it displays "Office comment is not added yet."
-- Closer authority by band: PIC=GREEN, DPA=YELLOW, FM=RED.
+- PIC or DPA can accept, close, send rework, or issue Fleet Alert for every incident risk band.
+- Fleet Alert is shown below Accept / Close for office-side users; it requires one or more selected active `VesselData` ships and sends in-app plus email alerts only to those selected ships.
 - Re-open authority mirrors closer authority (D-EDGE-03).
 **Dependencies:** FEAT-SAF-INC-027, FEAT-SAF-PDF-001, FEAT-SAF-RBAC-001.
-**Decisions:** D-PDF-01, D-RBAC-01, D-EDGE-03.
+**Decisions:** D-PDF-01, D-RBAC-01, D-EDGE-03, D-MAINT-CR044, D-MAINT-CR051.
 **SSOT refs:** see SSOT §2B.6; §6 D-PDF-01.
 
 ### FEAT-SAF-INC-031 — Phase 7 Loss Evaluation

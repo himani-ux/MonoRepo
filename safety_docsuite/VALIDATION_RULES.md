@@ -196,6 +196,7 @@ Sequencing is **Reporter → Master → HOD → DPA → FM**. Each next signatur
 | Visible Phase 4 → 6 | Preventive Action saved with Description, Due date, and risk reduction; frontend continues directly to Office Review | D-MAINT-CR038, D-MAINT-CR042, D-MAINT-CR043, D-MAINT-CR049 |
 | Visible Phase 5 Evidence | Evidence Documents can be opened early by authorized users; document Edit requires a title and updates title/description metadata without replacing the file. Witness Statement Edit reuses the simplified witness required fields and updates the existing witness row. Official submit/order still follows backend workflow gates | D-MAINT-CR012, D-MAINT-CR013, D-MAINT-CR039, D-MAINT-CR041, D-MAINT-CR043 |
 | Visible Phase 6 → 7 | Office Review accepted by PIC or DPA for any risk band; optional Office Comments/lesson learnt saved without a word limit; ship-side pending message displays when no comment exists; PDF preview/download is not blocked solely by pending Phase 7 acceptance. Send for rework uses a comment plus the fixed action-rework target. | D-PDF-01, D-MAINT-CR042, D-MAINT-CR043, D-MAINT-CR044, D-MAINT-CR049, D-MAINT-CR050 |
+| Visible Phase 6 Fleet Alert | At least one active `VesselData` ship is selected; in-app and email dispatch is scoped only to selected ships | D-MAINT-CR051 |
 | Visible Phase 7 → CLOSED | Loss Evaluation row saved in `vims_safety_incident_loss_evaluation` and closure note supplied | D-MAINT-CR047 |
 
 ### 2.6.1 Phase 7 Loss Evaluation Validation
@@ -207,6 +208,7 @@ Sequencing is **Reporter → Master → HOD → DPA → FM**. Each next signatur
 | V-INC-092 | User closes an incident without a closure note | server | `closure_reason` required | D-MAINT-CR047 |
 | V-INC-093 | Consequence, Likelihood, Risk level, or Type of Repairs submitted outside the configured fixed dropdown values | server serializer | field-level choice validation | D-MAINT-CR047 |
 | V-INC-094 | Code of Safe Working Practices dropdown loads | UI/API | active options are loaded from `vims_safety_injury_dropdown_option` where `field_key = SAFE_WORKING_PRACTICE`; CR-048 seeds the requested list and deactivates stale choices outside it | D-MAINT-CR048 |
+| V-INC-095 | Incident Fleet Alert submitted with no selected ship, an unknown ship, or an inactive/deleted `VesselData` row | server | "Select at least one ship." or field-level selected-ship error | D-MAINT-CR051 |
 
 ### 2.7 Timeline-Extension (D-GAP-B2)
 

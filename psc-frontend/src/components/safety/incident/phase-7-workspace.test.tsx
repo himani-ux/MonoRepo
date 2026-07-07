@@ -39,7 +39,9 @@ vi.mock('../../../lib/api/safety', () => ({
   safetyApi: {
     acceptIncidentPhase7: vi.fn(),
     downloadIncidentPdf: vi.fn(),
+    getIncidentFleetAlert: vi.fn(),
     getIncidentPhase7Preflight: phase7Mocks.getIncidentPhase7Preflight,
+    issueIncidentFleetAlert: vi.fn(),
     sendBackIncidentPhase7: vi.fn(),
     signIncidentPhase7Hod: vi.fn(),
     transitionIncident: vi.fn(),
@@ -64,6 +66,8 @@ describe('SafetyIncidentPhase7', () => {
       (processId: string) => processId === 'SAF_P_006'
     );
     vi.mocked(safetyApi.sendBackIncidentPhase7).mockReset();
+    vi.mocked(safetyApi.getIncidentFleetAlert).mockReset();
+    vi.mocked(safetyApi.issueIncidentFleetAlert).mockReset();
   });
 
   function buildPreflight(overrides = {}) {
@@ -219,5 +223,62 @@ describe('SafetyIncidentPhase7', () => {
     expect(
       screen.queryByRole('button', { name: 'Send for rework' })
     ).toBeNull();
+  });
+
+  it('lets office users send an incident Fleet Alert to selected ships only', async () => {
+    phase7Mocks.getIncidentPhase7Preflight.mockResolvedValue(buildPreflight());
+    vi.mocked(safetyApi.getIncidentFleetAlert).mockResolvedValue({
+      recipient_vessels: [
+        {
+          display_name: 'ALP - Vessel Alpha',
+          has_email: true,
+          vessel_id: '11111111-1111-1111-1111-111111111111',
+        },
+        {
+          display_name: 'BRV - Vessel Bravo',
+          has_email: true,
+          vessel_id: '22222222-2222-2222-2222-222222222222',
+        },
+        {
+          display_name: 'CHR - Vessel Charlie',
+          has_email: true,
+          vessel_id: '33333333-3333-3333-3333-333333333333',
+        },
+      ],
+    });
+    vi.mocked(safetyApi.issueIncidentFleetAlert).mockResolvedValue({
+      emails_sent: 2,
+      recipient_vessel_ids: [
+        '11111111-1111-1111-1111-111111111111',
+        '33333333-3333-3333-3333-333333333333',
+      ],
+    });
+
+    render(<SafetyIncidentPhase7 />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Fleet Alert' }));
+    const selector = await screen.findByLabelText('Select ships for Fleet Alert');
+    const options = screen.getAllByRole('option') as HTMLOptionElement[];
+    options[0].selected = true;
+    options[2].selected = true;
+    fireEvent.change(selector);
+    fireEvent.click(screen.getByRole('button', { name: 'Send Fleet Alert' }));
+
+    await waitFor(() => {
+      expect(safetyApi.issueIncidentFleetAlert).toHaveBeenCalledWith(
+        'incident-1',
+        {
+          recipient_vessel_ids: [
+            '11111111-1111-1111-1111-111111111111',
+            '33333333-3333-3333-3333-333333333333',
+          ],
+        }
+      );
+    });
+    expect(
+      await screen.findByText(
+        'Fleet alert sent to 2 selected ship(s). Emails sent: 2.'
+      )
+    ).toBeTruthy();
   });
 });

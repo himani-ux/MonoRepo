@@ -16,6 +16,8 @@
 >
 > **Incident Office Review update (2026-07-07):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments/lesson learnt captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields. Current send-for-rework UI sends a fixed action-rework target with the comment; it does not expose a target-phase picker. Ship-side Office Review shows a pending message when this comment is empty. Incident PDF preview/download is not blocked solely by pending Phase 7 acceptance.
 
+> **Incident Fleet Alert update (2026-07-07):** No migration is required for CR-051. The Office Review Fleet Alert endpoint reads active ships and email addresses from existing `VesselData`, writes in-app rows through existing `psc_notification`, and sends best-effort email only to the selected ships.
+
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
 ---
@@ -1396,7 +1398,7 @@ CREATE TABLE master_safety_bias_guard (
 | `master_RoleByVessel` | Office-user vessel scoping on every list / detail endpoint |
 | `master_applied_rank` | Rank normalization for SCM attendance + SOI trainee display |
 | `master_notification` | Shared notification queue — Safety writes rows; platform notifier consumes (per `<vims_integration>`) |
-| `VesselData` | Vessel master — FK target on every Safety row via `vessel_id` |
+| `VesselData` | Vessel master — FK target on every Safety row via `vessel_id`; Incident Fleet Alert reads active ship names/codes and `email` from this table |
 | `Crew_Onboarding_History` | Ship-side vessel scope + SOI assistant dept lookup + SCM attendance roster (live join, D-GAP-I2) |
 | `HRM501` | Crew email / rank enrichment — live join |
 | `master_applied_rank` | Already listed above — (explicit confirmation per rubric) |
@@ -1619,9 +1621,17 @@ Forward or loop-back phase transition. Writes `vims_safety_incident_phase_log`.
 
 #### 9.2.6 `POST /api/safety/incidents/{id}/accept/` (Office Review acceptance)
 
-- **Auth:** `SAF_P_004`. Role must be DPA for GREEN/YELLOW. For RED the endpoint is `POST /api/safety/incidents/{id}/approve-red/` requiring `SAF_P_005` (FM).
+- **Auth:** `SAF_F_001` plus `SAF_P_004` or `SAF_P_006`. Current Office Review role gate allows PIC or DPA for every risk band; legacy RED/FM paths are compatibility-only.
 - **Request body:** `{"typed_name":"...","device_fingerprint":"...","office_comment":"..."}`. `office_comment` is optional, unrestricted text and is saved to `vims_safety_incident.office_comment` when supplied.
 - **Response 200:** `{"state":"PHASE_7_DPA_ACCEPTED","dpa_accepted_at":"...","dpa_accepted_by":"...","office_comment":"..."}`.
+
+#### 9.2.6a `GET/POST /api/safety/incidents/{id}/fleet-alert/` (Office Review Fleet Alert)
+
+- **Auth:** `SAF_F_001` plus Office Review process permission `SAF_P_004` or `SAF_P_006`; role must be PIC or DPA. The incident must be in backend `current_phase = 7` (visible Phase 6 Office Review).
+- **GET response:** incident summary plus `recipient_vessels[]` loaded from active, non-deleted `VesselData` rows. Each row returns `vessel_id`, `display_name`, `vessel_name`, `vessel_code`, and `has_email`.
+- **POST request body:** `{"recipient_vessel_ids":["<vessel_uuid>", "..."]}`. At least one selected active ship is required.
+- **POST behavior:** writes `INCIDENT_FLEET_ALERT` in-app notifications through `psc_notification` for selected vessel recipients and sends best-effort emails only to selected ships using `VesselData.email`. Ships not selected do not receive in-app or email alerts.
+- **Response 200:** includes selected `recipient_vessel_ids`, selected `recipient_vessels`, `notifications_emitted`, `emails_sent`, `email_failed`, and `vessels_without_email`.
 
 #### 9.2.7 `POST /api/safety/incidents/{id}/close/`
 

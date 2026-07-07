@@ -28,6 +28,7 @@ from apps.safety.views.incident_closure import IncidentClosureView
 from apps.safety.views.incident_circular import IncidentCircularPublishView
 from apps.safety.views.incident_draft import IncidentDraftSaveView
 from apps.safety.views.incident_external_party import IncidentExternalPartyInjuryView
+from apps.safety.views.incident_fleet_alert import IncidentFleetAlertIssueView
 from apps.safety.views.incident_pdf import IncidentPDFDownloadView
 from apps.safety.views.msc_mepc3_export import MscMepc3ExportView
 from apps.safety.views.incident_phase1 import (
@@ -472,6 +473,11 @@ urlpatterns = [
         "incidents/<str:id>/phase-7/send-back/",
         IncidentPhase7SendBackView.as_view(),
         name="incident-phase-7-send-back",
+    ),
+    path(
+        "incidents/<str:id>/fleet-alert/",
+        IncidentFleetAlertIssueView.as_view(),
+        name="incident-fleet-alert",
     ),
     path(
         "incidents/<str:id>/phase-8/",

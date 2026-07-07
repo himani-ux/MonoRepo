@@ -22,7 +22,7 @@ This document is the **screen contract** for every route the Safety Module expos
 
 > **Incident action/evidence edit update (2026-07-03):** Phase 3 Corrective Action, Phase 4 Preventive Action, and Phase 5 Add Evidence saved cards include **Edit**. Edit loads the saved action, document metadata, or Witness Statement into the same form and saves back to the existing row; users should not add duplicate rows just to correct saved content.
 
-> **Incident Office Review update (2026-07-07):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments/lesson learnt** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. The comment is separate from the later closure reason and prints near the signature area in the incident PDF when present. Under D-MAINT-CR044, D-MAINT-CR049, and D-MAINT-CR050, PIC and DPA can accept, close, or send rework for every incident risk band; the old RED/FM closer gate is legacy-only. Office-side users see Accept / Close and Send for rework cards; ship-side users see the Office Comments/lesson learnt card, with "Office comment is not added yet." when no note exists. Office-side Phase 6 does not show Phase 7 acceptance-only PDF warning text.
+> **Incident Office Review update (2026-07-07):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments/lesson learnt** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. The comment is separate from the later closure reason and prints near the signature area in the incident PDF when present. Under D-MAINT-CR044, D-MAINT-CR049, D-MAINT-CR050, and D-MAINT-CR051, PIC and DPA can accept, close, send rework, or issue a selected-ship Fleet Alert for every incident risk band; the old RED/FM closer gate is legacy-only. Office-side users see Accept / Close, Fleet Alert, and Send for rework controls; ship-side users see the Office Comments/lesson learnt card, with "Office comment is not added yet." when no note exists. Office-side Phase 6 does not show Phase 7 acceptance-only PDF warning text.
 
 > **Incident Loss Evaluation update (2026-07-06):** Visible Phase 7 is **Loss Evaluation**, served on the existing compatibility route `/safety/incidents/:id/phase-6/`. It saves one editable `vims_safety_incident_loss_evaluation` row through `PATCH /api/safety/incidents/:id/phase-6/`. Incident Report and Injury Report records show different Other Details, Cost Evaluation, and Estimated Costs fields. Closure through `/phase-6/close/` requires a saved Loss Evaluation row and a closure note.
 
@@ -189,6 +189,7 @@ Anonymous near-miss reporting is removed from V1. Reporter name, rank, and user 
       people/ places/ parts/ photos/         # Legacy routes redirect to paper/
       interviews/                            # Witness Statement, opened only when needed
     :id/phase-5/                             # Office Review
+    :id/fleet-alert/                         # Office Review Incident Fleet Alert selected-ship notification/email
       analysis/step/                         # STEP swimlane
       analysis/fact-tree/                    # Fact Tree
       analysis/ecf/                          # ECF Chart

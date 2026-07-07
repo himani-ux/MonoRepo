@@ -535,6 +535,8 @@ Office Review runs the required readiness checks in the background. The visible 
 7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8, writes closure event to `vims_safety_incident_phase_log`.
 8. Open `/safety/incidents/:id/phase-6/`, complete **Loss Evaluation**, and save it. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds.
 
+To issue an Incident Fleet Alert from Office Review, tap **Fleet Alert** below **Accept / Close**, select one or more ships, and tap **Send Fleet Alert**. The system sends in-app and email alerts only to the selected ships; vessel email addresses come from `VesselData.email`.
+
 If **Record injury** was saved on Phase 1, the PDF prints the title `Injury Report`. If no injury was recorded, it prints `Incident Report`. Office Comments and closure reason appear near the end of the PDF before Signature, not in Summary. Evidence documents appear as separate document blocks with Description and File rows instead of numbered attachment rows; internal evidence notes are not printed. Action descriptions appear once inside their detail box without recommendation rationale / "Why is this needed?" text. Required signature rows remain visible in the PDF even when unsigned; unsigned rows show as `Pending`.
 
 Under the current CR-044 authority model, PIC or DPA can complete Office Review and later closure for any risk band.
@@ -565,6 +567,7 @@ You are the override authority for guard #5 (blame-fixation) via `SAF_P_006`. Us
 |-------|---------|
 | `/safety/dashboard/` | Fleet-wide Safety Intelligence Dashboard |
 | `/safety/incidents/:id/phase-5/` | Office Review acceptance or rework for any risk band |
+| `/safety/incidents/:id/fleet-alert/` | Incident Fleet Alert selected-ship in-app/email dispatch |
 | `/safety/near-miss/:id/triage/` | LOW / HIGH triage |
 | `/safety/near-miss/:id/fleet-alert/` | Prepare Circular/Alert handoff and issue Near Miss fleet-alert step (HIGH) |
 | `/safety/soi/:id/applicability/approve/` | Approve Master's area-applicability request |

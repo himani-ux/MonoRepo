@@ -2189,6 +2189,24 @@ export const safetyApi = {
     return response.data;
   },
 
+  async getIncidentFleetAlert(id: number | string) {
+    const response = await apiClient.get<SafetyOfficeWorkflowResponse>(
+      buildSafetyApiUrl(`/incidents/${id}/fleet-alert/`)
+    );
+    return response.data;
+  },
+
+  async issueIncidentFleetAlert(
+    id: number | string,
+    payload: SafetyOfficeWorkflowPayload
+  ) {
+    const response = await apiClient.post<SafetyOfficeWorkflowResponse>(
+      buildSafetyApiUrl(`/incidents/${id}/fleet-alert/`),
+      payload
+    );
+    return response.data;
+  },
+
   async acceptIncidentPhase7(
     id: number | string,
     payload: SafetyOfficeWorkflowPayload

@@ -136,6 +136,14 @@ function phasePath(id: string | undefined, phase: number) {
   return incidentPhaseRoute(id ?? '', phase);
 }
 
+interface IncidentFleetAlertVessel {
+  display_name: string;
+  has_email?: boolean;
+  vessel_code?: string;
+  vessel_id: string;
+  vessel_name?: string;
+}
+
 export function SafetyIncidentPhase7() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -155,6 +163,14 @@ export function SafetyIncidentPhase7() {
   const [selectedPdfSections, setSelectedPdfSections] = useState<
     IncidentPdfSectionKey[]
   >(DEFAULT_INCIDENT_PDF_SECTION_KEYS);
+  const [fleetAlertOpen, setFleetAlertOpen] = useState(false);
+  const [fleetAlertVessels, setFleetAlertVessels] = useState<
+    IncidentFleetAlertVessel[]
+  >([]);
+  const [selectedFleetAlertVesselIds, setSelectedFleetAlertVesselIds] =
+    useState<string[]>([]);
+  const [isFleetAlertLoading, setIsFleetAlertLoading] = useState(false);
+  const [isFleetAlertSending, setIsFleetAlertSending] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) {
@@ -353,6 +369,63 @@ export function SafetyIncidentPhase7() {
     }
   }
 
+  async function openFleetAlertSelector() {
+    if (!id) {
+      return;
+    }
+    if (fleetAlertOpen) {
+      setFleetAlertOpen(false);
+      return;
+    }
+    setFleetAlertOpen(true);
+    if (fleetAlertVessels.length > 0) {
+      return;
+    }
+    setIsFleetAlertLoading(true);
+    setError(null);
+    try {
+      const response = await safetyApi.getIncidentFleetAlert(id);
+      const vessels = Array.isArray(response.recipient_vessels)
+        ? (response.recipient_vessels as IncidentFleetAlertVessel[])
+        : [];
+      setFleetAlertVessels(vessels);
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+      setFleetAlertOpen(false);
+    } finally {
+      setIsFleetAlertLoading(false);
+    }
+  }
+
+  async function submitFleetAlert() {
+    if (!id || selectedFleetAlertVesselIds.length === 0) {
+      return;
+    }
+    setIsFleetAlertSending(true);
+    setError(null);
+    setResultMessage(null);
+    try {
+      const response = await safetyApi.issueIncidentFleetAlert(id, {
+        recipient_vessel_ids: selectedFleetAlertVesselIds,
+      });
+      const responseRecipientIds = Array.isArray(response.recipient_vessel_ids)
+        ? response.recipient_vessel_ids
+        : [];
+      const vesselCount =
+        responseRecipientIds.length || selectedFleetAlertVesselIds.length;
+      const emailsSent = Number(response.emails_sent ?? 0);
+      setResultMessage(
+        `Fleet alert sent to ${vesselCount} selected ship(s). Emails sent: ${emailsSent}.`
+      );
+      setSelectedFleetAlertVesselIds([]);
+      setFleetAlertOpen(false);
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setIsFleetAlertSending(false);
+    }
+  }
+
   const pdfPreviewReady = Boolean(
     preflight.pdf_preview.available && preflight.pdf_preview.download_path
   );
@@ -464,6 +537,64 @@ export function SafetyIncidentPhase7() {
                 >
                   {isMutating ? 'Submitting...' : actionLabel}
                 </button>
+                <div className="mt-5 border-t border-slate-200 pt-5">
+                  <button
+                    className="min-h-11 rounded-full border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-800 disabled:bg-slate-100 disabled:text-slate-400"
+                    disabled={isMutating || isFleetAlertLoading}
+                    onClick={() => void openFleetAlertSelector()}
+                    type="button"
+                  >
+                    {isFleetAlertLoading ? 'Loading ships...' : 'Fleet Alert'}
+                  </button>
+                  {fleetAlertOpen ? (
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Select ships for Fleet Alert
+                        <select
+                          className="mt-2 min-h-36 w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm"
+                          disabled={
+                            isFleetAlertLoading || isFleetAlertSending
+                          }
+                          multiple
+                          onChange={(event) => {
+                            const values = Array.from(
+                              event.currentTarget.selectedOptions
+                            ).map((option) => option.value);
+                            setSelectedFleetAlertVesselIds(values);
+                          }}
+                          value={selectedFleetAlertVesselIds}
+                        >
+                          {fleetAlertVessels.map((vessel) => (
+                            <option
+                              key={vessel.vessel_id}
+                              value={vessel.vessel_id}
+                            >
+                              {vessel.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                          className="min-h-10 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-400"
+                          disabled={
+                            isFleetAlertSending ||
+                            selectedFleetAlertVesselIds.length === 0
+                          }
+                          onClick={() => void submitFleetAlert()}
+                          type="button"
+                        >
+                          {isFleetAlertSending
+                            ? 'Sending...'
+                            : 'Send Fleet Alert'}
+                        </button>
+                        <span className="text-sm text-slate-600">
+                          {selectedFleetAlertVesselIds.length} selected
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </form>
 
               <form
