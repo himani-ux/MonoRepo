@@ -113,10 +113,10 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 | FEAT-SAF-INC-025 | Blame-Fixation Hard Block + Override | INC | V1 | D-DNV-11 #5, D-RBAC-07 |
 | FEAT-SAF-INC-026 | Human Factors — SHELL + IMO A.884(21) + Risk/Change Domain | INC | V1 | §2B.10, D-DNV-09, D-GAP-R21 |
 | FEAT-SAF-INC-027 | Split Action Phases (Corrective / Preventive) | INC | V1 | §2B.7, D-DNV-06, D-GAP-R13, D-MAINT-CR038, D-MAINT-CR042 |
-| FEAT-SAF-INC-028 | Preventive Action compatibility risk fields | INC | Compatibility | D-GAP-R02, D-MAINT-CR038 |
+| FEAT-SAF-INC-028 | Preventive Action compatibility risk fields | INC | Compatibility | D-GAP-R02, D-MAINT-CR038, D-MAINT-CR052 |
 | FEAT-SAF-INC-029 | Tolerable-Failure Filter (GREEN only) | INC | V1.1 | D-GAP-R11 |
 | FEAT-SAF-INC-030 | Phase 6 Office Review / Report Issued | INC | V1 | §2B.6, D-PDF-01 |
-| FEAT-SAF-INC-031 | Phase 7 Loss Evaluation | INC | V1 | D-MAINT-CR047 |
+| FEAT-SAF-INC-031 | Phase 7 Loss Evaluation | INC | V1 | D-MAINT-CR047, D-MAINT-CR052 |
 | FEAT-SAF-INC-032 | Multi-Vessel Incident Linking + Duplicate Detection | INC | V1 | D-EDGE-01, D-GAP-M25, D-GAP-M07 |
 | FEAT-SAF-INC-033 | Near-Miss ↔ Incident Supersede-and-Create-New | INC | V1 | D-EDGE-07 |
 | FEAT-SAF-INC-034 | Crew / Non-Crew Injury Capture | INC | V1 | D-EDGE-02 |
@@ -590,7 +590,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - The visible phase tabs split action capture into **Corrective Action** (`/phase-3/`) and **Preventive Action** (`/phase-3/preventive/`).
 - Corrective Action shows Description and Due date only; the previous "Who Will Do and Check This?" owner/checker card is not shown.
-- Preventive Action shows Description, Due date, and **How much will this reduce risk?** only; it does not show Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording.
+- Preventive Action shows Description, Due date, and one shared **How much will this reduce risk?** answer for the screen; it does not show Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording, and saved preventive cards do not repeat risk reduction per row.
 - The former **Lessons Learned** screen is not shown in current workflow tabs; `/phase-3/lessons/` is a legacy redirect to Office Review.
 - The action screens do not expose Type, Title, or "Why is this needed?" as separate user inputs.
 - Save acknowledgement appears after each action save and the page scrolls to the saved item.
@@ -607,7 +607,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - Current Preventive Action UI does not show Remaining risk, theme, effort, or "Prevent It Happening Again" wording.
 - Current Preventive Action UI does not show the "I confirm this will reduce risk" checkbox.
-- Frontend supplies the due date through the existing linked-action storage and preserves legacy recommendation compatibility fields as nullable data.
+- Frontend supplies the due date through the existing linked-action storage, sends the shared screen-level risk-reduction answer as the compatibility `estimated_likelihood_reduction` value for preventive saves, and preserves other legacy recommendation compatibility fields as nullable data.
 - Incident PDF does not print hidden compatibility risk-confirmation fields as separate user-entered content.
 **Dependencies:** FEAT-SAF-INC-027.
 **Decisions:** D-GAP-R02, D-MAINT-CR038, D-MAINT-CR049.
@@ -632,7 +632,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **User story:** As DPA, I need an Office Review acceptance gate that validates the required actions, bias guards, and causal-layer completeness before issuing the formal report.
 **Acceptance criteria:**
 - Pre-flight validations: bias guards resolved, ≥1 Immediate Cause and ≥1 Root Cause coded, all three recommendation tiers filled (for YELLOW/RED), ALARP fields populated.
-- On accept: generates the selected-section PDF (FEAT-SAF-PDF-001); state transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8.
+- On accept: generates the selected-section PDF (FEAT-SAF-PDF-001) and keeps the record compatible with visible Phase 7 Loss Evaluation; Loss Evaluation may already have been saved by an authorized ship-side or office-side user.
 - Manual selected-section PDF preview/download is available for incident records before Phase 7 acceptance; the screen must not display Phase 7 acceptance-only PDF warning text.
 - Ship-side users see the Office Comments/lesson learnt card; when office has not added a note, it displays "Office comment is not added yet."
 - PIC or DPA can accept, close, send rework, or issue Fleet Alert for every incident risk band.
@@ -645,16 +645,17 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 ### FEAT-SAF-INC-031 — Phase 7 Loss Evaluation
 
 **Priority:** V1
-**User story:** As PIC or DPA, I need Loss Evaluation to capture final risk, repair/injury details, operational loss, and estimated cost values before closing the incident.
+**User story:** As a ship-side or office-side incident user, I need Loss Evaluation to capture final risk, repair/injury details, operational loss, and estimated cost values before closure, without waiting for Office Review approval just to save the evaluation.
 **Acceptance criteria:**
 - Risk Assessment shows Consequence, Likelihood, and Risk level dropdowns using the fixed values requested in CR-047.
 - Incident Report records show master/chief engineer, repair type, repair details, last overhaul/maintenance/survey details, delay/material/deviation/off-hire fields, and incident estimated-cost fields.
 - Injury Report records show master/chief engineer, a seeded Code of Safe Working Practices dropdown, man-hour/rest fields, delay/man-hour/repatriation/hospitalization/deviation/evacuation fields, and injury estimated-cost fields.
 - Loss Evaluation saves as one editable row per incident in `vims_safety_incident_loss_evaluation`.
+- Authorized ship-side and office-side users with incident form access and vessel scope can open and save Loss Evaluation before Office Review approval/backend `current_phase` 8.
 - Incident closure requires a saved Loss Evaluation row and a closure note; PIC or DPA can perform this for any risk band.
 - The existing `/phase-6/verify/` endpoint remains compatibility-only and is not the current visible Phase 7 UI.
 **Dependencies:** FEAT-SAF-INC-030, FEAT-SAF-XMOD-004.
-**Decisions:** D-MAINT-CR047.
+**Decisions:** D-MAINT-CR047, D-MAINT-CR052.
 **SSOT refs:** see SSOT §3.0 D-MAINT-CR047.
 
 ### FEAT-SAF-INC-032 — Multi-Vessel Incident Linking + Duplicate Detection
@@ -1905,7 +1906,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 ### Action Phases
 - Corrective Action and Preventive Action are separate visible screens.
 - Corrective Action shows Description and Due date only; owner/checker fields are not user-facing.
-- Preventive Action shows Description, Due date, and risk reduction only while preserving backend compatibility storage.
+- Preventive Action shows Description, Due date, and one shared risk-reduction answer for the screen while preserving backend compatibility storage.
 - The former Lessons Learned route is legacy-only and redirects to Office Review; legacy `LESSONS_LEARNT` rows remain readable for old records/API compatibility.
 
 ### Paper-first SOI

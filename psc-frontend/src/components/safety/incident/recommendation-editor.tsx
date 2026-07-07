@@ -61,21 +61,12 @@ function RecommendationCard({
       <p className="mt-2 text-sm leading-6 text-slate-600">
         {recommendation.description}
       </p>
-      {linkedAction?.due_date ||
-      recommendation.estimated_likelihood_reduction ? (
+      {linkedAction?.due_date ? (
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-          {linkedAction?.due_date ? (
-            <p>
-              <span className="font-semibold">Due date:</span>{' '}
-              {linkedAction.due_date}
-            </p>
-          ) : null}
-          {recommendation.estimated_likelihood_reduction ? (
-            <p className={linkedAction?.due_date ? 'mt-2' : undefined}>
-              <span className="font-semibold">Risk reduction:</span>{' '}
-              {recommendation.estimated_likelihood_reduction}
-            </p>
-          ) : null}
+          <p>
+            <span className="font-semibold">Due date:</span>{' '}
+            {linkedAction.due_date}
+          </p>
         </div>
       ) : null}
     </article>

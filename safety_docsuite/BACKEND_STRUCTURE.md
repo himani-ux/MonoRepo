@@ -18,6 +18,8 @@
 
 > **Incident Fleet Alert update (2026-07-07):** No migration is required for CR-051. The Office Review Fleet Alert endpoint reads active ships and email addresses from existing `VesselData`, writes in-app rows through existing `psc_notification`, and sends best-effort email only to the selected ships.
 
+> **Incident Loss Evaluation and preventive-risk update (2026-07-07):** No migration is required for CR-052. `GET/PATCH /api/safety/incidents/{id}/phase-6/` allows authorized ship-side and office-side users with `SAF_F_001` and vessel scope to open/save Loss Evaluation without requiring Office Review approval/backend `current_phase = 8`; `/phase-6/close/` remains office-close controlled. The Phase 4 frontend shows one shared preventive risk-reduction answer and sends it as `vims_safety_recommendation.estimated_likelihood_reduction` for preventive saves.
+
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
 ---
@@ -593,7 +595,7 @@ GET /api/safety/reference/injury-dropdown-options/?field_key=SAFE_WORKING_PRACTI
 
 ### 4.0C `vims_safety_incident_loss_evaluation` - Phase 7 Loss Evaluation
 
-This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is required before Phase 7 close. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/` and backend `current_phase = 8`, but the payload is now Loss Evaluation rather than Check Actions.
+This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is required before Phase 7 close. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/`, but GET/PATCH saves are no longer gated by Office Review approval/backend `current_phase = 8`; authorized ship-side and office-side users with incident form access and vessel scope can save it. The payload is now Loss Evaluation rather than Check Actions.
 
 ```sql
 CREATE TABLE vims_safety_incident_loss_evaluation (
@@ -1158,7 +1160,7 @@ CREATE INDEX IX_vims_safety_recommendation_theme    ON vims_safety_recommendatio
 CREATE INDEX IX_vims_safety_recommendation_alarp    ON vims_safety_recommendation (alarp_attested);
 ```
 
-CR-049 compatibility note: `rationale`, `theme_code`, and `estimated_effort` remain nullable storage for old recommendation rows and direct API compatibility, but the current Incident action frontend does not render or send recommendation rationale / "Why is this needed?", theme, or effort. Preventive Action now sends Description, Due date, and risk reduction; the due date is stored through the existing linked `vims_safety_corrective_action` row for the preventive recommendation. Formal Incident PDF output also omits stored recommendation rationale.
+CR-049/CR-052 compatibility note: `rationale`, `theme_code`, and `estimated_effort` remain nullable storage for old recommendation rows and direct API compatibility, but the current Incident action frontend does not render or send recommendation rationale / "Why is this needed?", theme, or effort. Preventive Action now sends Description, Due date, and one shared screen-level risk reduction; the due date is stored through the existing linked `vims_safety_corrective_action` row for the preventive recommendation, and the shared risk-reduction answer is stored in `vims_safety_recommendation.estimated_likelihood_reduction` for backend compatibility. Formal Incident PDF output also omits stored recommendation rationale.
 
 ---
 
@@ -1594,11 +1596,11 @@ The current user-facing evidence screen writes new evidence to the legacy `PAPER
 
 #### 9.2.4b Phase 7 Loss Evaluation (CR-047)
 
-Current visible Phase 7 uses backend compatibility phase 8 and route path `/phase-6/`.
+Current visible Phase 7 uses route path `/phase-6/` and no longer requires backend compatibility phase 8 for workspace read/save.
 
-- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, `report_type` (`INCIDENT` or `INJURY`), fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation`, and `ready_for_close`.
-- `PATCH /api/safety/incidents/{id}/phase-6/` creates or updates the one-to-one `vims_safety_incident_loss_evaluation` row and emits `vims_safety_field_history` rows for changed fields.
-- `POST /api/safety/incidents/{id}/phase-6/close/` requires a saved Loss Evaluation row plus `closure_reason`, then transitions backend `current_phase` 8 to 9 and sets `state=CLOSED`.
+- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, `report_type` (`INCIDENT` or `INJURY`), fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation`, and `ready_for_close` for authorized ship-side or office-side users with incident form access and vessel scope.
+- `PATCH /api/safety/incidents/{id}/phase-6/` creates or updates the one-to-one `vims_safety_incident_loss_evaluation` row and emits `vims_safety_field_history` rows for changed fields without requiring Office Review approval/backend `current_phase = 8`.
+- `POST /api/safety/incidents/{id}/phase-6/close/` requires office close authority, a saved Loss Evaluation row, and `closure_reason`, then transitions backend `current_phase` 8 to 9 and sets `state=CLOSED`.
 - `POST /api/safety/incidents/{id}/phase-6/verify/` remains registered for legacy effectiveness-verification compatibility but is not the current visible Phase 7 UI.
 - PIC and DPA can save and close for every risk band after Office Review approval.
 

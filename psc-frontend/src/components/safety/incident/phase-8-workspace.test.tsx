@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const phase8Mocks = vi.hoisted(() => ({
   closeIncidentPhase8: vi.fn(),
-  getIncidentPhase7Preflight: vi.fn(),
   getIncidentPhase8Workspace: vi.fn(),
   navigate: vi.fn(),
   saveIncidentPhase8LossEvaluation: vi.fn(),
@@ -29,7 +28,6 @@ vi.mock('../../../hooks/use-auth', () => ({
 vi.mock('../../../lib/api/safety', () => ({
   safetyApi: {
     closeIncidentPhase8: phase8Mocks.closeIncidentPhase8,
-    getIncidentPhase7Preflight: phase8Mocks.getIncidentPhase7Preflight,
     getIncidentPhase8Workspace: phase8Mocks.getIncidentPhase8Workspace,
     saveIncidentPhase8LossEvaluation: phase8Mocks.saveIncidentPhase8LossEvaluation,
   },
@@ -136,27 +134,21 @@ describe('SafetyIncidentPhase8', () => {
     };
   }
 
-  it('shows office approval gating without calling the loss-evaluation endpoint', async () => {
-    phase8Mocks.getIncidentPhase7Preflight.mockResolvedValue({
+  it('loads loss evaluation before office approval', async () => {
+    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace({
       current_phase: 7,
       incident_id: 'incident-1',
-      ready_for_acceptance: true,
       state: 'IN_PROGRESS',
-    });
+    }));
 
     render(<SafetyIncidentPhase8 />);
 
-    expect(await screen.findByText('Office approval required')).toBeInTheDocument();
-    expect(screen.getByText(/Office Review must be approved before Loss Evaluation can start/i)).toBeInTheDocument();
-    expect(phase8Mocks.getIncidentPhase8Workspace).not.toHaveBeenCalled();
+    expect(await screen.findByRole('heading', { name: 'Loss Evaluation' })).toBeInTheDocument();
+    expect(screen.queryByText('Office approval required')).toBeNull();
+    expect(phase8Mocks.getIncidentPhase8Workspace).toHaveBeenCalledWith('incident-1');
   });
 
   it('loads incident report loss-evaluation fields after office approval', async () => {
-    phase8Mocks.getIncidentPhase7Preflight.mockResolvedValue({
-      current_phase: 8,
-      incident_id: 'incident-1',
-      state: 'IN_PROGRESS',
-    });
     phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace());
 
     render(<SafetyIncidentPhase8 />);
@@ -171,11 +163,6 @@ describe('SafetyIncidentPhase8', () => {
   });
 
   it('loads injury report specific fields', async () => {
-    phase8Mocks.getIncidentPhase7Preflight.mockResolvedValue({
-      current_phase: 8,
-      incident_id: 'incident-1',
-      state: 'IN_PROGRESS',
-    });
     phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace({ report_type: 'INJURY' }));
 
     render(<SafetyIncidentPhase8 />);
@@ -193,11 +180,6 @@ describe('SafetyIncidentPhase8', () => {
       ready_for_close: true,
       blockers: [],
       blocker_details: [],
-    });
-    phase8Mocks.getIncidentPhase7Preflight.mockResolvedValue({
-      current_phase: 8,
-      incident_id: 'incident-1',
-      state: 'IN_PROGRESS',
     });
     phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(firstWorkspace);
     phase8Mocks.saveIncidentPhase8LossEvaluation.mockResolvedValue(savedWorkspace);

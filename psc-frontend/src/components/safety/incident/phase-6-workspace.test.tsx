@@ -389,4 +389,67 @@ describe('SafetyIncidentPhase6', () => {
       );
     });
   });
+
+  it('shows one shared risk-reduction answer for saved preventive actions', async () => {
+    phase6Mocks.getIncidentPhase6Workspace.mockResolvedValue({
+      ...buildWorkspace(),
+      recommendations: {
+        CORRECTIVE: [],
+        LESSONS_LEARNT: [],
+        PREVENTIVE: [
+          {
+            alarp_attested: true,
+            corrective_actions: [
+              {
+                description: 'Add toolbox talk.',
+                due_date: '2026-07-21',
+                id: 'ca-1',
+                status: 'OPEN',
+                title: 'Add toolbox talk.',
+                verifier_user_id: 'current-user',
+              },
+            ],
+            description: 'Add toolbox talk.',
+            estimated_likelihood_reduction: 'LOW',
+            id: 'rec-1',
+            rationale: '',
+            tier: 'PREVENTIVE',
+            title: 'Add toolbox talk.',
+            tolerable_failure_filter: false,
+          },
+          {
+            alarp_attested: true,
+            corrective_actions: [
+              {
+                description: 'Revise checklist.',
+                due_date: '2026-07-22',
+                id: 'ca-2',
+                status: 'OPEN',
+                title: 'Revise checklist.',
+                verifier_user_id: 'current-user',
+              },
+            ],
+            description: 'Revise checklist.',
+            estimated_likelihood_reduction: 'LOW',
+            id: 'rec-2',
+            rationale: '',
+            tier: 'PREVENTIVE',
+            title: 'Revise checklist.',
+            tolerable_failure_filter: false,
+          },
+        ],
+      },
+      tier_counts: { CORRECTIVE: 0, LESSONS_LEARNT: 0, PREVENTIVE: 2 },
+    });
+
+    render(<SafetyIncidentPhase6 fixedTier="PREVENTIVE" />);
+
+    const riskReductionFields = await screen.findAllByLabelText(
+      'How much will this reduce risk?'
+    );
+
+    expect(riskReductionFields).toHaveLength(1);
+    expect(riskReductionFields[0]).toHaveValue('LOW');
+    expect(screen.queryByText('Risk reduction:')).toBeNull();
+  });
 });

@@ -206,10 +206,10 @@ Entry point: Safety sidebar → **Incidents** (`/safety/incidents/`).
 **Current action phases (CR-038, superseded by CR-042 for Lessons Learned):**
 
 1. **Phase 3 - Corrective Action** (`/safety/incidents/:id/phase-3/`) captures the corrective action description and due date. The old owner/checker card is not shown.
-2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures Description, Due date, and **How much will this reduce risk?** It does not ask for Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording.
+2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures Description, Due date, and one shared **How much will this reduce risk?** answer for the screen. It does not ask for Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording, and saved preventive cards do not repeat risk reduction per row.
 3. The former **Lessons Learned** screen is removed from current navigation. Its old URL redirects to Office Review.
 4. Each save shows a success message and moves to the saved item so users can review what was saved.
-5. To correct a saved corrective or preventive action, use **Edit** on that saved card. The form is filled with the saved values; **Update** changes that existing item instead of adding a duplicate.
+5. To correct a saved corrective or preventive action, use **Edit** on that saved card. The form is filled with the saved values; **Update** changes that existing item instead of adding a duplicate. The preventive risk-reduction answer remains a shared screen-level field.
 
 **Phase 4 — Evidence Workspace** (`/safety/incidents/:id/phase-4/`):
 
@@ -496,7 +496,7 @@ The DPA is a lead authority at every Incident investigation phase. Under the cur
 | Phase 4 — Preventive Action | Review preventive action |
 | Legacy Lessons route | Redirects to Office Review; not a current DPA work step |
 | Legacy analysis tools | Background compatibility only; not a current visible phase |
-| Phase 7 — Loss Evaluation | Save final risk, loss, repair/injury, and cost evaluation before closure |
+| Phase 7 — Loss Evaluation | Ship-side or office-side users save final risk, loss, repair/injury, and cost evaluation before office closure |
 | **Phase 6 — Office Review** | **Enter Office Comments/lesson learnt, accept, or send for rework** at `/safety/incidents/:id/phase-5/` |
 | Legacy follow-up verification | Compatibility route only; current visible Phase 7 is Loss Evaluation |
 | Closure | YELLOW band — sign and close. RED band — hand to FM. |
@@ -532,8 +532,8 @@ Office Review runs the required readiness checks in the background. The visible 
 4. Confirm ALARP attestation on every RED/YELLOW System-Action (Round 21 R02).
 5. Enter **Office Comments/lesson learnt** if the office review needs a note. There is no word limit.
 6. Before previewing or downloading the PDF, review the **Select PDF content** checklist. All items are selected by default: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature. PDF preview/download is available for incident records before Phase 7 acceptance; the page should not show a Phase 7 acceptance-only PDF warning.
-7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8, writes closure event to `vims_safety_incident_phase_log`.
-8. Open `/safety/incidents/:id/phase-6/`, complete **Loss Evaluation**, and save it. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds.
+7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, keeps the record compatible with visible Phase 7 Loss Evaluation, and writes the event to `vims_safety_incident_phase_log`.
+8. Open `/safety/incidents/:id/phase-6/`, complete **Loss Evaluation**, and save it. Ship-side and office-side users with incident access can save this evaluation without waiting for Office Review approval. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds and remains an office close action.
 
 To issue an Incident Fleet Alert from Office Review, tap **Fleet Alert** below **Accept / Close**, select one or more ships, and tap **Send Fleet Alert**. The system sends in-app and email alerts only to the selected ships; vessel email addresses come from `VesselData.email`.
 
@@ -623,8 +623,8 @@ For RED-band incidents only, you are the closer (D-GAP-M06):
 1. DPA signs during Office Review.
 2. Record routes to you at `/safety/incidents/:id/phase-5/`.
 3. Review the full investigation record; read-access to RCA, actions, evidence, and Office Review is full edit for RED (D-GAP-M06 gives you full-edit authority on RED — unusual among shore roles).
-4. Tap **Accept**. Record transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8. PDF generates (FEAT-SAF-PDF-001). Closure event logs to `vims_safety_incident_phase_log`.
-5. Complete and save Loss Evaluation at `/safety/incidents/:id/phase-6/`; then close with a closure note.
+4. Tap **Accept**. Record stays compatible with visible Phase 7 Loss Evaluation and PDF generation (FEAT-SAF-PDF-001). Closure event logs to `vims_safety_incident_phase_log`.
+5. Complete and save Loss Evaluation at `/safety/incidents/:id/phase-6/` if it has not already been saved by a ship-side or office-side user; then close with a closure note.
 5. Your signature is the terminal node in the Reporter → Master → HOD → DPA → FM chain (`V-INC-073` / `V-INC-074`).
 
 ### 8.5 FM Routes at a Glance

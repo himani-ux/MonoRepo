@@ -68,13 +68,10 @@ class IncidentPhase8ViewMixin(IncidentViewMixin):
 class IncidentPhase8WorkspaceView(IncidentPhase8ViewMixin, generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         incident = self.get_incident()
-        self._require_phase_eight(incident)
         return Response(build_phase8_workspace_payload(incident), status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
         incident = self.get_incident()
-        self._require_phase_eight(incident)
-        self._enforce_band_actor(incident)
 
         try:
             loss_evaluation = incident.loss_evaluation

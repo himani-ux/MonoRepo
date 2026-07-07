@@ -30,12 +30,13 @@ interface RecommendationDraft {
   description: string;
   due_date: string;
   estimated_effort: string;
-  estimated_likelihood_reduction: '' | (typeof LIKELIHOOD)[number];
   residual_risk_statement: string;
   theme_code: string;
   tier: Tier;
   tolerable_failure_filter: boolean;
 }
+
+type PreventiveRiskReduction = '' | (typeof LIKELIHOOD)[number];
 
 interface SafetyIncidentPhase6Props {
   fixedTier?: Tier;
@@ -54,7 +55,6 @@ function emptyDraftForTier(tier: Tier): RecommendationDraft {
     description: '',
     due_date: '',
     estimated_effort: '',
-    estimated_likelihood_reduction: '',
     residual_risk_statement: '',
     theme_code: '',
     tier,
@@ -161,6 +161,8 @@ export function SafetyIncidentPhase6({
   const [draft, setDraft] = useState<RecommendationDraft>(() =>
     emptyDraftForTier(fixedTier ?? 'CORRECTIVE')
   );
+  const [preventiveRiskReduction, setPreventiveRiskReduction] =
+    useState<PreventiveRiskReduction>('');
   const [error, setError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [phaseAdvanceError, setPhaseAdvanceError] = useState<string | null>(
@@ -224,6 +226,21 @@ export function SafetyIncidentPhase6({
   const selectedTierAlreadyExists = (
     workspace.recommendations[draft.tier] ?? []
   ).some((recommendation) => recommendation.id !== editingRecommendationId);
+  const savedPreventiveRiskReduction = useMemo(
+    () =>
+      workspace.recommendations.PREVENTIVE.find(
+        (recommendation) => recommendation.estimated_likelihood_reduction
+      )?.estimated_likelihood_reduction ?? '',
+    [workspace.recommendations.PREVENTIVE]
+  );
+
+  useEffect(() => {
+    if (savedPreventiveRiskReduction) {
+      setPreventiveRiskReduction(
+        savedPreventiveRiskReduction as PreventiveRiskReduction
+      );
+    }
+  }, [savedPreventiveRiskReduction]);
 
   useEffect(() => {
     if (
@@ -275,13 +292,17 @@ export function SafetyIncidentPhase6({
       description: recommendation.description,
       due_date: linkedAction?.due_date ?? '',
       estimated_effort: recommendation.estimated_effort ?? '',
-      estimated_likelihood_reduction:
-        recommendation.estimated_likelihood_reduction ?? '',
       residual_risk_statement: recommendation.residual_risk_statement ?? '',
       theme_code: recommendation.theme_code ?? '',
       tier: recommendation.tier,
       tolerable_failure_filter: recommendation.tolerable_failure_filter,
     });
+    if (recommendation.tier === 'PREVENTIVE') {
+      setPreventiveRiskReduction(
+        (recommendation.estimated_likelihood_reduction ??
+          preventiveRiskReduction) as PreventiveRiskReduction
+      );
+    }
     window.setTimeout(() => {
       recommendationFormRef.current?.scrollIntoView({
         behavior: 'smooth',
@@ -314,7 +335,7 @@ export function SafetyIncidentPhase6({
       payload.theme_code = null;
       payload.estimated_effort = null;
       payload.estimated_likelihood_reduction =
-        draft.estimated_likelihood_reduction || null;
+        preventiveRiskReduction || null;
       payload.residual_risk_statement = description;
       payload.alarp_attested = true;
       payload.corrective_action = {
@@ -388,7 +409,7 @@ export function SafetyIncidentPhase6({
 
   const preventiveMissingRequiredFields =
     draft.tier === 'PREVENTIVE' &&
-    (!draft.due_date || !draft.estimated_likelihood_reduction);
+    (!draft.due_date || !preventiveRiskReduction);
   const saveDisabled =
     isMutating ||
     (!isEditingRecommendation && availableTiers.length === 0) ||
@@ -546,13 +567,11 @@ export function SafetyIncidentPhase6({
                     <select
                       className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
                       onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          estimated_likelihood_reduction: event.target
-                            .value as RecommendationDraft['estimated_likelihood_reduction'],
-                        }))
+                        setPreventiveRiskReduction(
+                          event.target.value as PreventiveRiskReduction
+                        )
                       }
-                      value={draft.estimated_likelihood_reduction}
+                      value={preventiveRiskReduction}
                     >
                       <option value="">Select reduction</option>
                       {LIKELIHOOD.map((option) => (

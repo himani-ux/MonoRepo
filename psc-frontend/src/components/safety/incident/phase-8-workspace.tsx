@@ -311,7 +311,6 @@ export function SafetyIncidentPhase8() {
   const [closureReason, setClosureReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
-  const [isOfficeApprovalPending, setIsOfficeApprovalPending] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
 
@@ -322,22 +321,8 @@ export function SafetyIncidentPhase8() {
       return;
     }
     setError(null);
-    setIsOfficeApprovalPending(false);
     setIsLoading(true);
     try {
-      const preflight = await safetyApi.getIncidentPhase7Preflight(id);
-      const preflightPhase = Number((preflight as { current_phase?: unknown }).current_phase);
-      if (Number.isFinite(preflightPhase) && preflightPhase < 8) {
-        setWorkspace({
-          ...emptyWorkspace(),
-          current_phase: preflightPhase,
-          incident_id: String(id),
-          state: String((preflight as { state?: unknown }).state ?? ""),
-        });
-        setIsOfficeApprovalPending(true);
-        return;
-      }
-
       const payload = (await safetyApi.getIncidentPhase8Workspace(id)) as unknown as SafetyPhase8WorkspacePayload;
       const normalizedPayload = {
         ...emptyWorkspace(),
@@ -367,10 +352,10 @@ export function SafetyIncidentPhase8() {
   }, [reload]);
 
   const currentRole = normalizeCode(user?.role || role || user?.safety_role_name || user?.role_name);
-  const canAct = roleCanAct(currentRole);
   const reportType = workspace.report_type;
   const isInjuryReport = reportType === "INJURY";
   const reportLabel = isInjuryReport ? "Injury Report" : "Incident Report";
+  const canClose = roleCanAct(currentRole);
   const incidentTotal = useMemo(() => sumDecimalFields(draft, incidentCostFields), [draft]);
   const injuryTotal = useMemo(() => sumDecimalFields(draft, injuryCostFields), [draft]);
   const safeWorkingPracticeOptions = useMemo(() => {
@@ -450,23 +435,6 @@ export function SafetyIncidentPhase8() {
     );
   }
 
-  if (isOfficeApprovalPending) {
-    return (
-      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 shadow-sm">
-        <h2 className="text-xl font-semibold text-amber-950">Office approval required</h2>
-        <p className="mt-2 max-w-3xl leading-6">
-          Office Review must be approved before Loss Evaluation can start.
-        </p>
-        <Link
-          className="mt-4 inline-flex min-h-11 items-center rounded-full border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900"
-          to={`/safety/incidents/${id}/phase-5`}
-        >
-          Go to Office Review
-        </Link>
-      </section>
-    );
-  }
-
   return (
     <section className="space-y-6">
       <div ref={noticeRef} />
@@ -491,12 +459,6 @@ export function SafetyIncidentPhase8() {
           </span>
         </div>
       </header>
-
-      {!canAct ? (
-        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Your current login cannot update this phase.
-        </section>
-      ) : null}
 
       <form className="space-y-6" onSubmit={saveLossEvaluation}>
         <Card eyebrow="Risk Assessment" title="Risk Assessment">
@@ -800,7 +762,7 @@ export function SafetyIncidentPhase8() {
 
         <button
           className="min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400"
-          disabled={isMutating || !canAct}
+          disabled={isMutating}
           type="submit"
         >
           {isMutating ? "Saving..." : "Save Loss Evaluation"}
@@ -809,6 +771,11 @@ export function SafetyIncidentPhase8() {
 
       <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={closeIncident}>
         <h2 className="text-xl font-semibold text-slate-950">Close Incident</h2>
+        {!canClose ? (
+          <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Office role is required to close the incident.
+          </p>
+        ) : null}
         {!workspace.ready_for_close ? (
           <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             Save Loss Evaluation before closing.
@@ -824,7 +791,7 @@ export function SafetyIncidentPhase8() {
         </label>
         <button
           className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400"
-          disabled={isMutating || !canAct || !workspace.ready_for_close || !closureReason.trim()}
+          disabled={isMutating || !canClose || !workspace.ready_for_close || !closureReason.trim()}
           type="submit"
         >
           {isMutating ? "Closing..." : "Close Incident"}
