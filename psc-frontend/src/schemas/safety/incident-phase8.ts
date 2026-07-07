@@ -8,6 +8,7 @@ export interface SafetyLossEvaluationOption<T = string | boolean> {
 
 export interface SafetyIncidentLossEvaluation {
   id: string | null;
+  report_type: SafetyLossEvaluationReportType | null;
   consequence: string | null;
   likelihood: string | null;
   risk_level: string | null;
@@ -72,6 +73,7 @@ export interface SafetyPhase8WorkspacePayload {
   has_loss_evaluation: boolean;
   loss_evaluation: SafetyIncidentLossEvaluation;
   choices: {
+    report_type: Array<SafetyLossEvaluationOption<SafetyLossEvaluationReportType>>;
     consequence: Array<SafetyLossEvaluationOption<string>>;
     likelihood: Array<SafetyLossEvaluationOption<string>>;
     risk_level: Array<SafetyLossEvaluationOption<string>>;

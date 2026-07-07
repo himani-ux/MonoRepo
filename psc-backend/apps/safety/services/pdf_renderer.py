@@ -456,7 +456,12 @@ class IncidentPdfRenderer:
         if loss is None:
             return []
 
-        is_injury_report = self._external_party_injury_record(incident) is not None
+        saved_report_type = getattr(loss, "report_type", None)
+        is_injury_report = (
+            saved_report_type == IncidentLossEvaluation.ReportType.INJURY
+            if saved_report_type
+            else self._external_party_injury_record(incident) is not None
+        )
         blocks = [
             self._detail_block(
                 "Loss Evaluation - Risk Assessment",

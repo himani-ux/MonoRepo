@@ -6,6 +6,10 @@ from .base import PublicIdMixin
 
 
 class IncidentLossEvaluation(PublicIdMixin):
+    class ReportType(models.TextChoices):
+        INCIDENT = "INCIDENT", "Incident Report"
+        INJURY = "INJURY", "Injury Report"
+
     class Consequence(models.TextChoices):
         MINOR = "MINOR", "Minor"
         APPRECIABLE = "APPRECIABLE", "Appreciable"
@@ -39,6 +43,7 @@ class IncidentLossEvaluation(PublicIdMixin):
         related_name="loss_evaluation",
     )
 
+    report_type = models.CharField(max_length=16, choices=ReportType.choices, null=True, blank=True)
     consequence = models.CharField(max_length=32, choices=Consequence.choices, null=True, blank=True)
     likelihood = models.CharField(max_length=32, choices=Likelihood.choices, null=True, blank=True)
     risk_level = models.CharField(max_length=32, choices=RiskLevel.choices, null=True, blank=True)

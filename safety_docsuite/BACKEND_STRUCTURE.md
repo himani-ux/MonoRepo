@@ -20,6 +20,8 @@
 
 > **Incident Loss Evaluation and preventive-risk update (2026-07-07):** No migration is required for CR-052. `GET/PATCH /api/safety/incidents/{id}/phase-6/` allows authorized ship-side and office-side users with `SAF_F_001` and vessel scope to open/save Loss Evaluation without requiring Office Review approval/backend `current_phase = 8`; `/phase-6/close/` remains office-close controlled. The Phase 4 frontend shows one shared preventive risk-reduction answer and sends it as `vims_safety_recommendation.estimated_likelihood_reduction` for preventive saves.
 
+> **Incident Loss Evaluation report-type update (2026-07-07):** Deploy migration `0056_incident_loss_evaluation_report_type.py` before using the CR-053 Phase 7 selector. It adds nullable `vims_safety_incident_loss_evaluation.report_type` with `INCIDENT` and `INJURY` choices. `PATCH /api/safety/incidents/{id}/phase-6/` persists the selected type, `GET` returns `choices.report_type`, and PDF Loss Evaluation cost/detail blocks use the saved type. Existing rows without a saved type keep the previous injury-record fallback.
+
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
 ---
@@ -595,12 +597,13 @@ GET /api/safety/reference/injury-dropdown-options/?field_key=SAFE_WORKING_PRACTI
 
 ### 4.0C `vims_safety_incident_loss_evaluation` - Phase 7 Loss Evaluation
 
-This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is required before Phase 7 close. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/`, but GET/PATCH saves are no longer gated by Office Review approval/backend `current_phase = 8`; authorized ship-side and office-side users with incident form access and vessel scope can save it. The payload is now Loss Evaluation rather than Check Actions.
+This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is required before Phase 7 close. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/`, but GET/PATCH saves are no longer gated by Office Review approval/backend `current_phase = 8`; authorized ship-side and office-side users with incident form access and vessel scope can save it. The payload is now Loss Evaluation rather than Check Actions. Migration `0056_incident_loss_evaluation_report_type.py` adds nullable `report_type` so users can choose Incident Report or Injury Report first; existing rows without that value use the old injury-record fallback.
 
 ```sql
 CREATE TABLE vims_safety_incident_loss_evaluation (
   id                                            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   incident_id                                   UNIQUEIDENTIFIER NOT NULL UNIQUE,
+  report_type                                   VARCHAR(16) NULL,
   consequence                                   VARCHAR(32) NULL,
   likelihood                                    VARCHAR(32) NULL,
   risk_level                                    VARCHAR(32) NULL,
@@ -1598,8 +1601,8 @@ The current user-facing evidence screen writes new evidence to the legacy `PAPER
 
 Current visible Phase 7 uses route path `/phase-6/` and no longer requires backend compatibility phase 8 for workspace read/save.
 
-- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, `report_type` (`INCIDENT` or `INJURY`), fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation`, and `ready_for_close` for authorized ship-side or office-side users with incident form access and vessel scope.
-- `PATCH /api/safety/incidents/{id}/phase-6/` creates or updates the one-to-one `vims_safety_incident_loss_evaluation` row and emits `vims_safety_field_history` rows for changed fields without requiring Office Review approval/backend `current_phase = 8`.
+- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, effective/saved `report_type` (`INCIDENT` or `INJURY`), `choices.report_type`, fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation`, and `ready_for_close` for authorized ship-side or office-side users with incident form access and vessel scope.
+- `PATCH /api/safety/incidents/{id}/phase-6/` creates or updates the one-to-one `vims_safety_incident_loss_evaluation` row, persists selected `report_type`, and emits `vims_safety_field_history` rows for changed fields without requiring Office Review approval/backend `current_phase = 8`.
 - `POST /api/safety/incidents/{id}/phase-6/close/` requires office close authority, a saved Loss Evaluation row, and `closure_reason`, then transitions backend `current_phase` 8 to 9 and sets `state=CLOSED`.
 - `POST /api/safety/incidents/{id}/phase-6/verify/` remains registered for legacy effectiveness-verification compatibility but is not the current visible Phase 7 UI.
 - PIC and DPA can save and close for every risk band after Office Review approval.
@@ -1654,7 +1657,7 @@ Band-gated re-open (D-EDGE-03).
 
 #### 9.2.10 `GET /api/safety/incidents/{id}/pdf/`
 
-Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter template. For incident exports, the rendered title is `Injury Report` when `vims_safety_external_party_injury` has a row for the incident; otherwise the rendered title is `Incident Report`. The Estimated Cost selection prints Phase 7 Loss Evaluation blocks from `vims_safety_incident_loss_evaluation` when that row exists; older injury cost fields are used only as fallback when no Loss Evaluation row exists.
+Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter template. For incident exports, the rendered title is `Injury Report` when `vims_safety_external_party_injury` has a row for the incident; otherwise the rendered title is `Incident Report`. The Estimated Cost selection prints Phase 7 Loss Evaluation blocks from `vims_safety_incident_loss_evaluation` when that row exists; the saved `report_type` controls whether incident repair/loss/cost or injury safe-working-practice/rest/cost blocks print. Older rows without `report_type` use the injury-record fallback, and older injury cost fields are used only as fallback when no Loss Evaluation row exists.
 
 - **Auth:** `SAF_P_023`.
 - **Query:** optional `sections`, accepted as repeated values or comma-separated keys. Current frontend defaults to `summary`, `reporter_details`, `injury_details`, `estimated_cost`, `root_cause`, `evidence_documents`, `corrective_preventive_actions`, and `signature`. The legacy backend key `lessons_learned` remains accepted for old/direct exports only. Omitted or empty `sections` renders all allowed backend sections for compatibility.

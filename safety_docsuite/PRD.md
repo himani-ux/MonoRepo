@@ -116,7 +116,7 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 | FEAT-SAF-INC-028 | Preventive Action compatibility risk fields | INC | Compatibility | D-GAP-R02, D-MAINT-CR038, D-MAINT-CR052 |
 | FEAT-SAF-INC-029 | Tolerable-Failure Filter (GREEN only) | INC | V1.1 | D-GAP-R11 |
 | FEAT-SAF-INC-030 | Phase 6 Office Review / Report Issued | INC | V1 | §2B.6, D-PDF-01 |
-| FEAT-SAF-INC-031 | Phase 7 Loss Evaluation | INC | V1 | D-MAINT-CR047, D-MAINT-CR052 |
+| FEAT-SAF-INC-031 | Phase 7 Loss Evaluation | INC | V1 | D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053 |
 | FEAT-SAF-INC-032 | Multi-Vessel Incident Linking + Duplicate Detection | INC | V1 | D-EDGE-01, D-GAP-M25, D-GAP-M07 |
 | FEAT-SAF-INC-033 | Near-Miss ↔ Incident Supersede-and-Create-New | INC | V1 | D-EDGE-07 |
 | FEAT-SAF-INC-034 | Crew / Non-Crew Injury Capture | INC | V1 | D-EDGE-02 |
@@ -648,14 +648,15 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **User story:** As a ship-side or office-side incident user, I need Loss Evaluation to capture final risk, repair/injury details, operational loss, and estimated cost values before closure, without waiting for Office Review approval just to save the evaluation.
 **Acceptance criteria:**
 - Risk Assessment shows Consequence, Likelihood, and Risk level dropdowns using the fixed values requested in CR-047.
-- Incident Report records show master/chief engineer, repair type, repair details, last overhaul/maintenance/survey details, delay/material/deviation/off-hire fields, and incident estimated-cost fields.
-- Injury Report records show master/chief engineer, a seeded Code of Safe Working Practices dropdown, man-hour/rest fields, delay/man-hour/repatriation/hospitalization/deviation/evacuation fields, and injury estimated-cost fields.
-- Loss Evaluation saves as one editable row per incident in `vims_safety_incident_loss_evaluation`.
+- The screen first asks the user to choose whether the Loss Evaluation is for an Incident Report or Injury Report before showing report-specific fields.
+- Incident Report selection shows master/chief engineer, repair type, repair details, last overhaul/maintenance/survey details, delay/material/deviation/off-hire fields, and incident estimated-cost fields.
+- Injury Report selection shows master/chief engineer, a seeded Code of Safe Working Practices dropdown, man-hour/rest fields, delay/man-hour/repatriation/hospitalization/deviation/evacuation fields, and injury estimated-cost fields.
+- Loss Evaluation saves as one editable row per incident in `vims_safety_incident_loss_evaluation`, including nullable `report_type`; existing rows without `report_type` keep the prior injury-record fallback.
 - Authorized ship-side and office-side users with incident form access and vessel scope can open and save Loss Evaluation before Office Review approval/backend `current_phase` 8.
 - Incident closure requires a saved Loss Evaluation row and a closure note; PIC or DPA can perform this for any risk band.
 - The existing `/phase-6/verify/` endpoint remains compatibility-only and is not the current visible Phase 7 UI.
 **Dependencies:** FEAT-SAF-INC-030, FEAT-SAF-XMOD-004.
-**Decisions:** D-MAINT-CR047, D-MAINT-CR052.
+**Decisions:** D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053.
 **SSOT refs:** see SSOT §3.0 D-MAINT-CR047.
 
 ### FEAT-SAF-INC-032 — Multi-Vessel Incident Linking + Duplicate Detection

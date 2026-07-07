@@ -24,7 +24,7 @@ This document is the **screen contract** for every route the Safety Module expos
 
 > **Incident Office Review update (2026-07-07):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments/lesson learnt** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. The comment is separate from the later closure reason and prints near the signature area in the incident PDF when present. Under D-MAINT-CR044, D-MAINT-CR049, D-MAINT-CR050, and D-MAINT-CR051, PIC and DPA can accept, close, send rework, or issue a selected-ship Fleet Alert for every incident risk band; the old RED/FM closer gate is legacy-only. Office-side users see Accept / Close, Fleet Alert, and Send for rework controls; ship-side users see the Office Comments/lesson learnt card, with "Office comment is not added yet." when no note exists. Office-side Phase 6 does not show Phase 7 acceptance-only PDF warning text.
 
-> **Incident Loss Evaluation update (2026-07-07):** Visible Phase 7 is **Loss Evaluation**, served on the existing compatibility route `/safety/incidents/:id/phase-6/`. Authorized ship-side and office-side users with incident form access and vessel scope can open and save one editable `vims_safety_incident_loss_evaluation` row through `PATCH /api/safety/incidents/:id/phase-6/` without waiting for Office Review approval. Incident Report and Injury Report records show different Other Details, Cost Evaluation, and Estimated Costs fields. Closure through `/phase-6/close/` remains an office close action and requires a saved Loss Evaluation row plus a closure note.
+> **Incident Loss Evaluation update (2026-07-07):** Visible Phase 7 is **Loss Evaluation**, served on the existing compatibility route `/safety/incidents/:id/phase-6/`. Authorized ship-side and office-side users with incident form access and vessel scope can open and save one editable `vims_safety_incident_loss_evaluation` row through `PATCH /api/safety/incidents/:id/phase-6/` without waiting for Office Review approval. The first field asks whether the Loss Evaluation is for an Incident Report or Injury Report; the saved nullable `report_type` controls which Other Details, Cost Evaluation, and Estimated Costs fields are shown on reload and in PDF cost blocks. Existing rows without `report_type` keep the old injury-record fallback. Closure through `/phase-6/close/` remains an office close action and requires a saved Loss Evaluation row plus a closure note.
 
 **Glossary (first-use, per `<glossary>`):** **DPA** = Designated Person Ashore (ISM Code §4); **FM** = Fleet Manager; **TD** = Technical Director; **HOD** = Head of Department (onboard: CO or CE); **CO** = Chief Officer; **CE** = Chief Engineer; **SO** = Safety Officer (SOLAS Reg VI, COSWP 13.3.2); **SCM** = Safety Committee Meeting; **SOI** = Safety Officer Inspection; **MoC** = Management of Change; **RCA** = Root Cause Analysis; **CA / PA** = Corrective Action / Preventive Action; **ALARP** = As Low As Reasonably Practicable; **SMC / MC / MI** = Serious Marine Casualty / Marine Casualty / Marine Incident (IMO Casualty Investigation Code MSC.255(84)); **WRH** = Work & Rest Hours module; **CMS** = Crew Management System module; **PMS** = Planned Maintenance System module (**decoupled from VIMS — D-GAP-I1**); **SSQE** = Safety, Security, Quality & Environment (KSM Manual Rev 01 Feb 2026).
 
@@ -502,15 +502,15 @@ Current action screens use the existing recommendation/corrective-action backend
 ### 4.8 Phase 7 / backend Phase 8 — Loss Evaluation — `FEAT-SAF-INC-031`
 
 **Route:** `/safety/incidents/:id/phase-6/` (frontend compatibility path; legacy `/phase-8/` component aliases may still exist internally).
-**Current CR-047 role gate:** PIC or DPA can save Loss Evaluation and close for every risk band after Office Review approval.
-**Role gate:** `PermissionGate(SAF_F_001) + role ∈ {PIC, DPA}`.
+**Current CR-052/CR-053 save gate:** authorized ship-side and office-side users with `SAF_F_001` incident access and vessel scope can save Loss Evaluation before Office Review approval; closure remains an office action for PIC or DPA.
+**Role gate:** `PermissionGate(SAF_F_001) + vessel scope` for save; PIC or DPA for close.
 **Data loaded on mount:**
-- `GET /api/safety/incidents/:id/phase-6/` — Loss Evaluation workspace with `report_type`, dropdown choices, saved `loss_evaluation`, and close readiness.
-- `PATCH /api/safety/incidents/:id/phase-6/` — saves one editable Loss Evaluation row in `vims_safety_incident_loss_evaluation`.
+- `GET /api/safety/incidents/:id/phase-6/` — Loss Evaluation workspace with `report_type`, `choices.report_type`, fixed dropdown choices, saved `loss_evaluation`, and close readiness.
+- `PATCH /api/safety/incidents/:id/phase-6/` — saves one editable Loss Evaluation row in `vims_safety_incident_loss_evaluation`, including the user-selected `report_type`.
 - `POST /api/safety/incidents/:id/phase-6/close/` — closes after Loss Evaluation is saved and closure note is supplied.
 **Signature transition:** no formal re-signing of the incident report; closure note and Office Review signature remain in the final PDF signature/closure area.
 **States:**
-- **Loaded:** Risk Assessment, Other Details, Cost Evaluation, Estimated Costs, and Close Incident card. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields.
+- **Loaded:** Report Type selector first, then Risk Assessment, Other Details, Cost Evaluation, Estimated Costs, and Close Incident card after a type is selected. Incident Report selection shows repair/loss/cost fields; Injury Report selection shows safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields.
 - **Loading:** `"Loading Loss Evaluation..."`
 - **Empty:** saved status shows `Not saved`; Close Incident is disabled until Loss Evaluation is saved.
 - **Error — validation:** Attempt-close without saved Loss Evaluation → red/amber validation message.
@@ -519,7 +519,7 @@ Current action screens use the existing recommendation/corrective-action backend
 **Navigation:**
 - `[Close Incident]` → `/safety/incidents/:id/closure/` (terminal state).
 - `[Back to Office Review]` → `/safety/incidents/:id/phase-5/`.
-**Decisions:** D-MAINT-CR047.
+**Decisions:** D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053.
 
 ### 4.9 Closure / Read-only — `/safety/incidents/:id/closure/`
 

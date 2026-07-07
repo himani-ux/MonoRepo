@@ -23,6 +23,7 @@ const PIC_ROLES = new Set([
 const OFFICE_DECISION_ROLES = new Set(["DPA", ...PIC_ROLES]);
 
 const commonEmptyDraft: LossEvaluationDraft = {
+  report_type: null,
   consequence: null,
   likelihood: null,
   risk_level: null,
@@ -101,6 +102,10 @@ function emptyWorkspace(): SafetyPhase8WorkspacePayload {
       consequence: [],
       likelihood: [],
       repair_type: [],
+      report_type: [
+        { label: "Incident Report", value: "INCIDENT" },
+        { label: "Injury Report", value: "INJURY" },
+      ],
       risk_level: [],
       safe_working_practice: [],
       yes_no: [
@@ -339,7 +344,11 @@ export function SafetyIncidentPhase8() {
         },
       };
       setWorkspace(normalizedPayload);
-      setDraft(mergeDraft(normalizedPayload.loss_evaluation));
+      const nextDraft = mergeDraft(normalizedPayload.loss_evaluation);
+      if (normalizedPayload.has_loss_evaluation && !nextDraft.report_type) {
+        nextDraft.report_type = normalizedPayload.report_type;
+      }
+      setDraft(nextDraft);
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -352,9 +361,14 @@ export function SafetyIncidentPhase8() {
   }, [reload]);
 
   const currentRole = normalizeCode(user?.role || role || user?.safety_role_name || user?.role_name);
-  const reportType = workspace.report_type;
-  const isInjuryReport = reportType === "INJURY";
-  const reportLabel = isInjuryReport ? "Injury Report" : "Incident Report";
+  const selectedReportType = draft.report_type;
+  const reportTypeSelected = selectedReportType !== null;
+  const isInjuryReport = selectedReportType === "INJURY";
+  const reportLabel = selectedReportType
+    ? isInjuryReport
+      ? "Injury Report"
+      : "Incident Report"
+    : "Choose report type";
   const canClose = roleCanAct(currentRole);
   const incidentTotal = useMemo(() => sumDecimalFields(draft, incidentCostFields), [draft]);
   const injuryTotal = useMemo(() => sumDecimalFields(draft, injuryCostFields), [draft]);
@@ -380,7 +394,12 @@ export function SafetyIncidentPhase8() {
     setError(null);
     setResultMessage(null);
     try {
-      const payload = cleanPayload(draft, reportType);
+      if (!selectedReportType) {
+        setError("Choose Incident Report or Injury Report before saving.");
+        window.setTimeout(() => noticeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+        return;
+      }
+      const payload = cleanPayload(draft, selectedReportType);
       const response = (await safetyApi.saveIncidentPhase8LossEvaluation(
         id,
         payload,
@@ -397,7 +416,11 @@ export function SafetyIncidentPhase8() {
           ...(response.loss_evaluation ?? {}),
         },
       });
-      setDraft(mergeDraft(response.loss_evaluation));
+      const nextDraft = mergeDraft(response.loss_evaluation);
+      if (!nextDraft.report_type) {
+        nextDraft.report_type = response.report_type;
+      }
+      setDraft(nextDraft);
       setResultMessage("Loss Evaluation saved.");
       window.setTimeout(() => noticeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch (caught) {
@@ -461,14 +484,31 @@ export function SafetyIncidentPhase8() {
       </header>
 
       <form className="space-y-6" onSubmit={saveLossEvaluation}>
-        <Card eyebrow="Risk Assessment" title="Risk Assessment">
+        <Card eyebrow="Report Type" title="What are you recording?">
           <FieldGrid>
             <SelectField
-              label="Consequence"
-              onChange={(value) => updateField("consequence", value)}
-              options={workspace.choices.consequence}
-              value={draft.consequence}
+              label="Loss Evaluation type"
+              onChange={(value) => updateField("report_type", value)}
+              options={workspace.choices.report_type}
+              placeholder="Select report type"
+              value={draft.report_type}
             />
+          </FieldGrid>
+          <p className="mt-3 text-sm text-slate-600">
+            Select Incident Report or Injury Report first. The form below will change based on this choice.
+          </p>
+        </Card>
+
+        {reportTypeSelected ? (
+          <>
+            <Card eyebrow="Risk Assessment" title="Risk Assessment">
+              <FieldGrid>
+                <SelectField
+                  label="Consequence"
+                  onChange={(value) => updateField("consequence", value)}
+                  options={workspace.choices.consequence}
+                  value={draft.consequence}
+                />
             <SelectField
               label="Likelihood"
               onChange={(value) => updateField("likelihood", value)}
@@ -482,9 +522,9 @@ export function SafetyIncidentPhase8() {
               value={draft.risk_level}
             />
           </FieldGrid>
-        </Card>
+            </Card>
 
-        <Card eyebrow="Other Details" title="Other Details">
+            <Card eyebrow="Other Details" title="Other Details">
           <FieldGrid>
             <TextField
               label="Name of master"
@@ -549,9 +589,9 @@ export function SafetyIncidentPhase8() {
               </>
             )}
           </FieldGrid>
-        </Card>
+            </Card>
 
-        <Card eyebrow="Cost Evaluation" title="Cost Evaluation">
+            <Card eyebrow="Cost Evaluation" title="Cost Evaluation">
           <FieldGrid>
             <TextField
               label="Delays to Vessel (if any)"
@@ -648,9 +688,9 @@ export function SafetyIncidentPhase8() {
               </>
             )}
           </FieldGrid>
-        </Card>
+            </Card>
 
-        <Card eyebrow="Estimated Costs" title="Estimated Costs">
+            <Card eyebrow="Estimated Costs" title="Estimated Costs">
           <FieldGrid>
             {isInjuryReport ? (
               <>
@@ -758,11 +798,17 @@ export function SafetyIncidentPhase8() {
               </>
             )}
           </FieldGrid>
-        </Card>
+            </Card>
+          </>
+        ) : (
+          <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+            Choose a Loss Evaluation type to continue.
+          </section>
+        )}
 
         <button
           className="min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400"
-          disabled={isMutating}
+          disabled={isMutating || !reportTypeSelected}
           type="submit"
         >
           {isMutating ? "Saving..." : "Save Loss Evaluation"}

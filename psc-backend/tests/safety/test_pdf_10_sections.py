@@ -352,6 +352,7 @@ class IncidentPdfSectionTests(unittest.TestCase):
         incident = self._create_exportable_incident("KSM-INC-2026-LOSS-EVAL")
         IncidentLossEvaluation.objects.create(
             incident=incident,
+            report_type=IncidentLossEvaluation.ReportType.INCIDENT,
             consequence=IncidentLossEvaluation.Consequence.MAJOR,
             likelihood=IncidentLossEvaluation.Likelihood.POSSIBLE,
             risk_level=IncidentLossEvaluation.RiskLevel.HIGH,
@@ -385,6 +386,42 @@ class IncidentPdfSectionTests(unittest.TestCase):
         self.assertIn("Temporary repair completed onboard.", text)
         self.assertIn("Loss Evaluation - Estimated Costs", text)
         self.assertIn("150.00", text)
+
+    def test_pdf_loss_evaluation_uses_saved_report_type_over_injury_presence(self) -> None:
+        incident = self._create_exportable_incident("KSM-INC-2026-LOSS-TYPE")
+        ExternalPartyInjury.objects.create(
+            incident=incident,
+            injured_person_type=ExternalPartyInjury.InjuredPersonType.CREW,
+            created_by="rep-7",
+            schema_version=1,
+        )
+        IncidentLossEvaluation.objects.create(
+            incident=incident,
+            report_type=IncidentLossEvaluation.ReportType.INCIDENT,
+            consequence=IncidentLossEvaluation.Consequence.MAJOR,
+            likelihood=IncidentLossEvaluation.Likelihood.POSSIBLE,
+            risk_level=IncidentLossEvaluation.RiskLevel.HIGH,
+            repair_type=IncidentLossEvaluation.RepairType.PERMANENT,
+            repair_details="Permanent repair completed after inspection.",
+            safe_working_practice="Working on deck while ship is at sea",
+            injury_total_estimated_cost=Decimal("25.00"),
+            total_estimated_cost=Decimal("250.00"),
+            created_by="dpa-7",
+            schema_version=1,
+        )
+
+        result = IncidentPdfRenderer().render_incident_pdf(
+            incident_id=incident.pk,
+            viewer_user=None,
+            persist=False,
+            included_sections=["estimated_cost"],
+        )
+
+        text = self._extract_pdf_text(result.content)
+        self.assertIn("Permanent repair completed after inspection.", text)
+        self.assertIn("250.00", text)
+        self.assertNotIn("Code of Safe Working Practices", text)
+        self.assertNotIn("Working on deck while ship is at sea", text)
 
     def test_pdf_evidence_documents_group_attachments_and_notes_cleanly(self) -> None:
         incident = self._create_exportable_incident("KSM-INC-2026-EVIDENCE")

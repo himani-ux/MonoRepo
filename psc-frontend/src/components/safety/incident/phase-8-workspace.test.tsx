@@ -62,6 +62,10 @@ describe('SafetyIncidentPhase8', () => {
           { label: 'Temporary', value: 'TEMPORARY' },
           { label: 'Permanent', value: 'PERMANENT' },
         ],
+        report_type: [
+          { label: 'Incident Report', value: 'INCIDENT' },
+          { label: 'Injury Report', value: 'INJURY' },
+        ],
         risk_level: [
           { label: 'Low', value: 'LOW' },
           { label: 'High', value: 'HIGH' },
@@ -78,6 +82,7 @@ describe('SafetyIncidentPhase8', () => {
       has_loss_evaluation: false,
       incident_id: 'incident-1',
       loss_evaluation: {
+        report_type: null,
         consequence: null,
         likelihood: null,
         risk_level: null,
@@ -145,10 +150,12 @@ describe('SafetyIncidentPhase8', () => {
 
     expect(await screen.findByRole('heading', { name: 'Loss Evaluation' })).toBeInTheDocument();
     expect(screen.queryByText('Office approval required')).toBeNull();
+    expect(screen.getByLabelText('Loss Evaluation type')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Consequence')).toBeNull();
     expect(phase8Mocks.getIncidentPhase8Workspace).toHaveBeenCalledWith('incident-1');
   });
 
-  it('loads incident report loss-evaluation fields after office approval', async () => {
+  it('loads incident report fields after the user chooses Incident Report', async () => {
     phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace());
 
     render(<SafetyIncidentPhase8 />);
@@ -157,17 +164,23 @@ describe('SafetyIncidentPhase8', () => {
       expect(phase8Mocks.getIncidentPhase8Workspace).toHaveBeenCalledWith('incident-1');
     });
     expect(await screen.findByRole('heading', { name: 'Loss Evaluation' })).toBeInTheDocument();
-    expect(screen.getByText('Incident Report')).toBeInTheDocument();
+    const reportTypeSelect = screen.getByLabelText('Loss Evaluation type');
+    fireEvent.change(reportTypeSelect, { target: { value: 'INCIDENT' } });
+
+    expect(reportTypeSelect).toHaveValue('INCIDENT');
     expect(screen.getByLabelText('Type of Repairs')).toBeInTheDocument();
     expect(screen.getByLabelText('Estimated Cost for Off Hire')).toBeInTheDocument();
   });
 
-  it('loads injury report specific fields', async () => {
-    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace({ report_type: 'INJURY' }));
+  it('loads injury report fields after the user chooses Injury Report', async () => {
+    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace());
 
     render(<SafetyIncidentPhase8 />);
 
-    expect(await screen.findByText('Injury Report')).toBeInTheDocument();
+    const reportTypeSelect = await screen.findByLabelText('Loss Evaluation type');
+    fireEvent.change(reportTypeSelect, { target: { value: 'INJURY' } });
+
+    expect(reportTypeSelect).toHaveValue('INJURY');
     expect(screen.getByLabelText('Code of Safe Working Practices to which the Incident relates')).toBeInTheDocument();
     expect(screen.getByLabelText('Repatriation')).toBeInTheDocument();
     expect(screen.getByLabelText('Cost for Medicines Given Onboard')).toBeInTheDocument();
@@ -186,7 +199,8 @@ describe('SafetyIncidentPhase8', () => {
 
     render(<SafetyIncidentPhase8 />);
 
-    fireEvent.change(await screen.findByLabelText('Consequence'), { target: { value: 'MAJOR' } });
+    fireEvent.change(await screen.findByLabelText('Loss Evaluation type'), { target: { value: 'INCIDENT' } });
+    fireEvent.change(screen.getByLabelText('Consequence'), { target: { value: 'MAJOR' } });
     fireEvent.change(screen.getByLabelText('Likelihood'), { target: { value: 'POSSIBLE' } });
     fireEvent.change(screen.getByLabelText('Risk level'), { target: { value: 'HIGH' } });
     fireEvent.change(screen.getByLabelText('Estimated Cost for Off Hire'), { target: { value: '100' } });
@@ -196,6 +210,7 @@ describe('SafetyIncidentPhase8', () => {
       expect(phase8Mocks.saveIncidentPhase8LossEvaluation).toHaveBeenCalledWith(
         'incident-1',
         expect.objectContaining({
+          report_type: 'INCIDENT',
           consequence: 'MAJOR',
           likelihood: 'POSSIBLE',
           risk_level: 'HIGH',

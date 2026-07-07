@@ -27,6 +27,18 @@ def _has_injury_record(incident: Incident) -> bool:
         return False
 
 
+def _default_report_type(incident: Incident) -> str:
+    if _has_injury_record(incident):
+        return IncidentLossEvaluation.ReportType.INJURY
+    return IncidentLossEvaluation.ReportType.INCIDENT
+
+
+def _resolved_report_type(incident: Incident, loss_evaluation: IncidentLossEvaluation | None) -> str:
+    if loss_evaluation is not None and loss_evaluation.report_type:
+        return loss_evaluation.report_type
+    return _default_report_type(incident)
+
+
 class RecommendationVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecommendationVerification
@@ -68,6 +80,7 @@ class IncidentLossEvaluationSerializer(serializers.ModelSerializer):
         model = IncidentLossEvaluation
         fields = (
             "id",
+            "report_type",
             "consequence",
             "likelihood",
             "risk_level",
@@ -124,6 +137,7 @@ class IncidentLossEvaluationSerializer(serializers.ModelSerializer):
         incident: Incident = self.context["incident"]
         user = self.context.get("user")
         actor_id = resolve_actor_id(user)
+        validated_data.setdefault("report_type", _default_report_type(incident))
         return IncidentLossEvaluation.objects.create(
             incident=incident,
             created_by=actor_id,
@@ -171,7 +185,7 @@ def build_phase8_workspace_payload(incident: Incident) -> dict[str, object]:
         "risk_band": incident.risk_band,
         "required_process_id": "SAF_P_004",
         "phase_title": "Loss Evaluation",
-        "report_type": "INJURY" if _has_injury_record(incident) else "INCIDENT",
+        "report_type": _resolved_report_type(incident, loss_evaluation),
         "has_loss_evaluation": loss_evaluation is not None,
         "loss_evaluation": (
             IncidentLossEvaluationSerializer(loss_evaluation).data
@@ -183,6 +197,7 @@ def build_phase8_workspace_payload(incident: Incident) -> dict[str, object]:
             "likelihood": _choice_options(IncidentLossEvaluation.Likelihood.choices),
             "risk_level": _choice_options(IncidentLossEvaluation.RiskLevel.choices),
             "repair_type": _choice_options(IncidentLossEvaluation.RepairType.choices),
+            "report_type": _choice_options(IncidentLossEvaluation.ReportType.choices),
             "yes_no": [
                 {"value": True, "label": "Yes"},
                 {"value": False, "label": "No"},

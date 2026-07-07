@@ -102,6 +102,7 @@ class Phase8LoopbackTests(unittest.TestCase):
         patch_request = self.factory.patch(
             f"/api/safety/incidents/{incident.pk}/phase-8/",
             {
+                "report_type": "INCIDENT",
                 "consequence": "MAJOR",
                 "likelihood": "POSSIBLE",
                 "risk_level": "HIGH",
@@ -117,8 +118,49 @@ class Phase8LoopbackTests(unittest.TestCase):
 
         self.assertEqual(patch_response.status_code, 200)
         self.assertTrue(patch_response.data["has_loss_evaluation"])
+        self.assertEqual(patch_response.data["report_type"], "INCIDENT")
         self.assertEqual(patch_response.data["loss_evaluation"]["name_of_master"], "Master One")
         self.assertEqual(patch_response.data["loss_evaluation"]["total_estimated_cost"], "75.00")
+
+    def test_user_can_choose_injury_loss_evaluation_without_injury_record(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/P8TYPE1",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=7,
+            risk_band=Incident.RiskBand.YELLOW,
+            pic_user_id="pic-1",
+            created_by="master-1",
+            updated_by="master-1",
+            schema_version=1,
+        )
+
+        request = self.factory.patch(
+            f"/api/safety/incidents/{incident.pk}/phase-8/",
+            {
+                "report_type": "INJURY",
+                "consequence": "SEVERE",
+                "likelihood": "UNLIKELY",
+                "risk_level": "HIGH",
+                "safe_working_practice": "Working on deck while ship is at sea",
+                "injury_total_estimated_cost": "125.00",
+            },
+            format="json",
+        )
+        force_authenticate(
+            request,
+            user=build_user(role_name="MASTER", user_id="master-1", process_ids=[]),
+        )
+
+        response = self.workspace_view(request, id=incident.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["report_type"], "INJURY")
+        self.assertEqual(response.data["loss_evaluation"]["report_type"], "INJURY")
+        self.assertEqual(
+            response.data["loss_evaluation"]["safe_working_practice"],
+            "Working on deck while ship is at sea",
+        )
 
     def test_ineffective_verification_loops_back_to_phase_six(self) -> None:
         incident = Incident.objects.create(
@@ -266,6 +308,7 @@ class Phase8LoopbackTests(unittest.TestCase):
         request = self.factory.patch(
             f"/api/safety/incidents/{incident.pk}/phase-8/",
             {
+                "report_type": "INCIDENT",
                 "consequence": "MAJOR",
                 "likelihood": "POSSIBLE",
                 "risk_level": "HIGH",
@@ -289,6 +332,8 @@ class Phase8LoopbackTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["has_loss_evaluation"])
         self.assertTrue(response.data["ready_for_close"])
+        self.assertEqual(response.data["report_type"], "INCIDENT")
+        self.assertEqual(response.data["loss_evaluation"]["report_type"], "INCIDENT")
         self.assertEqual(response.data["loss_evaluation"]["repair_type"], "TEMPORARY")
         self.assertEqual(response.data["loss_evaluation"]["total_estimated_cost"], "150.00")
 
