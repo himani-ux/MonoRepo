@@ -2625,6 +2625,21 @@ Implementation impact:
 - Office Review removes root/action counters, pre-approval summary cards, approval-role wording, and the send-back target picker. Office-side users see Accept / Close and Send for rework cards; ship-side users see Office Comments/lesson learnt only when a comment exists.
 - Send for rework submits the comment with the fixed action-rework target phase through the existing endpoint. No database migration or new endpoint is required.
 
+## Amendment 25 - 2026-07-07
+
+Office Review comment visibility and PDF availability are corrected under CR-050. Ship-side users should not see an empty Office Review area while waiting for office comments, and office users should not see or be blocked by Phase 7 acceptance-only PDF wording.
+
+Triggering discovery: post-shipment UI review found that ship-side users could not tell whether office comments were pending, and the Phase 6 Office Review page still displayed "Formal incident PDF export is available after Phase 7 acceptance" with a matching backend guard.
+
+Supersedes:
+- D-MAINT-CR049 only where it says ship-side Office Review shows Office Comments/lesson learnt only when a comment exists.
+- D-PDF-01 and any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement only where it says incident PDF preview/download or MSC-MEPC.3/Circ.4 export is blocked solely until Phase 7 acceptance.
+
+Implementation impact:
+- Ship-side Office Review always shows the Office Comments/lesson learnt card. If no office note exists, it shows "Office comment is not added yet."
+- Office-side Office Review does not render the old Phase 7 acceptance-only PDF warning line.
+- `PdfPreviewGenerator`, `IncidentPdfRenderer`, and `MscMepc3Circ4PdfRenderer` no longer block incident PDF export solely because `current_phase < 7` or the incident is not approved/closed. Record-type and regulatory applicability checks remain.
+
 **Document Control:**
 - Created: 2026-04-17
 - Author: Wave 3 docsuite generation agent (Implementation Plan)

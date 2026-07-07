@@ -5,16 +5,19 @@ from apps.safety.models import Incident
 
 class PdfPreviewGenerator:
     def build_preview(self, incident: Incident) -> dict[str, object]:
-        available = incident.record_type == Incident.RecordType.INCIDENT
-        return {
-            "available": available,
-            "status": "READY_TO_GENERATE" if available else "NOT_AVAILABLE",
+        is_incident = incident.record_type == Incident.RecordType.INCIDENT
+        exportable = is_incident
+        payload: dict[str, object] = {
+            "available": exportable,
+            "status": "READY_TO_GENERATE" if exportable else "NOT_AVAILABLE",
             "incident_id": incident.pk,
             "expected_sections": 10,
-            "download_path": f"/api/safety/incidents/{incident.id}/pdf/",
             "message": (
-                "Formal incident PDF generation is available from the Step 6.1 renderer."
-                if available
+                "Formal incident PDF generation is available."
+                if exportable
                 else "Formal incident PDF generation only applies to incident records."
             ),
         }
+        if exportable:
+            payload["download_path"] = f"/api/safety/incidents/{incident.id}/pdf/"
+        return payload

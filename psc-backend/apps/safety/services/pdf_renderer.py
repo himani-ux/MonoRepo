@@ -195,8 +195,6 @@ class IncidentPdfRenderer:
     def _validate_exportable(incident: Incident) -> None:
         if incident.record_type != Incident.RecordType.INCIDENT:
             raise ValidationError("Formal PDF export is only available for incident records.")
-        if incident.current_phase < 7 and incident.state not in {"APPROVED", "CLOSED"}:
-            raise ValidationError("Formal incident PDF export is available after Phase 7 acceptance.")
 
     def _build_context(self, incident: Incident, *, viewer_user=None, included_sections: Iterable[str] | None = None) -> IncidentPdfContext:
         assessment = getattr(incident, "phase5_assessment", None)
@@ -2498,8 +2496,6 @@ class MscMepc3Circ4PdfRenderer:
     def _validate_exportable(incident: Incident) -> None:
         if incident.record_type != Incident.RecordType.INCIDENT:
             raise ValidationError("MSC-MEPC.3/Circ.4 export is only available for incident records.")
-        if incident.current_phase < 7 and incident.state not in {"APPROVED", "CLOSED"}:
-            raise ValidationError("MSC-MEPC.3/Circ.4 export is available after Phase 7 acceptance.")
         if incident.imo_classifier not in {
             Incident.ImoClassifier.SMC,
             Incident.ImoClassifier.MC,

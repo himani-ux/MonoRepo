@@ -349,6 +349,10 @@
 **Why:** A purge workflow can ask for an audit trail and also require parent-tied audit cleanup; if both are implemented on the same parent-bound history surface, the summary audit row deletes itself in the same operation.
 **Rule:** When a workflow needs a durable purge summary but the normal append-only history is contractually tied to the deleted parent, store the purge summary under a separate system-scoped audit parent and record that seam explicitly in `progress.txt` and `tasks/todo.md` instead of violating the parent-retention rule.
 
+## L-078 - PDF availability wording can hide a validation contract
+**What happened:** CR-050 was initially classified as Tier 2 because it looked like an Office Review UI wording cleanup, but the requested removal of "Formal incident PDF export is available after Phase 7 acceptance" also removed backend export validation and superseded canonical PDF availability behavior.
+**Why:** A visible warning line can be backed by the same backend guard that blocks the user, so removing the wording without checking the renderer would leave the product behavior unchanged.
+**Rule:** When a user asks to remove export availability wording and "no such validation", search both the preview message and the actual renderer/export endpoint. If the guard contradicts current docs, reclassify to Tier 3, add an implementation-plan amendment, and test both preview and download paths.
 <!-- Session close review completed 2026-04-30 10:21. No new lesson added for Step 5.5. Latest standing addition remains L-056. Session closure confirmed after Step 5.5 completion in the handover workspace. -->
 <!-- Session close review completed 2026-04-30 10:37. No new lesson added for Step 5.6. Latest standing addition remains L-056. Session closure confirmed after Step 5.6 completion in the handover workspace. -->
 <!-- Session close review completed 2026-04-30 10:57. Added L-057 for the Step 6.1 PDF export permission-registry drift. Session closure confirmed after Step 6.1 completion in the handover workspace. -->

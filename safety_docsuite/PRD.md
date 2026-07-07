@@ -219,7 +219,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 | 3 | Corrective Action | Existing recommendation/corrective-action compatibility storage |
 | 4 | Preventive Action | Existing recommendation compatibility storage |
 | 5 | Add Evidence | Evidence documents and witness statements |
-| 6 | Office Review | Office review comments, approval, or send-back |
+| 6 | Office Review | Office review comments, pending-comment state for ship users, approval, or send-back |
 | 7 | Loss Evaluation | Risk assessment, report-specific loss/cost evaluation, and closure |
 | Legacy redirect | Removed Lessons Learned | `/phase-3/lessons/` redirects to Office Review |
 | Direct read-only | Final Record | Legacy/audit route, hidden from workflow tabs |
@@ -632,6 +632,8 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - Pre-flight validations: bias guards resolved, ≥1 Immediate Cause and ≥1 Root Cause coded, all three recommendation tiers filled (for YELLOW/RED), ALARP fields populated.
 - On accept: generates the selected-section PDF (FEAT-SAF-PDF-001); state transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8.
+- Manual selected-section PDF preview/download is available for incident records before Phase 7 acceptance; the screen must not display Phase 7 acceptance-only PDF warning text.
+- Ship-side users see the Office Comments/lesson learnt card; when office has not added a note, it displays "Office comment is not added yet."
 - Closer authority by band: PIC=GREEN, DPA=YELLOW, FM=RED.
 - Re-open authority mirrors closer authority (D-EDGE-03).
 **Dependencies:** FEAT-SAF-INC-027, FEAT-SAF-PDF-001, FEAT-SAF-RBAC-001.
@@ -1450,6 +1452,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 - Office Review comments and closure reason print in the final Office Review / Closure area before Signature, not in Summary.
 - Evidence (Documents) prints each attachment as a separate document block with Description and File rows, and does not use numbered labels such as `Attachment 1` or `Attachment 2`.
 - Evidence (Documents) does not print legacy evidence-note-only rows; witness statements remain printable with Remark wording.
+- Incident PDF preview/download and MSC-MEPC.3/Circ.4 export are not blocked solely by pending Phase 7 acceptance. Record-type and MSC-MEPC.3/Circ.4 classifier applicability checks remain.
 **Dependencies:** FEAT-SAF-INC-002, FEAT-SAF-INC-007, FEAT-SAF-INC-018, FEAT-SAF-INC-027, FEAT-SAF-AUDIT-003.
 **Decisions:** D-PDF-01, D-GAP-R09.
 **SSOT refs:** see SSOT §6 D-PDF-01; D-GAP-R09.
@@ -1459,7 +1462,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 **Priority:** V1
 **User story:** As DPA preparing flag-state hand-off, I export the MSC-MEPC.3/Circ.4 PDF with ~40% auto-filled fields so manual entry is minimised.
 **Acceptance criteria:**
-- "Export to MSC-MEPC.3/Circ.4 PDF" button on closed incidents.
+- "Export to MSC-MEPC.3/Circ.4 PDF" is available on incident records with an applicable IMO classifier; it is not blocked solely because Phase 7 acceptance or closure is pending.
 - 5 appendices auto-populate per §2B.13:
   - App 1: investigator-entered (Phase 1–2).
   - App 2: auto from `vims_vessel_particulars`.

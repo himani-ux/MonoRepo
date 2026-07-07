@@ -14,7 +14,7 @@
 
 > **Incident backend update (2026-06-12):** The simplified incident workflow requires `vims_safety_incident.office_notified`, `office_notification_mode`, `loss_type_secondary_id`, `loss_type_tertiary_id`, and `loss_type_other`. Deploy migrations `0037_incident_office_notification_fields.py` and `0038_incident_multiple_loss_types.py` before deploying incident UI/API code that references these fields. Public incident routes follow the simplified phase contract in the Safety SSOT section 3.0; older backend class names and legacy URL aliases remain compatibility details only.
 >
-> **Incident Office Review update (2026-07-06):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments/lesson learnt captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields. Current send-for-rework UI sends a fixed action-rework target with the comment; it does not expose a target-phase picker.
+> **Incident Office Review update (2026-07-07):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments/lesson learnt captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields. Current send-for-rework UI sends a fixed action-rework target with the comment; it does not expose a target-phase picker. Ship-side Office Review shows a pending message when this comment is empty. Incident PDF preview/download is not blocked solely by pending Phase 7 acceptance.
 
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
@@ -1646,7 +1646,7 @@ Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter templa
 
 - **Auth:** `SAF_P_023`.
 - **Query:** optional `sections`, accepted as repeated values or comma-separated keys. Current frontend defaults to `summary`, `reporter_details`, `injury_details`, `estimated_cost`, `root_cause`, `evidence_documents`, `corrective_preventive_actions`, and `signature`. The legacy backend key `lessons_learned` remains accepted for old/direct exports only. Omitted or empty `sections` renders all allowed backend sections for compatibility.
-- **Response 200:** `application/pdf` binary. Near-miss PDFs show reporter details for authorized users and must not print anonymous/masked-reporter wording. Incident PDFs render required signature rows by band even when unsigned, showing `Pending` for incomplete signature slots. Incident `office_comment` and closure reason print in the final Office Review / Closure area before Signature, not in Summary.
+- **Response 200:** `application/pdf` binary. Near-miss PDFs show reporter details for authorized users and must not print anonymous/masked-reporter wording. Incident PDFs are available before Phase 7 acceptance and render required signature rows by band even when unsigned, showing `Pending` for incomplete signature slots. Incident `office_comment` and closure reason print in the final Office Review / Closure area before Signature, not in Summary.
 
 #### 9.2.11 `POST /api/safety/incidents/{id}/link/`
 
@@ -1881,11 +1881,11 @@ Physical verification record (Q45 pattern).
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
-| `GET /api/safety/export/incident/{id}/pdf` | `SAF_P_023` | D-PDF-01 internal report; optional `sections` query filters printable sections |
+| `GET /api/safety/export/incident/{id}/pdf` | `SAF_P_023` | D-PDF-01 internal report; optional `sections` query filters printable sections; not blocked solely by pending Phase 7 acceptance |
 | `GET /api/safety/export/near-miss/{id}/pdf` | `SAF_P_023` | D-PDF-03a light template |
 | `GET /api/safety/export/scm/{id}/pdf` | `SAF_P_023` | D-PDF-03b legacy structure |
 | `POST /api/safety/export/auditor-bundle/` | `SAF_F_020` | D-PDF-02 configurable ZIP (record types + date range); attachments live in `attachments/` subfolder |
-| `GET /api/safety/export/msc-mepc-3/{incident_id}/` | `SAF_P_023` | MSC-MEPC.3/Circ.4 auto-populated PDF (D-DNV-12) |
+| `GET /api/safety/export/msc-mepc-3/{incident_id}/` | `SAF_P_023` | MSC-MEPC.3/Circ.4 auto-populated PDF (D-DNV-12); requires applicable IMO classifier but not Phase 7 acceptance |
 
 ### 9.10 Circular integration
 

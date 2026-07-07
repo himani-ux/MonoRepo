@@ -44,6 +44,55 @@ class IncidentPdfEndToEndTests(unittest.TestCase):
         self.accept_view = IncidentPhase7AcceptView.as_view()
         self.download_view = IncidentPDFDownloadView.as_view()
 
+    def test_pdf_preview_and_download_are_available_before_phase_seven_acceptance(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="KSM-INC-2026-0098",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=6,
+            risk_band=Incident.RiskBand.YELLOW,
+            reporter_id="rep-6",
+            reporter_name="Reporter Six",
+            reporter_device_fingerprint="device-reporter-6",
+            reported_at=datetime.fromisoformat("2026-04-27T10:00:00+00:00"),
+            narrative="Formal PDF export should stay available before Phase 7 acceptance.",
+            created_by="rep-6",
+            updated_by="rep-6",
+            schema_version=1,
+        )
+
+        preview = PdfPreviewGenerator().build_preview(incident)
+
+        self.assertTrue(preview["available"])
+        self.assertEqual(preview["status"], "READY_TO_GENERATE")
+        self.assertEqual(
+            preview["download_path"],
+            f"/api/safety/incidents/{incident.pk}/pdf/",
+        )
+        self.assertEqual(preview["message"], "Formal incident PDF generation is available.")
+
+        original_export_root = os.environ.get("SAFETY_EXPORT_ROOT")
+        export_root = Path("test-output") / "pdf-before-acceptance"
+        shutil.rmtree(export_root, ignore_errors=True)
+        export_root.mkdir(parents=True, exist_ok=True)
+        os.environ["SAFETY_EXPORT_ROOT"] = str(export_root)
+        try:
+            download_request = self.factory.get(f"/api/safety/incidents/{incident.pk}/pdf/")
+            force_authenticate(
+                download_request,
+                user=build_user(role_name="DPA", user_id="dpa-6", process_ids=["SAF_P_023"]),
+            )
+            download_response = self.download_view(download_request, id=incident.pk)
+
+            self.assertEqual(download_response.status_code, 200)
+            self.assertEqual(download_response["Content-Type"], "application/pdf")
+        finally:
+            shutil.rmtree(export_root, ignore_errors=True)
+            if original_export_root is None:
+                os.environ.pop("SAFETY_EXPORT_ROOT", None)
+            else:
+                os.environ["SAFETY_EXPORT_ROOT"] = original_export_root
+
     def test_phase_seven_accept_generates_and_persists_pdf_export(self) -> None:
         incident = Incident.objects.create(
             incident_number="KSM-INC-2026-0099",

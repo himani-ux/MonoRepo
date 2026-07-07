@@ -531,14 +531,14 @@ Office Review runs the required readiness checks in the background. The visible 
 3. Confirm at least one action recommendation is recorded.
 4. Confirm ALARP attestation on every RED/YELLOW System-Action (Round 21 R02).
 5. Enter **Office Comments/lesson learnt** if the office review needs a note. There is no word limit.
-6. Before previewing or downloading the PDF, review the **Select PDF content** checklist. All items are selected by default: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature.
+6. Before previewing or downloading the PDF, review the **Select PDF content** checklist. All items are selected by default: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature. PDF preview/download is available for incident records before Phase 7 acceptance; the page should not show a Phase 7 acceptance-only PDF warning.
 7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, transitions to visible Phase 7 Loss Evaluation using backend compatibility phase 8, writes closure event to `vims_safety_incident_phase_log`.
 8. Open `/safety/incidents/:id/phase-6/`, complete **Loss Evaluation**, and save it. Incident Report records show repair/loss/cost fields; Injury Report records show safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds.
 
 If **Record injury** was saved on Phase 1, the PDF prints the title `Injury Report`. If no injury was recorded, it prints `Incident Report`. Office Comments and closure reason appear near the end of the PDF before Signature, not in Summary. Evidence documents appear as separate document blocks with Description and File rows instead of numbered attachment rows; internal evidence notes are not printed. Action descriptions appear once inside their detail box without recommendation rationale / "Why is this needed?" text. Required signature rows remain visible in the PDF even when unsigned; unsigned rows show as `Pending`.
 
 Under the current CR-044 authority model, PIC or DPA can complete Office Review and later closure for any risk band.
-When sending the incident back, enter only the rework comment and tap **Send for rework**. The current UI sends the incident back to the action rework target; it does not ask the office user to choose a phase. Ship-side users do not see Accept / Close or Send for rework cards on Office Review; they see Office Comments/lesson learnt only when a comment exists.
+When sending the incident back, enter only the rework comment and tap **Send for rework**. The current UI sends the incident back to the action rework target; it does not ask the office user to choose a phase. Ship-side users do not see Accept / Close or Send for rework cards on Office Review; they see the Office Comments/lesson learnt card. If office has not added a note yet, the card says **Office comment is not added yet.**
 
 ### 7.6 Overseeing M-SCAT Root-Cause Analysis
 

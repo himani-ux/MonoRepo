@@ -285,12 +285,33 @@ class MscMepc3PdfTests(unittest.TestCase):
                     )
                 self.assertIn("requires an applicable IMO classifier", str(context.exception))
 
-    def _create_exportable_incident(self, *, imo_classifier: str | None = Incident.ImoClassifier.MI) -> Incident:
+    def test_renderer_allows_applicable_incident_before_phase_seven_acceptance(self) -> None:
+        incident = self._create_exportable_incident(
+            current_phase=6,
+            state="IN_PROGRESS",
+        )
+
+        result = MscMepc3Circ4PdfRenderer().render_export_pdf(
+            incident_id=incident.pk,
+            viewer_user=None,
+            persist=False,
+        )
+
+        self.assertTrue(result.content.startswith(b"%PDF"))
+        self.assertEqual(result.incident_id, incident.pk)
+
+    def _create_exportable_incident(
+        self,
+        *,
+        current_phase: int = 9,
+        imo_classifier: str | None = Incident.ImoClassifier.MI,
+        state: str = "CLOSED",
+    ) -> Incident:
         return Incident.objects.create(
             incident_number=f"KSM-INC-2026-MSC-{Incident.objects.count() + 1}",
             vessel_id="SFD",
-            state="CLOSED",
-            current_phase=9,
+            state=state,
+            current_phase=current_phase,
             risk_band=Incident.RiskBand.YELLOW,
             imo_classifier=imo_classifier,
             occurred_at=datetime.fromisoformat("2026-04-27T10:15:00+00:00"),

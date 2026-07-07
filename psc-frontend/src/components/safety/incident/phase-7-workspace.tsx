@@ -404,14 +404,20 @@ export function SafetyIncidentPhase7() {
             </section>
           ) : null}
 
-          {!isOfficeReviewUser && hasVisibleOfficeComment ? (
+          {!isOfficeReviewUser ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">
                 Office Comments/lesson learnt
               </h2>
-              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                {officeComment}
-              </p>
+              {hasVisibleOfficeComment ? (
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                  {officeComment}
+                </p>
+              ) : (
+                <p className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Office comment is not added yet.
+                </p>
+              )}
             </section>
           ) : null}
 
@@ -524,13 +530,6 @@ export function SafetyIncidentPhase7() {
             </button>
           ) : null}
         </div>
-      ) : null}
-      {isOfficeReviewUser &&
-      !pdfPreviewReady &&
-      preflight.pdf_preview.message ? (
-        <p className="text-sm text-slate-600">
-          {preflight.pdf_preview.message}
-        </p>
       ) : null}
     </section>
   );

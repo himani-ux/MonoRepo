@@ -109,7 +109,18 @@ describe('SafetyIncidentPhase7', () => {
   }
 
   it('allows PIC to accept or close a RED incident when preflight allows PIC or DPA', async () => {
-    phase7Mocks.getIncidentPhase7Preflight.mockResolvedValue(buildPreflight());
+    phase7Mocks.getIncidentPhase7Preflight.mockResolvedValue(
+      buildPreflight({
+        pdf_preview: {
+          available: false,
+          expected_sections: 10,
+          incident_id: 1,
+          message:
+            'Formal incident PDF export is available after Phase 7 acceptance.',
+          status: 'NOT_AVAILABLE',
+        },
+      })
+    );
 
     render(<SafetyIncidentPhase7 />);
 
@@ -126,6 +137,11 @@ describe('SafetyIncidentPhase7', () => {
     expect(screen.queryByText('Actions')).toBeNull();
     expect(screen.queryByText('Before Office Review Approval')).toBeNull();
     expect(screen.queryByLabelText('Send back to')).toBeNull();
+    expect(
+      screen.queryByText(
+        'Formal incident PDF export is available after Phase 7 acceptance.'
+      )
+    ).toBeNull();
   });
 
   it('sends rework to the fixed action phase without asking for a target phase', async () => {
@@ -175,6 +191,30 @@ describe('SafetyIncidentPhase7', () => {
     expect(
       screen.getByText('Improve toolbox discussion before the next job.')
     ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Accept / Close' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Send for rework' })
+    ).toBeNull();
+  });
+
+  it('shows a pending office comment message to ship-side users when no comment exists', async () => {
+    phase7Mocks.role = 'VESSEL_MASTER';
+    phase7Mocks.user = {
+      full_name: 'Vessel Master',
+      id: 'master-1',
+      role: 'VESSEL_MASTER',
+    };
+    phase7Mocks.hasProcess.mockReturnValue(false);
+    phase7Mocks.getIncidentPhase7Preflight.mockResolvedValue(
+      buildPreflight({ office_comment: '' })
+    );
+
+    render(<SafetyIncidentPhase7 />);
+
+    expect(
+      await screen.findByText('Office Comments/lesson learnt')
+    ).toBeTruthy();
+    expect(screen.getByText('Office comment is not added yet.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Accept / Close' })).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Send for rework' })
