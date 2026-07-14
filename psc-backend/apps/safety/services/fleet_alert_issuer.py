@@ -1,9 +1,13 @@
 from __future__ import annotations
+import os
 from dataclasses import dataclass
 from datetime import timedelta
 
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db import connection
 from django.utils import timezone
+from dotenv import load_dotenv
 
 from apps.safety.authentication.roles import normalized_authority_role
 from apps.safety.models import Incident, SafetyFieldHistory
@@ -89,6 +93,7 @@ class FleetAlertIssuer:
     circular_publish_field_name = "near_miss_circular_publish"
     notification_writer_class = NotificationWriter
     circular_client_class = WorkspaceCircularModuleClient
+    cc_recipients = ["HSSEQ@kaizenship.net"]
 
     def __init__(self) -> None:
         self.notification_writer = self.notification_writer_class()
@@ -189,6 +194,7 @@ class FleetAlertIssuer:
                 "HIGH-priority near-miss requires fleet alert within 1 week (D-GAP-R22). "
                 "Record a DPA/FM extension reason before issuing late."
             )
+        recipient_emails = self._require_email_delivery_ready(recipients)
 
         circular_result = self.circular_client.publish_draft(
             payload=self.build_circular_payload(
@@ -217,6 +223,14 @@ class FleetAlertIssuer:
                 "circular_publish_status": circular_result.status,
                 "sla_extension_reason": cleaned_extension_reason,
             },
+        )
+        email_result = self._send_email_alert(
+            near_miss=near_miss,
+            recipients=recipients,
+            recipient_emails=recipient_emails,
+            subject=title,
+            alert_text=cleaned_text,
+            fleet_learning_text=cleaned_learning,
         )
 
         old_state = capture_model_state(near_miss, field_names=("updated_by", "updated_date"))
@@ -311,6 +325,7 @@ class FleetAlertIssuer:
             "notifications_emitted": len(notification_rows),
             "recipients": recipients,
             "recipient_vessels": self.build_recipient_vessel_payload(recipients, user=user),
+            **email_result,
             "sla": {
                 "due_by": due_by,
                 "status": "ISSUED_LATE_WITH_EXTENSION" if issued_late else "ISSUED_ON_TIME",
@@ -319,6 +334,148 @@ class FleetAlertIssuer:
             },
             "title": title,
         }
+
+    def _require_email_delivery_ready(self, recipients: list[str]) -> dict[str, str]:
+        self._refresh_email_settings_from_env()
+        recipient_emails = self._resolve_recipient_emails(recipients)
+        missing_email_vessels = [
+            vessel_id
+            for vessel_id in recipients
+            if not str(recipient_emails.get(str(vessel_id).strip(), "")).strip()
+        ]
+        if missing_email_vessels:
+            raise FleetAlertIssueError(
+                "Email is not recorded in VesselData for: "
+                f"{', '.join(missing_email_vessels)}."
+            )
+
+        if not getattr(settings, "EMAIL_HOST_USER", None) or not getattr(settings, "EMAIL_HOST_PASSWORD", None):
+            raise FleetAlertIssueError(
+                "Fleet Alert email sender credentials are not configured. "
+                "Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD on the backend and restart the service."
+            )
+        return recipient_emails
+
+    def _refresh_email_settings_from_env(self) -> None:
+        if getattr(settings, "EMAIL_HOST_USER", None) and getattr(settings, "EMAIL_HOST_PASSWORD", None):
+            return
+        env_path = getattr(settings, "BASE_DIR", None)
+        if env_path:
+            load_dotenv(env_path / ".env", override=False)
+        if not getattr(settings, "EMAIL_HOST_USER", None):
+            settings.EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+        if not getattr(settings, "EMAIL_HOST_PASSWORD", None):
+            settings.EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+        if not getattr(settings, "DEFAULT_FROM_EMAIL", None) and settings.EMAIL_HOST_USER:
+            settings.DEFAULT_FROM_EMAIL = os.getenv(
+                "DEFAULT_FROM_EMAIL",
+                f"KSM Marine <{settings.EMAIL_HOST_USER}>",
+            )
+
+    def _resolve_recipient_emails(self, recipients: list[str]) -> dict[str, str]:
+        normalized_recipients = [str(vessel_id).strip() for vessel_id in recipients if str(vessel_id or "").strip()]
+        if not normalized_recipients:
+            return {}
+        if "VesselData" not in connection.introspection.table_names():
+            return {}
+
+        placeholders = ", ".join(["%s"] * len(normalized_recipients))
+        id_expression = self._quote("id")
+        if connection.vendor != "sqlite":
+            id_expression = f"CONVERT(varchar(64), {id_expression})"
+        sql = (
+            f"SELECT {id_expression}, {self._quote('Email')} "
+            f"FROM {self._quote('VesselData')} "
+            f"WHERE {id_expression} IN ({placeholders}) "
+            f"AND COALESCE({self._quote('is_active')}, 1) <> 0 "
+            f"AND COALESCE({self._quote('is_deleted')}, 0) = 0"
+        )
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, normalized_recipients)
+                rows = cursor.fetchall()
+        except Exception:
+            return {}
+        return {str(vessel_id).strip(): str(email or "").strip() for vessel_id, email in rows}
+
+    def _quote(self, name: str) -> str:
+        return connection.ops.quote_name(name)
+
+    def _send_email_alert(
+        self,
+        *,
+        near_miss: Incident,
+        recipients: list[str],
+        recipient_emails: dict[str, str],
+        subject: str,
+        alert_text: str,
+        fleet_learning_text: str,
+    ) -> dict[str, object]:
+        emails: list[str] = []
+        seen: set[str] = set()
+        for vessel_id in recipients:
+            email = str(recipient_emails.get(str(vessel_id).strip(), "")).strip()
+            email_key = email.lower()
+            if not email or email_key in seen:
+                continue
+            emails.append(email)
+            seen.add(email_key)
+        if not emails:
+            return {"emails_sent": 0, "email_failed": 0, "vessels_without_email": len(recipients)}
+
+        try:
+            pdf_attachment = self._build_pdf_attachment(near_miss)
+            email_message = EmailMultiAlternatives(
+                subject=subject,
+                body=self._email_body(
+                    near_miss=near_miss,
+                    alert_text=alert_text,
+                    fleet_learning_text=fleet_learning_text,
+                ),
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                cc=self.cc_recipients,
+                bcc=emails,
+                to=[],
+                connection=get_connection(timeout=getattr(settings, "EMAIL_TIMEOUT", 15)),
+            )
+            email_message.attach(
+                pdf_attachment.file_name,
+                pdf_attachment.content,
+                pdf_attachment.content_type,
+            )
+            send_count = email_message.send()
+        except Exception as exc:
+            raise FleetAlertIssueError(
+                "Fleet Alert email could not be sent. Check the backend SMTP credentials and mail server settings."
+            ) from exc
+
+        return {
+            "emails_sent": len(emails) if send_count else 0,
+            "email_failed": 0 if send_count else len(emails),
+            "vessels_without_email": 0,
+        }
+
+    def _email_body(self, *, near_miss: Incident, alert_text: str, fleet_learning_text: str) -> str:
+        return "\n".join(
+            [
+                "Hello,",
+                "",
+                f"A near miss has occurred: {near_miss.incident_number}.",
+                "",
+                "Please review what happened in the attached PDF and take the necessary preventive action.",
+                "",
+                "Kaizen Ship Management",
+            ]
+        )
+
+    def _build_pdf_attachment(self, near_miss: Incident):
+        from apps.safety.services.pdf_renderer import NearMissLightweightPdfRenderer
+
+        return NearMissLightweightPdfRenderer().render_near_miss_pdf(
+            incident_id=near_miss.pk,
+            viewer_user=None,
+            persist=False,
+        )
 
     def build_circular_payload(
         self,
@@ -513,7 +670,7 @@ class FleetAlertIssuer:
             return False
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT 1 FROM {self.notification_writer.table_name} WHERE record_id = %s AND notification_kind = %s",
+                f"SELECT 1 FROM {self.notification_writer.table_name} WHERE entity_id = %s AND notification_type = %s",
                 [record_id, kind],
             )
             return cursor.fetchone() is not None

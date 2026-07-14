@@ -14,15 +14,33 @@
 
 > **Incident backend update (2026-06-12):** The simplified incident workflow requires `vims_safety_incident.office_notified`, `office_notification_mode`, `loss_type_secondary_id`, `loss_type_tertiary_id`, and `loss_type_other`. Deploy migrations `0037_incident_office_notification_fields.py` and `0038_incident_multiple_loss_types.py` before deploying incident UI/API code that references these fields. Public incident routes follow the simplified phase contract in the Safety SSOT section 3.0; older backend class names and legacy URL aliases remain compatibility details only.
 >
-> **Incident Office Review update (2026-07-07):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments/lesson learnt captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields. Current send-for-rework UI sends a fixed action-rework target with the comment; it does not expose a target-phase picker. Ship-side Office Review shows a pending message when this comment is empty. Incident PDF preview/download is not blocked solely by pending Phase 7 acceptance.
+> **Incident Office Review update (2026-07-13):** Deploy migration `0052_incident_office_comment.py` before using the renamed Office Review screen. It adds nullable `vims_safety_incident.office_comment` for unrestricted Office Comments/lesson learnt captured during visible Phase 6 Office Review. This is separate from SCM meeting `office_comment` fields. Current send-for-rework UI sends a fixed action-rework target with one comment textbox; it does not expose a target-phase picker. The comment is stored in the existing `vims_safety_incident_phase_log.loop_back_reason` REWORK row, and preflight returns it as `rework_summary` while the incident is sent back. Ship-side Office Review shows a pending message when this comment is empty. Incident PDF preview/download is not blocked solely by pending Phase 7 acceptance.
+> **Incident Rework Done update (2026-07-13):** When an incident is `SENT_BACK` at backend `current_phase = 6`, ship-side and office-side users can mark **Rework Done** through `POST /api/safety/incidents/{id}/transition/` with `{"target_phase":7}`. The state machine changes `state` from `SENT_BACK` to `UNDER_REVIEW` and returns the incident to Office Review.
+> **Incident CR-079 send-back phase guard update (2026-07-13):** No migration is required. `POST /api/safety/incidents/{id}/phase-5/send-back/` no longer rejects send-back solely because the incident has not reached internal `current_phase = 7`. The endpoint still requires PIC/DPA send-back permission and a reason, writes `state = SENT_BACK`, moves the incident to the fixed action-rework target phase, and logs the actual source phase in `vims_safety_incident_phase_log.phase_from`.
 
-> **Incident Fleet Alert update (2026-07-07):** No migration is required for CR-051. The Office Review Fleet Alert endpoint reads active ships and email addresses from existing `VesselData`, writes in-app rows through existing `psc_notification`, and sends best-effort email only to the selected ships.
+> **Incident CR-080 register vessel filter update (2026-07-13):** No migration is required. `GET /api/safety/incidents/vessels/` returns active `VesselData` options within the caller's safety vessel scope for the Safety Incidents register Vessel dropdown. The existing incident list keeps using `vessel_id`, `risk_band`, and `state` query parameters; the frontend labels `state` as Status.
 
-> **Incident Loss Evaluation and preventive-risk update (2026-07-07):** No migration is required for CR-052. `GET/PATCH /api/safety/incidents/{id}/phase-6/` allows authorized ship-side and office-side users with `SAF_F_001` and vessel scope to open/save Loss Evaluation without requiring Office Review approval/backend `current_phase = 8`; `/phase-6/close/` remains office-close controlled. The Phase 4 frontend shows one shared preventive risk-reduction answer and sends it as `vims_safety_recommendation.estimated_likelihood_reduction` for preventive saves.
+> **Fleet Alert email update (2026-07-13; PDF attachment current as of CR-086 on 2026-07-14):** No migration is required for CR-051/CR-062/CR-083/CR-086. Incident Office Review Fleet Alert and HIGH-priority Near Miss Fleet Alert read selected ship email addresses from existing `VesselData`; Confirm/Issue writes in-app rows through existing `psc_notification` and sends email only to selected ships. SMTP sender settings are read from environment variables such as `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL`; passwords are not stored in tracked source. Incident and Near Miss fleet-alert email batches include `HSSEQ@kaizenship.net` in CC, attach the relevant Incident/Near Miss PDF, and use a short prevention-focused body.
+
+> **Incident CR-064/CR-073/CR-076 backend update (2026-07-13):** Deploy migration `0058_incident_phase1_operational_fields.py` before using the CR-064 Phase 1 UI. It adds nullable `vims_safety_incident` fields `risk_assessment_carried_out`, `toolbox_meeting_carried_out`, `permit_issued`, `activity_type`, `incident_type_other`, and `vessel_location_detail`; the three yes/no/NA fields are constrained to `YES`, `NO`, or `NA` when present. Phase 1 serializers expose these fields. Incident Fleet Alert email adds CC `HSSEQ@kaizenship.net`, while the frontend select-all control only changes the selected recipient id list. Incident PDF section order is Summary, Reporter Details, Injury Details, Describe What happened?, Root Cause Analysis, Corrective and Preventive Actions, Evidence (Documents), Lessons Learned, Signature, then optional Estimated Cost/Loss Evaluation on a new page.
+
+> **Incident CR-078 injury narrative update (2026-07-13):** No migration is required. `vims_safety_external_party_injury.what_happened_narrative` remains nullable legacy storage/API compatibility, but the current Phase 1 injury form does not render a separate **Describe What Happened** field and the current Incident PDF does not print that injury-row value.
+
+> **Incident CR-065 action/PDF update (2026-07-09; PDF wording superseded by CR-071):** No migration is required. Current incident Corrective and Preventive recommendation saves require only Description and no longer require linked `vims_safety_corrective_action` due-date/status data or preventive ALARP/risk-reduction fields. Existing linked corrective-action rows remain readable for old/direct API clients. Incident PDFs print Location of Vessel once with any In Port / At Anchorage detail appended in the same value, group Immediate Cause and Root Cause once per layer, group Corrective Actions and Preventive Actions independently, and render `office_comment` as one full-width **Office comments/ lesson learnt** block.
+
+> **Incident CR-066/CR-067/CR-069/CR-072 PDF/witness attachment update (2026-07-10):** No migration is required. `GET /api/safety/incidents/{id}/phase-4/interviews/{interview_id}/statement-attachment/` serves the downloadable data-url payload stored on the Witness Statement row so Incident PDF witness attachment rows can link to the statement; the PDF does not render the old free-text witness statement value even when legacy rows contain it. Incident PDFs render Corrective/Preventive actions as full-width bordered rows with no left-side `Description` label column, description first, and any saved linked due date second as `Due Date: YYYY-MM-DD`; `office_comment` renders as a single-column, undivided **Office comments/ lesson learnt** box.
+
+> **Incident CR-068 office-comment PDF update (2026-07-10):** No migration is required. Incident PDFs render `office_comment` as one full-width text block, preserving typed line breaks and repeated spaces and avoiding the previous long-text chunking path. The PDF engine can still wrap long lines to the page width.
+
+> **Incident CR-070 Last Port PDF update (2026-07-10):** No migration is required. `last_port` remains nullable legacy database/API compatibility storage on incident and injury rows, but current Incident PDFs do not print Last port from either source because the current Phase 1 frontend does not show or send that field.
+
+> **Incident Loss Evaluation update (2026-07-07; action wording superseded by CR-065):** No migration is required for CR-052/CR-056. `GET/PATCH /api/safety/incidents/{id}/phase-6/` allows authorized ship-side and office-side users with `SAF_F_001` and vessel scope to open/save Loss Evaluation without requiring Office Review approval/backend `current_phase = 8`; `/phase-6/close/` now rejects closure because Phase 6 Office Review owns incident close. CR-065 supersedes the former shared preventive risk-reduction frontend behavior; current incident action capture sends Description only.
 
 > **Incident Loss Evaluation report-type update (2026-07-07):** Deploy migration `0056_incident_loss_evaluation_report_type.py` before using the CR-053 Phase 7 selector. It adds nullable `vims_safety_incident_loss_evaluation.report_type` with `INCIDENT` and `INJURY` choices. `PATCH /api/safety/incidents/{id}/phase-6/` persists the selected type, `GET` returns `choices.report_type`, and PDF Loss Evaluation cost/detail blocks use the saved type. Existing rows without a saved type keep the previous injury-record fallback.
 
 > **Incident Phase 1 vessel identity update (2026-07-07):** No migration is required for CR-054. `GET /api/safety/incidents/{id}/phase-1/` returns resolved `vessel_code` together with `vessel_name` and `vessel_display_name` using the existing VesselData/auth resolver. `vessel_code` remains accepted on create for draft-number allocation and is ignored on Phase 1 update; `vessel_id` plus vessel-scope validation remain the persisted authority.
+
+> **Incident Phase 1 estimated-cost update (2026-07-07):** No migration is required for CR-055. Current Phase 1 injury UI no longer shows or submits legacy injury estimated-cost fields; current cost entry belongs to Phase 7 Loss Evaluation. Existing `vims_safety_external_party_injury` cost columns remain nullable compatibility/fallback storage for older records and exports.
 
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
@@ -532,6 +550,7 @@ ALTER TABLE vims_safety_external_party_injury ADD onboard_location NVARCHAR(128)
 ALTER TABLE vims_safety_external_party_injury ADD last_port NVARCHAR(128) NULL;
 ALTER TABLE vims_safety_external_party_injury ADD departure_date DATE NULL;
 ALTER TABLE vims_safety_external_party_injury ADD vessel_condition VARCHAR(16) NULL;
+-- Legacy compatibility only in current UI/PDF: the incident-level narrative is authoritative.
 ALTER TABLE vims_safety_external_party_injury ADD what_happened_narrative NVARCHAR(MAX) NULL;
 ALTER TABLE vims_safety_external_party_injury ADD nature_of_injury NVARCHAR(255) NULL;
 ALTER TABLE vims_safety_external_party_injury ADD source_of_injury NVARCHAR(255) NULL;
@@ -562,7 +581,7 @@ ALTER TABLE vims_safety_external_party_injury ADD miscellaneous_expenses_reason 
 ALTER TABLE vims_safety_external_party_injury ADD total_estimated_cost DECIMAL(12,2) NULL;
 ```
 
-Serializer contract: `external_party_injury` is nested in Phase 1 create/update. Non-crew requires the original fields; crew details are nullable draft fields. The old injury-row context columns `shore_assistance_required`, `vessel_location`, `onboard_location`, `last_port`, `departure_date`, and `vessel_condition` remain for backward compatibility with older injury records, but the current Phase 1 UI/API source of truth is the incident-level columns added by CR-024. On update, a populated nested payload creates or updates the injury row; a null or omitted `external_party_injury` leaves any existing injury row unchanged.
+Serializer contract: `external_party_injury` is nested in Phase 1 create/update. Non-crew requires the original fields; crew details are nullable draft fields. The old injury-row context columns `shore_assistance_required`, `vessel_location`, `onboard_location`, `last_port`, `departure_date`, and `vessel_condition` remain for backward compatibility with older injury records, but the current Phase 1 UI/API source of truth is the incident-level columns added by CR-024. `last_port` remains storage compatibility only and is not printed in the current Incident PDF. On update, a populated nested payload creates or updates the injury row; a null or omitted `external_party_injury` leaves any existing injury row unchanged.
 
 ### 4.0B `vims_safety_injury_dropdown_option` - Injury dropdown master
 
@@ -599,7 +618,9 @@ GET /api/safety/reference/injury-dropdown-options/?field_key=SAFE_WORKING_PRACTI
 
 ### 4.0C `vims_safety_incident_loss_evaluation` - Phase 7 Loss Evaluation
 
-This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is required before Phase 7 close. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/`, but GET/PATCH saves are no longer gated by Office Review approval/backend `current_phase = 8`; authorized ship-side and office-side users with incident form access and vessel scope can save it. The payload is now Loss Evaluation rather than Check Actions. Migration `0056_incident_loss_evaluation_report_type.py` adds nullable `report_type` so users can choose Incident Report or Injury Report first; existing rows without that value use the old injury-record fallback.
+This table stores the current visible Phase 7 Loss Evaluation. It is one editable row per incident and is additional data entry, not the close owner. The backend keeps the compatibility route `/api/safety/incidents/{id}/phase-6/`, but GET/PATCH saves are no longer gated by Office Review approval/backend `current_phase = 8`; authorized ship-side and office-side users with incident form access and vessel scope can save it. The payload is now Loss Evaluation rather than Check Actions. Migration `0056_incident_loss_evaluation_report_type.py` adds nullable `report_type` so users can choose Incident Report or Injury Report first; existing rows without that value use the old injury-record fallback.
+
+On GET, blank `name_of_master` and `name_of_chief_engineer` values in the Loss Evaluation payload default from current active onboard crew for the incident vessel. The resolver reads `Crew_Onboarding_History.CrewID/Vessel/SignOffDate`, `HRM501.CrewID/first_name/surname/rank_name`, and `master_applied_rank.rank_name`, using `MASTER` for Name of master and `CHIEF ENGINEER` for Name of Chief Engineer. Saved nonblank Loss Evaluation names are returned unchanged.
 
 ```sql
 CREATE TABLE vims_safety_incident_loss_evaluation (
@@ -1127,7 +1148,7 @@ CREATE INDEX IX_vims_safety_corrective_action_aging     ON vims_safety_correctiv
 
 ### 4.14 `vims_safety_recommendation` — Corrective / Preventive / Lessons tiers
 
-> **Build-time deferral #4 (cardinality):** whether a single-row model with three nullable tier columns vs one-row-per-tier vs child sub-table best fits the "≥1 per tier on YELLOW/RED" rule (V-INC-064). Current lock: one-row-per-tier (easier bulk query; cleaner cardinality constraint).
+> **Build-time deferral #4 (cardinality):** resolved by CR-057. `vims_safety_recommendation` remains one row per action, and multiple active rows per incident/tier are allowed. Closure/readiness checks count whether at least one relevant action row exists; they do not enforce one-row-per-tier.
 
 ```sql
 CREATE TABLE vims_safety_recommendation (
@@ -1165,7 +1186,7 @@ CREATE INDEX IX_vims_safety_recommendation_theme    ON vims_safety_recommendatio
 CREATE INDEX IX_vims_safety_recommendation_alarp    ON vims_safety_recommendation (alarp_attested);
 ```
 
-CR-049/CR-052 compatibility note: `rationale`, `theme_code`, and `estimated_effort` remain nullable storage for old recommendation rows and direct API compatibility, but the current Incident action frontend does not render or send recommendation rationale / "Why is this needed?", theme, or effort. Preventive Action now sends Description, Due date, and one shared screen-level risk reduction; the due date is stored through the existing linked `vims_safety_corrective_action` row for the preventive recommendation, and the shared risk-reduction answer is stored in `vims_safety_recommendation.estimated_likelihood_reduction` for backend compatibility. Formal Incident PDF output also omits stored recommendation rationale.
+CR-049/CR-052/CR-065/CR-066/CR-067/CR-069 compatibility note: `rationale`, `theme_code`, `estimated_effort`, `estimated_likelihood_reduction`, and linked `vims_safety_corrective_action` rows remain nullable/readable storage for old recommendation rows and direct API compatibility, but the current Incident action frontend renders and sends only Description for Corrective and Preventive Action. Formal Incident PDF output renders each action as a full-width bordered row/box with no left-side `Description` label column, prints the description first, prints any saved linked due date second as `Due Date: YYYY-MM-DD`, and omits stored recommendation rationale, status/open-close, physical verification, closed-at, and verification fields.
 
 ---
 
@@ -1405,7 +1426,7 @@ CREATE TABLE master_safety_bias_guard (
 | `master_RoleByVessel` | Office-user vessel scoping on every list / detail endpoint |
 | `master_applied_rank` | Rank normalization for SCM attendance + SOI trainee display |
 | `master_notification` | Shared notification queue — Safety writes rows; platform notifier consumes (per `<vims_integration>`) |
-| `VesselData` | Vessel master — FK target on every Safety row via `vessel_id`; Incident Fleet Alert reads active ship names/codes and `email` from this table |
+| `VesselData` | Vessel master — FK target on every Safety row via `vessel_id`; Incident and Near Miss Fleet Alert read active ship names/codes and `email` from this table |
 | `Crew_Onboarding_History` | Ship-side vessel scope + SOI assistant dept lookup + SCM attendance roster (live join, D-GAP-I2) |
 | `HRM501` | Crew email / rank enrichment — live join |
 | `master_applied_rank` | Already listed above — (explicit confirmation per rubric) |
@@ -1469,7 +1490,7 @@ Per master prompt §6, the following 12 items are explicitly deferred to build-t
 
 **#3 — Soft-archive implementation.** Options: (a) `archived_at NULL` sentinel (current lock — simplest); (b) `is_archived BIT + archived_at DATETIME2` (redundant but explicit); (c) partition by archived state (best for 3-year retention purge performance; high initial complexity). Impact: retention job (D-GAP-G2) + search default filters. Required by Phase 0 because initial migration sets the column shape.
 
-**#4 — `vims_safety_recommendation` cardinality.** See §4.14. Options: (a) one-row-per-tier (current lock — V-INC-064 compatibility); (b) single row with three tier columns (lossy for multiple recs per tier); (c) parent row + child tier-specific rows (most flexible, most joins). Impact: ≥1-per-tier enforcement on YELLOW/RED (V-INC-064).
+**#4 — `vims_safety_recommendation` cardinality.** Resolved by CR-057. The active model keeps one row per action recommendation and allows multiple rows for the same incident/tier. Impact: ≥1 action checks count rows but do not cap rows per tier.
 
 **#5 — `vims_safety_soi_finding` state ENUM + Carried-Forward.** See §4.6. Options: (a) 5-state ENUM with explicit `CARRIED_FORWARD` state + counter (current lock); (b) 4-state ENUM + derived carried-forward via JOIN to `vims_safety_scm_agenda`; (c) separate `vims_safety_soi_finding_scm_link` table. Impact: SCM auto-feed query complexity (D-SOI-14).
 
@@ -1543,6 +1564,14 @@ List incidents/near-misses with filters + pagination.
 }
 ```
 
+#### 9.2.1a `GET /api/safety/incidents/vessels/`
+
+List vessel options for the current Safety Incidents register.
+
+- **Auth:** `SAF_F_001`.
+- **Behavior:** returns active `VesselData` rows within the user's vessel scope. Global office users receive all active ships.
+- **Response 200:** array of `{ "id": "<vessel_uuid>", "vessel_code": "YCF", "vessel_name": "YC FORTITUDE" }`.
+
 #### 9.2.2 `POST /api/safety/incidents/`
 
 Create incident / near miss. `record_type` in body determines row class.
@@ -1595,6 +1624,7 @@ The current user-facing evidence screen writes new evidence to the legacy `PAPER
 - `POST /api/safety/incidents/{id}/phase-4/evidence/attachments/` accepts multipart fields `tab_key=paper`, `file`, `title`, and optional `description`.
 - `PATCH /api/safety/incidents/{id}/phase-4/evidence/attachments/?path={attachment_path}` updates saved attachment `title` and `description` metadata on the existing attachment record and matching `EvidenceItem`; it does not replace the uploaded file.
 - `PATCH /api/safety/incidents/{id}/phase-4/interviews/{interview_id}/` updates an existing simplified Witness Statement row instead of creating a new witness row.
+- `GET /api/safety/incidents/{id}/phase-4/interviews/{interview_id}/statement-attachment/` returns the stored Witness Statement upload inline when the row contains a downloadable data-url attachment; Incident PDFs use this route for Witness Statement attachment links.
 - The upload response returns `attachment` metadata and refreshed `workspace`.
 - The attachment metadata stored in `IncidentEvidence.structured_data.attachments[]` includes `attachment_path`, `file_name`, `original_name`, `content_type`, `byte_size`, `tab_key`, `title`, `description`, and `uploaded_at`.
 - A matching `EvidenceItem` row is created with `item_type=PHYSICAL`, `title`, `description`, `source_label=PAPER`, and the same metadata JSON, so exports and later analysis can display the user-facing title instead of a raw file UUID/path.
@@ -1603,9 +1633,9 @@ The current user-facing evidence screen writes new evidence to the legacy `PAPER
 
 Current visible Phase 7 uses route path `/phase-6/` and no longer requires backend compatibility phase 8 for workspace read/save.
 
-- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, effective/saved `report_type` (`INCIDENT` or `INJURY`), `choices.report_type`, fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation`, and `ready_for_close` for authorized ship-side or office-side users with incident form access and vessel scope.
+- `GET /api/safety/incidents/{id}/phase-6/` returns `phase_title="Loss Evaluation"`, effective/saved `report_type` (`INCIDENT` or `INJURY`), `choices.report_type`, fixed dropdown choices, safe-working-practice options from `vims_safety_injury_dropdown_option`, saved `loss_evaluation` with crew-derived defaults for blank master/chief engineer fields, and `ready_for_close` for authorized ship-side or office-side users with incident form access and vessel scope.
 - `PATCH /api/safety/incidents/{id}/phase-6/` creates or updates the one-to-one `vims_safety_incident_loss_evaluation` row, persists selected `report_type`, and emits `vims_safety_field_history` rows for changed fields without requiring Office Review approval/backend `current_phase = 8`.
-- `POST /api/safety/incidents/{id}/phase-6/close/` requires office close authority, a saved Loss Evaluation row, and `closure_reason`, then transitions backend `current_phase` 8 to 9 and sets `state=CLOSED`.
+- `POST /api/safety/incidents/{id}/phase-6/close/` rejects closure with "Incident close is handled in Phase 6 Office Review."
 - `POST /api/safety/incidents/{id}/phase-6/verify/` remains registered for legacy effectiveness-verification compatibility but is not the current visible Phase 7 UI.
 - PIC and DPA can save and close for every risk band after Office Review approval.
 
@@ -1625,6 +1655,12 @@ Forward or loop-back phase transition. Writes `vims_safety_incident_phase_log`.
   ```
 - **Response 200:** updated incident + appended phase_log row.
 - **Errors:** 409 PhaseTransitionDenied with current_phase; 422 V-INC-040..056 (phase-specific preconditions, excluding legacy V-INC-043 in the current UI); 422 V-INC-061 (ALARP not attested); 422 V-INC-044 (Blame-fixation without override); 422 loop_back_reason missing.
+- **Rework Done compatibility:** for `state = SENT_BACK`, `current_phase = 6`, and `target_phase = 7`, the endpoint accepts ship submit permission `SAF_P_002` or Office Review permissions `SAF_P_003`, `SAF_P_004`, `SAF_P_006`; on success it sets `state = UNDER_REVIEW`.
+
+#### 9.2.5a `GET /api/safety/incidents/{id}/phase-5/preflight/` (Office Review preflight)
+
+- **Auth:** `SAF_F_001` with vessel scope; Office Review actors also use this payload for Accept / Close, Fleet Alert, PDF controls, and Send for rework.
+- **Response 200:** Office Review readiness, PDF preview, `office_comment`, and `rework_summary`. `rework_summary` is `null` unless the incident state is `SENT_BACK`; when present it contains `comment`, `requested_at`, `requested_by`, and `requested_by_role` from the latest REWORK phase log. Send-back can create this sent-back state even when the incident had not yet reached internal `current_phase = 7`; the REWORK log stores the actual source phase.
 
 #### 9.2.6 `POST /api/safety/incidents/{id}/accept/` (Office Review acceptance)
 
@@ -1634,10 +1670,10 @@ Forward or loop-back phase transition. Writes `vims_safety_incident_phase_log`.
 
 #### 9.2.6a `GET/POST /api/safety/incidents/{id}/fleet-alert/` (Office Review Fleet Alert)
 
-- **Auth:** `SAF_F_001` plus Office Review process permission `SAF_P_004` or `SAF_P_006`; role must be PIC or DPA. The incident must be in backend `current_phase = 7` (visible Phase 6 Office Review).
-- **GET response:** incident summary plus `recipient_vessels[]` loaded from active, non-deleted `VesselData` rows. Each row returns `vessel_id`, `display_name`, `vessel_name`, `vessel_code`, and `has_email`.
+- **Auth:** `SAF_F_001` plus Office Review process permission `SAF_P_004` or `SAF_P_006`; role must be PIC or DPA. The visible Office Review Fleet Alert button advances the legacy backend phase to Office Review before loading recipient ships when needed. The endpoint accepts Office Review and later final phases for this notification action, including incidents closed through Office Review, while rejecting early investigation phases.
+- **GET response:** incident summary plus `recipient_vessels[]` loaded from active, non-deleted `VesselData` rows for the frontend popup. Each row returns `vessel_id`, `display_name`, `vessel_name`, `vessel_code`, and `has_email`.
 - **POST request body:** `{"recipient_vessel_ids":["<vessel_uuid>", "..."]}`. At least one selected active ship is required.
-- **POST behavior:** writes `INCIDENT_FLEET_ALERT` in-app notifications through `psc_notification` for selected vessel recipients and sends best-effort emails only to selected ships using `VesselData.email`. Ships not selected do not receive in-app or email alerts.
+- **POST behavior:** runs after popup Confirm, writes `INCIDENT_FLEET_ALERT` in-app notifications through `psc_notification` for selected vessel recipients, and sends best-effort emails only to selected ships using `VesselData.email` plus the configured Django SMTP sender. The email attaches the Incident PDF and uses a short prevention-focused body. Ships not selected do not receive in-app or email alerts.
 - **Response 200:** includes selected `recipient_vessel_ids`, selected `recipient_vessels`, `notifications_emitted`, `emails_sent`, `email_failed`, and `vessels_without_email`.
 
 #### 9.2.7 `POST /api/safety/incidents/{id}/close/`
@@ -1662,8 +1698,8 @@ Band-gated re-open (D-EDGE-03).
 Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter template. For incident exports, the rendered title is `Injury Report` when `vims_safety_external_party_injury` has a row for the incident; otherwise the rendered title is `Incident Report`. The Estimated Cost selection prints Phase 7 Loss Evaluation blocks from `vims_safety_incident_loss_evaluation` when that row exists; the saved `report_type` controls whether incident repair/loss/cost or injury safe-working-practice/rest/cost blocks print. Older rows without `report_type` use the injury-record fallback, and older injury cost fields are used only as fallback when no Loss Evaluation row exists.
 
 - **Auth:** `SAF_P_023`.
-- **Query:** optional `sections`, accepted as repeated values or comma-separated keys. Current frontend defaults to `summary`, `reporter_details`, `injury_details`, `estimated_cost`, `root_cause`, `evidence_documents`, `corrective_preventive_actions`, and `signature`. The legacy backend key `lessons_learned` remains accepted for old/direct exports only. Omitted or empty `sections` renders all allowed backend sections for compatibility.
-- **Response 200:** `application/pdf` binary. Near-miss PDFs show reporter details for authorized users and must not print anonymous/masked-reporter wording. Incident PDFs are available before Phase 7 acceptance and render required signature rows by band even when unsigned, showing `Pending` for incomplete signature slots. Incident `office_comment` and closure reason print in the final Office Review / Closure area before Signature, not in Summary.
+- **Query:** optional `sections`, accepted as repeated values or comma-separated keys. Current Phase 6 frontend sends the compulsory report keys `summary`, `reporter_details`, `injury_details`, `root_cause`, `evidence_documents`, `corrective_preventive_actions`, and `signature`; it adds `estimated_cost` only when the user checks **Print Loss Evaluation**. The legacy backend key `lessons_learned` remains accepted for old/direct exports only. Omitted or empty `sections` renders all allowed backend sections for compatibility.
+- **Response 200:** `application/pdf` binary. Near-miss PDFs show reporter details for authorized users and must not print anonymous/masked-reporter wording. Incident PDFs are available before Phase 7 acceptance. Current Incident PDFs print Reporter signature and PIC / DPA office signature only; Master and HOD signature rows are not printed. Incident `office_comment` prints in the final Closure area as one single-column full-width **Office comments/ lesson learnt** block before Signature; it is passed through as one text block with typed line breaks and repeated spaces preserved and no artificial chunk rows. Stored closure reason and a separate Comment row are not printed. Corrective and Preventive action PDF blocks render before Evidence (Documents); each action is a full-width bordered row/box without a left-side `Description` label column, with description first and any saved linked due date second as `Due Date: YYYY-MM-DD`. Location of Vessel prints once with any In Port / At Anchorage detail appended in the same value. Witness Statement blocks use the witness display in the heading, show downloadable attachment links without repeating a Witness name row, and suppress the old free-text `What the witness said` value. Immediate/Root Cause blocks are grouped once per layer.
 
 #### 9.2.11 `POST /api/safety/incidents/{id}/link/`
 
@@ -1910,7 +1946,7 @@ Physical verification record (Q45 pattern).
 
 Near Miss Office Comments are handled through `/api/safety/near-miss/{id}/office-comments/` with the legacy `/triage/` route retained as a compatibility alias. `Accept` saves priority, category tag, factor causes, and office comment; `Send to Rework` moves the record back to vessel rework with a required reason. PIC/office PIC accepts LOW/MEDIUM cases; DPA accepts HIGH cases.
 
-Near Miss HIGH-priority fleet alerts use a UI handoff, not a Safety-owned Circular insert. `/api/safety/near-miss/{id}/fleet-alert/draft/` prepares anonymised title/body text. The frontend stores that text as a one-time Circular prefill and opens `/circular/office?safety_prefill=near_miss_fleet_alert`; DPA completes recipients/category/priority/attachments and publishes from the Circular module. The Near Miss `[Issue fleet alert]` action records Safety workflow completion separately and must not be treated as Circular publication.
+Near Miss HIGH-priority fleet alerts use a UI handoff, not a Safety-owned Circular insert. `/api/safety/near-miss/{id}/fleet-alert/draft/` prepares anonymised title/body text. The frontend stores that text as a one-time Circular prefill and opens `/circular/office?safety_prefill=near_miss_fleet_alert`; DPA completes recipients/category/priority/attachments and publishes from the Circular module. The Near Miss `[Issue fleet alert]` action records Safety workflow completion separately and must not be treated as Circular publication. Current POST issue also writes `NEAR_MISS_FLEET_ALERT` in-app notifications and sends one BCC email batch to selected vessel `VesselData.Email` recipients with `HSSEQ@kaizenship.net` in CC, the Near Miss PDF attached, and a short prevention-focused body. Response includes `notifications_emitted`, `emails_sent`, `email_failed`, and `vessels_without_email`.
 
 ---
 

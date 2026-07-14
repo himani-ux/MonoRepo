@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 
 from django.db import connection
+from django.test import override_settings
 
 from tests.safety.support import bootstrap_django, recreate_incident_table
 
@@ -100,8 +102,14 @@ class IncidentFleetAlertTests(unittest.TestCase):
             schema_version=Incident.ENUM_TIGHTENED_SCHEMA_VERSION,
         )
 
+    @patch("apps.safety.services.incident_fleet_alert.IncidentFleetAlertService._build_pdf_attachment")
     @patch("apps.safety.services.incident_fleet_alert.EmailMultiAlternatives")
-    def test_issue_sends_in_app_and_email_only_to_selected_ships(self, email_class) -> None:
+    def test_issue_sends_in_app_and_email_only_to_selected_ships(self, email_class, pdf_attachment) -> None:
+        pdf_attachment.return_value = SimpleNamespace(
+            file_name="ARY-2026-099.pdf",
+            content=b"%PDF-incident",
+            content_type="application/pdf",
+        )
         email_message = email_class.return_value
         request = self.factory.post(
             f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
@@ -110,7 +118,12 @@ class IncidentFleetAlertTests(unittest.TestCase):
         )
         force_authenticate(request, user=build_user())
 
-        response = self.view(request, id=self.incident.pk)
+        with override_settings(
+            DEFAULT_FROM_EMAIL="KSM Marine <pms@cymsol.co.in>",
+            EMAIL_HOST_USER="pms@cymsol.co.in",
+            EMAIL_HOST_PASSWORD="smtp-password",
+        ):
+            response = self.view(request, id=self.incident.pk)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["issued"])
@@ -129,18 +142,29 @@ class IncidentFleetAlertTests(unittest.TestCase):
             {"INCIDENT_FLEET_ALERT"},
         )
 
-        sent_addresses = {
-            call.kwargs["to"][0]
-            for call in email_class.call_args_list
-        }
-        self.assertEqual(sent_addresses, {"alpha@example.com", "charlie@example.com"})
-        self.assertEqual(email_message.send.call_count, 2)
+        email_class.assert_called_once()
+        self.assertEqual(email_class.call_args.kwargs["to"], [])
+        self.assertEqual(
+            set(email_class.call_args.kwargs["bcc"]),
+            {"alpha@example.com", "charlie@example.com"},
+        )
+        self.assertEqual(email_class.call_args.kwargs["from_email"], "KSM Marine <pms@cymsol.co.in>")
+        self.assertEqual(tuple(email_class.call_args.kwargs["cc"]), ("HSSEQ@kaizenship.net",))
+        self.assertIn("Please review what happened in the attached PDF", email_class.call_args.kwargs["body"])
+        self.assertNotIn("Cargo hose failed", email_class.call_args.kwargs["body"])
+        email_message.attach.assert_called_once_with(
+            "ARY-2026-099.pdf",
+            b"%PDF-incident",
+            "application/pdf",
+        )
+        self.assertEqual(email_message.send.call_count, 1)
 
     def test_workspace_lists_active_vessels_for_office_selection(self) -> None:
         request = self.factory.get(f"/api/safety/incidents/{self.incident.pk}/fleet-alert/")
         force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
 
-        response = self.view(request, id=self.incident.pk)
+        with override_settings(EMAIL_HOST_USER="pms@cymsol.co.in", EMAIL_HOST_PASSWORD="smtp-password"):
+            response = self.view(request, id=self.incident.pk)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -151,6 +175,86 @@ class IncidentFleetAlertTests(unittest.TestCase):
             [row["display_name"] for row in response.data["recipient_vessels"]],
             ["ALP - Vessel Alpha", "BRV - Vessel Bravo", "CHR - Vessel Charlie"],
         )
+
+    def test_workspace_allows_backend_phase_six_office_review(self) -> None:
+        self.incident.current_phase = 6
+        self.incident.save(update_fields=["current_phase"])
+        request = self.factory.get(f"/api/safety/incidents/{self.incident.pk}/fleet-alert/")
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
+
+        with override_settings(EMAIL_HOST_USER="pms@cymsol.co.in", EMAIL_HOST_PASSWORD="smtp-password"):
+            response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [row["vessel_id"] for row in response.data["recipient_vessels"]],
+            [VESSEL_A, VESSEL_B, VESSEL_C],
+        )
+
+    @patch("apps.safety.services.incident_fleet_alert.IncidentFleetAlertService._build_pdf_attachment")
+    @patch("apps.safety.services.incident_fleet_alert.EmailMultiAlternatives")
+    def test_issue_allows_backend_phase_six_office_review(self, email_class, pdf_attachment) -> None:
+        pdf_attachment.return_value = SimpleNamespace(
+            file_name="phase-six-incident.pdf",
+            content=b"%PDF",
+            content_type="application/pdf",
+        )
+        self.incident.current_phase = 6
+        self.incident.save(update_fields=["current_phase"])
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
+            {"recipient_vessel_ids": [VESSEL_B]},
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        with override_settings(EMAIL_HOST_USER="pms@cymsol.co.in", EMAIL_HOST_PASSWORD="smtp-password"):
+            response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["issued"])
+        self.assertEqual(response.data["recipient_vessel_ids"], [VESSEL_B])
+        self.assertEqual(response.data["notifications_emitted"], 1)
+        self.assertEqual(response.data["emails_sent"], 1)
+        email_class.return_value.attach.assert_called_once_with(
+            "phase-six-incident.pdf",
+            b"%PDF",
+            "application/pdf",
+        )
+        self.assertEqual(email_class.return_value.send.call_count, 1)
+
+    @patch("apps.safety.services.incident_fleet_alert.IncidentFleetAlertService._build_pdf_attachment")
+    @patch("apps.safety.services.incident_fleet_alert.EmailMultiAlternatives")
+    def test_issue_allows_closed_office_review_incident(self, email_class, pdf_attachment) -> None:
+        pdf_attachment.return_value = SimpleNamespace(
+            file_name="closed-incident.pdf",
+            content=b"%PDF",
+            content_type="application/pdf",
+        )
+        self.incident.current_phase = 9
+        self.incident.state = Incident.State.CLOSED
+        self.incident.save(update_fields=["current_phase", "state"])
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
+            {"recipient_vessel_ids": [VESSEL_B]},
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        with override_settings(EMAIL_HOST_USER="pms@cymsol.co.in", EMAIL_HOST_PASSWORD="smtp-password"):
+            response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["issued"])
+        self.assertEqual(response.data["recipient_vessel_ids"], [VESSEL_B])
+        self.assertEqual(response.data["notifications_emitted"], 1)
+        self.assertEqual(response.data["emails_sent"], 1)
+        email_class.return_value.attach.assert_called_once_with(
+            "closed-incident.pdf",
+            b"%PDF",
+            "application/pdf",
+        )
+        self.assertEqual(email_class.return_value.send.call_count, 1)
 
     def test_issue_requires_at_least_one_ship(self) -> None:
         request = self.factory.post(
@@ -164,6 +268,92 @@ class IncidentFleetAlertTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("recipient_vessel_ids", response.data)
+
+    @patch("apps.safety.services.incident_fleet_alert.EmailMultiAlternatives")
+    def test_issue_requires_configured_sender_password_before_notification(self, email_class) -> None:
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
+            {"recipient_vessel_ids": [VESSEL_A]},
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        with (
+            override_settings(EMAIL_HOST_PASSWORD=""),
+            patch("apps.safety.services.incident_fleet_alert.load_dotenv"),
+            patch.dict("os.environ", {"EMAIL_HOST_PASSWORD": ""}),
+        ):
+            response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("EMAIL_HOST_PASSWORD", str(response.data))
+        self.assertEqual(Notification.objects.count(), 0)
+        email_class.assert_not_called()
+
+    @patch("apps.safety.services.incident_fleet_alert.IncidentFleetAlertService._build_pdf_attachment")
+    @patch("apps.safety.services.incident_fleet_alert.EmailMultiAlternatives")
+    def test_issue_loads_sender_password_from_environment_without_restart(self, email_class, pdf_attachment) -> None:
+        pdf_attachment.return_value = SimpleNamespace(
+            file_name="incident.pdf",
+            content=b"%PDF",
+            content_type="application/pdf",
+        )
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
+            {"recipient_vessel_ids": [VESSEL_A]},
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        with (
+            override_settings(EMAIL_HOST_USER="pms@cymsol.co.in", EMAIL_HOST_PASSWORD=""),
+            patch("apps.safety.services.incident_fleet_alert.load_dotenv"),
+            patch.dict("os.environ", {"EMAIL_HOST_PASSWORD": "smtp-password"}),
+        ):
+            response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["emails_sent"], 1)
+        email_class.return_value.attach.assert_called_once_with(
+            "incident.pdf",
+            b"%PDF",
+            "application/pdf",
+        )
+        self.assertEqual(email_class.return_value.send.call_count, 1)
+
+    @patch("apps.safety.services.incident_fleet_alert.EmailMultiAlternatives")
+    def test_issue_requires_selected_ship_email_before_notification(self, email_class) -> None:
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE VesselData SET email = NULL WHERE id = %s", [VESSEL_A])
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
+            {"recipient_vessel_ids": [VESSEL_A]},
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        with override_settings(EMAIL_HOST_USER="pms@cymsol.co.in", EMAIL_HOST_PASSWORD="smtp-password"):
+            response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Email is not recorded in VesselData", str(response.data))
+        self.assertEqual(Notification.objects.count(), 0)
+        email_class.assert_not_called()
+
+    def test_issue_blocks_before_office_review(self) -> None:
+        self.incident.current_phase = 5
+        self.incident.save(update_fields=["current_phase"])
+        request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/fleet-alert/",
+            {"recipient_vessel_ids": [VESSEL_B]},
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        response = self.view(request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(str(response.data[0]), "Incident Fleet Alert is available from Office Review.")
 
 
 if __name__ == "__main__":

@@ -100,13 +100,14 @@ Step-by-step:
 
 1. On `/safety/incidents/create/` (Phase 1 — Intake + Scene Control), fill:
    - **Vessel identity** — Vessel and Vessel code are filled by the system from your vessel assignment or the saved report. They are disabled so users cannot manually change the vessel identity.
-   - **What happened** — free-text narrative (minimum 200 characters; enforced by `V-INC-001`).
+   - **Describe What happened?** — free-text narrative (minimum 200 characters; enforced by `V-INC-001`).
    - **When and position** — date, time, Latitude, and Longitude. Report time appears beside Shore Assistance Required. Latitude and Longitude appear together on their own row.
    - **Office communication** — answer **Was office informed?**. If Yes, select how it was informed: On call or On email.
-   - **Reporting context** — Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition. Shore Assistance Required is beside Report time; the remaining reporting-context fields appear below the coordinates. These are stored on the incident report and are used for both incident and injury reporting. Last Port is not shown in the current form.
+   - **Reporting context** — Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition. Shore Assistance Required is beside Report time; the remaining reporting-context fields appear below the coordinates. Location of Vessel is selected from At Sea (Open sea condition), At Sea (Coastal passage), In Port, or At Anchorage; In Port and At Anchorage also ask for details. These are stored on the incident report and are used for both incident and injury reporting. Last Port is not shown in the current form and is not printed in the current Incident PDF.
    - **Weather Condition** — record weather and sea details. Ice condition on-board and Ice condition at sea are not shown in the current form.
-   - **Incident type** — picked from `master_safety_incident_type` (32 active options; retired earlier options such as `Missing vessel` are not offered).
-   - **Injury Details** — optional. Select `Crew` for crew injury and fill rank, age, and `Type of Activity`. Select `Non-crew` for pilot/contractor/shipyard/passenger injuries and fill the existing person/company/type/injury-level fields. In crew injury, choose `Type of Activity`, nature of injury, source of injury, and affected body area from the dropdowns; select `Others(Specify)` when the required value is not listed. Estimated cost details are optional: select Yes to open the cost fields, or No to continue without them.
+   - **Incident type** — picked from `master_safety_incident_type` (32 active options; retired earlier options such as `Missing vessel` are not offered). If you select Other, type the incident type details.
+   - **Operational checks** — answer Was a Risk Assessment carried out?, Was Toolbox Meeting carried out?, Was a Permit Issue? using Yes / No / NA, and type the Type of Activity.
+   - **Injury Details** — optional. Select `Crew` for crew injury and fill rank, age, and `Type of Activity`. Select `Non-crew` for pilot/contractor/shipyard/passenger injuries and fill the existing person/company/type/injury-level fields. In crew injury, choose `Type of Activity`, nature of injury, source of injury, and affected body area from the dropdowns; select `Others(Specify)` when the required value is not listed. The injury subsection does not ask for a second Describe What Happened narrative; use the main incident **Describe What happened?** field. Phase 1 does not collect estimated costs; enter cost details later in Phase 7 Loss Evaluation.
    - **Scene control** — confirm the area is secured per SSQE §11.
 2. Tap **Save Draft**. System issues a draft reference `DRAFT-{VslCode}/{YYYY}/T{nnn}` (D-GAP-C1).
 3. Attach evidence under **Phase 4 → Documents** if photos, logs, VDR exports, or other proof are immediately available. You do not need to finish Phase 2 or Phase 3 before saving these documents.
@@ -118,7 +119,7 @@ Step-by-step:
 6. Tap **Submit to office**. The system assigns the formal reference `{VslCode}/{YYYY}/{NNN}` (gap-free), routes to `/safety/incidents/:id/phase-3/`, and fires notifications to PIC + DPA via `master_notification` (FEAT-SAF-XMOD-006, D-GAP-F2).
 7. After Phase 2 submission, the investigation workspace is driven by the Master (lead for GREEN / YELLOW) or the shore team (RED). You continue contributing witness statements and evidence when asked.
 
-Until office approval, authorized users can return to saved incident details and correct them. User-facing investigation phases are flexible: RCA, Corrective Action, Preventive Action, Evidence Documents, and Witness Statements can be opened and saved even when the formal workflow has not yet moved to that legacy backend phase number. Moving from one phase to the next does not make earlier phases read-only. Phase 2 saved Immediate Cause and Root Cause cards include **Edit**, which loads the existing cause into the form and updates that same saved cause. Phase 3 Corrective Action, Phase 4 Preventive Action, and Phase 5 Add Evidence saved cards also include **Edit** and update the existing saved row instead of adding a duplicate. The former Lessons Learned screen is removed from the current workflow; its old URL redirects to Office Review. The Phase 1 edit page loads the saved report and **Save changes** writes back to the incident; leaving the injury section unchanged does not remove a saved injury record. Once office approves, closes, or supersedes the incident, the record is locked for normal phase edits.
+Until office approval, authorized users can return to saved incident details and correct them. User-facing investigation phases are flexible: RCA, Corrective Action, Preventive Action, Evidence Documents, and Witness Statements can be opened and saved even when the formal workflow has not yet moved to that legacy backend phase number. Moving from one phase to the next does not make earlier phases read-only. Phase 2 saved Immediate Cause and Root Cause cards include **Edit**, which loads the existing cause into the form and updates that same saved cause. Phase 3 Corrective Action, Phase 4 Preventive Action, and Phase 5 Add Evidence saved cards also include **Edit** and update the selected existing saved row. Corrective and Preventive Action saves can also add multiple rows for the same incident when separate actions are needed. The former Lessons Learned screen is removed from the current workflow; its old URL redirects to Office Review. The Phase 1 edit page loads the saved report and **Save changes** writes back to the incident; leaving the injury section unchanged does not remove a saved injury record. Once office approves, closes, or supersedes the incident, the record is locked for normal phase edits.
 
 ### 3.3 Reporting a Near Miss
 
@@ -185,7 +186,7 @@ You will receive a `master_notification` when state changes materially (triage c
 
 You see a draft incident notification at 07:10. The Master opened it at 06:40 after a crane-wire pre-tension parted on #3 cargo hold. By 08:00 you are at your workstation reviewing evidence documents and witness statements. The Master records Corrective Action and Preventive Action on separate action screens; you counter-sign the HOD signature block once the Master has signed and before the DPA closes. Your name + timestamp + device fingerprint lock the HOD signature (D-GAP-D1).
 
-Current Witness Statement update: the Phase 4 Witness Statement screen no longer asks users to flag statements as FORMAL, type a separate witness-statement text field, or complete read-back/copy-to-witness controls. Choose a crew witness from the vessel list or select Other and type the name, enter a Remark, and use Upload witness statement when a statement file/image is available.
+Current Witness Statement update: the Phase 4 Witness Statement screen no longer asks users to flag statements as FORMAL, type a separate witness-statement text field, or complete read-back/copy-to-witness controls. Choose a crew witness from the vessel list or select Other and type the name, use Upload witness statement when a statement file/image is available, and enter the Remark below the upload.
 
 ### 4.2 Reviewing Incoming Incident Reports
 
@@ -206,11 +207,11 @@ Entry point: Safety sidebar → **Incidents** (`/safety/incidents/`).
 
 **Current action phases (CR-038, superseded by CR-042 for Lessons Learned):**
 
-1. **Phase 3 - Corrective Action** (`/safety/incidents/:id/phase-3/`) captures the corrective action description and due date. The old owner/checker card is not shown.
-2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures Description, Due date, and one shared **How much will this reduce risk?** answer for the screen. It does not ask for Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording, and saved preventive cards do not repeat risk reduction per row.
+1. **Phase 3 - Corrective Action** (`/safety/incidents/:id/phase-3/`) captures the corrective action Description and optional Due Date. Status/open-close, owner/checker, and verification fields are not shown. Save each separate corrective action as its own row.
+2. **Phase 4 - Preventive Action** (`/safety/incidents/:id/phase-3/preventive/`) captures the preventive action Description and optional Due Date. It does not ask for status/open-close, risk reduction, Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording. Save each separate preventive action as its own row.
 3. The former **Lessons Learned** screen is removed from current navigation. Its old URL redirects to Office Review.
 4. Each save shows a success message and moves to the saved item so users can review what was saved.
-5. To correct a saved corrective or preventive action, use **Edit** on that saved card. The form is filled with the saved values; **Update** changes that existing item instead of adding a duplicate. The preventive risk-reduction answer remains a shared screen-level field.
+5. To correct a saved corrective or preventive action, use **Edit** on that saved card. The form is filled with the saved description; **Update** changes that existing item instead of adding a duplicate.
 
 **Phase 4 — Evidence Workspace** (`/safety/incidents/:id/phase-4/`):
 
@@ -218,7 +219,7 @@ Entry point: Safety sidebar → **Incidents** (`/safety/incidents/`).
 2. Add one evidence entry with **Attachment**, **Title**, and **Description**. Repeat the same form for as many attachments as needed.
 3. Use the title to name what the attachment is, and use the description to explain why it matters.
 4. After a document or witness statement saves, the page shows a success message and moves to the saved-content area so you can immediately review the saved entry.
-5. Click **Witness Statement** when a statement needs to be recorded; it opens the witness statement page directly with no extra **Open Witness Statement** step. Choose a crew witness from the incident vessel list or select **Other** and type the name, add a Remark, and upload the witness statement when available. Evidence Check is not part of the current Phase 4 screen.
+5. Click **Witness Statement** when a statement needs to be recorded; it opens the witness statement page directly with no extra **Open Witness Statement** step. Choose a crew witness from the incident vessel list or select **Other** and type the name, upload the witness statement when available, and add the Remark below the upload. Evidence Check is not part of the current Phase 4 screen.
 6. To correct a saved document title/description or saved Witness Statement, use **Edit** on that saved card. Document Edit keeps the original file and updates only the metadata; Witness Statement Edit updates the same witness row.
 7. Every fact you record must link to ≥1 evidence row (assumption-bias guard `V-INC-041` / D-DNV-11 #2).
 
@@ -460,7 +461,7 @@ At the action-check stage you review the saved corrective/preventive action entr
 
 ### 6.7 Fleet-Wide Read Access
 
-You have fleet-wide read-only access to **closed** incidents on sister vessels (D-RBAC-09). Use this to learn from fleet-wide events. Open `/safety/incidents/` and remove the vessel filter; closed records on other vessels are visible read-only.
+You have fleet-wide read-only access to **closed** incidents on sister vessels (D-RBAC-09). Use this to learn from fleet-wide events. Open `/safety/incidents/` and use the Vessel filter above the register to choose All vessels or a specific ship. The same register also has `risk_band` and Status filters; Status is the current label for the incident lifecycle state.
 
 ### 6.8 Master Routes at a Glance
 
@@ -482,7 +483,7 @@ You have fleet-wide read-only access to **closed** incidents on sister vessels (
 
 ### 7.1 Day in the Life — DPA
 
-You arrive at your desk at 07:30. One incident closed overnight on MV Alpha — you do the Office Review acceptance. Two Near Misses were filed in the last 24 hours — you triage both, mark one HIGH (a mooring rope tension reading + crew fatigue signal), prepare the Circular/Alert handoff from `/safety/near-miss/:id/fleet-alert/`, complete the remaining Circular fields in the Circular module, then record the Near Miss fleet-alert step as issued. You open the Safety Intelligence Dashboard at `/safety/dashboard/`, check the Pareto of root causes across the fleet, notice the 10.15 Design/MOC Governance category creeping up. You open the taxonomy admin at `/safety/admin/mscat/` and check the case-study repository. Before lunch you approve two SOI area-applicability requests from Masters. Afternoon is a cross-vessel lessons-learned digest export from the dashboard.
+You arrive at your desk at 07:30. One incident closed overnight on MV Alpha - you do the Office Review acceptance. Two Near Misses were filed in the last 24 hours - you triage both, mark one HIGH, prepare the Circular/Alert handoff from `/safety/near-miss/:id/fleet-alert/`, complete the remaining Circular fields in the Circular module, then record the Near Miss fleet-alert step as issued. You open the Safety Dashboard at `/safety/dashboard/`, check the summary first, open details only when needed, approve two SOI area-applicability requests from Masters, and use `/safety/admin/auditor-export/` when an auditor bundle is required.
 
 ### 7.2 Owning the Investigation Lifecycle
 
@@ -511,7 +512,7 @@ Entry point: Safety sidebar → **Near Miss** → click a LOW-triage item → `/
 3. Set priority LOW or HIGH (D-GAP-R22). If HIGH, proceed to fleet alert at `/safety/near-miss/:id/fleet-alert/`.
 4. Fleet alert payload auto-drafts with vessel + crew names anonymised per D-GAP-M08. Review and edit the alert text and fleet-learning text.
 5. Use **Issue Circular/Alert** when you want the same alert prepared in the Circular module. The Circular page opens with only the title and body prefilled; complete recipients, category, priority, attachments, and publish there as normal (FEAT-SAF-NM-006 / D-CFG-04).
-6. Use **Issue fleet alert** in Near Miss to record that the HIGH-priority fleet-alert requirement is complete. This is separate from the Circular module publish action.
+6. Use **Issue fleet alert** in Near Miss to record and dispatch the HIGH-priority fleet-alert requirement. The system sends in-app notifications plus one selected-vessel email batch using `VesselData.Email`, with `HSSEQ@kaizenship.net` in CC. The email attaches the Near Miss PDF and keeps the body short: recipients are told that the event happened, to review the PDF, and to take preventive action. This remains separate from the Circular module publish action.
 
 ### 7.4 Reporter Identity View (D-GAP-J1 revised)
 
@@ -532,16 +533,16 @@ Office Review runs the required readiness checks in the background. The visible 
 3. Confirm at least one action recommendation is recorded.
 4. Confirm ALARP attestation on every RED/YELLOW System-Action (Round 21 R02).
 5. Enter **Office Comments/lesson learnt** if the office review needs a note. There is no word limit.
-6. Before previewing or downloading the PDF, review the **Select PDF content** checklist. All items are selected by default: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature. PDF preview/download is available for incident records before Phase 7 acceptance; the page should not show a Phase 7 acceptance-only PDF warning.
-7. Tap **Accept**. System fires PDF generation (FEAT-SAF-PDF-001) with the selected sections, keeps the record compatible with visible Phase 7 Loss Evaluation, and writes the event to `vims_safety_incident_phase_log`.
-8. Open `/safety/incidents/:id/phase-6/`, choose **Incident Report** or **Injury Report** in **Loss Evaluation type**, complete **Loss Evaluation**, and save it. Ship-side and office-side users with incident access can save this evaluation without waiting for Office Review approval. Incident Report shows repair/loss/cost fields; Injury Report shows safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Closure is enabled only after the Loss Evaluation save succeeds and remains an office close action.
+6. Before downloading the PDF, tick **Print Loss Evaluation** only when the Loss Evaluation blocks should print. Summary, Reporter Details, Injury Details, Root Cause Analysis, Corrective and Preventive Actions, Evidence (Documents), and Signature are included automatically. PDF download is available to ship-side and office-side users for incident records before Phase 7 acceptance; the page should not show a Phase 7 acceptance-only PDF warning.
+7. Tap **Accept / Close**. System fires PDF generation (FEAT-SAF-PDF-001) with the required sections, closes the incident from Office Review, keeps the record compatible with visible Phase 7 Loss Evaluation, and writes the event to `vims_safety_incident_phase_log`.
+8. Open `/safety/incidents/:id/phase-6/`, choose **Incident Report** or **Injury Report** in **Loss Evaluation type**, complete **Loss Evaluation**, and save it. Ship-side and office-side users with incident access can save this evaluation without waiting for Office Review approval. In **Other Details**, Name of master and Name of Chief Engineer auto-fill from the current active onboard crew for the incident vessel when those saved fields are blank; you can still edit and save the names. Incident Report shows repair/loss/cost fields; Injury Report shows safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. Loss Evaluation is additional data entry and has no close control.
 
-To issue an Incident Fleet Alert from Office Review, tap **Fleet Alert** below **Accept / Close**, select one or more ships, and tap **Send Fleet Alert**. The system sends in-app and email alerts only to the selected ships; vessel email addresses come from `VesselData.email`.
+To issue an Incident Fleet Alert from Office Review, tap **Fleet Alert** below **Accept / Close**. A vessel popup opens with active ships from `VesselData`; select one or more vessels, or tick **Select all vessels**, and tap **Confirm**. DPA/PIC can send the alert from this Office Review workflow before or after **Accept / Close** has moved the incident to the final backend phase. The system sends in-app and email alerts only to the selected ships, using `VesselData.email`, and CCs `HSSEQ@kaizenship.net`. The email attaches the Incident PDF and keeps the body short: recipients are told that the incident happened, to review the PDF, and to take preventive action.
 
-If **Record injury** was saved on Phase 1, the PDF prints the title `Injury Report`. If no injury was recorded, it prints `Incident Report`. The PDF Loss Evaluation cost/details block follows the saved Phase 7 Loss Evaluation type; older saved evaluations without a type use the injury-record fallback. Office Comments and closure reason appear near the end of the PDF before Signature, not in Summary. Evidence documents appear as separate document blocks with Description and File rows instead of numbered attachment rows; internal evidence notes are not printed. Action descriptions appear once inside their detail box without recommendation rationale / "Why is this needed?" text. Required signature rows remain visible in the PDF even when unsigned; unsigned rows show as `Pending`.
+If **Record injury** was saved on Phase 1, the PDF prints the title `Injury Report`. If no injury was recorded, it prints `Incident Report`. The PDF prints Corrective Actions and Preventive Actions before Evidence (Documents), and starts Loss Evaluation on a new page when selected. For normal Incident Reports, **Describe What happened?** prints below the intake/detail sections immediately before **Root Cause Analysis**, not at the top of Summary. For Injury Reports, **Describe What happened?** prints after **Reporter Details** and before **Injury Details**; legacy injury-row `what_happened_narrative` is not printed as a second narrative. Location on Board is the PDF label for the onboard location field. Location of Vessel prints once; when In Port or At Anchorage details were entered, the detail is appended in the same value, such as `In Port - Singapore`, and no separate Specific vessel location row is printed. The PDF Loss Evaluation cost/details block follows the saved Phase 7 Loss Evaluation type; older saved evaluations without a type use the injury-record fallback. Office comments appear near the end of the PDF as one full-width **Office comments/ lesson learnt** box before Signature; the stored comment is kept as one text block with typed line breaks and repeated spaces preserved, while ordinary PDF wrapping still fits long lines to the page. Stored closure reason, a separate Comment row, filler labels, and artificial chunk rows are not printed. Corrective Actions and Preventive Actions print as separate unnumbered boxes; each action is a full-width bordered row/box with no left-side `Description` label column, the description on the first line, and any saved linked due date on the second line as `Due Date: YYYY-MM-DD`. Status, physical verification note, closed-at, and verification rows are not printed. Evidence documents appear after those action sections as separate document blocks with Description and File rows instead of numbered attachment rows. Each Witness Statement prints as its own block named with the witness display when available, then shows a clickable witness-statement attachment link when the upload is downloadable and Remark without repeating a separate Witness name row. The old `What the witness said` value is not printed even when legacy rows contain it. Immediate Cause and Root Cause each print once as their own boxes with cause factor on the left and cause/reason on the right. The PDF signature table prints Reporter signature and PIC / DPA office signature only.
 
 Under the current CR-044 authority model, PIC or DPA can complete Office Review and later closure for any risk band.
-When sending the incident back, enter only the rework comment and tap **Send for rework**. The current UI sends the incident back to the action rework target; it does not ask the office user to choose a phase. Ship-side users do not see Accept / Close or Send for rework cards on Office Review; they see the Office Comments/lesson learnt card. If office has not added a note yet, the card says **Office comment is not added yet.**
+When sending the incident back, enter only the rework comment and tap **Send for rework**. The current UI sends the incident back to the action rework target; it does not ask the office user to choose a phase, and it does not require the incident to already be at internal phase 7 before the rework request can be recorded. While the incident is sent back, Office Review shows the latest **Rework summary** in red using the same office-typed comment so users can read what needs to change. Ship-side and office-side users can tap **Rework Done** after the requested updates are complete; this returns the incident from `SENT_BACK` to Office Review/`UNDER_REVIEW`. Ship-side users do not see Accept / Close or Send for rework cards on Office Review; they see the Office Comments/lesson learnt card. If office has not added a note yet, the card says **Office comment is not added yet.**
 
 ### 7.6 Overseeing M-SCAT Root-Cause Analysis
 
@@ -549,7 +550,6 @@ You are the **sole maintainer** of the M-SCAT taxonomy, case-study library, and 
 
 ### 7.7 Managing Bias Guards (Round 21 R12)
 
-The 8 bias-guard catalogue lives at `/safety/admin/bias-guards/` (read-only for V1 — maintained centrally as `master_safety_bias_guard`). The 8 are:
 
 1. Recency (DNV) — at least one evidence item is recorded before leaving evidence capture (D-MAINT-CR012 / `V-INC-040`).
 2. Assumption (DNV) — every fact linked to evidence (D-DNV-11 #2 / `V-INC-041`).
@@ -566,16 +566,16 @@ You are the override authority for guard #5 (blame-fixation) via `SAF_P_006`. Us
 
 | Route | Purpose |
 |-------|---------|
-| `/safety/dashboard/` | Fleet-wide Safety Intelligence Dashboard |
+| `/safety/dashboard/` | Fleet-wide Safety Dashboard. Safety score, current view, filters, and export controls show first; repeat issues, top causes, action age, Heinrich Ratio, and SOI Compliance % open from **Show dashboard details**. |
 | `/safety/incidents/:id/phase-5/` | Office Review acceptance or rework for any risk band |
 | `/safety/incidents/:id/fleet-alert/` | Incident Fleet Alert selected-ship in-app/email dispatch |
 | `/safety/near-miss/:id/triage/` | LOW / HIGH triage |
-| `/safety/near-miss/:id/fleet-alert/` | Prepare Circular/Alert handoff and issue Near Miss fleet-alert step (HIGH) |
+| `/safety/near-miss/:id/fleet-alert/` | Prepare Circular/Alert handoff and issue Near Miss fleet-alert in-app/email dispatch (HIGH) |
 | `/safety/soi/:id/applicability/approve/` | Approve Master's area-applicability request |
-| `/safety/admin/mscat/` | M-SCAT taxonomy edit (exclusive) |
-| `/safety/admin/soi-template/` | 13-area × 329-item template edit (exclusive) |
-| `/safety/admin/case-studies/` | Navigator + Sinkfast case-study library |
+| `/safety/admin/auditor-export/` | Auditor Bundle Export with date range, record type checkboxes, and Vessel filter dropdown populated from active ships. |
 | `/safety/search/` | Cross-record FTS search (archive toggle) |
+
+The Safety sidebar does not show a broad **Admin** section. Use the direct **Auditor Export** shortcut when the auditor bundle is needed.
 
 ---
 
@@ -624,8 +624,8 @@ For RED-band incidents only, you are the closer (D-GAP-M06):
 1. DPA signs during Office Review.
 2. Record routes to you at `/safety/incidents/:id/phase-5/`.
 3. Review the full investigation record; read-access to RCA, actions, evidence, and Office Review is full edit for RED (D-GAP-M06 gives you full-edit authority on RED — unusual among shore roles).
-4. Tap **Accept**. Record stays compatible with visible Phase 7 Loss Evaluation and PDF generation (FEAT-SAF-PDF-001). Closure event logs to `vims_safety_incident_phase_log`.
-5. Complete and save Loss Evaluation at `/safety/incidents/:id/phase-6/` if it has not already been saved by a ship-side or office-side user; then close with a closure note.
+4. Tap **Accept / Close**. The incident closes from Phase 6 Office Review, stays compatible with visible Phase 7 Loss Evaluation and PDF generation (FEAT-SAF-PDF-001), and logs the closure event to `vims_safety_incident_phase_log`.
+5. Complete and save Loss Evaluation at `/safety/incidents/:id/phase-6/` if it has not already been saved by a ship-side or office-side user. Phase 7 has no separate close note or Close Incident action.
 5. Your signature is the terminal node in the Reporter → Master → HOD → DPA → FM chain (`V-INC-073` / `V-INC-074`).
 
 ### 8.5 FM Routes at a Glance
@@ -823,12 +823,8 @@ This index cross-references every route from `APP_FLOW.md` against the roles tha
 | `/safety/soi/:id/applicability/approve/` | DPA | §7.8 |
 | `/safety/soi/:id/close/` | Master | §6.5 |
 | `/safety/soi/:id/pdf/` | All (read) | §5.7 |
-| `/safety/admin/mscat/` | DPA only | §7.6, §7.8 |
-| `/safety/admin/soi-template/` | DPA only | §7.8 |
-| `/safety/admin/bias-guards/` | DPA (read V1) | §7.7 |
-| `/safety/admin/case-studies/` | DPA | §7.8 |
 
-Total APP_FLOW routes referenced in this guide: **63 of 63 (100%)**.
+Current visible Safety routes are referenced above; hidden admin/config routes are not listed as sidebar destinations.
 
 ---
 

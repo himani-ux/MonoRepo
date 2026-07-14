@@ -14,17 +14,25 @@ This document is the **screen contract** for every route the Safety Module expos
 
 > **Incident save-feedback update (2026-07-03):** Phase 2 RCA cause saves, Corrective Action / Preventive Action saves, and Phase 5 Evidence document/witness saves show an inline success message and automatically scroll to the saved-content area. This is a frontend acknowledgement/focus rule only; API payloads, validation, persistence, and workflow transitions are unchanged.
 
-> **Incident RCA/action simplification update (2026-07-07):** Current Phase 2 RCA exposes Immediate Cause and Root Cause only. New Intermediate Cause submissions are rejected, and legacy Intermediate rows are displayed under Root Cause instead of as a separate current category. Current action capture is split into Corrective Action and Preventive Action screens. Corrective Action shows Description and Due date only, without the owner/checker card. Preventive Action shows Description, Due date, and one shared **How much will this reduce risk?** answer for the screen; it does not show Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording, and saved preventive cards do not repeat risk reduction per row. The action screens do not show or send the "Why is this needed?" recommendation-rationale field.
+> **Incident RCA/action simplification update (2026-07-09, amended by CR-081 on 2026-07-13):** Current Phase 2 RCA exposes Immediate Cause and Root Cause only. New Intermediate Cause submissions are rejected, and legacy Intermediate rows are displayed under Root Cause instead of as a separate current category. Current action capture is split into Corrective Action and Preventive Action screens. Corrective Action and Preventive Action both show Description and optional Due Date only. They do not show status/open-close, owner/checker, Remaining risk, the "I confirm this will reduce risk" checkbox, risk-reduction dropdown, theme, effort, or "Prevent It Happening Again" wording. Multiple Corrective and Preventive rows are allowed for the same incident. The action screens do not show or send the "Why is this needed?" recommendation-rationale field.
 
-> **Incident phase-header and witness statement update (2026-07-06):** Incident phase tabs are the single visible phase number/name indicator; phase content areas do not repeat separate Phase X/phase-title header cards. Phase 4 supporting witness capture is labelled **Witness Statement**, opens `/phase-4/interviews/` directly, loads the incident vessel crew list with an **Other** typed-name option, captures **Remark**, and offers **Upload witness statement**.
+> **Incident phase-header and witness statement update (2026-07-06):** Incident phase tabs are the single visible phase number/name indicator; phase content areas do not repeat separate Phase X/phase-title header cards. Phase 4 supporting witness capture is labelled **Witness Statement**, opens `/phase-4/interviews/` directly, loads the incident vessel crew list with an **Other** typed-name option, offers **Upload witness statement**, and captures **Remark** below the upload.
 
 > **Incident RCA edit update (2026-07-03):** Phase 2 saved Immediate Cause and Root Cause cards include an **Edit** action. Edit loads the saved cause into the RCA form and saves back to that existing cause row; users should not add a duplicate cause just to correct factor, cause, Other text, or reason.
 
 > **Incident action/evidence edit update (2026-07-03):** Phase 3 Corrective Action, Phase 4 Preventive Action, and Phase 5 Add Evidence saved cards include **Edit**. Edit loads the saved action, document metadata, or Witness Statement into the same form and saves back to the existing row; users should not add duplicate rows just to correct saved content.
 
-> **Incident Office Review update (2026-07-07):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments/lesson learnt** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. The comment is separate from the later closure reason and prints near the signature area in the incident PDF when present. Under D-MAINT-CR044, D-MAINT-CR049, D-MAINT-CR050, and D-MAINT-CR051, PIC and DPA can accept, close, send rework, or issue a selected-ship Fleet Alert for every incident risk band; the old RED/FM closer gate is legacy-only. Office-side users see Accept / Close, Fleet Alert, and Send for rework controls; ship-side users see the Office Comments/lesson learnt card, with "Office comment is not added yet." when no note exists. Office-side Phase 6 does not show Phase 7 acceptance-only PDF warning text.
+> **Incident Office Review update (2026-07-13; Fleet Alert email current as of CR-086 on 2026-07-14):** Office Check is renamed **Office Review**. The Office Review screen includes an unrestricted **Office Comments/lesson learnt** textarea saved to `vims_safety_incident.office_comment` through migration `0052_incident_office_comment`. Under D-MAINT-CR044, D-MAINT-CR049, D-MAINT-CR050, D-MAINT-CR051, D-MAINT-CR056, D-MAINT-CR061, D-MAINT-CR062, D-MAINT-CR074, D-MAINT-CR075, and D-MAINT-CR079, PIC and DPA can accept/close, send rework, or issue a selected-ship Fleet Alert for every incident risk band; the old RED/FM closer gate is legacy-only. Office-side users see Accept / Close, Fleet Alert, and one Send for rework comment textbox with no target-phase picker. Send for rework can create the sent-back state without first requiring internal `current_phase = 7`. Fleet Alert opens a popup populated from active `VesselData` ships, sends only after Confirm, and remains available from this Office Review workflow after Accept / Close has moved the record to the final backend phase. Fleet Alert email carries the Incident PDF as an attachment and uses a short prevention-focused body telling recipients to review what happened and take preventive action. Ship-side users see the Office Comments/lesson learnt card, with "Office comment is not added yet." when no note exists. When an incident is currently sent back, Office Review also shows the latest Rework summary from the office textbox highlighted in red with a **Rework Done** button for both ship-side and office-side users. Rework Done transitions backend phase `6 -> 7` and state `SENT_BACK -> UNDER_REVIEW`. Office-side Phase 6 does not show Phase 7 acceptance-only PDF warning text.
 
-> **Incident Loss Evaluation update (2026-07-07):** Visible Phase 7 is **Loss Evaluation**, served on the existing compatibility route `/safety/incidents/:id/phase-6/`. Authorized ship-side and office-side users with incident form access and vessel scope can open and save one editable `vims_safety_incident_loss_evaluation` row through `PATCH /api/safety/incidents/:id/phase-6/` without waiting for Office Review approval. The first field asks whether the Loss Evaluation is for an Incident Report or Injury Report; the saved nullable `report_type` controls which Other Details, Cost Evaluation, and Estimated Costs fields are shown on reload and in PDF cost blocks. Existing rows without `report_type` keep the old injury-record fallback. Closure through `/phase-6/close/` remains an office close action and requires a saved Loss Evaluation row plus a closure note.
+> **Incident CR-064/CR-073 update (2026-07-10):** Phase 1 labels the narrative **Describe What happened?** and adds Risk Assessment carried out, Toolbox Meeting carried out, Permit Issue, Type of Activity, Incident Type Other details, and Location of Vessel detail for In Port / At Anchorage. Location of Vessel is now the controlled list At Sea (Open sea condition), At Sea (Coastal passage), In Port, and At Anchorage. Phase 6 PDF download is visible to ship-side and office-side users when PDF preview is available; the only visible PDF option is **Print Loss Evaluation**. The Fleet Alert popup supports **Select all vessels** and incident fleet-alert email CCs `HSSEQ@kaizenship.net`. Incident PDF output places Corrective Actions and Preventive Actions before Evidence (Documents), starts Loss Evaluation on a new page when selected, labels onboard location as Location on Board, and prints root causes/actions as unnumbered detail boxes instead of Cause 1 / Action 1 numbering.
+> **Incident register CR-080 update (2026-07-13):** The Safety Incidents register shows Vessel, `risk_band`, and Status filters. The Vessel filter uses active ship options from `VesselData` within the user's scope; global office users can choose any active ship. The table column formerly labelled Band is now `risk_band`, and State is now Status.
+> **Incident CR-065 update (2026-07-09; PDF wording superseded by CR-071):** The four Phase 1 operational fields sit below Location on Board and above Departure Date / Vessel Condition. Incident PDF output prints Location of Vessel once, appending any In Port / At Anchorage detail in the same value such as `In Port - Singapore`, groups Immediate Cause and Root Cause once each with cause factor on the left and cause/reason on the right, groups Corrective Actions and Preventive Actions independently, and renders Office comments/ lesson learnt as one full-width comment box.
+
+> **Incident CR-066/CR-067/CR-069/CR-072 PDF update (2026-07-10, amended by CR-081 on 2026-07-13):** Incident PDF Witness Statement attachment rows render as clickable links to the stored statement attachment, and the old free-text witness statement value is not printed even when legacy rows contain it. Corrective Actions and Preventive Actions use current screens with Description and optional Due Date only, and the PDF renders each action as one full-width bordered row/box with the description on the first line and any saved linked due date on the second line as `Due Date: YYYY-MM-DD`. The Closure area renders Office comments/ lesson learnt as one undivided full-width comment box with no left-side filler label.
+
+> **Incident CR-068 PDF comment update (2026-07-10):** The Closure **Office comments/ lesson learnt** block renders the stored office comment as one full-width text block. It preserves typed line breaks and no longer splits long comments into artificial template chunks; ordinary PDF line wrapping still occurs to fit the page width.
+
+> **Incident Loss Evaluation update (2026-07-07):** Visible Phase 7 is **Loss Evaluation**, served on the existing compatibility route `/safety/incidents/:id/phase-6/`. Authorized ship-side and office-side users with incident form access and vessel scope can open and save one editable `vims_safety_incident_loss_evaluation` row through `PATCH /api/safety/incidents/:id/phase-6/` without waiting for Office Review approval. The first field asks whether the Loss Evaluation is for an Incident Report or Injury Report; the saved nullable `report_type` controls which Other Details, Cost Evaluation, and Estimated Costs fields are shown on reload and in PDF cost blocks. Existing rows without `report_type` keep the old injury-record fallback. Phase 7 is additional data entry only: it does not show a closing note or Close Incident control, and `/phase-6/close/` rejects closure because closure is handled by Phase 6 Office Review.
 
 **Glossary (first-use, per `<glossary>`):** **DPA** = Designated Person Ashore (ISM Code §4); **FM** = Fleet Manager; **TD** = Technical Director; **HOD** = Head of Department (onboard: CO or CE); **CO** = Chief Officer; **CE** = Chief Engineer; **SO** = Safety Officer (SOLAS Reg VI, COSWP 13.3.2); **SCM** = Safety Committee Meeting; **SOI** = Safety Officer Inspection; **MoC** = Management of Change; **RCA** = Root Cause Analysis; **CA / PA** = Corrective Action / Preventive Action; **ALARP** = As Low As Reasonably Practicable; **SMC / MC / MI** = Serious Marine Casualty / Marine Casualty / Marine Incident (IMO Casualty Investigation Code MSC.255(84)); **WRH** = Work & Rest Hours module; **CMS** = Crew Management System module; **PMS** = Planned Maintenance System module (**decoupled from VIMS — D-GAP-I1**); **SSQE** = Safety, Security, Quality & Environment (KSM Manual Rev 01 Feb 2026).
 
@@ -66,7 +74,7 @@ This is the canonical permission matrix for V1. "Y" = screen and primary actions
 | Incident — create | — | — | — | — |
 | Incident — investigate (GREEN / YELLOW) | R + comment | R + comment (D-RBAC-04) | R | R + comment |
 | Incident — investigate RED (edit) | Lead | **Full edit (D-GAP-M06)** | R | R |
-| Incident — Phase-7 acceptance | YELLOW closer | RED closer | — | — |
+| Incident - Phase 6 Office Review close | Y | Y | - | - |
 | Incident — re-open | GREEN/YELLOW | RED | — | — |
 | Blame-fixation override | GREEN/YELLOW | RED | — | — |
 | Near Miss — reporter identity visible | **Y** | **Y** | **Y** | **Y** |
@@ -116,7 +124,7 @@ This is the canonical permission matrix for V1. "Y" = screen and primary actions
 | Create SOI record | SO (CO or 2/E alternate, `SAF_P_001` on `SAF_F_004`) |
 | Approve SOI finding closure | Master (`SAF_P_004` on `SAF_F_004`) |
 | Approve area-applicability false | DPA (`SAF_P_010` on `SAF_F_004`) |
-| Phase-6 Incident Office Review acceptance/rework | PIC or DPA for every risk band (`SAF_P_004` or `SAF_P_006` on `SAF_F_001`; send-back also accepts `SAF_P_003`) |
+| Phase-6 Incident Office Review accept-close/rework | PIC or DPA for every risk band (`SAF_P_004` or `SAF_P_006` on `SAF_F_001`; send-back also accepts `SAF_P_003`) |
 | Re-open closed Incident | Band-gated, mirrors closer (D-EDGE-03) |
 
 ---
@@ -133,7 +141,7 @@ Safety (sidebar group — hidden if user has no SAF_F_* IDs)
 │   ├── Create incident ............ process_ids: SAF_P_001
 │   ├── Submit Phase 1 / 2 / ... 6 . process_ids: SAF_P_002
 │   ├── Send back (DPA → vessel) ... process_ids: SAF_P_003
-│   ├── Phase-7 acceptance (close) . process_ids: SAF_P_004
+│   ├── Phase-6 Office Review close process_ids: SAF_P_004
 │   ├── Re-open closed ............. process_ids: SAF_P_005
 │   ├── Blame-fixation override .... process_ids: SAF_P_006
 │   └── Export PDF / regulatory .... process_ids: SAF_P_007
@@ -163,6 +171,8 @@ Safety (sidebar group — hidden if user has no SAF_F_* IDs)
     ├── Case-study edit ............ process_ids: SAF_P_012
     └── SOI template edit .......... process_ids: SAF_P_012
 ```
+
+**CR-085 sidebar simplification:** The current Safety sidebar does not show a broad **Admin** item. **Auditor Export** remains a direct sidebar link for users with `SAF_F_020`. Existing admin/config routes stay permission-gated for direct access but are not advertised as a sidebar Admin section.
 
 ### 2.2 Reporter Identity
 
@@ -259,7 +269,7 @@ Incident flow follows the simplified current workflow recorded in SSOT section 3
 | Phase 7 | Loss Evaluation | `/safety/incidents/:id/phase-6/` |
 | Legacy redirect | Removed Lessons Learned path | `/safety/incidents/:id/phase-3/lessons/` redirects to Office Review |
 
-Current action screens use the existing recommendation/corrective-action backend contract for compatibility. Corrective Action shows Description and Due date only. Preventive Action shows Description, Due date, and **How much will this reduce risk?** only. The owner/checker card, theme, effort, Remaining risk, risk-confirmation checkbox, and "Prevent It Happening Again" wording are removed from the current action UI. Saved action cards show **Edit**, load the existing row into the form, and update that row instead of adding a duplicate.
+Current action screens use the existing recommendation backend contract for compatibility. Corrective Action and Preventive Action show Description and optional Due Date only. Status/open-close, owner/checker, theme, effort, risk reduction, Remaining risk, risk-confirmation checkbox, and "Prevent It Happening Again" wording are removed from the current action UI. Multiple Corrective and Preventive rows are allowed. Saved action cards show **Edit**, load the selected existing row into the form including its Due Date, display saved due dates as `Due Date: YYYY-MM-DD`, and update that row.
 
 ### 4.0 Incident List — `/safety/incidents/`
 
@@ -301,16 +311,16 @@ Current action screens use the existing recommendation/corrective-action backend
 - **Loaded:** Form renders with:
   - Incident type picker (32 active options in the CR-031 business order; retired earlier options are hidden).
   - Vessel and Vessel code are auto-filled from the logged-in vessel context, single-vessel scope, or saved incident. Vessel identity fields are disabled after autofill/save; office users with more than one vessel option may select the vessel during new-report creation before it is locked.
-  - Narrative free-text (≥150 chars — enforced in VALIDATION_RULES §4).
+  - **Describe What happened?** narrative free-text (minimum 200 characters).
   - Office communication fields labelled **Was office informed?** and **How was office informed?**. The current communication-mode dropdown offers On call and On email; WhatsApp is not offered.
   - Report time and Shore Assistance Required together on one incident-report row.
   - Latitude and Longitude fields together on their own incident-report row.
-  - Incident reporting context fields on the main report form: Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition. These use incident-level columns added by CR-024 and are shared by incident and injury reporting. Last Port remains legacy storage only and is not shown by the current Phase 1 UI.
+  - Incident reporting context fields on the main report form: Shore Assistance Required, Location of Vessel, Location of Vessel detail, Location on Board, Risk Assessment carried out, Toolbox Meeting carried out, Permit Issue, Type of Activity, Departure Date, and Vessel Condition. The four operational fields are placed above Departure Date and Vessel Condition. Location of Vessel uses At Sea (Open sea condition), At Sea (Coastal passage), In Port, and At Anchorage; In Port / At Anchorage show a detail textbox. These use incident-level columns added through CR-024 and CR-064 and are shared by incident and injury reporting. Last Port remains legacy storage only and is not shown by the current Phase 1 UI or printed in the current Incident PDF.
   - Weather Condition fields exclude Ice condition on-board and Ice condition at sea in the current UI.
   - Injury details section (FEAT-SAF-INC-034) optional; asks `Crew` or `Non-crew`.
   - Non-crew injury shows the existing person/company/party type/injury level/notes fields.
   - Crew injury shows ship-crew rank dropdown, age, and `Type of Activity`.
-  - Crew injury also captures investigation narrative and OCIMF yes/no flags; estimated cost fields are optional and are shown only when the user answers Yes to adding estimated cost details.
+  - Crew injury captures OCIMF yes/no flags but does not show a separate **Describe What Happened** field inside Investigation - Narrative. The incident-level **Describe What happened?** field is the current narrative for both incident and injury reports; legacy injury `what_happened_narrative` storage is not printed in the current PDF. Phase 1 does not show or submit injury estimated-cost fields; current cost entry belongs to Phase 7 Loss Evaluation.
   - `Type of Activity` is loaded from the injury dropdown master using field key `TYPE_OF_ACTIVITY`.
   - In the crew investigation section, `Nature of Injury`, `Source of Injury`, and `Affected Areas of the Body` are dropdowns loaded from the injury dropdown master. Choosing `Others(Specify)` opens a blank text field and saves the typed value.
   - During edit, a null or omitted `external_party_injury` payload leaves any existing injury record unchanged; populated injury payloads create or update the injury row.
@@ -370,7 +380,7 @@ Current action screens use the existing recommendation/corrective-action backend
 |-------|---------|
 | `/phase-4/paper/` | Documents evidence capture. Each entry has Attachment, Title, and Description. Users can add as many attachments as required. |
 | `/phase-4/people/`, `/phase-4/places/`, `/phase-4/parts/`, `/phase-4/photos/` | Legacy routes retained for bookmarks and redirected to `/phase-4/paper/`. |
-| `/phase-4/interviews/` | Witness Statement, opened only when needed. The form has vessel crew/Other witness selection, Remark, and Upload witness statement. |
+| `/phase-4/interviews/` | Witness Statement, opened only when needed. The form has vessel crew/Other witness selection, Upload witness statement, and Remark below the upload. |
 
 **Current UI simplification (CR-012):**
 - The screen shows one **Documents** evidence section, not People / Place / Equipment / Photos category cards.
@@ -483,12 +493,12 @@ Current action screens use the existing recommendation/corrective-action backend
 **Role gate:** `PermissionGate(SAF_F_001) + ActionGate(SAF_P_004) + role ∈ {PIC (GREEN closer), DPA (YELLOW closer), FM (RED closer)}`.
 **Data loaded on mount:**
 - `GET /api/safety/incidents/:id/phase-7/preflight/` — returns `{bias_guards_resolved, root_count, recommendation_tier_count, alarp_complete, signature_chain_status}`.
-- On Accept: `POST /api/safety/incidents/:id/phase-7/accept/` → triggers PDF generation (FEAT-SAF-PDF-001), transitions to user-facing Phase 7 Loss Evaluation using backend compatibility phase 8, writes closure event to `vims_safety_incident_phase_log`. Manual PDF preview/download is also available before Phase 7 acceptance when the record is an incident.
+- On Accept / Close: `POST /api/safety/incidents/:id/phase-5/accept/` -> triggers PDF generation (FEAT-SAF-PDF-001), closes the incident from Office Review, and writes the close event to `vims_safety_incident_phase_log`. Manual PDF download is also available before Phase 7 acceptance when the record is an incident; the only visible PDF option is **Print Loss Evaluation**.
 **Signature transition:**
 - **DPA** signature (YELLOW) or **FM** signature (RED) captured here — fourth / fifth in the Reporter → Master → HOD → DPA → FM chain (SSQE §11.2). For GREEN, PIC signature is terminal.
 - HOD signature (third) is captured when the HOD completes department-level review at an earlier Phase-6 sub-routing step (same screen, department-locked rows) — see DESIGN_SYSTEM §8.2 `--safety-sig-hod`.
 **States:**
-- **Loaded:** Preflight card — green ticks + any red blockers listed; PDF preview tile with the default-selected content checklist; `[Accept & Issue Report]` CTA.
+- **Loaded:** Preflight card — green ticks + any red blockers listed; PDF options tile with the **Print Loss Evaluation** checkbox; `[Accept & Issue Report]` CTA.
 - **Loading:** Preflight spinner.
 - **Empty:** not applicable (always has Phase 6 data).
 - **Error — validation:** Any preflight check failed → CTA disabled with reason listed.
@@ -497,8 +507,8 @@ Current action screens use the existing recommendation/corrective-action backend
 **Navigation:**
 - `[Accept]` → `/safety/incidents/:id/phase-8/` + download 10-section PDF.
 - `[Send back to Phase 3]` (DPA safety-net) → reason required.
-- `[View draft PDF]` → opens `/safety/incidents/:id/pdf/incident/` using the selected PDF section checklist.
-**Decisions:** D-PDF-01 (10-section), D-MAINT-CR044 (PIC/DPA all-band Office Review), D-EDGE-03 (legacy re-open).
+- `[Download PDF]` → downloads the incident PDF with compulsory sections and optionally the Loss Evaluation blocks.
+**Decisions:** D-PDF-01 (10-section), D-MAINT-CR044 (PIC/DPA all-band Office Review), D-MAINT-CR058 (optional Loss Evaluation print), D-EDGE-03 (legacy re-open).
 
 ### 4.8 Phase 7 / backend Phase 8 — Loss Evaluation — `FEAT-SAF-INC-031`
 
@@ -506,21 +516,21 @@ Current action screens use the existing recommendation/corrective-action backend
 **Current CR-052/CR-053 save gate:** authorized ship-side and office-side users with `SAF_F_001` incident access and vessel scope can save Loss Evaluation before Office Review approval; closure remains an office action for PIC or DPA.
 **Role gate:** `PermissionGate(SAF_F_001) + vessel scope` for save; PIC or DPA for close.
 **Data loaded on mount:**
-- `GET /api/safety/incidents/:id/phase-6/` — Loss Evaluation workspace with `report_type`, `choices.report_type`, fixed dropdown choices, saved `loss_evaluation`, and close readiness.
+- `GET /api/safety/incidents/:id/phase-6/` — Loss Evaluation workspace with `report_type`, `choices.report_type`, fixed dropdown choices, saved `loss_evaluation`, officer-name defaults for blank Name of master / Name of Chief Engineer fields, and close readiness.
 - `PATCH /api/safety/incidents/:id/phase-6/` — saves one editable Loss Evaluation row in `vims_safety_incident_loss_evaluation`, including the user-selected `report_type`.
-- `POST /api/safety/incidents/:id/phase-6/close/` — closes after Loss Evaluation is saved and closure note is supplied.
-**Signature transition:** no formal re-signing of the incident report; closure note and Office Review signature remain in the final PDF signature/closure area.
+- `POST /api/safety/incidents/:id/phase-6/close/` - compatibility endpoint that rejects closure because Phase 6 Office Review owns close.
+**Signature transition:** no formal re-signing of the incident report; Office Review signature remains in the final PDF signature/closure area.
 **States:**
-- **Loaded:** Report Type selector first, then Risk Assessment, Other Details, Cost Evaluation, Estimated Costs, and Close Incident card after a type is selected. Incident Report selection shows repair/loss/cost fields; Injury Report selection shows safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields.
+- **Loaded:** Report Type selector first, then Risk Assessment, Other Details, Cost Evaluation, and Estimated Costs after a type is selected. Other Details auto-fills Name of master and Name of Chief Engineer from current active onboard crew for the incident vessel when the saved Loss Evaluation values are blank. Incident Report selection shows repair/loss/cost fields; Injury Report selection shows safe-working-practice/rest/repatriation/hospitalization/evacuation/injury-cost fields. No close card is shown.
 - **Loading:** `"Loading Loss Evaluation..."`
-- **Empty:** saved status shows `Not saved`; Close Incident is disabled until Loss Evaluation is saved.
-- **Error — validation:** Attempt-close without saved Loss Evaluation → red/amber validation message.
+- **Empty:** saved status shows `Not saved`.
+- **Error - validation:** Save without selecting Incident Report or Injury Report shows a validation message.
 - **Error — network:** Retry.
 - **Error — auth:** PIC or DPA role required.
 **Navigation:**
-- `[Close Incident]` → `/safety/incidents/:id/closure/` (terminal state).
+- Terminal closure is reached from Phase 6 Office Review Accept / Close.
 - `[Back to Office Review]` → `/safety/incidents/:id/phase-5/`.
-**Decisions:** D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053.
+**Decisions:** D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053, D-MAINT-CR063.
 
 ### 4.9 Closure / Read-only — `/safety/incidents/:id/closure/`
 
@@ -559,19 +569,19 @@ Current action screens use the existing recommendation/corrective-action backend
 
 | Sub-route | Feature | Role gate | States |
 |-----------|---------|-----------|--------|
-| `/pdf/incident/` | FEAT-SAF-PDF-001 selectable-section PDF | Closer-band roles; any `SAF_F_001` for view | Loaded: default-selected section checklist + inline PDF viewer. Loading: spinner + "Generating PDF…". Error: "Generation failed — retry" |
+| `/pdf/incident/` | FEAT-SAF-PDF-001 incident PDF | Closer-band roles; any `SAF_F_001` for view | Loaded: required report content + optional Loss Evaluation print. Loading: spinner + "Generating PDF…". Error: "Generation failed — retry" |
 | `/pdf/mscmepc3/` | FEAT-SAF-PDF-002 MSC-MEPC.3/Circ.4 | DPA | Loaded: 5-appendix regulatory PDF; position auto-filled from Daily Report live-join (D-GAP-M09) |
 | `/pdf/auditor-zip/` | FEAT-SAF-PDF-006 ZIP | Master (vessel vetting) + DPA (fleet) | Loaded: scope selector → ZIP download. Error: "Scope empty" |
 
 The FEAT-SAF-PDF-001 visible title is `Injury Report` when the incident has a saved Phase 1 injury record from `Record injury`; otherwise it is `Incident Report`.
 
-Before incident PDF preview or download, the user chooses the content to include. The current checklist defaults all items to selected and includes: Summary, Reporter Details, Injury Details, Estimated Cost, Root Cause, Evidence (Documents), Corrective / Preventive Actions, and Signature. The frontend sends selected keys in the `sections` query parameter; omitted or empty `sections` means print all allowed backend sections for backward compatibility, including the legacy `lessons_learned` key for old/direct exports.
+Before incident PDF download from Phase 6 Office Review, the user only chooses whether to print Loss Evaluation. The frontend always sends Summary, Reporter Details, Injury Details, Root Cause Analysis, Corrective and Preventive Actions, Evidence (Documents), and Signature. When **Print Loss Evaluation** is checked, the frontend also sends `estimated_cost`; omitted or empty `sections` still means print all allowed backend sections for backward compatibility, including the legacy `lessons_learned` key for old/direct exports. The backend renders Corrective and Preventive Actions before Evidence (Documents) in current Incident PDFs.
 
 Incident PDF preview/download and MSC-MEPC.3/Circ.4 export are not blocked only because Phase 7 acceptance is pending. Record-type checks and MSC-MEPC.3/Circ.4 classifier applicability checks still apply.
 
-In FEAT-SAF-PDF-001 output, Office Review comments and closure reason are not part of the Summary table. When present, they print in the final Office Review / Closure area immediately before Signature. Current action detail boxes print each saved description once and do not repeat the same description as a separate paragraph above the box. Recommendation rationale / "Why is this needed?" text is not captured by the current action screens and is not printed in the PDF.
+In FEAT-SAF-PDF-001 output, Office Review comments are not part of the Summary table. The **Describe What happened?** narrative is also not printed at the top of Summary. For standard **Incident Report** output it prints below the intake/detail sections immediately before **Root Cause Analysis**. For **Injury Report** output it prints directly after **Reporter Details** and before **Injury Details**. For injury reports, the legacy injury-row `what_happened_narrative` value is not printed; the incident-level narrative remains authoritative. When present, Office Review comments print in the final Closure area as one undivided full-width **Office comments/ lesson learnt** block immediately before Signature. The stored office comment is rendered as one text block with typed line breaks and repeated spaces preserved and no artificial template chunking; ordinary PDF line wrapping still occurs to fit the page width. Stored closure reason, a separate Comment row, and filler labels are not printed. Current action detail boxes are split into Corrective Actions and Preventive Actions and render each saved action as a full-width bordered row/box with no left-side `Description` label column. The first line is the action description; any saved linked due date prints on the next line as `Due Date: YYYY-MM-DD`. Recommendation rationale / "Why is this needed?", action status, physical verification note, closed-at, and recommendation verification rows are not captured by the current action screens and are not printed in the PDF. Immediate Cause and Root Cause each print once as their own blocks with cause factor on the left and cause/reason on the right.
 
-Evidence (Documents) PDF output prints each saved attachment as its own document block. The block uses the saved title when available and separates Description and File rows; it does not use numbered labels such as `Attachment 1` or `Attachment 2`. Legacy evidence-note-only rows are not printed in the PDF; saved Witness Statements remain printable with Remark wording.
+Evidence (Documents) PDF output prints each saved attachment as its own document block. The block uses the saved title when available and separates Description and File rows; it does not use numbered labels such as `Attachment 1` or `Attachment 2`. Legacy evidence-note-only rows are not printed in the PDF; saved Witness Statements print as separate witness blocks named `Witness Statement - <witness display>` where a witness display exists, then print a clickable statement-attachment link when the upload is downloadable and Remark rows inside the block. The old free-text witness statement value is not printed even when legacy rows contain it.
 
 ---
 
@@ -660,9 +670,10 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 - `[Issue Circular/Alert]` stores a one-time prefill handoff and opens `/circular/office?safety_prefill=near_miss_fleet_alert`.
 - The handoff pre-fills only Circular title and body from the anonymised Near Miss fleet-alert draft. DPA completes document type, department, scope, sub-categories, priority, recipients, attachments, and publish from the Circular module.
 - The Safety module does **not** directly create or publish the Circular record from this screen.
+- `[Issue fleet alert]` records the Near Miss HIGH-alert requirement, writes in-app notifications, and sends one batched email to selected vessel `VesselData.Email` recipients with `HSSEQ@kaizenship.net` in CC. The email carries the Near Miss PDF as an attachment and uses a short prevention-focused body telling recipients to review what happened and take preventive action. Missing selected-vessel email or missing SMTP credentials blocks issue before completion history is written.
 **Signature transition:** DPA fleet-alert issue signature stays in Near Miss; Circular publish signature stays in the Circular module.
 **States:** Loaded / Loading / Empty (new draft) / Error if Near Miss fleet-alert issue fails.
-**Navigation:** `[Issue Circular/Alert]` opens the Circular create page with title/body prefilled; `[Issue fleet alert]` records the Near Miss HIGH-alert requirement as issued.
+**Navigation:** `[Issue Circular/Alert]` opens the Circular create page with title/body prefilled; `[Issue fleet alert]` records and dispatches the Near Miss HIGH-alert requirement as issued.
 **Decisions:** D-GAP-R22, D-CFG-04, D-GAP-M08.
 
 ### 5.6 Near Miss PDF — `/safety/near-miss/:id/pdf/`
@@ -1036,7 +1047,7 @@ All cross-module joins use **same-DB live queries** — no ETL, no sync stalenes
 | **SCM → WRH host readiness and attendance** | `/safety/scm/create-*` readiness card and `/safety/scm/:id/attendance/` table badges | `vims_wrh_rest_hours` + `wrh_ship_time_config` live join | SCM hosting is blocked until ship time and all roster crew WRH readiness are clear; after creation, per-row badges remain visible and do not block PDF export or Office Comment closure | **D-MAINT-CR014** · **D-GAP-M11** · **D-GAP-M26** · FEAT-SAF-XMOD-002 |
 | **Corrective Action → Purchase Requisition (hard FK)** | Corrective Action row from `/safety/incidents/:id/phase-3/` | `/purchase/requisitions/create?linked_safety_ca={caId}` or `/purchase/requisitions/:reqId` | Hard FK = Purchase Req cannot be archived while open CA linked; CA detail shows live Req status | **D-GAP-M12** · FEAT-SAF-XMOD-004 |
 | **SOI assistant picker → CMS** | `/safety/soi/create/` | `Crew_Onboarding_History` live join with cross-department filter | Picker enforces cross-dept (SSQE §4.5.2); no manual override | **D-GAP-I2** · **D-GAP-M18** · FEAT-SAF-XMOD-003 |
-| **Near Miss fleet alert → Circular module** | `/safety/near-miss/:id/fleet-alert/` `[Issue Circular/Alert]` | `/circular/office?safety_prefill=near_miss_fleet_alert` | Opens existing Circular create flow with title/body prefilled from the anonymised Near Miss alert; DPA completes all remaining Circular fields and publishes there. Safety does not direct-create the circular. | **D-CFG-04** · **D-GAP-M08** · FEAT-SAF-NM-006 |
+| **Near Miss fleet alert → Circular module + email** | `/safety/near-miss/:id/fleet-alert/` `[Issue Circular/Alert]` and `[Issue fleet alert]` | `/circular/office?safety_prefill=near_miss_fleet_alert`, `VesselData.Email`, SMTP sender, Near Miss PDF | Opens existing Circular create flow with title/body prefilled from the anonymised Near Miss alert; DPA completes all remaining Circular fields and publishes there. Safety does not direct-create the circular. The Safety issue action separately records completion, emits in-app notifications, and sends one selected-vessel email batch with `HSSEQ@kaizenship.net` in CC, the Near Miss PDF attached, and a short prevention-focused body. | **D-CFG-04** · **D-GAP-M08** · **D-MAINT-CR083** · **D-MAINT-CR086** · FEAT-SAF-NM-006 |
 | **Legacy backend verification → PSC Physical Verification (Inspection module)** | `/safety/incidents/:id/phase-8/` | `vims_psc_physical_verification` live join | Status shown inline; CA close independent of PV close (separate tracks) | **D-EDGE-06** · **D-GAP-M03** · FEAT-SAF-INC-031 |
 | **Safety → PMS (DECOUPLED)** | Phase-3 Parts tab text note | *No link* | Note: `"PMS equipment history: cross-reference manually — PMS is standalone (D-GAP-I1)."` **No navigation path. No FK. No live join.** | **D-GAP-I1** · FEAT-SAF-XMOD-005 |
 | **Safety → master_notification** | All screens that send notifications | Shared notification queue | Internal write; user doesn't navigate. Slack best-effort + in-app authoritative | **D-GAP-F2** · **D-GAP-M28** · **D-GAP-F4** · FEAT-SAF-XMOD-006 |
@@ -1051,7 +1062,7 @@ Per **D-GAP-I1**, the Safety module has **no navigation to PMS**. There is no li
 
 Per SSQE Manual Rev 01 Feb 2026 §11 and DESIGN_SYSTEM §8.2, the canonical signature chain is **Reporter → Master → HOD → DPA → FM** (as applicable by band / module). The frontend renders each slot via the `<SignatureBlock role={…} state={awaiting|signed}>` component (DESIGN_SYSTEM §8.2). Out-of-order submission blocked client + server (VALIDATION_RULES §3).
 
-Current Incident PDFs render the Office Review decision slot as PIC / DPA office signature for every risk band. Older per-band signature rows in this section are legacy background and are superseded by D-MAINT-CR044 for the current Incident Office Review path.
+Current Incident PDFs render only Reporter signature and PIC / DPA office signature rows. Older Master, HOD, and per-band signature rows in this section are legacy background and are superseded by D-MAINT-CR044 and D-MAINT-CR059 for the current Incident Office Review path.
 
 ### 10.1 Signature chain per module
 
@@ -1112,7 +1123,7 @@ Every PRD V1 feature must map to ≥1 screen or route. `R` = referenced on scree
 | FEAT-SAF-INC-012 | P: `/phase-3/interview/:intId/` | R: People tab |
 | FEAT-SAF-INC-013 | R: interview detail picklist | — |
 | FEAT-SAF-INC-014 | R: interview detail checklist | — |
-Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current user-facing Phase 4 Witness Statement route by D-MAINT-CR016, D-MAINT-CR036, and D-MAINT-CR049. Current users open `/phase-4/interviews/`, choose a crew witness or Other typed name, enter Remark, and may upload a witness statement; formal/informal, text statement, and read-back/copy-to-witness controls remain legacy API compatibility.
+Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current user-facing Phase 4 Witness Statement route by D-MAINT-CR016, D-MAINT-CR036, and D-MAINT-CR049. Current users open `/phase-4/interviews/`, choose a crew witness or Other typed name, upload a witness statement when available, and enter Remark below the upload; formal/informal, text statement, and read-back/copy-to-witness controls remain legacy API compatibility.
 
 | FEAT-SAF-INC-015 | P: `/phase-4/` | R: Phase 5 analyses |
 | FEAT-SAF-INC-016 | P: `/phase-5/` (loop-back CTA) | R: Phase 4/6 |
@@ -1233,5 +1244,7 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 
 **Open BLOCKED stubs:**
 - §8.2 — FTS engine selection (build-time deferral, Round 20).
+
+**CR-084 current Safety Dashboard and auditor export presentation:** `/safety/dashboard/` uses the visible heading **Safety Dashboard** and defaults to a quiet office view with Safety score, Current view, period/vessel controls, and export controls. Repeat issues, top repeat causes, corrective-action age, Heinrich Ratio, and SOI Compliance % remain available only after the user opens **Show dashboard details**. `/safety/admin/auditor-export/` uses a Vessel filter dropdown populated from active vessel options rather than a free-text vessel field.
 
 **End of APP_FLOW.**
