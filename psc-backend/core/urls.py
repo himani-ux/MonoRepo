@@ -125,6 +125,10 @@ urlpatterns = [
 
     # Safety module endpoints
     path('api/safety/', include('apps.safety.urls', namespace='safety')),
+
+    # Certificates module endpoints
+    path('api/certs/', include('apps.certs.urls', namespace='certs')),
+    path('api/auditor/', include('apps.certs.auditor_urls', namespace='certs-auditor')),
 ]
 
 # Serve media files in development

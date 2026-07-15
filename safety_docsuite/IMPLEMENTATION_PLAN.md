@@ -2640,6 +2640,22 @@ Implementation impact:
 - Office-side Office Review does not render the old Phase 7 acceptance-only PDF warning line.
 - `PdfPreviewGenerator`, `IncidentPdfRenderer`, and `MscMepc3Circ4PdfRenderer` no longer block incident PDF export solely because `current_phase < 7` or the incident is not approved/closed. Record-type and regulatory applicability checks remain.
 
+## Amendment 37 - 2026-07-14
+
+The Certificates module is synced into the maintained repository under CR-087 as a separate module, using only Certs-specific files from `C:\Users\himan\Desktop\VIMS-CERTS-HANDOVER` and not importing the stale source tree's unrelated VIMS-with-Safety code. The current backend registers `apps.certs` and exposes `/api/certs/` plus `/api/auditor/`; the current frontend exposes `/certs/*` and public `/auditor/*` routes, Certs permission IDs, and Certs navigation beside the other non-Safety modules. Certs-specific canonical docs now live under `certs_docsuite/` and `certs_ssot/`.
+
+Triggering discovery: deployment preparation required bringing the already-developed Certs module into the current maintained VIMS workspace, while avoiding stale PSC/Safety files from the older handover repository.
+
+Supersedes:
+- Any previous assumption in this repository that Certs was absent from the maintained app shell.
+- Any source-tree implication that Certs sync should replace current PSC, Safety, Circular, ORB, login, or shared navigation files wholesale.
+
+Current behavior after CR-087:
+- Django includes the Certs app and resolves Certs API routes without system-check errors.
+- React includes lazy-loaded Certs and auditor routes without replacing current PSC/Safety routes.
+- The global sidebar and mobile bottom nav show Certs only for users with at least one `CERT_F_*` form permission.
+- Certs parsing/OCR/Slack dependencies are listed in backend requirements for deployment.
+
 **Document Control:**
 - Created: 2026-04-17
 - Author: Wave 3 docsuite generation agent (Implementation Plan)

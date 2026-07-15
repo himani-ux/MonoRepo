@@ -23,6 +23,7 @@ import {
   LayoutDashboard,
   BookText,
   BookOpenCheck,
+  FileCheck2,
   X,
   ChevronDown,
   ChevronRight,
@@ -31,6 +32,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useUnreadCount } from '@/hooks/use-notifications';
+import { getCertsHomeRoute } from '@/lib/certs/navigation';
 import { ROUTES } from '@/lib/utils/constants';
 import { FORM_IDS } from '@/lib/utils/permission-ids';
 import { Button } from '@/components/ui/button';
@@ -129,9 +131,20 @@ const safetyNavItems: SafetyNavItem[] = [
   { formId: 'SAF_F_020', href: '/safety/admin/auditor-export', label: 'Auditor Export' },
 ];
 
+const certsFormIds = [
+  FORM_IDS.CERTS_CATALOG,
+  FORM_IDS.CERTS_TRACKED_ITEMS,
+  FORM_IDS.CERTS_RECONCILIATION,
+  FORM_IDS.CERTS_PRINT_EXPORT,
+  FORM_IDS.CERTS_ONBOARDING,
+  FORM_IDS.CERTS_NOTIFICATION_CONFIG,
+  FORM_IDS.CERTS_AUDITOR_ACCESS,
+  FORM_IDS.CERTS_AUDIT_LOG,
+] as const;
+
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
-  const { hasForm, user, isVessel } = useAuth();
+  const { hasForm, user, isVessel, vesselId } = useAuth();
   const { data: unreadCount = 0 } = useUnreadCount();
 
   // Filter nav items based on user role
@@ -170,7 +183,15 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const hasSafetyAccess = visibleSafetyItems.length > 0;
   const hasActiveSafetyItem = location.pathname.startsWith('/safety');
   const hasActiveInspectionItem = hasActivePscItem || hasActiveSafetyItem;
+  const hasCertsAccess = certsFormIds.some((formId) => hasForm(formId));
+  const certsHref = getCertsHomeRoute({ user, vesselId, hasForm });
   const legacyModuleItems = [
+    {
+      label: 'Certs',
+      href: certsHref,
+      icon: FileCheck2,
+      visible: hasCertsAccess,
+    },
     {
       label: 'Circular',
       href: ROUTES.CIRCULAR,

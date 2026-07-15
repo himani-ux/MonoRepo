@@ -11,9 +11,10 @@
  */
 
 import { NavLink, useLocation } from 'react-router-dom';
-import { Ship, ClipboardList, ListChecks, Bell, RefreshCw, Settings, LayoutDashboard } from 'lucide-react';
+import { Ship, ClipboardList, ListChecks, Bell, RefreshCw, Settings, LayoutDashboard, FileCheck2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
+import { getCertsHomeRoute } from '@/lib/certs/navigation';
 import { ROUTES } from '@/lib/utils/constants';
 import { FORM_IDS } from '@/lib/utils/permission-ids';
 
@@ -22,7 +23,19 @@ interface NavItem {
   href: string;
   icon: typeof Ship;
   formId?: string;
+  anyFormIds?: readonly string[];
 }
+
+const certsFormIds = [
+  FORM_IDS.CERTS_CATALOG,
+  FORM_IDS.CERTS_TRACKED_ITEMS,
+  FORM_IDS.CERTS_RECONCILIATION,
+  FORM_IDS.CERTS_PRINT_EXPORT,
+  FORM_IDS.CERTS_ONBOARDING,
+  FORM_IDS.CERTS_NOTIFICATION_CONFIG,
+  FORM_IDS.CERTS_AUDITOR_ACCESS,
+  FORM_IDS.CERTS_AUDIT_LOG,
+] as const;
 
 const navItems: NavItem[] = [
   {
@@ -56,6 +69,12 @@ const navItems: NavItem[] = [
     formId: FORM_IDS.NOTIFICATIONS,
   },
   {
+    label: 'Certs',
+    href: ROUTES.CERTS,
+    icon: FileCheck2,
+    anyFormIds: certsFormIds,
+  },
+  {
     label: 'Sync',
     href: ROUTES.SYNC,
     icon: RefreshCw,
@@ -71,13 +90,19 @@ const navItems: NavItem[] = [
 
 export function BottomNav() {
   const location = useLocation();
-  const { hasForm } = useAuth();
+  const auth = useAuth();
+  const { hasForm } = auth;
+  const certsHref = getCertsHomeRoute(auth);
 
   // Filter nav items based on permissions
   const filteredNavItems = navItems.filter((item) => {
     if (item.formId && !hasForm(item.formId)) return false;
+    if (item.anyFormIds && !item.anyFormIds.some((formId) => hasForm(formId))) return false;
     return true;
   });
+  const effectiveNavItems = filteredNavItems.map((item) => (
+    item.href === ROUTES.CERTS ? { ...item, href: certsHref } : item
+  ));
   const isActive = (href: string) => {
     if (href === ROUTES.DASHBOARD) {
       return location.pathname === '/' || location.pathname === '/dashboard';
@@ -91,13 +116,16 @@ export function BottomNav() {
     if (href === ROUTES.CARS) {
       return location.pathname.startsWith('/cars');
     }
+    if (href.startsWith('/certs')) {
+      return location.pathname.startsWith('/certs');
+    }
     return location.pathname === href;
   };
 
   return (
     <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-200 bg-white md:hidden">
       <ul className="flex h-16 items-center justify-around">
-        {filteredNavItems.map((item) => {
+        {effectiveNavItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
 
