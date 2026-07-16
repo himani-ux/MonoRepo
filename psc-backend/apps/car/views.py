@@ -28,7 +28,8 @@ from datetime import date
 import uuid
 from core.vessel_access import apply_office_vessel_filter
 from django.conf import settings
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db import DatabaseError, OperationalError, ProgrammingError
+from django.db.models import Prefetch, Q
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from django.http import FileResponse
@@ -95,6 +96,22 @@ from apps.notifications.signals import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_true_query_param(value):
+    return str(value or '').strip().lower() in ('1', 'true', 'yes')
+
+
+def _empty_car_list_response(page, page_size):
+    return Response({
+        'data': [],
+        'pagination': {
+            'page': page,
+            'page_size': page_size,
+            'total_count': 0,
+            'total_pages': 0,
+        }
+    })
 
 
 def _compact_uuid_text(value):
@@ -352,14 +369,14 @@ class CARListView(generics.ListAPIView):
         if pv_due is not None:
             pv_due_value = pv_due.strip().lower()
             if pv_due_value in ('1', 'true', 'yes'):
-                open_pv = PhysicalVerification.objects.filter(
-                    car_id=OuterRef('pk'),
+                open_pv_car_ids = PhysicalVerification.objects.filter(
                     status=PVStatus.OPEN,
                     is_deleted=False,
-                )
+                ).values('car_id')
                 queryset = queryset.filter(
                     status=CARStatus.CLOSED,
-                ).filter(Exists(open_pv))
+                    id__in=open_pv_car_ids,
+                )
         
         car_number = self.request.query_params.get('car_number')
         if car_number:
@@ -374,8 +391,15 @@ class CARListView(generics.ListAPIView):
         # Pagination — count on base queryset (no RawSQL annotations)
         page = int(request.query_params.get('page', 1))
         page_size = min(int(request.query_params.get('page_size', 20)), 100)
+        is_pv_due_probe = _is_true_query_param(request.query_params.get('pv_due'))
 
-        total_count = queryset.count()
+        try:
+            total_count = queryset.count()
+        except (DatabaseError, OperationalError, ProgrammingError):
+            if is_pv_due_probe:
+                logger.exception("CAR pv_due list count failed; returning empty PV due result.")
+                return _empty_car_list_response(page, page_size)
+            raise
         total_pages = (total_count + page_size - 1) // page_size
 
         start = (page - 1) * page_size
@@ -384,8 +408,24 @@ class CARListView(generics.ListAPIView):
         # Annotate with vessel name/code and counts AFTER slicing.
         # All annotations use scalar RawSQL subqueries to avoid SQL Server
         # GROUP BY conflicts (SQL Server can't have subqueries in GROUP BY).
-        paginated_queryset = queryset[start:end]
-        annotated_ids = [obj.id for obj in paginated_queryset]
+        try:
+            paginated_queryset = queryset[start:end]
+            annotated_ids = [obj.id for obj in paginated_queryset]
+        except (DatabaseError, OperationalError, ProgrammingError):
+            if is_pv_due_probe:
+                logger.exception("CAR pv_due list page fetch failed; returning empty PV due result.")
+                return _empty_car_list_response(page, page_size)
+            raise
+        if not annotated_ids:
+            return Response({
+                'data': [],
+                'pagination': {
+                    'page': page,
+                    'page_size': page_size,
+                    'total_count': total_count,
+                    'total_pages': total_pages,
+                }
+            })
         annotated_queryset = CAR.objects.filter(
             id__in=annotated_ids
         ).select_related(
@@ -424,10 +464,17 @@ class CARListView(generics.ListAPIView):
             ),
         ).order_by('-created_date')
 
-        serializer = self.get_serializer(annotated_queryset, many=True)
+        try:
+            serializer = self.get_serializer(annotated_queryset, many=True)
+            response_data = serializer.data
+        except (DatabaseError, OperationalError, ProgrammingError):
+            if is_pv_due_probe:
+                logger.exception("CAR pv_due list serialization failed; returning empty PV due result.")
+                return _empty_car_list_response(page, page_size)
+            raise
 
         return Response({
-            'data': serializer.data,
+            'data': response_data,
             'pagination': {
                 'page': page,
                 'page_size': page_size,
