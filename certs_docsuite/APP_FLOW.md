@@ -232,7 +232,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout (3-column desktop / stacked tablet):**
 - **Left col — Cert metadata:**
-  - Identity: catalog_code (display_name + canonical_code), certificate_number (with bypass per D-CERT-105 / FEAT-CERT-OCR-003), issuing_authority, place_of_issue, validity_type, form_variant (if IOPP-style per D-CERT-032).
+  - Identity: catalog_code (display_name + canonical_code), certificate_number (with bypass per D-CERT-105 / FEAT-CERT-OCR-003), issuing_authority, place_of_issue, validity_type, form_variant (if IOPP-style per D-CERT-032). Users with TrackedItem write permission can use **Edit** in the Metadata card to manually correct OCR-filled certificate number, issuing authority, place of issue, issue date, and expiry date with an audit reason.
   - Dates: issue_date, expiry_date (or "Permanent"), anniversary_date (read-only; DPA-edit only via separate confirm flow), window_open/close (computed, read-only with tooltip "Computed from anniversary + cadence per D-CERT-063"), last_done_date, next_due_date, postponed_until.
   - Status pill (D-CERT-135/136 color+shape) + days_to_go.
   - Hierarchy: parent breadcrumb (D-CERT-010 2-level UI cap); child rows list (STC, extensions, dispensations, sub-surveys).

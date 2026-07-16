@@ -259,3 +259,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-15 | MAINTAIN | T1 | Restored local Certs entries in the global sidebar and mobile bottom nav after Certs deployment readiness. | docs: none - temporary local navigation restore only | exemptions: none
 2026-07-16 | MAINTAIN | CR-088 | Added paged/lazy Certs catalog row loading so Catalog Admin renders the first 50 rows before background page fetches | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md, certs_docsuite/FRONTEND_GUIDELINES.md | exemptions: none
 2026-07-16 | MAINTAIN | T1 | Renamed visible Certs missing-PDF labels to Certificates missing on the vessel dashboard and certificate rows | docs: none - UI copy only | exemptions: none
+2026-07-16 | MAINTAIN | CR-089 | Added manual metadata edit on Certs tracked-item detail for OCR correction | docs: certs_docsuite/APP_FLOW.md | exemptions: none

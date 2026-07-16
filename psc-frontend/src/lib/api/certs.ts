@@ -283,6 +283,15 @@ export interface CertTrackedItemUploadPdfResponse {
   ocrConfidencePerField: Record<string, number>;
 }
 
+export interface CertTrackedItemMetadataUpdatePayload {
+  certificateNumber?: string | null;
+  issuingAuthority?: string | null;
+  placeOfIssue?: string | null;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+  reason?: string | null;
+}
+
 export interface CertTrackedItemRemovePdfPayload {
   reason: string;
 }
@@ -1446,6 +1455,14 @@ export const certsApi = {
   async rejectTrackedItem(id: string, payload: CertTrackedItemTransitionPayload): Promise<CertTrackedItemDetail> {
     const response = await apiClient.post<CertTrackedItemDetail>(
       buildCertsApiUrl(`/tracked-items/${id}/reject/`),
+      payload
+    );
+    return response.data;
+  },
+
+  async updateTrackedItemMetadata(id: string, payload: CertTrackedItemMetadataUpdatePayload): Promise<CertTrackedItemDetail> {
+    const response = await apiClient.patch<CertTrackedItemDetail>(
+      buildCertsApiUrl(`/tracked-items/${id}/`),
       payload
     );
     return response.data;

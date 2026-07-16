@@ -109,6 +109,7 @@ import {
   useRejectTrackedItem,
   useSubmitTrackedItem,
   useTrackedItemDetail,
+  useUpdateTrackedItemMetadata,
   useUploadTrackedItemPdf,
 } from '@/hooks/certs/use-tracked-item';
 import {
@@ -3770,7 +3771,7 @@ function CertTrackedItemDetailPage({ imo, trackedItemId }: { imo: string; tracke
         <CertTrackedItemHeader item={item} imo={imo} />
         <CertTrackedItemSpecialBanners item={item} imo={imo} />
         <div className="grid gap-4 xl:grid-cols-[1.05fr_1fr_1fr]">
-          <CertTrackedItemMetadataPanel item={item} />
+          <CertTrackedItemMetadataPanel item={item} imo={imo} canEdit={canDirectEditItem} />
           <CertTrackedItemPdfPanel item={item} imo={imo} canUpload={canDirectEditItem} />
           <CertTrackedItemWorkflowPanel
             item={item}
@@ -3877,28 +3878,146 @@ function CertTrackedItemSpecialBanners({ item, imo }: { item: CertTrackedItemDet
   );
 }
 
-function CertTrackedItemMetadataPanel({ item }: { item: CertTrackedItemDetail }) {
+function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTrackedItemDetail; imo: string; canEdit: boolean }) {
+  const updateMetadata = useUpdateTrackedItemMetadata(item.id, imo);
+  const [isEditing, setIsEditing] = useState(false);
+  const [certificateNumber, setCertificateNumber] = useState(item.certificateNumber ?? '');
+  const [issuingAuthority, setIssuingAuthority] = useState(item.issuingAuthority ?? '');
+  const [placeOfIssue, setPlaceOfIssue] = useState(item.placeOfIssue ?? '');
+  const [issueDate, setIssueDate] = useState(item.issueDate ?? '');
+  const [expiryDate, setExpiryDate] = useState(item.expiryDate ?? '');
+  const [reason, setReason] = useState('Metadata corrected after OCR review.');
+  const [formError, setFormError] = useState('');
   const hierarchyRows = [
     ['Parent', item.parentId ? formatEntityLabel(item.parentId, 'Parent certificate') : 'Top-level certificate'],
     ['Relationship', item.relationshipType ? formatStatus(item.relationshipType) : 'None'],
     ['Supersedes', item.supersedesId ? formatEntityLabel(item.supersedesId, 'Superseded certificate') : 'None'],
   ];
+
+  useEffect(() => {
+    if (isEditing) {
+      return;
+    }
+    setCertificateNumber(item.certificateNumber ?? '');
+    setIssuingAuthority(item.issuingAuthority ?? '');
+    setPlaceOfIssue(item.placeOfIssue ?? '');
+    setIssueDate(item.issueDate ?? '');
+    setExpiryDate(item.expiryDate ?? '');
+  }, [isEditing, item.certificateNumber, item.expiryDate, item.issueDate, item.issuingAuthority, item.placeOfIssue]);
+
+  const resetMetadataForm = () => {
+    setCertificateNumber(item.certificateNumber ?? '');
+    setIssuingAuthority(item.issuingAuthority ?? '');
+    setPlaceOfIssue(item.placeOfIssue ?? '');
+    setIssueDate(item.issueDate ?? '');
+    setExpiryDate(item.expiryDate ?? '');
+    setReason('Metadata corrected after OCR review.');
+    setFormError('');
+    setIsEditing(false);
+  };
+
+  const handleMetadataSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedAuthority = issuingAuthority.trim();
+    const trimmedReason = reason.trim();
+    if (!trimmedAuthority) {
+      setFormError('Issuing authority is required.');
+      return;
+    }
+    if (!trimmedReason) {
+      setFormError('Reason is required for the audit trail.');
+      return;
+    }
+    setFormError('');
+    updateMetadata.mutate(
+      {
+        certificateNumber: certificateNumber.trim() || null,
+        issuingAuthority: trimmedAuthority,
+        placeOfIssue: placeOfIssue.trim() || null,
+        issueDate: issueDate || null,
+        expiryDate: item.validityType === 'permanent' ? null : expiryDate || null,
+        reason: trimmedReason,
+      },
+      {
+        onSuccess: () => {
+          setIsEditing(false);
+        },
+      }
+    );
+  };
+
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Metadata</CardTitle>
+        {canEdit ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing((current) => !current)}>
+            {isEditing ? 'Close edit' : 'Edit'}
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-5">
-        <CertDetailGrid
-          rows={[
-            ['Certificate number', item.certificateNumber ?? 'Not set'],
-            ['Issuing authority', item.issuingAuthority ?? 'Not set'],
-            ['Place of issue', item.placeOfIssue ?? 'Not set'],
-            ['Validity', item.validityType ? formatStatus(item.validityType) : 'Not set'],
-            ['Form variant', item.formVariant ?? 'n/a'],
-            ['Source', item.source ? formatStatus(item.source) : 'Not set'],
-          ]}
-        />
+        {isEditing ? (
+          <form className="space-y-4" onSubmit={handleMetadataSubmit}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`certNumber-${item.id}`}>Certificate number</Label>
+                <Input id={`certNumber-${item.id}`} value={certificateNumber} onChange={(event) => setCertificateNumber(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`issuingAuthority-${item.id}`}>Issuing authority</Label>
+                <Input id={`issuingAuthority-${item.id}`} value={issuingAuthority} onChange={(event) => setIssuingAuthority(event.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`placeOfIssue-${item.id}`}>Place of issue</Label>
+                <Input id={`placeOfIssue-${item.id}`} value={placeOfIssue} onChange={(event) => setPlaceOfIssue(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`issueDate-${item.id}`}>Issue date</Label>
+                <Input id={`issueDate-${item.id}`} type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`expiryDate-${item.id}`}>Expiry date</Label>
+                <Input
+                  id={`expiryDate-${item.id}`}
+                  type="date"
+                  value={expiryDate}
+                  onChange={(event) => setExpiryDate(event.target.value)}
+                  disabled={item.validityType === 'permanent'}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Validity</Label>
+                <Input value={item.validityType ? formatStatus(item.validityType) : 'Not set'} disabled />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`metadataReason-${item.id}`}>Reason</Label>
+              <Textarea id={`metadataReason-${item.id}`} value={reason} onChange={(event) => setReason(event.target.value)} required />
+            </div>
+            {formError ? <p className="text-sm text-error-700">{formError}</p> : null}
+            {updateMetadata.isError ? <p className="text-sm text-error-700">{getErrorMessage(updateMetadata.error)}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={updateMetadata.isPending}>
+                Save metadata
+              </Button>
+              <Button type="button" variant="outline" onClick={resetMetadataForm} disabled={updateMetadata.isPending}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <CertDetailGrid
+            rows={[
+              ['Certificate number', item.certificateNumber ?? 'Not set'],
+              ['Issuing authority', item.issuingAuthority ?? 'Not set'],
+              ['Place of issue', item.placeOfIssue ?? 'Not set'],
+              ['Validity', item.validityType ? formatStatus(item.validityType) : 'Not set'],
+              ['Form variant', item.formVariant ?? 'n/a'],
+              ['Source', item.source ? formatStatus(item.source) : 'Not set'],
+            ]}
+          />
+        )}
         <div>
           <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Dates</h2>
           <CertDetailGrid

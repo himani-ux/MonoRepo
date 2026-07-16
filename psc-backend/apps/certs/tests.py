@@ -5,6 +5,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from apps.certs.services.catalog_repository import CatalogRepository
+from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
 
 
 class CertsAppRegistrationTests(SimpleTestCase):
@@ -54,3 +55,20 @@ class _FakeCatalogCursor:
 
     def fetchall(self):
         return [("catalog-1",)]
+
+
+class TrackedItemMetadataSerializerTests(SimpleTestCase):
+    def test_partial_metadata_correction_payload_is_valid(self):
+        serializer = TrackedItemWriteSerializer(
+            data={
+                "certificateNumber": "CERT-2026-001",
+                "issuingAuthority": "ClassNK",
+                "placeOfIssue": "Singapore",
+                "issueDate": "2026-07-01",
+                "expiryDate": "2027-07-01",
+                "reason": "Metadata corrected after OCR review.",
+            },
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
