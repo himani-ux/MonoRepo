@@ -263,3 +263,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-16 | MAINTAIN | CR-090 | Simplified user-facing Certs wording on landing, vessel dashboard, filters, cards, certificate details, and certificate file actions | docs: certs_docsuite/APP_FLOW.md | exemptions: none
 2026-07-16 | MAINTAIN | T1 | Fixed CAR list pv_due dashboard fetch by replacing raw SQL list flag handling with ORM Exists/Prefetch logic | docs: Docs/LESSONS.md | exemptions: none
 2026-07-16 | MAINTAIN | T1 | Hardened CAR list fetch by removing raw SQL list annotations and guarding the PV Due dashboard probe against database errors | docs: none - implementation refinement of prior CAR pv_due fix | exemptions: none
+2026-07-16 | MAINTAIN | T1 | Refined the login page visual design with premium light SaaS styling, subtle maritime background patterns, polished card spacing, inputs, and button states without changing login behavior | docs: none - visual-only login UI styling | exemptions: none
