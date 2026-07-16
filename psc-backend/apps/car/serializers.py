@@ -570,8 +570,8 @@ class CARListSerializer(serializers.ModelSerializer):
     inspection_type = serializers.SerializerMethodField()
     inspection_date = serializers.SerializerMethodField()
     vessel_id = serializers.SerializerMethodField()
-    vessel_name = serializers.CharField(read_only=True, default='')
-    vessel_code = serializers.CharField(read_only=True, default='')
+    vessel_name = serializers.SerializerMethodField()
+    vessel_code = serializers.SerializerMethodField()
 
     # Counts
     action_count = serializers.IntegerField(read_only=True, default=0)
@@ -664,6 +664,17 @@ class CARListSerializer(serializers.ModelSerializer):
     def get_vessel_id(self, obj):
         deficiency = self._get_deficiency(obj)
         return str(deficiency.inspection.vessel_id) if deficiency else None
+
+    def get_vessel_name(self, obj):
+        annotated = getattr(obj, 'vessel_name', None)
+        if annotated:
+            return annotated
+        deficiency = self._get_deficiency(obj)
+        return str(deficiency.inspection.vessel_id) if deficiency else ''
+
+    def get_vessel_code(self, obj):
+        annotated = getattr(obj, 'vessel_code', None)
+        return annotated or ''
 
     def get_is_overdue(self, obj):
         if not obj.target_date:

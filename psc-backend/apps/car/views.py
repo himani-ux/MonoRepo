@@ -29,8 +29,7 @@ import uuid
 from core.vessel_access import apply_office_vessel_filter
 from django.conf import settings
 from django.db import DatabaseError, OperationalError, ProgrammingError
-from django.db.models import Prefetch, Q
-from django.db.models.expressions import RawSQL
+from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 from django.http import FileResponse
 from rest_framework import generics, status
@@ -45,6 +44,7 @@ from apps.inspection.deficiency_models import CAR, CARStatus, Deficiency
 from .models import (
     CorrectiveAction,
     Evidence,
+    EvidenceType,
     CarClcMapping,
     ActivityHistory,
     PhysicalVerification,
@@ -440,27 +440,34 @@ class CARListView(generics.ListAPIView):
                 to_attr='prefetched_open_physical_verifications',
             )
         ).annotate(
-            vessel_name=car_vessel_name_annotation(),
-            vessel_code=car_vessel_code_annotation(),
-            action_count=RawSQL(
-                "(SELECT COUNT(*) FROM psc_corrective_action a "
-                "WHERE a.car_id = psc_car.id AND a.is_deleted = 0)",
-                [],
+            action_count=Count(
+                'corrective_actions',
+                filter=Q(corrective_actions__is_deleted=False),
+                distinct=True,
             ),
-            completed_action_count=RawSQL(
-                "(SELECT COUNT(*) FROM psc_corrective_action a "
-                "WHERE a.car_id = psc_car.id AND a.is_deleted = 0 AND a.is_completed = 1)",
-                [],
+            completed_action_count=Count(
+                'corrective_actions',
+                filter=Q(
+                    corrective_actions__is_deleted=False,
+                    corrective_actions__is_completed=True,
+                ),
+                distinct=True,
             ),
-            before_evidence_count=RawSQL(
-                "(SELECT COUNT(*) FROM psc_evidence e "
-                "WHERE e.car_id = psc_car.id AND e.is_deleted = 0 AND e.evidence_type = 'BEFORE')",
-                [],
+            before_evidence_count=Count(
+                'evidence',
+                filter=Q(
+                    evidence__is_deleted=False,
+                    evidence__evidence_type=EvidenceType.BEFORE,
+                ),
+                distinct=True,
             ),
-            after_evidence_count=RawSQL(
-                "(SELECT COUNT(*) FROM psc_evidence e "
-                "WHERE e.car_id = psc_car.id AND e.is_deleted = 0 AND e.evidence_type = 'AFTER')",
-                [],
+            after_evidence_count=Count(
+                'evidence',
+                filter=Q(
+                    evidence__is_deleted=False,
+                    evidence__evidence_type=EvidenceType.AFTER,
+                ),
+                distinct=True,
             ),
         ).order_by('-created_date')
 
