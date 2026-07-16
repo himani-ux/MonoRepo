@@ -353,6 +353,11 @@
 **What happened:** CR-050 was initially classified as Tier 2 because it looked like an Office Review UI wording cleanup, but the requested removal of "Formal incident PDF export is available after Phase 7 acceptance" also removed backend export validation and superseded canonical PDF availability behavior.
 **Why:** A visible warning line can be backed by the same backend guard that blocks the user, so removing the wording without checking the renderer would leave the product behavior unchanged.
 **Rule:** When a user asks to remove export availability wording and "no such validation", search both the preview message and the actual renderer/export endpoint. If the guard contradicts current docs, reclassify to Tier 3, add an implementation-plan amendment, and test both preview and download paths.
+
+## L-080 - Prefer ORM relationship checks over RawSQL for list flags
+**What happened:** The CAR list `pv_due` flag used a raw SQL table subquery while the matching filter used ORM joins, so a dashboard probe with `pv_due=true&page_size=1` could fail on the SQL Server runtime path even though lightweight test coverage did not expose the raw-table dependency.
+**Why:** List flags often look like harmless annotations, but raw SQL bypasses Django's backend quoting, relationship metadata, and test portability. SQLite-style coverage can miss SQL Server-specific failures until a normal frontend query hits the endpoint.
+**Rule:** For booleans derived from related rows, use ORM `Exists`, `Prefetch`, or serializer methods before RawSQL. If RawSQL is unavoidable, add a regression test for the exact frontend query shape and validate against the SQL Server path when available.
 <!-- Session close review completed 2026-04-30 10:21. No new lesson added for Step 5.5. Latest standing addition remains L-056. Session closure confirmed after Step 5.5 completion in the handover workspace. -->
 <!-- Session close review completed 2026-04-30 10:37. No new lesson added for Step 5.6. Latest standing addition remains L-056. Session closure confirmed after Step 5.6 completion in the handover workspace. -->
 <!-- Session close review completed 2026-04-30 10:57. Added L-057 for the Step 6.1 PDF export permission-registry drift. Session closure confirmed after Step 6.1 completion in the handover workspace. -->

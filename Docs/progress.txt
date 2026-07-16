@@ -261,3 +261,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-16 | MAINTAIN | T1 | Renamed visible Certs missing-PDF labels to Certificates missing on the vessel dashboard and certificate rows | docs: none - UI copy only | exemptions: none
 2026-07-16 | MAINTAIN | CR-089 | Added manual metadata edit on Certs tracked-item detail for OCR correction | docs: certs_docsuite/APP_FLOW.md | exemptions: none
 2026-07-16 | MAINTAIN | CR-090 | Simplified user-facing Certs wording on landing, vessel dashboard, filters, cards, certificate details, and certificate file actions | docs: certs_docsuite/APP_FLOW.md | exemptions: none
+2026-07-16 | MAINTAIN | T1 | Fixed CAR list pv_due dashboard fetch by replacing raw SQL list flag handling with ORM Exists/Prefetch logic | docs: Docs/LESSONS.md | exemptions: none

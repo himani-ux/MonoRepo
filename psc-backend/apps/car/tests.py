@@ -4142,6 +4142,23 @@ class TestCARListPVDue(BaseCARAPITestCase):
         self.assertEqual(ids, {str(self.closed_with_open_pv.id)})
         self.assertEqual(response.data["pagination"]["total_count"], 1)
 
+    def test_car_list_filter_pv_due_true_supports_dashboard_page_size_probe(self):
+        response = self._list(
+            self.vessel_master,
+            params={
+                "pv_due": "true",
+                "page": "1",
+                "page_size": "1",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["pagination"]["page"], 1)
+        self.assertEqual(response.data["pagination"]["page_size"], 1)
+        self.assertEqual(response.data["pagination"]["total_count"], 1)
+        self.assertEqual(response.data["data"][0]["id"], str(self.closed_with_open_pv.id))
+        self.assertTrue(response.data["data"][0]["pv_due"])
+
     def test_car_list_filter_pv_due_true_combines_with_car_number_search(self):
         response = self._list(
             self.vessel_master,

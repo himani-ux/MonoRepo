@@ -47,6 +47,7 @@ from .models import (
     ActivityHistory,
     AuditLog,
     PhysicalVerification,
+    PVStatus,
 )
 
 
@@ -581,7 +582,7 @@ class CARListSerializer(serializers.ModelSerializer):
     # Status display
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     is_overdue = serializers.SerializerMethodField()
-    pv_due = serializers.BooleanField(read_only=True, default=False)
+    pv_due = serializers.SerializerMethodField()
 
     class Meta:
         model = CAR
@@ -634,6 +635,19 @@ class CARListSerializer(serializers.ModelSerializer):
     def get_deficiency_is_cleared(self, obj):
         deficiency = self._get_deficiency(obj)
         return deficiency.is_cleared if deficiency else None
+
+    def get_pv_due(self, obj):
+        if obj.status != CARStatus.CLOSED:
+            return False
+
+        prefetched = getattr(obj, 'prefetched_open_physical_verifications', None)
+        if prefetched is not None:
+            return bool(prefetched)
+
+        return obj.physical_verifications.filter(
+            status=PVStatus.OPEN,
+            is_deleted=False,
+        ).exists()
 
     def get_inspection_id(self, obj):
         deficiency = self._get_deficiency(obj)

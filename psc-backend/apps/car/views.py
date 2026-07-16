@@ -28,7 +28,7 @@ from datetime import date
 import uuid
 from core.vessel_access import apply_office_vessel_filter
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.db.models.expressions import RawSQL
 from django.utils import timezone
 from django.http import FileResponse
@@ -352,11 +352,14 @@ class CARListView(generics.ListAPIView):
         if pv_due is not None:
             pv_due_value = pv_due.strip().lower()
             if pv_due_value in ('1', 'true', 'yes'):
+                open_pv = PhysicalVerification.objects.filter(
+                    car_id=OuterRef('pk'),
+                    status=PVStatus.OPEN,
+                    is_deleted=False,
+                )
                 queryset = queryset.filter(
                     status=CARStatus.CLOSED,
-                    physical_verifications__status=PVStatus.OPEN,
-                    physical_verifications__is_deleted=False,
-                ).distinct()
+                ).filter(Exists(open_pv))
         
         car_number = self.request.query_params.get('car_number')
         if car_number:
@@ -387,6 +390,15 @@ class CARListView(generics.ListAPIView):
             id__in=annotated_ids
         ).select_related(
             'deficiency__inspection'
+        ).prefetch_related(
+            Prefetch(
+                'physical_verifications',
+                queryset=PhysicalVerification.objects.filter(
+                    status=PVStatus.OPEN,
+                    is_deleted=False,
+                ),
+                to_attr='prefetched_open_physical_verifications',
+            )
         ).annotate(
             vessel_name=car_vessel_name_annotation(),
             vessel_code=car_vessel_code_annotation(),
@@ -408,13 +420,6 @@ class CARListView(generics.ListAPIView):
             after_evidence_count=RawSQL(
                 "(SELECT COUNT(*) FROM psc_evidence e "
                 "WHERE e.car_id = psc_car.id AND e.is_deleted = 0 AND e.evidence_type = 'AFTER')",
-                [],
-            ),
-            pv_due=RawSQL(
-                "CASE WHEN psc_car.status = 'CLOSED' "
-                "AND EXISTS (SELECT 1 FROM psc_physical_verification pv "
-                "WHERE pv.car_id = psc_car.id AND pv.is_deleted = 0 AND pv.status = 'OPEN') "
-                "THEN 1 ELSE 0 END",
                 [],
             ),
         ).order_by('-created_date')
