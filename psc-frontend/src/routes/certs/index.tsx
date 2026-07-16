@@ -295,7 +295,7 @@ function CertsLandingStub() {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-neutral-900">Certificate Register</h2>
-              <p className="mt-1 text-sm text-neutral-500">Vessel records, renewals and catalog tools in one place.</p>
+              <p className="mt-1 text-sm text-neutral-500">Vessel certificates, renewals and reminders in one place.</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -360,8 +360,8 @@ function CertOfficeVesselListCard() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">{vessel.trackedItemCount} tracked</span>
-                      <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">{vessel.actionItemCount} action</span>
+                      <span className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">{vessel.trackedItemCount} certificates</span>
+                      <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">{vessel.actionItemCount} need attention</span>
                       <span className="rounded-md bg-red-50 px-2 py-1 text-red-700">{vessel.pdfMissingCount} Certificates missing</span>
                     </div>
                   </div>
@@ -2496,10 +2496,10 @@ function CertVesselSpecialBanners({ data, imo }: { data: CertVesselDashboardResp
 
 function CertVesselKpis({ data }: { data: CertVesselDashboardResponse }) {
   const kpis = [
-    { label: 'Tracked items', value: data.summary.totalTrackedItems },
-    { label: 'Action items', value: data.summary.actionItemCount },
+    { label: 'Certificates', value: data.summary.totalTrackedItems },
+    { label: 'Need attention', value: data.summary.actionItemCount },
     { label: 'Certificates missing', value: data.summary.pdfMissingCount },
-    { label: 'Class tracked', value: data.summary.classTrackedCount },
+    { label: 'Class certificates', value: data.summary.classTrackedCount },
   ];
   return (
     <div className="certs-kpi-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -2563,8 +2563,8 @@ function CertVesselFilters({
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="current">Current</SelectItem>
-              <SelectItem value="window_open">Window open</SelectItem>
-              <SelectItem value="window_closing">Window closing</SelectItem>
+              <SelectItem value="window_open">Renewal due</SelectItem>
+              <SelectItem value="window_closing">Renewal urgent</SelectItem>
               <SelectItem value="expired">Expired</SelectItem>
               <SelectItem value="pending_first_upload">Pending upload</SelectItem>
             </SelectContent>
@@ -2583,24 +2583,24 @@ function CertVesselFilters({
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vesselClassFilter">Class tracking</Label>
+          <Label htmlFor="vesselClassFilter">Certificate type</Label>
           <Select value={classFilter} onValueChange={setClassFilter}>
             <SelectTrigger id="vesselClassFilter"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All rows</SelectItem>
-              <SelectItem value="class">Class tracked</SelectItem>
-              <SelectItem value="non_class">Non-class</SelectItem>
+              <SelectItem value="all">All certificates</SelectItem>
+              <SelectItem value="class">Class certificates</SelectItem>
+              <SelectItem value="non_class">Other certificates</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="vesselPdfFilter">PDF</Label>
+          <Label htmlFor="vesselPdfFilter">Certificate file</Label>
           <Select value={pdfFilter} onValueChange={setPdfFilter}>
             <SelectTrigger id="vesselPdfFilter"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All PDFs</SelectItem>
-              <SelectItem value="missing">Missing PDF</SelectItem>
-              <SelectItem value="attached">Attached PDF</SelectItem>
+              <SelectItem value="all">All files</SelectItem>
+              <SelectItem value="missing">File missing</SelectItem>
+              <SelectItem value="attached">File attached</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2615,7 +2615,7 @@ function CertVesselSectionAccordion({ section, imo, defaultOpen }: { section: Ce
       <summary className="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-neutral-900">{section.displayName}</h2>
-          <p className="text-sm text-neutral-500">{section.activeTrackedItemCount} active tracked items</p>
+          <p className="text-sm text-neutral-500">{section.activeTrackedItemCount} active certificates</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries(section.statusBreakdown).map(([status, count]) => (
@@ -2638,7 +2638,7 @@ function CertVesselSectionAccordion({ section, imo, defaultOpen }: { section: Ce
                   <th className="px-3 py-3">Expiry date</th>
                   <th className="px-3 py-3">Days</th>
                   <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Validity</th>
+                  <th className="px-3 py-3">Valid for</th>
                   <th className="px-3 py-3">Action</th>
                 </tr>
               </thead>
@@ -2675,7 +2675,7 @@ function CertVesselTableRow({ item, imo }: { item: CertTrackedItem; imo: string 
       <td className="px-3 py-3 text-neutral-700">{formatExpiry(item)}</td>
       <td className="px-3 py-3 text-neutral-700">{item.daysToGo ?? 'Permanent'}</td>
       <td className="px-3 py-3"><CertStatusBadge status={item.status} /></td>
-      <td className="px-3 py-3 text-neutral-700">{item.validityShortCode ?? item.validityType ?? 'n/a'}</td>
+      <td className="px-3 py-3 text-neutral-700">{formatCertificateValidity(item)}</td>
       <td className="px-3 py-3">
         <Button asChild size="sm" variant="outline">
           <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id)}>{actionLabel(item)}</Link>
@@ -2702,7 +2702,7 @@ function CertVesselItemCard({ item, imo }: { item: CertTrackedItem; imo: string 
           <div><span className="text-neutral-500">Issued by: </span>{item.issuingAuthority ?? 'Not set'}</div>
           <div><span className="text-neutral-500">Expiry: </span>{formatExpiry(item)}</div>
           <div><span className="text-neutral-500">Days: </span>{item.daysToGo ?? 'Permanent'}</div>
-          <div><span className="text-neutral-500">Validity: </span>{item.validityShortCode ?? item.validityType ?? 'n/a'}</div>
+          <div><span className="text-neutral-500">Valid for: </span>{formatCertificateValidity(item)}</div>
         </div>
         <div className="flex flex-wrap gap-2">
           {item.pdfMissing ? <Badge variant="destructive">Certificates missing</Badge> : null}
@@ -3795,9 +3795,8 @@ function CertTrackedItemHeader({ item, imo }: { item: CertTrackedItemDetail; imo
           <div className="space-y-3">
             <div>
               <div className="mb-2 flex flex-wrap gap-2">
-                <Badge variant="secondary">{item.catalogCode ?? 'Catalog code not set'}</Badge>
+                {item.catalogCode ? <Badge variant="secondary">Certificate code {item.catalogCode}</Badge> : null}
                 {item.type ? <Badge variant="info">{formatStatus(item.type)}</Badge> : null}
-                {item.submissionScope ? <Badge variant="secondary">{formatStatus(item.submissionScope)}</Badge> : null}
               </div>
               <h1 className="text-2xl font-semibold text-neutral-900">
                 {item.displayName ?? item.catalogDisplayName ?? item.catalogCode ?? 'Certificate'}
@@ -3886,7 +3885,7 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
   const [placeOfIssue, setPlaceOfIssue] = useState(item.placeOfIssue ?? '');
   const [issueDate, setIssueDate] = useState(item.issueDate ?? '');
   const [expiryDate, setExpiryDate] = useState(item.expiryDate ?? '');
-  const [reason, setReason] = useState('Metadata corrected after OCR review.');
+  const [reason, setReason] = useState('Certificate details corrected after review.');
   const [formError, setFormError] = useState('');
   const hierarchyRows = [
     ['Parent', item.parentId ? formatEntityLabel(item.parentId, 'Parent certificate') : 'Top-level certificate'],
@@ -3911,7 +3910,7 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
     setPlaceOfIssue(item.placeOfIssue ?? '');
     setIssueDate(item.issueDate ?? '');
     setExpiryDate(item.expiryDate ?? '');
-    setReason('Metadata corrected after OCR review.');
+    setReason('Certificate details corrected after review.');
     setFormError('');
     setIsEditing(false);
   };
@@ -3925,7 +3924,7 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
       return;
     }
     if (!trimmedReason) {
-      setFormError('Reason is required for the audit trail.');
+      setFormError('Please enter a reason for the change.');
       return;
     }
     setFormError('');
@@ -3949,7 +3948,7 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle>Metadata</CardTitle>
+        <CardTitle>Certificate details</CardTitle>
         {canEdit ? (
           <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing((current) => !current)}>
             {isEditing ? 'Close edit' : 'Edit'}
@@ -3987,8 +3986,8 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
                 />
               </div>
               <div className="space-y-2">
-                <Label>Validity</Label>
-                <Input value={item.validityType ? formatStatus(item.validityType) : 'Not set'} disabled />
+                <Label>Valid for</Label>
+                <Input value={formatCertificateValidity(item)} disabled />
               </div>
             </div>
             <div className="space-y-2">
@@ -3999,7 +3998,7 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
             {updateMetadata.isError ? <p className="text-sm text-error-700">{getErrorMessage(updateMetadata.error)}</p> : null}
             <div className="flex flex-wrap gap-2">
               <Button type="submit" disabled={updateMetadata.isPending}>
-                Save metadata
+                Save details
               </Button>
               <Button type="button" variant="outline" onClick={resetMetadataForm} disabled={updateMetadata.isPending}>
                 Cancel
@@ -4012,31 +4011,37 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
               ['Certificate number', item.certificateNumber ?? 'Not set'],
               ['Issuing authority', item.issuingAuthority ?? 'Not set'],
               ['Place of issue', item.placeOfIssue ?? 'Not set'],
-              ['Validity', item.validityType ? formatStatus(item.validityType) : 'Not set'],
-              ['Form variant', item.formVariant ?? 'n/a'],
-              ['Source', item.source ? formatStatus(item.source) : 'Not set'],
+              ['Valid for', formatCertificateValidity(item)],
             ]}
           />
         )}
         <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Dates</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Important dates</h2>
           <CertDetailGrid
             rows={[
               ['Issue date', formatDate(item.issueDate)],
               ['Expiry date', formatExpiry(item)],
-              ['Anniversary date', formatDate(item.anniversaryDate)],
-              ['Window open', formatDate(item.windowOpen)],
-              ['Window close', formatDate(item.windowClose)],
-              ['Last done', formatDate(item.lastDoneDate)],
+              ['Renewal starts', formatDate(item.windowOpen)],
+              ['Renewal deadline', formatDate(item.windowClose)],
               ['Next due', formatDate(item.nextDueDate)],
-              ['Postponed until', formatDate(item.postponedUntil)],
             ]}
           />
         </div>
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Hierarchy</h2>
-          <CertDetailGrid rows={hierarchyRows} />
-        </div>
+        <details className="rounded-md border border-neutral-200 bg-neutral-50/60">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-neutral-700">More details</summary>
+          <div className="space-y-4 border-t border-neutral-200 p-3">
+            <CertDetailGrid
+              rows={[
+                ['Anniversary date', formatDate(item.anniversaryDate)],
+                ['Last completed', formatDate(item.lastDoneDate)],
+                ['Postponed until', formatDate(item.postponedUntil)],
+                ['Certificate family', item.formVariant ?? 'n/a'],
+                ['Source', item.source ? formatStatus(item.source) : 'Not set'],
+              ]}
+            />
+            <CertDetailGrid rows={hierarchyRows} />
+          </div>
+        </details>
         {item.extensionAuthority || item.extensionReason || item.extensionLetterPdfId ? (
           <div>
             <h2 className="mb-3 text-sm font-semibold uppercase text-neutral-500">Extension</h2>
@@ -4106,7 +4111,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
   return (
     <Card>
       <CardHeader>
-        <CardTitle>PDF Preview</CardTitle>
+        <CardTitle>Certificate file</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex min-h-56 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
@@ -4122,8 +4127,8 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
           ) : (
             <div className="space-y-2">
               <FileText className="mx-auto h-8 w-8 text-neutral-400" aria-hidden="true" />
-              <p className="font-medium text-neutral-900">No active PDF on file</p>
-              <p className="text-sm text-neutral-600">{item.pdfMissing ? 'Certificate missing is marked for this row.' : 'No certificate version has been uploaded yet.'}</p>
+              <p className="font-medium text-neutral-900">No active certificate file</p>
+              <p className="text-sm text-neutral-600">{item.pdfMissing ? 'This certificate is marked as missing.' : 'No certificate file has been uploaded yet.'}</p>
             </div>
           )}
         </div>
@@ -4133,19 +4138,19 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
               <DialogTrigger asChild>
                 <Button type="button" variant="outline">
                   <UploadCloud className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Upload new PDF
+                  Upload certificate
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <form className="space-y-4" onSubmit={handleUploadSubmit}>
                   <DialogHeader>
-                    <DialogTitle>Upload certificate PDF</DialogTitle>
+                    <DialogTitle>Upload certificate</DialogTitle>
                     <DialogDescription>
-                      Attach the scanned certificate PDF and record the reason for the audit trail.
+                      Attach the scanned certificate file and add a short reason for the change.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-2">
-                    <Label htmlFor={`trackedItemPdfUpload-${item.id}`}>Certificate PDF</Label>
+                    <Label htmlFor={`trackedItemPdfUpload-${item.id}`}>Certificate file</Label>
                     <Input
                       id={`trackedItemPdfUpload-${item.id}`}
                       type="file"
@@ -4159,7 +4164,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
                       id={`trackedItemPdfReason-${item.id}`}
                       value={uploadReason}
                       onChange={(event) => setUploadReason(event.target.value)}
-                      placeholder="Uploading renewed certificate PDF."
+                      placeholder="Uploading renewed certificate."
                     />
                   </div>
                   {uploadMutation.error ? (
@@ -4172,7 +4177,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
                       </Button>
                     </DialogClose>
                     <Button type="submit" disabled={!uploadFile || uploadMutation.isPending}>
-                      {uploadMutation.isPending ? 'Uploading...' : 'Upload PDF'}
+                      {uploadMutation.isPending ? 'Uploading...' : 'Upload certificate'}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -4183,15 +4188,15 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
                 <DialogTrigger asChild>
                   <Button type="button" variant="outline">
                     <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Remove PDF
+                    Remove file
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <form className="space-y-4" onSubmit={handleRemoveSubmit}>
                     <DialogHeader>
-                      <DialogTitle>Remove active PDF</DialogTitle>
+                      <DialogTitle>Remove active certificate file</DialogTitle>
                       <DialogDescription>
-                        Remove the currently active PDF from this certificate and record the reason for the audit trail.
+                        Remove the currently active certificate file and add a short reason for the change.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm">
@@ -4206,7 +4211,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
                         id={`trackedItemPdfRemoveReason-${item.id}`}
                         value={removeReason}
                         onChange={(event) => setRemoveReason(event.target.value)}
-                        placeholder="Wrong certificate PDF uploaded."
+                        placeholder="Wrong certificate file uploaded."
                       />
                     </div>
                     {removeMutation.error ? (
@@ -4219,7 +4224,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
                         </Button>
                       </DialogClose>
                       <Button type="submit" variant="destructive" disabled={!removeReason.trim() || removeMutation.isPending}>
-                        {removeMutation.isPending ? 'Removing...' : 'Remove PDF'}
+                        {removeMutation.isPending ? 'Removing...' : 'Remove file'}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -4231,7 +4236,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
         <div className="space-y-2">
           <h2 className="text-sm font-semibold uppercase text-neutral-500">Version history</h2>
           {item.pdfVersions.length === 0 ? (
-            <p className="text-sm text-neutral-600">No PDF versions recorded.</p>
+            <p className="text-sm text-neutral-600">No certificate files recorded.</p>
           ) : (
             <div className="space-y-2">
               {item.pdfVersions.map((pdf) => (
@@ -4278,7 +4283,7 @@ function CertTrackedItemWorkflowPanel({
   const mutationError = submitMutation.error ?? approveMutation.error ?? rejectMutation.error;
 
   const transitionPayload = () => ({
-    reason: reason.trim() || 'Phase 2.6 tracked-item detail workflow action.',
+    reason: reason.trim() || 'Certificate workflow action.',
     version: item.version,
   });
 
@@ -4307,7 +4312,7 @@ function CertTrackedItemWorkflowPanel({
               id="trackedItemTransitionReason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Reason for audit trail"
+              placeholder="Reason for change"
             />
             {mutationError ? <p className="text-sm text-error-700">{getErrorMessage(mutationError)}</p> : null}
             <div className="flex flex-wrap gap-2">
@@ -6135,6 +6140,22 @@ function formatExpiry(item: CertTrackedItem): string {
     return 'Permanent';
   }
   return formatDate(item.expiryDate);
+}
+
+function formatCertificateValidity(item: CertTrackedItem): string {
+  if (item.validityShortCode) {
+    return item.validityShortCode;
+  }
+  if (item.validityType === 'permanent') {
+    return 'Permanent';
+  }
+  if (item.validityType === 'conditional') {
+    return 'Survey based';
+  }
+  if (item.validityType === 'full') {
+    return 'Fixed expiry';
+  }
+  return item.validityType ? formatStatus(item.validityType) : 'n/a';
 }
 
 function formatShipType(value: string | null | undefined): string {

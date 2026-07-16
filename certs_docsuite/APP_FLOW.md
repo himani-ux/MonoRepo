@@ -205,7 +205,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - Header card: vessel name + IMO + flag + class society + ship type + current Master at top. "Last class snapshot uploaded N days ago" with link to `/certs/reconciliation` filtered to this vessel. Mandatory-coverage % (D-CERT-119) with override banner if applicable.
 - Section accordion (9 sections, D-CERT-017): each section header shows section_name + active TrackedItem count + status-band breakdown badges (per D-CERT-136).
 - Per-section table: expanded by default for sections with action items (overdue / window_open / window_closing); collapsed for healthy sections.
-- Per-row columns: `display_name`, `certificate_number`, `issuing_authority`, `issue_date`, `expiry_date` ("Permanent" if applicable), `days_to_go` (computed), status pill (color+shape per D-CERT-135), validity short code (D-CERT-132), action button (Renew / Acknowledge / Upload).
+- Per-row columns use user-facing certificate language: Certificate, Cert number, Issued by, Issue date, Expiry date, Days, Status, Valid for, and Action. Internal labels such as tracked item, PDF, validity type, and class-tracked are not shown on the normal vessel dashboard; where needed they are translated to certificate-focused wording such as certificate file, fixed expiry, survey based, or class certificates.
 - Toolbar: "Print this vessel" (D-CERT-140 per-vessel scope), "Share bundle" (Master self / DPA / FM only per D-CERT-142), "Upload class snapshot" (DPA / FM / Sup'tts), filter chips (status / section / `is_class_tracked` / `pdf_missing`).
 
 **Surfaces (FIELD_MAP):**
@@ -232,14 +232,14 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout (3-column desktop / stacked tablet):**
 - **Left col — Cert metadata:**
-  - Identity: catalog_code (display_name + canonical_code), certificate_number (with bypass per D-CERT-105 / FEAT-CERT-OCR-003), issuing_authority, place_of_issue, validity_type, form_variant (if IOPP-style per D-CERT-032). Users with TrackedItem write permission can use **Edit** in the Metadata card to manually correct OCR-filled certificate number, issuing authority, place of issue, issue date, and expiry date with an audit reason.
+  - Identity: display name, certificate number (with bypass per D-CERT-105 / FEAT-CERT-OCR-003), issuing authority, place of issue, and user-facing validity wording. Users with TrackedItem write permission can use **Edit** in the Certificate details card to manually correct certificate number, issuing authority, place of issue, issue date, and expiry date with a short change reason. Technical hierarchy/source details are collapsed under **More details**.
   - Dates: issue_date, expiry_date (or "Permanent"), anniversary_date (read-only; DPA-edit only via separate confirm flow), window_open/close (computed, read-only with tooltip "Computed from anniversary + cadence per D-CERT-063"), last_done_date, next_due_date, postponed_until.
   - Status pill (D-CERT-135/136 color+shape) + days_to_go.
   - Hierarchy: parent breadcrumb (D-CERT-010 2-level UI cap); child rows list (STC, extensions, dispensations, sub-surveys).
-- **Middle col — PDF preview:**
-  - Active PDF embedded (with download button).
-  - Version history tray (D-CERT-019/020): previous PDFs with `superseded_at` timestamps; deleted-pending blobs grayed out (7-day grace per D-CERT-021).
-  - Upload new PDF button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015).
+- **Middle col — Certificate file:**
+  - Active certificate file embedded (with download button).
+  - Version history tray (D-CERT-019/020): previous files with `superseded_at` timestamps; deleted-pending blobs grayed out (7-day grace per D-CERT-021).
+  - Upload certificate button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015).
 - **Right col — Workflow + audit:**
   - Approval state pill (`draft / pending_master_approval / approved / rejected`).
   - Submitted_by + submitted_at + approved_by + approved_at (when applicable).
