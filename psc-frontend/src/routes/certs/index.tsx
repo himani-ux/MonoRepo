@@ -56,6 +56,7 @@ import {
   useCatalogRow,
   useCatalogRowAuditHistory,
   useCatalogRows,
+  useCatalogRowsLazy,
   useCatalogSections,
   useBulkSoftDeleteCatalogRows,
   useCreateCatalogRow,
@@ -3570,7 +3571,7 @@ function CertClassMappingDialog({ flag, run }: { flag: CertReconciliationFlag; r
   const [certOrSurveyKind, setCertOrSurveyKind] = useState('renewal');
   const [notes, setNotes] = useState('');
   const [mappingReason, setMappingReason] = useState('');
-  const catalogRows = useCatalogRows({ isActive: true, q: catalogSearch || undefined });
+  const catalogRows = useCatalogRows({ isActive: true, q: catalogSearch || undefined, page: 1, pageSize: 30 });
   const addMapping = useAddClassCodeMappingForFlag(run.id);
   const classExtract = normalizeRecord(flag.classRowExtract);
   const classCode = formatUnknown(
@@ -5642,13 +5643,25 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
   const [bulkReasonError, setBulkReasonError] = useState('');
   const inlinePromotion = getInlinePromotionContext(location.search);
   const sections = useCatalogSections();
-  const rows = useCatalogRows({
+  const rows = useCatalogRowsLazy({
     sectionId: selectedSectionId,
     isActive: true,
     q: filter,
     applicableShipType: applicableShipTypeFilter || null,
-  });
+  }, 50);
   const bulkSoftDeleteMutation = useBulkSoftDeleteCatalogRows();
+  const loadedCatalogRows = rows.data?.pages.flatMap((page) => page.results) ?? [];
+  const catalogTotalCount = rows.data?.pages[0]?.count ?? 0;
+
+  useEffect(() => {
+    if (!rows.hasNextPage || rows.isFetchingNextPage || rows.isLoading) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      void rows.fetchNextPage();
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [rows.dataUpdatedAt, rows.fetchNextPage, rows.hasNextPage, rows.isFetchingNextPage, rows.isLoading]);
 
   const toggleBulkRow = (rowId: string, selected: boolean) => {
     setSelectedBulkIds((current) => {
@@ -5812,18 +5825,25 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
             {isCreating ? (
               <CertCatalogCreateForm
                 onCancel={() => setIsCreating(false)}
-                parentOptions={getParentOptions(rows.data?.results ?? [])}
+                parentOptions={getParentOptions(loadedCatalogRows)}
                 inlinePromotion={inlinePromotion}
               />
             ) : null}
-            {rowId ? <CertCatalogDetail rowId={rowId} catalogRows={rows.data?.results ?? []} /> : null}
-            {rows.data && rows.data.results.length > 0 ? (
-              <CertCatalogTable
-                rows={rows.data.results}
-                canSelect={canBulkActionCatalog}
-                selectedIds={selectedBulkIds}
-                onToggleRow={toggleBulkRow}
-              />
+            {rowId ? <CertCatalogDetail rowId={rowId} catalogRows={loadedCatalogRows} /> : null}
+            {loadedCatalogRows.length > 0 ? (
+              <div className="space-y-2">
+                <CertCatalogTable
+                  rows={loadedCatalogRows}
+                  canSelect={canBulkActionCatalog}
+                  selectedIds={selectedBulkIds}
+                  onToggleRow={toggleBulkRow}
+                />
+                {rows.isFetchingNextPage ? (
+                  <p className="text-sm text-neutral-500">
+                    Loading more catalog rows... {loadedCatalogRows.length} of {catalogTotalCount}
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <Card>
                 <CardContent className="p-6 text-center text-sm text-neutral-600">

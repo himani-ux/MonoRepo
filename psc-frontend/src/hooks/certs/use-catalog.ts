@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   certsApi,
@@ -11,6 +11,7 @@ export const certCatalogKeys = {
   all: ['certs', 'catalog'] as const,
   sections: () => [...certCatalogKeys.all, 'sections'] as const,
   rows: (filters: CertCatalogRowFilters) => [...certCatalogKeys.all, 'rows', filters] as const,
+  rowsLazy: (filters: CertCatalogRowFilters, pageSize: number) => [...certCatalogKeys.all, 'rows-lazy', filters, pageSize] as const,
   detail: (id: string) => [...certCatalogKeys.all, 'row', id] as const,
   auditHistory: (id: string) => [...certCatalogKeys.all, 'row', id, 'audit'] as const,
 };
@@ -27,6 +28,20 @@ export function useCatalogRows(filters: CertCatalogRowFilters = {}) {
   return useQuery({
     queryKey: certCatalogKeys.rows(filters),
     queryFn: () => certsApi.getCatalogRows(filters),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCatalogRowsLazy(filters: CertCatalogRowFilters = {}, pageSize = 50) {
+  return useInfiniteQuery({
+    queryKey: certCatalogKeys.rowsLazy(filters, pageSize),
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => certsApi.getCatalogRows({ ...filters, page: Number(pageParam), pageSize }),
+    getNextPageParam: (lastPage) => {
+      const currentPage = lastPage.page ?? 1;
+      const currentPageSize = lastPage.pageSize ?? pageSize;
+      return currentPage * currentPageSize < lastPage.count ? currentPage + 1 : undefined;
+    },
     staleTime: 60 * 1000,
   });
 }

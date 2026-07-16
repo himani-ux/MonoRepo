@@ -71,6 +71,8 @@ JSON_COLUMNS = {"applicable_ship_types", "specific_vessel_ids", "alert_lead_over
 @dataclass(frozen=True)
 class CatalogRowPage:
     count: int
+    page: int | None
+    page_size: int | None
     results: list[dict[str, Any]]
 
 
@@ -135,6 +137,8 @@ class CatalogRepository:
         is_active: bool | None = None,
         q: str | None = None,
         applicable_ship_type: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> CatalogRowPage:
         where: list[str] = []
         params: list[Any] = []
@@ -154,6 +158,15 @@ class CatalogRepository:
             params.extend(['%"all"%', f'%"{applicable_ship_type}"%'])
 
         where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        safe_page = max(1, int(page)) if page is not None else None
+        safe_page_size = min(max(1, int(page_size)), 100) if page_size is not None else None
+        order_sql = "ORDER BY s.sort_order, r.print_order, r.display_name"
+        page_sql = ""
+        page_params: list[Any] = []
+        if safe_page is not None and safe_page_size is not None:
+            page_sql = " OFFSET %s ROWS FETCH NEXT %s ROWS ONLY"
+            page_params = [(safe_page - 1) * safe_page_size, safe_page_size]
+
         with connection.cursor() as cursor:
             cursor.execute(
                 f"SELECT COUNT(*) FROM dbo.vims_certs_catalog_row r {where_sql}",
@@ -161,10 +174,15 @@ class CatalogRepository:
             )
             count = int(cursor.fetchone()[0])
             cursor.execute(
-                _row_select_sql(where_sql) + " ORDER BY s.sort_order, r.print_order, r.display_name",
-                params,
+                _row_select_sql(where_sql) + f" {order_sql}{page_sql}",
+                [*params, *page_params],
             )
-            return CatalogRowPage(count=count, results=_fetch_all(cursor))
+            return CatalogRowPage(
+                count=count,
+                page=safe_page,
+                page_size=safe_page_size,
+                results=_fetch_all(cursor),
+            )
 
     def get_row(self, catalog_id: str) -> dict[str, Any] | None:
         with connection.cursor() as cursor:

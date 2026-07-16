@@ -149,7 +149,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout:**
 - Section sidebar (9 sections, D-CERT-017): each shows count of active rows.
-- Main area: filterable table of catalog rows. Visible columns are Code, Name, Validity, Ship types, and Status. Select is shown only when bulk actions are available. Cadence and submission scope remain available on catalog row detail/edit surfaces but are not repeated in the list table.
+- Main area: filterable table of catalog rows. Visible columns are Code, Name, Validity, Ship types, and Status. Select is shown only when bulk actions are available. The first 50 rows load immediately, then later pages append in the background so the screen does not block on the full catalog. Cadence and submission scope remain available on catalog row detail/edit surfaces but are not repeated in the list table.
 - Toolbar: "Add row" (DPA), "Bulk soft-delete" (DPA, capped at 50 rows + reason per D-CERT-092 / FEAT-CERT-CAT-019), "Bulk push to fleet" (DPA, auto-creates `pending_first_upload` rows on every active vessel per D-CERT-092 / FEAT-CERT-RBAC-026), "Anniversary recompute" (DPA + FM 2nd approver per D-CERT-092 / FEAT-CERT-RBAC-025), "Export catalog CSV" (DPA).
 - Inline indicators: `parent_id` shown as indented child rows (UI 2-level cap per D-CERT-010); `parent_supports_dynamic_children: true` flag visible (D-CERT-035); IWS age-gate flag visible (D-CERT-034); `retain_all_versions: true` flag visible (D-CERT-039).
 

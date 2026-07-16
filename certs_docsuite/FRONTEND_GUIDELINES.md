@@ -259,6 +259,7 @@ Use `<embed>` or `<object>` for inline PDF preview. Fallback to native viewer li
 
 - Code-split per route via TanStack Router lazy imports.
 - Reconciliation review tabs: virtualize long flag lists (>50 rows) with `react-window` or equivalent.
+- Catalog Admin: fetch catalog rows with `page/pageSize`; render the first page before loading later pages in the background.
 - Audit log table: server-side pagination 25 rows; never load full table client-side.
 - Print artifact list: server-side pagination 25 rows.
 - PDF preview: lazy-load (`loading="lazy"` on embed) until row expanded.

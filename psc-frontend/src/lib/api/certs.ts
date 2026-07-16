@@ -59,6 +59,8 @@ export interface CertCatalogRow {
 
 export interface CertCatalogRowsResponse {
   count: number;
+  page: number | null;
+  pageSize: number | null;
   results: CertCatalogRow[];
 }
 
@@ -955,6 +957,8 @@ export interface CertCatalogRowFilters {
   isActive?: boolean | null;
   q?: string;
   applicableShipType?: string | null;
+  page?: number | null;
+  pageSize?: number | null;
 }
 
 export type CertPrintScope = 'per_vessel_full' | 'per_vessel_partial' | 'per_section_fleetwide' | 'custom_selection' | 'share_bundle' | 'audit_log_export';
@@ -1024,6 +1028,8 @@ function buildParams(filters: CertCatalogRowFilters): URLSearchParams {
   if (filters.applicableShipType) {
     params.set('applicableShipType', filters.applicableShipType);
   }
+  appendIfPresent(params, 'page', filters.page);
+  appendIfPresent(params, 'pageSize', filters.pageSize);
   return params;
 }
 

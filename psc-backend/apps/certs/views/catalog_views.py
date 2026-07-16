@@ -44,6 +44,8 @@ class CatalogRowListCreateView(CatalogWritePermissionMixin, generics.GenericAPIV
     def get(self, request, *args, **kwargs):
         section_id = request.query_params.get("sectionId")
         is_active = request.query_params.get("isActive")
+        page_number = _parse_positive_int(request.query_params.get("page"), default=None, maximum=None)
+        page_size = _parse_positive_int(request.query_params.get("pageSize"), default=None, maximum=100)
         applicable_ship_type = request.query_params.get("applicableShipType") or None
         if applicable_ship_type:
             applicable_ship_type = applicable_ship_type.strip().lower()
@@ -57,10 +59,14 @@ class CatalogRowListCreateView(CatalogWritePermissionMixin, generics.GenericAPIV
             is_active=_parse_bool(is_active) if is_active not in (None, "") else None,
             q=request.query_params.get("q") or None,
             applicable_ship_type=applicable_ship_type,
+            page=page_number,
+            page_size=page_size,
         )
         return Response(
             {
                 "count": page.count,
+                "page": page.page,
+                "pageSize": page.page_size,
                 "results": [serialize_catalog_row(row) for row in page.results],
             }
         )
@@ -245,6 +251,19 @@ def _parse_bool(value: str | None) -> bool | None:
     if value is None:
         return None
     return value.strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _parse_positive_int(value: str | None, *, default: int | None, maximum: int | None) -> int | None:
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(str(value))
+    except (TypeError, ValueError):
+        return default
+    parsed = max(1, parsed)
+    if maximum is not None:
+        parsed = min(parsed, maximum)
+    return parsed
 
 
 def _hard_purge_catalog_row(request, catalog_id: str) -> Response:
