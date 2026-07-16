@@ -361,7 +361,7 @@ function CertOfficeVesselListCard() {
                     <div className="flex flex-wrap gap-2 text-xs">
                       <span className="rounded-md bg-neutral-100 px-2 py-1 text-neutral-700">{vessel.trackedItemCount} tracked</span>
                       <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700">{vessel.actionItemCount} action</span>
-                      <span className="rounded-md bg-red-50 px-2 py-1 text-red-700">{vessel.pdfMissingCount} PDF missing</span>
+                      <span className="rounded-md bg-red-50 px-2 py-1 text-red-700">{vessel.pdfMissingCount} Certificates missing</span>
                     </div>
                   </div>
                   <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -2497,7 +2497,7 @@ function CertVesselKpis({ data }: { data: CertVesselDashboardResponse }) {
   const kpis = [
     { label: 'Tracked items', value: data.summary.totalTrackedItems },
     { label: 'Action items', value: data.summary.actionItemCount },
-    { label: 'PDF missing', value: data.summary.pdfMissingCount },
+    { label: 'Certificates missing', value: data.summary.pdfMissingCount },
     { label: 'Class tracked', value: data.summary.classTrackedCount },
   ];
   return (
@@ -2665,7 +2665,7 @@ function CertVesselTableRow({ item, imo }: { item: CertTrackedItem; imo: string 
         <div className="mt-1 flex flex-wrap gap-1">
           {item.shortName ? <Badge variant="secondary">{item.shortName}</Badge> : null}
           {item.approvalState && item.approvalState !== 'approved' ? <Badge variant="warning">{formatStatus(item.approvalState)}</Badge> : null}
-          {item.pdfMissing ? <Badge variant="destructive">PDF missing</Badge> : null}
+          {item.pdfMissing ? <Badge variant="destructive">Certificates missing</Badge> : null}
         </div>
       </td>
       <td className="px-3 py-3 text-neutral-700">{item.certificateNumber ?? 'Not set'}</td>
@@ -2704,7 +2704,7 @@ function CertVesselItemCard({ item, imo }: { item: CertTrackedItem; imo: string 
           <div><span className="text-neutral-500">Validity: </span>{item.validityShortCode ?? item.validityType ?? 'n/a'}</div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {item.pdfMissing ? <Badge variant="destructive">PDF missing</Badge> : null}
+          {item.pdfMissing ? <Badge variant="destructive">Certificates missing</Badge> : null}
           {item.approvalState && item.approvalState !== 'approved' ? <Badge variant="warning">{formatStatus(item.approvalState)}</Badge> : null}
           <Button asChild size="sm" variant="outline">
             <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id)}>{actionLabel(item)}</Link>
@@ -3808,7 +3808,7 @@ function CertTrackedItemHeader({ item, imo }: { item: CertTrackedItemDetail; imo
             <div className="flex flex-wrap gap-2">
               <CertStatusBadge status={item.status} />
               {item.approvalState ? <Badge variant={statusBadgeVariant(item.approvalState)}>{formatStatus(item.approvalState)}</Badge> : null}
-              {item.pdfMissing ? <Badge variant="destructive">PDF missing</Badge> : null}
+              {item.pdfMissing ? <Badge variant="destructive">Certificates missing</Badge> : null}
               {item.lifecycleStatus ? <Badge variant="secondary">{formatStatus(item.lifecycleStatus)}</Badge> : null}
             </div>
           </div>
@@ -3836,7 +3836,7 @@ function CertTrackedItemSpecialBanners({ item, imo }: { item: CertTrackedItemDet
     banners.push({
       key: 'pdf-missing',
       variant: 'destructive',
-      content: 'PDF not on file. Request copy from issuer.',
+      content: 'Certificate not on file. Request copy from issuer.',
     });
   }
   if (item.approvalState === 'rejected') {
@@ -4004,7 +4004,7 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
             <div className="space-y-2">
               <FileText className="mx-auto h-8 w-8 text-neutral-400" aria-hidden="true" />
               <p className="font-medium text-neutral-900">No active PDF on file</p>
-              <p className="text-sm text-neutral-600">{item.pdfMissing ? 'PDF missing is marked for this row.' : 'No PDF version has been uploaded yet.'}</p>
+              <p className="text-sm text-neutral-600">{item.pdfMissing ? 'Certificate missing is marked for this row.' : 'No certificate version has been uploaded yet.'}</p>
             </div>
           )}
         </div>
