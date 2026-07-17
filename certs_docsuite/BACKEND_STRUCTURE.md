@@ -615,8 +615,8 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | GET | `/api/certs/catalog/sections/` | (read-any-Cert) | All Certs roles | List 9 sections |
 | GET | `/api/certs/catalog/rows/` | (read-any-Cert) | All Certs roles | Supports `sectionId`, `isActive`, `q`, `applicableShipType`, `page`, `pageSize`; `pageSize` is capped at 100 and implemented with SQL `OFFSET/FETCH` |
 | GET | `/api/certs/catalog/rows/<catalog_id>/` | (read-any-Cert) | All Certs roles | Detail |
-| POST | `/api/certs/catalog/rows/` | CERT_P_001 + CERT_P_008 | DPA + System Admin | Create row |
-| PATCH | `/api/certs/catalog/rows/<catalog_id>/` | CERT_P_008 | DPA + System Admin | Update |
+| POST | `/api/certs/catalog/rows/` | CERT_P_001 + CERT_P_008 | DPA + System Admin | Create row; rejects `submission_scope = master_only` per D-CERT-199 |
+| PATCH | `/api/certs/catalog/rows/<catalog_id>/` | CERT_P_008 | DPA + System Admin | Update; rejects `submission_scope = master_only` per D-CERT-199 |
 | POST | `/api/certs/catalog/rows/<catalog_id>/deprecate/` | CERT_P_008 | DPA | Soft-delete (is_active=false) |
 | DELETE | `/api/certs/catalog/rows/<catalog_id>/` | CERT_P_008 + CERT_P_009 | DPA | Hard purge with cascade |
 | POST | `/api/certs/catalog/rows/bulk-soft-delete/` | CERT_P_009 | DPA | Cap 50, reason required |

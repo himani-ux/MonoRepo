@@ -5160,7 +5160,7 @@ function CertCatalogCreateForm({
   const [validityType, setValidityType] = useState('full');
   const [cadenceMonths, setCadenceMonths] = useState(60);
   const [issuingAuthorityType, setIssuingAuthorityType] = useState('flag');
-  const [submissionScope, setSubmissionScope] = useState('master_only');
+  const [submissionScope, setSubmissionScope] = useState('all_ranks_with_approval');
   const [parentId, setParentId] = useState('none');
   const [applicableShipTypes, setApplicableShipTypes] = useState<string[]>(['all']);
   const [applicabilityMode, setApplicabilityMode] = useState('all_matching_type');

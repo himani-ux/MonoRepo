@@ -11,6 +11,7 @@ from apps.certs.iopp_variant import IOPP_VARIANT_CATALOG_ERROR, is_iopp_variant_
 VALIDITY_TYPES = {"full", "conditional", "short_term", "permanent"}
 ISSUING_AUTHORITY_TYPES = {"flag", "class", "RO", "manufacturer", "company", "ko_other"}
 SUBMISSION_SCOPES = {"master_only", "all_ranks_with_approval"}
+MASTER_ONLY_SCOPE_ERROR = "New and edited catalog rows must use all_ranks_with_approval under D-CERT-199."
 APPLICABILITY_MODES = {"all_matching_type", "specific_vessel_ids"}
 SHIP_TYPES = ("all", "bulk_carrier", "tanker", "container", "gas_carrier", "chemical_tanker")
 SHIP_TYPE_SET = set(SHIP_TYPES)
@@ -86,6 +87,8 @@ class CatalogRowWriteSerializer(serializers.Serializer):
             missing = [field for field in self.create_required_fields if field not in attrs]
             if missing:
                 raise serializers.ValidationError({field: "This field is required." for field in missing})
+        if attrs.get("submissionScope") == "master_only":
+            raise serializers.ValidationError({"submissionScope": MASTER_ONLY_SCOPE_ERROR})
         if "canonicalCode" in attrs and is_iopp_variant_catalog_code(attrs["canonicalCode"]):
             raise serializers.ValidationError({"canonicalCode": IOPP_VARIANT_CATALOG_ERROR})
         if attrs.get("parentSupportsDynamicChildren") and is_portable_rollup_catalog_row(attrs):

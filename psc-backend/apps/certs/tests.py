@@ -4,6 +4,7 @@ from django.urls import resolve, reverse
 from unittest import TestCase
 from unittest.mock import patch
 
+from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
 
@@ -34,6 +35,37 @@ class CatalogRepositoryPaginationTests(TestCase):
         self.assertEqual(page.results, [{"catalog_id": "catalog-1"}])
         self.assertIn("OFFSET %s ROWS FETCH NEXT %s ROWS ONLY", cursor.executed[1][0])
         self.assertEqual(cursor.executed[1][1][-2:], [25, 25])
+
+
+class CatalogRowSubmissionScopeTests(SimpleTestCase):
+    def test_catalog_row_create_rejects_master_only_under_all_rank_policy(self):
+        serializer = CatalogRowWriteSerializer(
+            data=_catalog_row_payload("master_only"),
+            context={"is_create": True},
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("submissionScope", serializer.errors)
+
+    def test_catalog_row_create_accepts_all_rank_policy(self):
+        serializer = CatalogRowWriteSerializer(
+            data=_catalog_row_payload("all_ranks_with_approval"),
+            context={"is_create": True},
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+
+def _catalog_row_payload(submission_scope: str) -> dict[str, object]:
+    return {
+        "canonicalCode": "TEST-CATALOG-ROW",
+        "sectionId": 2,
+        "displayName": "Test Catalog Row",
+        "printSectionLabel": "Statutory & Flag",
+        "validityType": "full",
+        "issuingAuthorityType": "flag",
+        "submissionScope": submission_scope,
+    }
 
 
 class _FakeCatalogCursor:

@@ -23,7 +23,7 @@
 
 ### 1.3 DPA (Designated Person Ashore)
 - **Daily:** Open `/certs` fleet dashboard → check expiring KPIs, mandatory-coverage banners, bouncing-email surface.
-- **Catalog edits:** `/certs/catalog` → add / deprecate / push to fleet. All audited.
+- **Catalog edits:** `/certs/catalog` → add / deprecate / push to fleet. New rows save as all-rank-with-Master-approval, and all changes are audited.
 - **Onboarding new vessel:** `/certs/onboarding` → start wizard → 7 steps. Use save-as-draft between batches; takes 2–4 hours per vessel total.
 - **Class status snapshot upload:** every 3 months per vessel. Open vessel → "Upload class snapshot" → select PDF → parser runs → review reconciliation panel.
 - **Provisioning external auditors:** `/certs/auditor-access` → "New grant" → set scope + expiry. System emails auditor a one-time signup link.

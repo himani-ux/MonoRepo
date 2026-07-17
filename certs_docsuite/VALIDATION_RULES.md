@@ -136,6 +136,8 @@ coverage_pct = (count of TrackedItems for vessel where catalog.mandatory_for_all
 
 All active Certs catalog rows now use `submission_scope = all_ranks_with_approval` (D-CERT-199). CO / CE / 2E uploads enter `pending_master_approval`; Master and office direct uploads are approved directly. Other onboard ranks remain read-only for uploads unless the backend sub-officer recognition list is expanded.
 
+Catalog add/edit rejects submitted `submission_scope = master_only`; DPA/System Admin catalog writes must save `all_ranks_with_approval` so newly added rows do not drift from D-CERT-199.
+
 ---
 
 ## 8. RBAC Guards (server-enforced)
