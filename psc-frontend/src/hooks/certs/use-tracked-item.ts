@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { certVesselDashboardKeys } from '@/hooks/certs/use-vessel-dashboard';
 import {
   certsApi,
+  type CertTrackedItemFilters,
   type CertTrackedItemMetadataUpdatePayload,
   type CertTrackedItemRemovePdfPayload,
   type CertTrackedItemUploadPdfPayload,
@@ -11,8 +12,18 @@ import {
 
 export const certTrackedItemKeys = {
   all: ['certs', 'tracked-items'] as const,
+  list: (filters: CertTrackedItemFilters) => [...certTrackedItemKeys.all, 'list', filters] as const,
   detail: (id: string) => [...certTrackedItemKeys.all, 'detail', id] as const,
 };
+
+export function useTrackedItems(filters: CertTrackedItemFilters = {}, enabled = true) {
+  return useQuery({
+    queryKey: certTrackedItemKeys.list(filters),
+    queryFn: () => certsApi.getTrackedItems(filters),
+    enabled,
+    staleTime: 60 * 1000,
+  });
+}
 
 export function useTrackedItemDetail(id: string | undefined) {
   return useQuery({
@@ -32,6 +43,7 @@ function useTrackedItemTransition(
   return useMutation({
     mutationFn,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: certTrackedItemKeys.all });
       queryClient.invalidateQueries({ queryKey: certTrackedItemKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: certVesselDashboardKeys.vessel(imo) });
     },

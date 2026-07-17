@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
+from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
 
 
@@ -35,6 +36,19 @@ class CatalogRepositoryPaginationTests(TestCase):
         self.assertEqual(page.results, [{"catalog_id": "catalog-1"}])
         self.assertIn("OFFSET %s ROWS FETCH NEXT %s ROWS ONLY", cursor.executed[1][0])
         self.assertEqual(cursor.executed[1][1][-2:], [25, 25])
+
+
+class TrackedItemRepositoryFilterTests(TestCase):
+    def test_list_items_can_filter_by_approval_state(self):
+        cursor = _FakeTrackedItemCursor()
+
+        with patch("apps.certs.services.tracked_item_repository.connection.cursor", return_value=cursor):
+            page = TrackedItemRepository().list_items(approval_state="pending_master_approval")
+
+        self.assertEqual(page.count, 0)
+        self.assertIn("t.approval_state = %s", cursor.executed[0][0])
+        self.assertIn("t.approval_state = %s", cursor.executed[1][0])
+        self.assertEqual(cursor.executed[0][1], ["pending_master_approval"])
 
 
 class CatalogRowSubmissionScopeTests(SimpleTestCase):
@@ -87,6 +101,27 @@ class _FakeCatalogCursor:
 
     def fetchall(self):
         return [("catalog-1",)]
+
+
+class _FakeTrackedItemCursor:
+    def __init__(self):
+        self.executed = []
+        self.description = [("tracked_item_id",)]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, list(params or [])))
+
+    def fetchone(self):
+        return (0,)
+
+    def fetchall(self):
+        return []
 
 
 class TrackedItemMetadataSerializerTests(SimpleTestCase):

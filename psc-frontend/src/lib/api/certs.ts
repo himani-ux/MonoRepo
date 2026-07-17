@@ -221,6 +221,18 @@ export interface CertTrackedItem {
   mandatoryForAllVessels?: boolean;
 }
 
+export interface CertTrackedItemsResponse {
+  count: number;
+  results: CertTrackedItem[];
+}
+
+export interface CertTrackedItemFilters {
+  vesselId?: string;
+  catalogId?: string;
+  status?: string;
+  approvalState?: string;
+}
+
 export interface CertPdfVersion {
   id: string;
   trackedItemId: string | null;
@@ -1432,6 +1444,19 @@ export const certsApi = {
   async getTrackedItemDetail(id: string): Promise<CertTrackedItemDetail> {
     const response = await apiClient.get<CertTrackedItemDetail>(
       buildCertsApiUrl(`/tracked-items/${id}/`)
+    );
+    return response.data;
+  },
+
+  async getTrackedItems(filters: CertTrackedItemFilters = {}): Promise<CertTrackedItemsResponse> {
+    const params = new URLSearchParams();
+    if (filters.vesselId) params.set('vesselId', filters.vesselId);
+    if (filters.catalogId) params.set('catalogId', filters.catalogId);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.approvalState) params.set('approvalState', filters.approvalState);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiClient.get<CertTrackedItemsResponse>(
+      buildCertsApiUrl(`/tracked-items/${suffix}`)
     );
     return response.data;
   },

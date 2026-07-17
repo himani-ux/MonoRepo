@@ -10,6 +10,7 @@
 ## 1. Quick Reference per Role
 
 ### 1.1 Master (onboard)
+- **Approval queue:** Open `/certs/approvals` to see certificate uploads waiting for Master approval/rejection.
 - **Daily:** Open `/certs/vessels/<your-vessel>` → review status pills + alerts → action overdue/expiring rows.
 - **On cert renewal:** Open the cert → "Upload renewed cert" → pick PDF (file or scanner) → confirm OCR-pre-filled fields → submit. System auto-detects renewal vs revision (D-CERT-170).
 - **Approving subordinate submissions:** Open notifications inbox → tap pending approval → review submitted form + PDF → Approve or Reject (with reason).
@@ -20,6 +21,7 @@
 - You can upload certificate updates for any certificate on your vessel when your login has Certs write access.
 - Every upload you submit goes to the Master for approval before it becomes final.
 - After submitting: status shows `pending_master_approval`; Master will approve or reject with reason.
+- The vessel certificate Status filter includes `Pending master approval` so waiting rows can be found quickly.
 
 ### 1.3 DPA (Designated Person Ashore)
 - **Daily:** Open `/certs` fleet dashboard → check expiring KPIs, mandatory-coverage banners, bouncing-email surface.

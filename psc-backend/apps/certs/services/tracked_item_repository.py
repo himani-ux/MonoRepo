@@ -179,6 +179,7 @@ class TrackedItemRepository:
         vessel_id: str | None = None,
         catalog_id: str | None = None,
         status_value: str | None = None,
+        approval_state: str | None = None,
     ) -> TrackedItemPage:
         where: list[str] = []
         params: list[Any] = []
@@ -191,6 +192,9 @@ class TrackedItemRepository:
         if status_value:
             where.append("t.status = %s")
             params.append(status_value)
+        if approval_state:
+            where.append("t.approval_state = %s")
+            params.append(approval_state)
 
         where_sql = f"WHERE {' AND '.join(where)}" if where else ""
         with connection.cursor() as cursor:

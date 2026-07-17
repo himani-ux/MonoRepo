@@ -108,6 +108,7 @@ import {
   useRemoveTrackedItemPdf,
   useRejectTrackedItem,
   useSubmitTrackedItem,
+  useTrackedItems,
   useTrackedItemDetail,
   useUpdateTrackedItemMetadata,
   useUploadTrackedItemPdf,
@@ -249,6 +250,15 @@ function isDpaRole(role: string): boolean {
   return ['DPA', 'SEQ MANAGER', 'ADMIN', 'SUPER ADMIN', 'SYSTEM ADMIN'].includes(role);
 }
 
+function isMasterRole(role: string): boolean {
+  return role.includes('MASTER') || role.includes('CAPTAIN');
+}
+
+function canOpenCertApprovalQueue(auth: ReturnType<typeof useAuth>): boolean {
+  const role = normalizeAuthRole(auth);
+  return auth.hasForm?.(FORM_IDS.CERTS_TRACKED_ITEMS) === true && (auth.isOffice || isMasterRole(role));
+}
+
 function CertsPermissionDenied() {
   return (
     <RootLayout>
@@ -283,6 +293,7 @@ function CertsLandingStub() {
   const showHighVolumePrintCard = isFleetManagerRole(role) && auth.hasForm?.(FORM_IDS.CERTS_PRINT_EXPORT);
   const showBouncingEmailCard = isDpaRole(role) && auth.hasForm?.(FORM_IDS.CERTS_TRACKED_ITEMS);
   const showHeartbeatCard = isDpaRole(role) && auth.hasForm?.(FORM_IDS.CERTS_TRACKED_ITEMS);
+  const showApprovalQueue = canOpenCertApprovalQueue(auth);
 
   return (
     <RootLayout>
@@ -309,14 +320,44 @@ function CertsLandingStub() {
                 <Link to={ROUTES.CERTS_VESSEL_DASHBOARD(vesselDashboardIdentifier)}>Open vessel certificates</Link>
               </Button>
             ) : null}
+            {showApprovalQueue ? (
+              <Button asChild variant="outline">
+                <Link to={ROUTES.CERTS_APPROVALS}>Pending approvals</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
+        {showApprovalQueue ? <CertApprovalQueueSummaryCard /> : null}
         {showOfficeVesselList ? <CertOfficeVesselListCard /> : null}
         {showHeartbeatCard ? <CertFleetCadenceHeartbeatCard /> : null}
         {showBouncingEmailCard ? <CertFleetBouncingEmailCard /> : null}
         {showHighVolumePrintCard ? <CertFleetHighVolumePrintCard /> : null}
       </section>
     </RootLayout>
+  );
+}
+
+function CertApprovalQueueSummaryCard() {
+  const pending = useTrackedItems({ approvalState: 'pending_master_approval' });
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-neutral-900">Pending master approval</h2>
+            <p className="text-sm text-neutral-600">
+              {pending.isLoading ? 'Checking uploaded certificates...' : `${pending.data?.count ?? 0} upload request${(pending.data?.count ?? 0) === 1 ? '' : 's'} waiting.`}
+            </p>
+          </div>
+        </div>
+        <Button asChild>
+          <Link to={ROUTES.CERTS_APPROVALS}>Open approval queue</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -375,6 +416,146 @@ function CertOfficeVesselListCard() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function CertApprovalQueuePage() {
+  const auth = useAuth();
+  const canOpenQueue = canOpenCertApprovalQueue(auth);
+  const canMasterDecide = isMasterRole(normalizeAuthRole(auth));
+  const pending = useTrackedItems({ approvalState: 'pending_master_approval' }, canOpenQueue);
+
+  if (!canOpenQueue) {
+    return <CertsPermissionDenied />;
+  }
+
+  return (
+    <RootLayout>
+      <PageHeader title="Certificate Approvals" />
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6">
+        <Card>
+          <CardHeader className="border-b border-neutral-200 bg-neutral-50/70">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>Pending master approval</CardTitle>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Uploaded certificates waiting for Master review.
+                </p>
+              </div>
+              <Badge variant="warning">{pending.data?.count ?? 0} pending</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {pending.isLoading ? (
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : pending.isError ? (
+              <div className="p-4">
+                <ErrorState
+                  title="Could not load approvals"
+                  message={`Could not load pending certificate approvals. ${getErrorMessage(pending.error)}`}
+                  onRetry={() => pending.refetch()}
+                />
+              </div>
+            ) : !pending.data?.results.length ? (
+              <div className="p-6 text-center text-sm text-neutral-600">
+                No certificate uploads are waiting for approval.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-neutral-200 text-sm">
+                  <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase text-neutral-500">
+                    <tr>
+                      <th className="px-4 py-3">Certificate</th>
+                      <th className="px-4 py-3">Vessel</th>
+                      <th className="px-4 py-3">Submitted by</th>
+                      <th className="px-4 py-3">Submitted at</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-100">
+                    {pending.data.results.map((item) => (
+                      <CertApprovalQueueRow
+                        key={item.id}
+                        item={item}
+                        canMasterDecide={canMasterDecide}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </RootLayout>
+  );
+}
+
+function CertApprovalQueueRow({ item, canMasterDecide }: { item: CertTrackedItem; canMasterDecide: boolean }) {
+  const auth = useAuth();
+  const imo = item.vesselImo || item.vesselId || '';
+  const [reason, setReason] = useState('');
+  const approveMutation = useApproveTrackedItem(item.id, imo);
+  const rejectMutation = useRejectTrackedItem(item.id, imo);
+  const canApprove = canMasterDecide && auth.hasProcess?.(PROCESS_IDS.CERTS_APPROVE) === true;
+  const canReject = canMasterDecide && auth.hasProcess?.(PROCESS_IDS.CERTS_REJECT) === true;
+  const detailHref = ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id);
+  const transitionPayload = () => ({
+    reason: reason.trim() || 'Certificate reviewed from approval queue.',
+    version: item.version,
+  });
+  const mutationError = approveMutation.error ?? rejectMutation.error;
+
+  return (
+    <tr className="align-top hover:bg-neutral-50">
+      <td className="min-w-72 px-4 py-4">
+        <Link className="font-medium text-neutral-900 hover:text-primary-600" to={detailHref}>
+          {item.displayName ?? item.catalogDisplayName ?? item.catalogCode}
+        </Link>
+        <p className="mt-1 text-xs text-neutral-500">{item.certificateNumber ?? 'Certificate number not set'}</p>
+      </td>
+      <td className="px-4 py-4 text-neutral-700">
+        <div className="font-medium text-neutral-900">{item.vesselName ?? item.vesselCode ?? item.vesselImo ?? 'Vessel'}</div>
+        <div className="text-xs text-neutral-500">{item.vesselImo ? `IMO ${item.vesselImo}` : item.vesselCode}</div>
+      </td>
+      <td className="px-4 py-4 text-neutral-700">{formatPrincipalLabel(item.submittedByDisplay, item.submittedBy, undefined, 'Not recorded')}</td>
+      <td className="px-4 py-4 text-neutral-700">{formatDateTime(item.submittedAt)}</td>
+      <td className="px-4 py-4"><Badge variant="warning">Pending master approval</Badge></td>
+      <td className="min-w-72 px-4 py-4">
+        {canApprove || canReject ? (
+          <div className="space-y-2">
+            <Textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Add a short review note"
+              rows={2}
+            />
+            {mutationError ? <p className="text-xs text-error-700">{getErrorMessage(mutationError)}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              {canApprove ? (
+                <Button size="sm" type="button" onClick={() => approveMutation.mutate(transitionPayload())} disabled={approveMutation.isPending}>
+                  Approve
+                </Button>
+              ) : null}
+              {canReject ? (
+                <Button size="sm" type="button" variant="destructive" onClick={() => rejectMutation.mutate(transitionPayload())} disabled={rejectMutation.isPending || reason.trim().length < 10}>
+                  Reject
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <Button asChild size="sm" variant="outline">
+            <Link to={detailHref}>Open request</Link>
+          </Button>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -2567,6 +2748,7 @@ function CertVesselFilters({
               <SelectItem value="window_closing">Renewal urgent</SelectItem>
               <SelectItem value="expired">Expired</SelectItem>
               <SelectItem value="pending_first_upload">Pending upload</SelectItem>
+              <SelectItem value="pending_master_approval">Pending master approval</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -6248,6 +6430,8 @@ function filterDashboardSections(
         if (filters.status !== 'all') {
           if (filters.status === 'current') {
             if (!['current', 'ok', 'permanent'].includes(item.status)) return false;
+          } else if (filters.status === 'pending_master_approval') {
+            if (item.approvalState !== 'pending_master_approval') return false;
           } else if (item.status !== filters.status) {
             return false;
           }
@@ -6570,6 +6754,10 @@ function CertsRouteContent() {
   }
   if (path === ROUTES.CERTS_CATALOG && certsHomeRoute !== ROUTES.CERTS) {
     return <Navigate to={certsHomeRoute} replace />;
+  }
+
+  if (path === ROUTES.CERTS_APPROVALS) {
+    return <CertApprovalQueuePage />;
   }
 
   if (path === ROUTES.CERTS_CATALOG || path.startsWith(`${ROUTES.CERTS_CATALOG}/`)) {

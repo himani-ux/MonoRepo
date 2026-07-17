@@ -181,6 +181,7 @@ export const ROUTES = {
   CERTS: '/certs',
   CERTS_CATALOG: '/certs/catalog',
   CERTS_CATALOG_DETAIL: (id: string) => `/certs/catalog/${id}`,
+  CERTS_APPROVALS: '/certs/approvals',
   CERTS_VESSEL_DASHBOARD: (imo: string) => `/certs/vessels/${imo}`,
   CERTS_VESSEL_PROFILE: (imo: string) => `/certs/vessels/${imo}/profile`,
   CERTS_TRACKED_ITEM_DETAIL: (imo: string, id: string) => `/certs/vessels/${imo}/cert/${id}`,

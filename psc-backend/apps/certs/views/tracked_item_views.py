@@ -70,15 +70,24 @@ class TrackedItemPermissionMixin:
 
 class TrackedItemListCreateView(TrackedItemPermissionMixin, generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
+        requested_vessel_id = request.query_params.get("vesselId") or None
+        if requested_vessel_id and not user_can_access_vessel(request.user, requested_vessel_id):
+            return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
         page = repository.list_items(
-            vessel_id=request.query_params.get("vesselId") or None,
+            vessel_id=requested_vessel_id,
             catalog_id=request.query_params.get("catalogId") or None,
             status_value=request.query_params.get("status") or None,
+            approval_state=request.query_params.get("approvalState") or None,
         )
+        rows = [
+            row
+            for row in page.results
+            if user_can_access_vessel(request.user, str(row.get("vessel_id") or ""))
+        ]
         return Response(
             {
-                "count": page.count,
-                "results": [serialize_tracked_item(row) for row in page.results],
+                "count": len(rows),
+                "results": [serialize_tracked_item(row) for row in rows],
             }
         )
 

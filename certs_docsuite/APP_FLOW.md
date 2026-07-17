@@ -18,6 +18,7 @@
    - 3.3 Catalog Row Detail `/certs/catalog/<catalog_id>`
    - 3.4 Vessel Cert Dashboard `/certs/vessels/<imo>`
    - 3.5 TrackedItem Detail `/certs/vessels/<imo>/cert/<tracked_item_id>`
+   - 3.5a Approval Queue `/certs/approvals`
    - 3.6 Onboarding Hub `/certs/onboarding`
    - 3.7 Onboarding Wizard `/certs/onboarding/<imo>` (7 steps)
    - 3.8 Gap-Fill UI `/certs/onboarding/<imo>/batch/<batch_id>/gap-fill`
@@ -48,6 +49,7 @@ Top-level VIMS nav (existing)
    ├─ Vessels                 → /certs/vessels (list) → /certs/vessels/<imo>
    │   ├─ Profile             → /certs/vessels/<imo>/profile
    │   └─ Cert detail         → /certs/vessels/<imo>/cert/<tracked_item_id>
+   ├─ Approvals               → /certs/approvals (pending Master approval queue)
    ├─ Catalog                 → /certs/catalog (DPA + System Admin only)
    │   └─ Row detail          → /certs/catalog/<catalog_id>
    ├─ Onboarding              → /certs/onboarding (DPA + FM only)
@@ -86,6 +88,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 | 3.3 Catalog Row Detail | RW | R | R | R | R | — | — | — | — |
 | 3.4 Vessel Cert Dashboard | full fleet | full fleet | assigned | assigned | assigned | own vessel | own vessel | own vessel | scoped |
 | 3.5 TrackedItem Detail | RW any | RW any | RW assigned | RW assigned | R assigned | RW own + approver | submit own + Master gate | R own | R scoped |
+| 3.5a Approval Queue | R full fleet | R full fleet | R assigned | R assigned | R assigned | approve/reject own vessel | — | — | — |
 | 3.6 Onboarding Hub | RW | R | — | — | — | — | — | — | — |
 | 3.7 Onboarding Wizard | RW | R + sign-off step 7 | — | — | — | — | — | — | — |
 | 3.8 Gap-Fill UI | RW | R | — | — | — | — | — | — | — |
@@ -259,6 +262,24 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - `pdf_missing: true` → red banner: "PDF not on file. Request copy from issuer." (D-CERT-113 / FEAT-CERT-TRK-011)
 - `approval_state = rejected` → callout with rejection reason from approver, "Resubmit" button.
 - `supersedes_id != null` → "This cert supersedes [link]." Linked predecessor row.
+
+---
+
+### 3.5a Approval Queue `/certs/approvals`
+
+**Route:** `/certs/approvals`
+**Form ID:** `CERT_F_002`
+**Process IDs:** `CERT_P_003` (Approve), `CERT_P_004` (Reject)
+**Primary user:** Master for approve/reject on own-vessel rows; office users read/monitor within fleet or assigned vessel scope.
+**Purpose:** One window for `approval_state = pending_master_approval` uploads so Master does not need to search each vessel certificate list.
+
+**Layout:**
+- Summary card on `/certs` shows pending count and opens the queue.
+- Queue table lists certificate, vessel, submitter, submitted date, approval state, and action.
+- Master with approval/rejection process IDs sees approve/reject controls with a review note; office users can open the request for monitoring.
+- Vessel dashboard Status filter includes `Pending master approval` and filters by `approval_state`.
+
+**4 states:** loading skeleton, loaded table, empty "No certificate uploads are waiting for approval.", error with retry.
 
 ---
 
