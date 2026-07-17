@@ -42,6 +42,7 @@ Implemented effect:
 - mapped PIC users resolve to `OFFICE_PIC`
 - mapped DPA users resolve to `DPA`
 - mapped global reviewers receive `has_global_vessel_access = true`
+- `Chief Accounting Officer` keeps its profile label but receives `has_global_vessel_access = true` as a read-scope exception for fleet-wide read dashboards/lists
 - non-global office users continue to use vessel-scoped filtering through `master_RoleByVessel`
 
 ### 0.4 Later-Added Endpoints

@@ -294,6 +294,28 @@ class TestFEAT_AUTH_001_UserAuthentication(BaseAuthAPITestCase):
         self.assertEqual(snapshot["safety_role_name"], "FM")
         self.assertTrue(snapshot["has_global_vessel_access"])
 
+    def test_feat_auth_001_chief_accounting_officer_snapshot_is_global_read_scope(self):
+        """Chief Accounting Officer needs fleet-wide read screens without reviewer mapping."""
+        with (
+            patch(
+                "apps.accounts.utils.get_office_profile_bundle_by_mapping",
+                return_value=("Chief Accounting Officer", ["PSC_F_001"], ["PSC_P_001"]),
+            ),
+            patch("apps.accounts.utils.get_office_global_reviewer_role", return_value=None),
+        ):
+            snapshot = resolve_current_office_permission_snapshot(
+                user_type="OFFICE",
+                login_id="cao001",
+                employee_id="CAO001",
+                role=RoleCodes.OFFICE_PIC,
+                has_global_vessel_access=None,
+                full_name="Chief Accounting Officer",
+            )
+
+        self.assertEqual(snapshot["role_name"], "Chief Accounting Officer")
+        self.assertEqual(snapshot["safety_role_name"], "CHIEF ACCOUNTING OFFICER")
+        self.assertTrue(snapshot["has_global_vessel_access"])
+
     def test_feat_auth_001_psc_jwt_authentication_refreshes_vessel_permissions_from_profile_mapping(self):
         """Authenticated Safety requests should not rely on stale vessel permission claims."""
         validated_token = {

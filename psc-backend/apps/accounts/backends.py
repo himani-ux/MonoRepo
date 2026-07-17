@@ -18,6 +18,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 
 from .models import HRM501, OfficeUser, RoleCodes, ShipUsersLogin, CrewOnboardingHistory
 from .utils import (
+    office_profile_has_global_read_scope,
     resolve_current_office_permission_snapshot,
     resolve_safety_role_name,
     resolve_current_vessel_permission_snapshot,
@@ -560,6 +561,8 @@ class PSCAuthenticationBackend(BaseBackend):
                 role = RoleCodes.OFFICE_PIC
                 has_global_vessel_access = True
             elif initial_safety_role_name == "FM":
+                has_global_vessel_access = True
+            elif office_profile_has_global_read_scope(user.employee_role):
                 has_global_vessel_access = True
             else:
                 role = RoleCodes.OFFICE_PIC

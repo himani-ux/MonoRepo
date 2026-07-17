@@ -444,6 +444,16 @@ def resolve_safety_role_name(
     return normalized_role or None
 
 
+GLOBAL_READ_SCOPE_OFFICE_PROFILES = {
+    "CHIEF ACCOUNTING OFFICER",
+}
+
+
+def office_profile_has_global_read_scope(profile_name: Optional[str]) -> bool:
+    normalized_profile = str(profile_name or "").strip().upper()
+    return normalized_profile in GLOBAL_READ_SCOPE_OFFICE_PROFILES
+
+
 def resolve_current_office_permission_snapshot(
     *,
     user_type: Optional[str] = "OFFICE",
@@ -503,6 +513,8 @@ def resolve_current_office_permission_snapshot(
         role = RoleCodes.OFFICE_PIC
         has_global_vessel_access = True
     elif initial_safety_role_name == "FM":
+        has_global_vessel_access = True
+    elif office_profile_has_global_read_scope(profile_name):
         has_global_vessel_access = True
     elif has_global_vessel_access is None:
         has_global_vessel_access = False

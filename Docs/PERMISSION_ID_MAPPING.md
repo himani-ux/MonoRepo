@@ -39,6 +39,7 @@ Auth resolution paths:
 - Office users: `mapping_role_user -> master_role -> msc_profiles`
 - Vessel users: `master_applied_rank.rank_name -> msc_profiles`
 - Global reviewer mapping: `mapping_role_user.role_id -> msc_profiles.profile_id -> Mapping_CrewAssReviewers`
+- Fleet-wide read-only scope exception: `Chief Accounting Officer` keeps its own profile name but receives `has_global_vessel_access = true` so read dashboards/lists are not vessel-filtered.
 
 ## 3. Full ID Catalog
 
