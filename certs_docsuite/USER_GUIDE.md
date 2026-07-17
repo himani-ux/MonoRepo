@@ -10,7 +10,7 @@
 ## 1. Quick Reference per Role
 
 ### 1.1 Master (onboard)
-- **Approval queue:** Open `/certs/approvals` to see certificate uploads waiting for Master approval/rejection.
+- **Approval queue:** Open `/certs/approvals` to see certificate uploads waiting for approval/rejection.
 - **Daily:** Open `/certs/vessels/<your-vessel>` → review status pills + alerts → action overdue/expiring rows.
 - **On cert renewal:** Open the cert → "Upload renewed cert" → pick PDF (file or scanner) → confirm OCR-pre-filled fields → submit. System auto-detects renewal vs revision (D-CERT-170).
 - **Approving subordinate submissions:** Open notifications inbox → tap pending approval → review submitted form + PDF → Approve or Reject (with reason).
@@ -20,11 +20,12 @@
 ### 1.2 C/O / C/E / 2/E (onboard sub-officers)
 - You can upload certificate updates for any certificate on your vessel when your login has Certs write access.
 - Every upload you submit goes to the Master for approval before it becomes final.
-- After submitting: status shows `pending_master_approval`; Master will approve or reject with reason.
+- After submitting: status shows `pending_master_approval`; Master, DPA, or PIC will approve or reject with reason.
 - The vessel certificate Status filter includes `Pending master approval` so waiting rows can be found quickly.
 
 ### 1.3 DPA (Designated Person Ashore)
 - **Daily:** Open `/certs` fleet dashboard → check expiring KPIs, mandatory-coverage banners, bouncing-email surface.
+- **Approval queue:** Open `/certs/approvals` to approve/reject pending certificate uploads when urgent office review is needed.
 - **Catalog edits:** `/certs/catalog` → add / deprecate / push to fleet. New rows save as all-rank-with-Master-approval, and all changes are audited.
 - **Onboarding new vessel:** `/certs/onboarding` → start wizard → 7 steps. Use save-as-draft between batches; takes 2–4 hours per vessel total.
 - **Class status snapshot upload:** every 3 months per vessel. Open vessel → "Upload class snapshot" → select PDF → parser runs → review reconciliation panel.
@@ -36,6 +37,10 @@
 - Sign-off authority at onboarding step 7 (vessel goes live).
 - Co-approver for anniversary recompute bulk action (D-CERT-092).
 - Print: per-vessel + fleet-wide scopes both available.
+
+### 1.4a PIC (office)
+- Open `/certs/approvals` to review pending certificate uploads for vessels in your scope.
+- Approve or reject with a short reason when your login has Certs approve/reject permission.
 
 ### 1.5 Marine Sup'tt
 - **Primary reconciliation reviewer.** When a class snapshot is uploaded for an assigned vessel, you get an in-app + Slack notification → open `/certs/reconciliation/<run_id>` → resolve mismatches.

@@ -632,8 +632,8 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | POST | `/api/certs/tracked-items/` | CERT_P_001 / CERT_P_002 | Per submission_scope rule | Create (direct or draft) |
 | PATCH | `/api/certs/tracked-items/<id>/` | CERT_P_001 / CERT_P_002 | Per role + state | Edit |
 | POST | `/api/certs/tracked-items/<id>/submit/` | CERT_P_002 | C/O / C/E / 2/E (own vessel) | draft â†’ pending_master_approval |
-| POST | `/api/certs/tracked-items/<id>/approve/` | CERT_P_003 | Master (own vessel) | pending_master_approval â†’ approved |
-| POST | `/api/certs/tracked-items/<id>/reject/` | CERT_P_004 | Master (own vessel) | pending_master_approval â†’ rejected; reason required |
+| POST | `/api/certs/tracked-items/<id>/approve/` | CERT_P_003 | Master (own vessel), DPA, PIC | pending_master_approval â†’ approved |
+| POST | `/api/certs/tracked-items/<id>/reject/` | CERT_P_004 | Master (own vessel), DPA, PIC | pending_master_approval â†’ rejected; reason required |
 | POST | `/api/certs/tracked-items/<id>/upload-pdf/` | CERT_P_001 | Master direct / DPA / FM / Sup'tts | Renewal vs revision auto-detect |
 | GET | `/api/certs/tracked-items/<id>/pdfs/` | (read-vessel) | Per RBAC | Active + superseded + pending-delete |
 | POST | `/api/certs/tracked-items/<id>/anniversary/` | CERT_P_008 | DPA | Rare; confirmation flow |

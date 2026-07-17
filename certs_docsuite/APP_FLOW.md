@@ -87,8 +87,8 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 | 3.2 Catalog Admin | RW | R | R | R | R | — | — | — | — |
 | 3.3 Catalog Row Detail | RW | R | R | R | R | — | — | — | — |
 | 3.4 Vessel Cert Dashboard | full fleet | full fleet | assigned | assigned | assigned | own vessel | own vessel | own vessel | scoped |
-| 3.5 TrackedItem Detail | RW any | RW any | RW assigned | RW assigned | R assigned | RW own + approver | submit own + Master gate | R own | R scoped |
-| 3.5a Approval Queue | R full fleet | R full fleet | R assigned | R assigned | R assigned | approve/reject own vessel | — | — | — |
+| 3.5 TrackedItem Detail | RW any + approve/reject | RW any | RW assigned | RW assigned | R assigned | RW own + approve/reject | submit own + approval gate | R own | R scoped |
+| 3.5a Approval Queue | approve/reject full fleet | R full fleet | R assigned | R assigned | R assigned | approve/reject own vessel | — | — | — |
 | 3.6 Onboarding Hub | RW | R | — | — | — | — | — | — | — |
 | 3.7 Onboarding Wizard | RW | R + sign-off step 7 | — | — | — | — | — | — | — |
 | 3.8 Gap-Fill UI | RW | R | — | — | — | — | — | — | — |
@@ -248,6 +248,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Submitted_by + submitted_at + approved_by + approved_at (when applicable).
   - Action buttons gated by role + state:
     - Master: Approve / Reject (with reason) when state = `pending_master_approval`; Edit + Save direct (Master own write).
+    - DPA / PIC: Approve / Reject (with reason) when state = `pending_master_approval` and vessel scope permits.
     - CO/CE/2E: Save as draft / Submit for approval (when own submission).
     - DPA / FM / MS / TS: Edit + Save direct (no approval gate).
   - Approval event timeline (D-CERT-018 / D-CERT-076): full state transitions with timestamps + reasons.
@@ -270,13 +271,13 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Route:** `/certs/approvals`
 **Form ID:** `CERT_F_002`
 **Process IDs:** `CERT_P_003` (Approve), `CERT_P_004` (Reject)
-**Primary user:** Master for approve/reject on own-vessel rows; office users read/monitor within fleet or assigned vessel scope.
+**Primary user:** Master for own-vessel approve/reject; DPA and office PIC for approve/reject within fleet or assigned vessel scope; other office users read/monitor within scope.
 **Purpose:** One window for `approval_state = pending_master_approval` uploads so Master does not need to search each vessel certificate list.
 
 **Layout:**
 - Summary card on `/certs` shows pending count and opens the queue.
 - Queue table lists certificate, vessel, submitter, submitted date, approval state, and action.
-- Master with approval/rejection process IDs sees approve/reject controls with a review note; office users can open the request for monitoring.
+- Master, DPA, or PIC with approval/rejection process IDs sees approve/reject controls with a review note; other office users can open the request for monitoring.
 - Vessel dashboard Status filter includes `Pending master approval` and filters by `approval_state`.
 
 **4 states:** loading skeleton, loaded table, empty "No certificate uploads are waiting for approval.", error with retry.

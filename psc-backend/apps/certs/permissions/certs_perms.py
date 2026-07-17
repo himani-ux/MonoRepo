@@ -209,6 +209,25 @@ def is_vessel_sub_officer(user) -> bool:
     return (getattr(user, "user_type", "") or "").upper() == "VESSEL" and any(marker in role_text for marker in markers)
 
 
+def is_office_approval_user(user) -> bool:
+    if (getattr(user, "user_type", "") or "").upper() == "VESSEL":
+        return False
+    role_text = " ".join(
+        str(getattr(user, attr_name, "") or "").strip().upper()
+        for attr_name in ("role", "role_name", "safety_role_name")
+    )
+    markers = (
+        "DPA",
+        "DESIGNATED PERSON",
+        "SEQ MANAGER",
+        "OFFICE_PIC",
+        "OFFICE PIC",
+        "PIC",
+        "PERSON IN CHARGE",
+    )
+    return any(marker in role_text for marker in markers)
+
+
 def user_can_access_vessel(user, vessel_id: str) -> bool:
     normalized_vessel_id = str(vessel_id or "").strip().lower()
     if not normalized_vessel_id:
@@ -222,6 +241,10 @@ def user_can_access_vessel(user, vessel_id: str) -> bool:
         return True
     vessel_ids = _normalize_permission_ids(getattr(user, "vessel_ids", None))
     return normalized_vessel_id.upper() in vessel_ids or normalized_vessel_id in {value.lower() for value in vessel_ids}
+
+
+def can_approve_tracked_item(user, item: dict) -> bool:
+    return (is_master_user(user) or is_office_approval_user(user)) and user_can_access_vessel(user, str(item.get("vessel_id")))
 
 
 class HasAnyCertsFormPermission(BasePermission):

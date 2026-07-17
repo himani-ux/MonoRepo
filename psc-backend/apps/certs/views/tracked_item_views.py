@@ -18,6 +18,7 @@ from apps.certs.permissions import (
     TRACKED_ITEM_WRITE_PROCESS_ID,
     HasTrackedItemReadPermission,
     IsTrackedItemWriter,
+    can_approve_tracked_item,
     has_request_certs_perm,
     is_master_user,
     is_vessel_sub_officer,
@@ -605,8 +606,8 @@ class TrackedItemApproveView(generics.GenericAPIView):
         current = repository.get_item(str(tracked_item_id))
         if current is None:
             return Response({"detail": "Tracked item not found."}, status=status.HTTP_404_NOT_FOUND)
-        if not _can_master_act_on_item(request.user, current):
-            return Response({"detail": "Only the vessel Master may approve this tracked item."}, status=status.HTTP_403_FORBIDDEN)
+        if not _can_approval_actor_act_on_item(request.user, current):
+            return Response({"detail": "Only the vessel Master, PIC, or DPA may approve this tracked item."}, status=status.HTTP_403_FORBIDDEN)
         if current.get("approval_state") != "pending_master_approval":
             return Response({"detail": "Only pending Master approval rows can be approved."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -638,8 +639,8 @@ class TrackedItemRejectView(generics.GenericAPIView):
         current = repository.get_item(str(tracked_item_id))
         if current is None:
             return Response({"detail": "Tracked item not found."}, status=status.HTTP_404_NOT_FOUND)
-        if not _can_master_act_on_item(request.user, current):
-            return Response({"detail": "Only the vessel Master may reject this tracked item."}, status=status.HTTP_403_FORBIDDEN)
+        if not _can_approval_actor_act_on_item(request.user, current):
+            return Response({"detail": "Only the vessel Master, PIC, or DPA may reject this tracked item."}, status=status.HTTP_403_FORBIDDEN)
         if current.get("approval_state") != "pending_master_approval":
             return Response({"detail": "Only pending Master approval rows can be rejected."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -802,8 +803,8 @@ def _parse_ocr_date(value: str) -> str | None:
         return None
 
 
-def _can_master_act_on_item(user, item: dict) -> bool:
-    return is_master_user(user) and user_can_access_vessel(user, str(item.get("vessel_id")))
+def _can_approval_actor_act_on_item(user, item: dict) -> bool:
+    return can_approve_tracked_item(user, item)
 
 
 def _catalog_submission_scope(item: dict) -> str:

@@ -1,9 +1,11 @@
 from django.conf import settings
 from django.test import SimpleTestCase
 from django.urls import resolve, reverse
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
+from apps.certs.permissions import can_approve_tracked_item
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
@@ -49,6 +51,23 @@ class TrackedItemRepositoryFilterTests(TestCase):
         self.assertIn("t.approval_state = %s", cursor.executed[0][0])
         self.assertIn("t.approval_state = %s", cursor.executed[1][0])
         self.assertEqual(cursor.executed[0][1], ["pending_master_approval"])
+
+
+class TrackedItemApprovalAuthorityTests(SimpleTestCase):
+    def test_dpa_can_approve_when_vessel_access_is_global(self):
+        user = SimpleNamespace(user_type="OFFICE", role="DPA", has_global_vessel_access=True)
+
+        self.assertTrue(can_approve_tracked_item(user, {"vessel_id": "VESSEL-1"}))
+
+    def test_pic_can_approve_when_vessel_is_assigned(self):
+        user = SimpleNamespace(user_type="OFFICE", role="OFFICE_PIC", vessel_ids=["VESSEL-1"])
+
+        self.assertTrue(can_approve_tracked_item(user, {"vessel_id": "VESSEL-1"}))
+
+    def test_non_approval_office_role_cannot_approve(self):
+        user = SimpleNamespace(user_type="OFFICE", role="CHIEF ACCOUNTING OFFICER", has_global_vessel_access=True)
+
+        self.assertFalse(can_approve_tracked_item(user, {"vessel_id": "VESSEL-1"}))
 
 
 class CatalogRowSubmissionScopeTests(SimpleTestCase):

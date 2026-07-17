@@ -250,8 +250,21 @@ function isDpaRole(role: string): boolean {
   return ['DPA', 'SEQ MANAGER', 'ADMIN', 'SUPER ADMIN', 'SYSTEM ADMIN'].includes(role);
 }
 
+function isDpaApprovalRole(role: string): boolean {
+  return ['DPA', 'SEQ MANAGER'].includes(role) || role.includes('DESIGNATED PERSON');
+}
+
+function isPicRole(role: string): boolean {
+  return ['PIC', 'OFFICE_PIC', 'OFFICE PIC'].includes(role) || role.includes('PERSON IN CHARGE');
+}
+
 function isMasterRole(role: string): boolean {
   return role.includes('MASTER') || role.includes('CAPTAIN');
+}
+
+function canDecideCertApproval(auth: ReturnType<typeof useAuth>): boolean {
+  const role = normalizeAuthRole(auth);
+  return isMasterRole(role) || (auth.isOffice && (isDpaApprovalRole(role) || isPicRole(role)));
 }
 
 function canOpenCertApprovalQueue(auth: ReturnType<typeof useAuth>): boolean {
@@ -347,7 +360,7 @@ function CertApprovalQueueSummaryCard() {
             <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-neutral-900">Pending master approval</h2>
+            <h2 className="text-base font-semibold text-neutral-900">Pending approval</h2>
             <p className="text-sm text-neutral-600">
               {pending.isLoading ? 'Checking uploaded certificates...' : `${pending.data?.count ?? 0} upload request${(pending.data?.count ?? 0) === 1 ? '' : 's'} waiting.`}
             </p>
@@ -422,7 +435,7 @@ function CertOfficeVesselListCard() {
 function CertApprovalQueuePage() {
   const auth = useAuth();
   const canOpenQueue = canOpenCertApprovalQueue(auth);
-  const canMasterDecide = isMasterRole(normalizeAuthRole(auth));
+  const canDecide = canDecideCertApproval(auth);
   const pending = useTrackedItems({ approvalState: 'pending_master_approval' }, canOpenQueue);
 
   if (!canOpenQueue) {
@@ -437,9 +450,9 @@ function CertApprovalQueuePage() {
           <CardHeader className="border-b border-neutral-200 bg-neutral-50/70">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>Pending master approval</CardTitle>
+                <CardTitle>Pending approval</CardTitle>
                 <p className="mt-1 text-sm text-neutral-600">
-                  Uploaded certificates waiting for Master review.
+                  Uploaded certificates waiting for Master, PIC, or DPA review.
                 </p>
               </div>
               <Badge variant="warning">{pending.data?.count ?? 0} pending</Badge>
@@ -482,7 +495,7 @@ function CertApprovalQueuePage() {
                       <CertApprovalQueueRow
                         key={item.id}
                         item={item}
-                        canMasterDecide={canMasterDecide}
+                        canDecide={canDecide}
                       />
                     ))}
                   </tbody>
@@ -496,14 +509,14 @@ function CertApprovalQueuePage() {
   );
 }
 
-function CertApprovalQueueRow({ item, canMasterDecide }: { item: CertTrackedItem; canMasterDecide: boolean }) {
+function CertApprovalQueueRow({ item, canDecide }: { item: CertTrackedItem; canDecide: boolean }) {
   const auth = useAuth();
   const imo = item.vesselImo || item.vesselId || '';
   const [reason, setReason] = useState('');
   const approveMutation = useApproveTrackedItem(item.id, imo);
   const rejectMutation = useRejectTrackedItem(item.id, imo);
-  const canApprove = canMasterDecide && auth.hasProcess?.(PROCESS_IDS.CERTS_APPROVE) === true;
-  const canReject = canMasterDecide && auth.hasProcess?.(PROCESS_IDS.CERTS_REJECT) === true;
+  const canApprove = canDecide && auth.hasProcess?.(PROCESS_IDS.CERTS_APPROVE) === true;
+  const canReject = canDecide && auth.hasProcess?.(PROCESS_IDS.CERTS_REJECT) === true;
   const detailHref = ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id);
   const transitionPayload = () => ({
     reason: reason.trim() || 'Certificate reviewed from approval queue.',
@@ -525,7 +538,7 @@ function CertApprovalQueueRow({ item, canMasterDecide }: { item: CertTrackedItem
       </td>
       <td className="px-4 py-4 text-neutral-700">{formatPrincipalLabel(item.submittedByDisplay, item.submittedBy, undefined, 'Not recorded')}</td>
       <td className="px-4 py-4 text-neutral-700">{formatDateTime(item.submittedAt)}</td>
-      <td className="px-4 py-4"><Badge variant="warning">Pending master approval</Badge></td>
+      <td className="px-4 py-4"><Badge variant="warning">Pending approval</Badge></td>
       <td className="min-w-72 px-4 py-4">
         {canApprove || canReject ? (
           <div className="space-y-2">
@@ -3945,6 +3958,7 @@ function CertTrackedItemDetailPage({ imo, trackedItemId }: { imo: string; tracke
   const isVesselCrew = auth.isCrew && !auth.isMaster;
   const canDirectEditItem = canCreateOrEdit && (!isVesselCrew || item.submissionScope !== 'master_only');
   const canSubmitItem = canSubmit && (!isVesselCrew || item.submissionScope === 'all_ranks_with_approval');
+  const canDecideApproval = canDecideCertApproval(auth);
 
   return (
     <RootLayout>
@@ -3959,8 +3973,8 @@ function CertTrackedItemDetailPage({ imo, trackedItemId }: { imo: string; tracke
             item={item}
             imo={imo}
             canSubmit={canSubmitItem}
-            canApprove={canApprove && auth.isMaster}
-            canReject={canReject && auth.isMaster}
+            canApprove={canApprove && canDecideApproval}
+            canReject={canReject && canDecideApproval}
           />
         </div>
       </div>
