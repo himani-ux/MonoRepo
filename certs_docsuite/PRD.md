@@ -78,7 +78,7 @@
 | Tech Sup'tt | Technical Superintendent (office) |
 | Marine Sup'tt | Marine Superintendent (office; primary reconciliation reviewer per D-CERT-068, primary auditor liaison per D-CERT-194) |
 | Master | Vessel commanding officer; vessel-side admin per PSC Inspection pattern (D-CERT-077, D-CERT-165) |
-| C/O · C/E · 2/E | Chief Officer · Chief Engineer · Second Engineer (vessel submitters with Master-approval gate per D-CERT-079) |
+| C/O · C/E · 2/E | Chief Officer · Chief Engineer · Second Engineer (vessel submitters with Master-approval gate per D-CERT-079 / D-CERT-199) |
 | RO | Recognized Organization (class society acting on behalf of Flag administration) |
 | STC | Short-Term Certificate (class-issued bridge cert covering gap to next port; D-CERT-012) |
 | COC | Certificate of Class (class society's primary doc — NOT Certificate of Competency, which is a crew cert handled by CMS) |
@@ -97,7 +97,7 @@
 | TEC-04B | Legacy KSM Excel form, used as catalog inspiration (D-CERT-003, D-CERT-103) |
 | Anniversary date | Per-vessel-cert-family anchor for survey-window computation; set ONCE at onboarding by office (D-CERT-074, D-CERT-110) |
 | `is_class_tracked` | Catalog-row flag indicating cert appears on NK/KR/BV class status report; class is authoritative (D-CERT-009) |
-| `submission_scope` | Catalog-row enum `master_only` vs `all_ranks_with_approval` (D-CERT-079) |
+| `submission_scope` | Catalog-row enum `master_only` vs `all_ranks_with_approval`; shipped active catalog rows use `all_ranks_with_approval` (D-CERT-079 / D-CERT-199) |
 | `print_id` | Human-readable print artifact ID `SQE-S633-<imo>-<yyyymmdd>-<seq>` for single-vessel artifacts; fleet/multi-vessel artifacts use `SQE-S633-FLEET-<yyyymmdd>-<seq>` (D-CERT-128; B-PRT-01 resolved 2026-06-29) |
 | Magic-link ack | Single-use 24h-expiring URL in notification email enabling one-click acknowledge without full app login (D-CERT-154) |
 | Per-side routing | Notification rule: vessel users get in-app+email only; office users get in-app+Slack only (D-CERT-161) |
@@ -195,9 +195,9 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-REC-030 | Parser ops page (dev-only, feature-flagged) | REC | V1 | D-CERT-072 |
 | FEAT-CERT-REC-031 | Anomaly thresholds (mismatch>15% / parse>3min / count<exp×0.7) | REC | V1 | D-CERT-073 |
 | FEAT-CERT-RBAC-001 | Master = onboard admin (PSC Inspection pattern) | RBAC | V1 | D-CERT-018, D-CERT-077 |
-| FEAT-CERT-RBAC-002 | C/O + C/E + 2/E submit-with-Master-approval | RBAC | V1 | D-CERT-018, D-CERT-079 |
+| FEAT-CERT-RBAC-002 | C/O + C/E + 2/E submit-with-Master-approval | RBAC | V1 | D-CERT-018, D-CERT-079, D-CERT-199 |
 | FEAT-CERT-RBAC-003 | Office direct write (DPA / FM / Tech / Marine Sup'tt) | RBAC | V1 | D-CERT-018 |
-| FEAT-CERT-RBAC-004 | `submission_scope` per row (`master_only` vs `all_ranks_with_approval`) | RBAC | V1 | D-CERT-079 |
+| FEAT-CERT-RBAC-004 | `submission_scope` per row; active catalog rows use `all_ranks_with_approval` | RBAC | V1 | D-CERT-079, D-CERT-199 |
 | FEAT-CERT-RBAC-005 | Master self-submission = no self-approval gate | RBAC | V1 | D-CERT-165 |
 | FEAT-CERT-RBAC-006 | Approval workflow lifecycle (PSC CAR pattern) | RBAC | V1 | D-CERT-076 |
 | FEAT-CERT-RBAC-007 | Draft auto-expire 7 days | RBAC | V1 | D-CERT-076 |
@@ -869,7 +869,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 
 ## 21. User Roles & Permissions
 
-See `BACKEND_STRUCTURE.md` for the canonical RBAC matrix derived from D-CERT-018, D-CERT-079, D-CERT-086, D-CERT-090, D-CERT-098, D-CERT-141, D-CERT-142.
+See `BACKEND_STRUCTURE.md` for the canonical RBAC matrix derived from D-CERT-018, D-CERT-079, D-CERT-086, D-CERT-090, D-CERT-098, D-CERT-141, D-CERT-142, and D-CERT-199.
 
 | Role | Catalog | TrackedItem write | TrackedItem read | Class snapshot upload | Reconciliation review | Print: per-vessel | Print: fleet-wide | External auditor access grants |
 |------|---------|-------------------|------------------|----------------------|----------------------|-------------------|-------------------|------------------------------|
@@ -884,8 +884,8 @@ See `BACKEND_STRUCTURE.md` for the canonical RBAC matrix derived from D-CERT-018
 | External Auditor | — | — | ✓ scoped | — | — | ✓ scoped (watermarked AUDIT COPY) | — | — |
 
 Notes:
-- Master is the approver for `all_ranks_with_approval` rows from C/O / C/E / 2/E (D-CERT-079).
-- Master self-submission for `master_only` rows = NO self-approval gate; goes direct to Marine Sup'tt reconciliation review (D-CERT-165).
+- Master is the approver for all certificate uploads submitted by C/O / C/E / 2/E because every active catalog row now uses `all_ranks_with_approval` (D-CERT-199).
+- Master self-submission has NO self-approval gate and remains a direct Master/office path (D-CERT-165, D-CERT-199).
 - "Assigned" scope = `master_RoleByVessel` (D-CERT-090).
 - DPA gets `has_global_vessel_access` flag for full-fleet reach (D-CERT-090).
 - Auditor permission scopes set at provisioning time (D-CERT-096, D-CERT-194).
@@ -912,3 +912,4 @@ Notes:
 | D-CERT-075 | Class status snapshot purpose narrowed: (1) detect stale certs, (2) capture Conditions of Class, (3) capture extensions/postpon... | LOCKED |
 | D-CERT-102 | AMENDED by D-CERT-103. | SUPERSEDED |
 | D-CERT-198 | Round 7 / Interrogation closeout — no additional compliance topics raised. | LOCKED |
+| D-CERT-199 | All active Certs catalog rows use `all_ranks_with_approval`; C/O, C/E, and 2/E may upload any vessel certificate subject to Master approval. | LOCKED |

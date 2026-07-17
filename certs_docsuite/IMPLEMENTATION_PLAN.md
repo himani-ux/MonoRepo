@@ -276,6 +276,16 @@ See PRD §19. Build-time deferrals (Phase 0 picks) listed in BACKEND_STRUCTURE �
 
 ---
 
+## Amendment 1 - 2026-07-17
+
+**What changed:** CR-091 changed the live Certs catalog policy so every active catalog row uses `submission_scope = all_ranks_with_approval`.
+
+**Triggering discovery:** Local DB verification showed all 459 rows were still `master_only`, preventing Chief Officer, Chief Engineer, and Second Engineer from uploading any certificate despite backend support for vessel sub-officer upload.
+
+**Supersedes:** D-CERT-079 and D-CERT-165 only where they assigned Class, Statutory/Flag, or class-tracked rows to `master_only`. The current shipped behavior is D-CERT-199: C/O, C/E, and 2/E may upload any certificate on their own vessel, and those uploads require Master approval.
+
+---
+
 ## Appendix — Decisions Index Backfill
 
 > **Audit traceability (2026-05-13):** the following D-CERT-\* IDs are referenced by `COVERAGE.md` as in-scope for `IMPLEMENTATION_PLAN.md` but were not literally cited inline in earlier prose. They are listed here as an audit-grade citation index so every `COVERAGE.md` ✓ resolves to a literal grep match against this doc. Decision text remains binding from `../VIMS-CERTIFICATES-MODULE-SSOT.md` §16; this index points back to the SSOT row.

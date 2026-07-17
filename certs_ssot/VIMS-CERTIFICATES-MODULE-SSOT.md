@@ -1,6 +1,6 @@
 # VIMS Certificates Module — Single Source of Truth (SSOT)
 
-> **Module Status:** **INTERROGATION COMPLETE 2026-05-07** — All 7 rounds done · **198 decisions LOCKED** (D-CERT-001 → D-CERT-198) · KLOSS Step 2 DONE · Module ready for KLOSS Step 3 (DocSuite generation)
+> **Module Status:** **INTERROGATION COMPLETE 2026-05-07** — All 7 rounds done · **199 decisions LOCKED** (D-CERT-001 → D-CERT-199) · KLOSS Step 2 DONE · Module ready for KLOSS Step 3 (DocSuite generation)
 > **Owner:** Prince (Maritime PO) · **Methodology:** KLOSS Framework (Step 2 — Interrogation, paused)
 > **Sister Modules:** Reporting (DocSuite COMPLETE 2026-04-06) · Safety (DocSuite COMPLETE 2026-04-17) · PMS · Purchase · WRH · Inspection
 > **Project Path:** `/Users/prince/Documents/Project reserch/`
@@ -1005,12 +1005,13 @@ Step 5: Phase 0 build (per IMPLEMENTATION_PLAN.md)
 | D-CERT-196 | **External auditor activity audit trail = NOT TRACKED.** No per-action logging of what an auditor reads / downloads / prints during their session. Read access is just credentialed access — page views, PDF downloads, search queries, and ZIP exports are NOT individually audit-logged. Information has no operational use; tracking adds storage volume and complexity without value. The grant event itself (who provisioned, scope, expiry) is logged per D-CERT-194; everything within the grant window is opaque. | LOCKED |
 | D-CERT-197 | **Auditor attestation tooling = NOT BUILT.** No "Auditor Attestation Form" generator, no read-only auditor note-taking inside VIMS, no system-side attestation export. External auditors produce their own reports per their professional standards using whatever data they accessed via the read-only login (per D-CERT-096 + D-CERT-194). VIMS provides data; auditor produces attestation. Avoids ambiguity about authorship of compliance documents. | LOCKED |
 | D-CERT-198 | **Round 7 / Interrogation closeout — no additional compliance topics raised.** Quick-scan checklist confirmed: ISM Code retention (D-CERT-099/181), ISPS/MLC/SOLAS retention (D-CERT-181), audit log integrity (D-CERT-179), cross-module scope (D-CERT-176), crew PII (D-CERT-177), GDPR/PDPA (D-CERT-184–188), encryption / keys / backup / DR (D-CERT-189–193), external auditor workflow (D-CERT-096, D-CERT-194–197), vessel sale handover (D-CERT-093, D-CERT-145), class society APIs out-of-scope (D-CERT-169) — all covered. **Interrogation complete (KLOSS Step 2).** Module proceeds to DocSuite (KLOSS Step 3). | LOCKED |
+| D-CERT-199 | **AMENDS D-CERT-079 and D-CERT-165: all active Certs catalog rows use `submission_scope = all_ranks_with_approval`.** Chief Officer, Chief Engineer, and Second Engineer may upload certificate PDFs for any certificate on their own vessel when they hold Certs tracked-item write permission; their uploads enter `pending_master_approval` and require Master approval. Master and office direct uploads still finalize without a Master self-approval gate. Other ship ranks remain upload-blocked unless code-level sub-officer recognition is expanded. | LOCKED |
 
 ---
 
 ## §16a Resume Point (For Next Session)
 
-**Status:** **INTERROGATION COMPLETE 2026-05-07.** Rounds 1–7 ALL DONE. **198 decisions locked** (D-CERT-001 → D-CERT-198). KLOSS Step 2 finished.
+**Status:** **INTERROGATION COMPLETE 2026-05-07.** Rounds 1–7 ALL DONE. **199 decisions locked** (D-CERT-001 → D-CERT-199). KLOSS Step 2 finished.
 
 **Next session — KLOSS Step 3: DocSuite generation.**
 

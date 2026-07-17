@@ -17,8 +17,8 @@
 - **Magic-link email ack:** When you get an email alert, tap "Acknowledge" — single-use link, expires in 24h.
 
 ### 1.2 C/O / C/E / 2/E (onboard sub-officers)
-- You can submit cert updates for your assigned categories (Equipment / Calibrations / Tests / Misc); Master approves.
-- Class Certificates + Statutory & Flag rows: Master submits these directly (you can view but not submit).
+- You can upload certificate updates for any certificate on your vessel when your login has Certs write access.
+- Every upload you submit goes to the Master for approval before it becomes final.
 - After submitting: status shows `pending_master_approval`; Master will approve or reject with reason.
 
 ### 1.3 DPA (Designated Person Ashore)
@@ -224,3 +224,4 @@ You cannot personally tune channel preference (D-CERT-160) — DPA centrally con
 | D-CERT-178 | External auditor access = per-module only (no cross-module bundle, no federated SSO). | LOCKED |
 | D-CERT-194 | External auditor access provisioning = Marine Sup'tt self-service (AMENDS D-CERT-096). | LOCKED |
 | D-CERT-195 | External auditor access revocation = AUTO-EXPIRE ONLY (no early revocation). | LOCKED |
+| D-CERT-199 | All active Certs catalog rows use all-rank submission, so C/O, C/E, and 2/E may upload any vessel certificate subject to Master approval. | LOCKED |

@@ -203,7 +203,7 @@ Types use SQL Server compatible expressions; Django field types in parens.
 | cadence_custom_days | INT | NULL | For `custom_days(N)` cadence |
 | issuing_authority_type | NVARCHAR(16) | NN | enum: `flag \| class \| RO \| manufacturer \| company \| ko_other` |
 | is_class_tracked | BIT | NN, default 0 | D-CERT-009 |
-| submission_scope | NVARCHAR(32) | NN | enum: `master_only \| all_ranks_with_approval` per D-CERT-079 |
+| submission_scope | NVARCHAR(32) | NN | enum: `master_only \| all_ranks_with_approval`; shipped active catalog rows use `all_ranks_with_approval` per D-CERT-199 |
 | parent_id | UNIQUEIDENTIFIER | NULL, FK â†’ self.catalog_id | Nullable; arbitrary depth schema (D-CERT-010); UI 2-level cap |
 | relationship_type_default | NVARCHAR(32) | NULL | Default `relationship_type` for child instances |
 | applicable_ship_types | NVARCHAR(256) | NN, default '["all"]' | JSON array per D-CERT-028 / D-CERT-109 |

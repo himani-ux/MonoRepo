@@ -126,7 +126,7 @@ coverage_pct = (count of TrackedItems for vessel where catalog.mandatory_for_all
 |------|----|---------------|------|
 | (none) | draft | Master / CO / CE / 2E / Office direct | New row |
 | draft | pending_master_approval | Submitter (CO / CE / 2E) | `submission_scope = all_ranks_with_approval` rows |
-| draft | approved | Submitter Master direct / Office direct | Master self-submit on `master_only` rows = NO approval gate (D-CERT-165); Office direct write skips approval (D-CERT-018) |
+| draft | approved | Submitter Master direct / Office direct | Master self-submit = NO approval gate (D-CERT-165/D-CERT-199); Office direct write skips approval (D-CERT-018) |
 | pending_master_approval | approved | Master (own vessel) | Audit captures both submitter and approver |
 | pending_master_approval | rejected | Master | `rejection_reason` required (min 10 chars); increments `rejection_count` |
 | rejected | draft | Original submitter | "Resubmit" button |
@@ -134,7 +134,7 @@ coverage_pct = (count of TrackedItems for vessel where catalog.mandatory_for_all
 | draft (any) | (deleted) | system | Nightly cron when `draft_expires_at <= now()` (D-CERT-076) |
 | approved | (no transition) | — | Terminal except via new version supersession |
 
-`master_only` rows (Class Certificates + Statutory & Flag + `is_class_tracked: true`) — only Master can submit; reconciliation review by Marine Sup'tt is operational, not an approval gate (D-CERT-165).
+All active Certs catalog rows now use `submission_scope = all_ranks_with_approval` (D-CERT-199). CO / CE / 2E uploads enter `pending_master_approval`; Master and office direct uploads are approved directly. Other onboard ranks remain read-only for uploads unless the backend sub-officer recognition list is expanded.
 
 ---
 
