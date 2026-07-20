@@ -143,7 +143,6 @@ import {
   type CertTrackedItemAuditEvent,
   type CertTrackedItemDetail,
   type CertTrackedItem,
-  type CertOnboardingWizardState,
   type CertPrintArtifact,
   type CertPrintScope,
   type CertPrintWatermark,
@@ -284,7 +283,7 @@ function CertsPermissionDenied() {
             </div>
             <div className="space-y-2">
               <h1 className="text-xl font-semibold text-neutral-900">
-                You don't have access to this page.
+                You don&apos;t have access to this page.
               </h1>
             </div>
             <Button asChild>
@@ -294,6 +293,25 @@ function CertsPermissionDenied() {
         </Card>
       </section>
     </RootLayout>
+  );
+}
+
+function CertsInlineError({ title, message, onRetry }: { title: string; message: string; onRetry?: () => void }) {
+  return (
+    <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="font-semibold">{title}</p>
+          <p className="text-red-700">{message}</p>
+          {onRetry ? (
+            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -393,7 +411,7 @@ function CertOfficeVesselListCard() {
           </div>
         ) : dashboard.isError ? (
           <div className="p-4">
-            <ErrorState
+            <CertsInlineError
               title="Could not load vessels"
               message={`Could not load onboarded vessels. ${getErrorMessage(dashboard.error)}`}
               onRetry={() => dashboard.refetch()}
@@ -468,7 +486,7 @@ function CertApprovalQueuePage() {
               </div>
             ) : pending.isError ? (
               <div className="p-4">
-                <ErrorState
+                <CertsInlineError
                   title="Could not load approvals"
                   message={`Could not load pending certificate approvals. ${getErrorMessage(pending.error)}`}
                   onRetry={() => pending.refetch()}
@@ -2331,7 +2349,7 @@ function CertVesselDashboardPage({ imo }: { imo: string }) {
               <FileText className="mx-auto h-8 w-8 text-neutral-500" aria-hidden="true" />
               <div className="space-y-1">
                 <h2 className="text-lg font-semibold text-neutral-900">Vessel not yet onboarded</h2>
-                <p className="text-sm text-neutral-600">Start the onboarding wizard to create this vessel's certificate register.</p>
+                <p className="text-sm text-neutral-600">Start the onboarding wizard to create this vessel&apos;s certificate register.</p>
               </div>
               <Button asChild>
                 <Link to={`/certs/onboarding/${imo}`}>Start wizard</Link>
@@ -6019,18 +6037,25 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
     applicableShipType: applicableShipTypeFilter || null,
   }, 50);
   const bulkSoftDeleteMutation = useBulkSoftDeleteCatalogRows();
+  const {
+    dataUpdatedAt: catalogRowsDataUpdatedAt,
+    fetchNextPage: fetchNextCatalogRowsPage,
+    hasNextPage: hasNextCatalogRowsPage,
+    isFetchingNextPage: isFetchingNextCatalogRowsPage,
+    isLoading: isCatalogRowsLoading,
+  } = rows;
   const loadedCatalogRows = rows.data?.pages.flatMap((page) => page.results) ?? [];
   const catalogTotalCount = rows.data?.pages[0]?.count ?? 0;
 
   useEffect(() => {
-    if (!rows.hasNextPage || rows.isFetchingNextPage || rows.isLoading) {
+    if (!hasNextCatalogRowsPage || isFetchingNextCatalogRowsPage || isCatalogRowsLoading) {
       return undefined;
     }
     const timer = window.setTimeout(() => {
-      void rows.fetchNextPage();
+      void fetchNextCatalogRowsPage();
     }, 150);
     return () => window.clearTimeout(timer);
-  }, [rows.dataUpdatedAt, rows.fetchNextPage, rows.hasNextPage, rows.isFetchingNextPage, rows.isLoading]);
+  }, [catalogRowsDataUpdatedAt, fetchNextCatalogRowsPage, hasNextCatalogRowsPage, isFetchingNextCatalogRowsPage, isCatalogRowsLoading]);
 
   const toggleBulkRow = (rowId: string, selected: boolean) => {
     setSelectedBulkIds((current) => {
@@ -6077,7 +6102,7 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
     return <CertsPermissionDenied />;
   }
 
-  if (sections.isLoading || rows.isLoading) {
+  if (sections.isLoading || isCatalogRowsLoading) {
     return <CertCatalogLoading />;
   }
 
@@ -6272,25 +6297,6 @@ function formatReconciliationFindingSummary(run: CertReconciliationRun): string 
 function normalizeRecord(value: unknown): Record<string, unknown> | null {
   if (!value || Array.isArray(value) || typeof value !== 'object') return null;
   return value as Record<string, unknown>;
-}
-
-function formatJson(value: unknown): string {
-  if (value === null || value === undefined) return 'Not recorded';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function formatJsonCompact(value: unknown): string {
-  if (value === null || value === undefined) return 'not recorded';
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
 }
 
 function formatAnomalyBreach(breach: CertReconciliationAnomalyBreach): string {
