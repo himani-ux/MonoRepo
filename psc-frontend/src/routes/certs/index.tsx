@@ -147,6 +147,7 @@ import {
   type CertPrintScope,
   type CertPrintWatermark,
   type CertValidationEntry,
+  type CertFleetDashboardVessel,
   type CertFleetDashboardResponse,
   type CertVesselLifecycleResponse,
   type CertVesselDashboardResponse,
@@ -2988,6 +2989,7 @@ function CertReconciliationDashboardPage() {
   const [uploadError, setUploadError] = useState('');
   const runs = useReconciliationRuns(canRead ? { bucket: bucketFilter === 'all' ? null : bucketFilter } : {});
   const snapshots = useClassSnapshots(canRead ? {} : { vesselId: 'permission-denied' });
+  const vesselDashboard = useFleetDashboard(canUpload);
   const uploadMutation = useUploadClassSnapshot();
 
   if (!canRead) {
@@ -3018,6 +3020,9 @@ function CertReconciliationDashboardPage() {
 
   const hasRuns = runs.data.count > 0;
   const filtersActive = bucketFilter !== 'all';
+  const uploadVessels = [...(vesselDashboard.data?.onboardedVessels ?? [])].sort((left, right) =>
+    formatClassSnapshotVesselOption(left).localeCompare(formatClassSnapshotVesselOption(right))
+  );
 
   const submitUpload = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -3027,7 +3032,7 @@ function CertReconciliationDashboardPage() {
       return;
     }
     if (!vesselId.trim()) {
-      setUploadError('Vessel ID is required.');
+      setUploadError('Select a vessel.');
       return;
     }
     uploadMutation.mutate({
@@ -3136,8 +3141,30 @@ function CertReconciliationDashboardPage() {
                 <CardContent>
                   <form className="space-y-3" onSubmit={submitUpload}>
                     <div className="space-y-2">
-                      <Label htmlFor="classSnapshotVesselId">Vessel ID</Label>
-                      <Input id="classSnapshotVesselId" value={vesselId} onChange={(event) => setVesselId(event.target.value)} />
+                      <Label htmlFor="classSnapshotVesselId">Vessel</Label>
+                      <Select
+                        value={vesselId}
+                        onValueChange={setVesselId}
+                        disabled={vesselDashboard.isLoading || uploadVessels.length === 0}
+                      >
+                        <SelectTrigger id="classSnapshotVesselId">
+                          <SelectValue placeholder={vesselDashboard.isLoading ? 'Loading vessels...' : 'Select vessel'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {uploadVessels.map((vessel) => (
+                            <SelectItem key={vessel.id} value={vessel.id}>
+                              {formatClassSnapshotVesselOption(vessel)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-neutral-500">Select the vessel name. The system will use the correct vessel ID automatically.</p>
+                      {vesselDashboard.isError ? (
+                        <p className="text-xs text-error-700">Could not load vessels. {getErrorMessage(vesselDashboard.error)}</p>
+                      ) : null}
+                      {!vesselDashboard.isLoading && !vesselDashboard.isError && uploadVessels.length === 0 ? (
+                        <p className="text-xs text-neutral-500">No onboarded vessels are available for class snapshot upload.</p>
+                      ) : null}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
@@ -3157,18 +3184,21 @@ function CertReconciliationDashboardPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="classSnapshotPdf">PDF</Label>
+                      <Label htmlFor="classSnapshotPdf">Class Status PDF</Label>
                       <Input
                         id="classSnapshotPdf"
                         type="file"
                         accept="application/pdf,.pdf"
                         onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
                       />
+                      <p className="text-xs text-neutral-500">
+                        Upload the latest official Class Status or Vessel Status PDF downloaded from the class society portal. Do not upload an individual certificate PDF here.
+                      </p>
                     </div>
                     {uploadError ? <p className="text-sm text-error-700">{uploadError}</p> : null}
                     {uploadMutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(uploadMutation.error)}</p> : null}
                     {uploadMutation.isSuccess ? <p className="text-sm text-success-700">Snapshot uploaded.</p> : null}
-                    <Button type="submit" disabled={uploadMutation.isPending}>
+                    <Button type="submit" disabled={uploadMutation.isPending || vesselDashboard.isLoading || uploadVessels.length === 0}>
                       <UploadCloud className="mr-2 h-4 w-4" aria-hidden="true" />
                       Upload snapshot
                     </Button>
@@ -6453,6 +6483,19 @@ function formatSnapshotAge(snapshot: CertVesselDashboardResponse['lastClassSnaps
   if (snapshot.daysAgo === 1) return 'Uploaded 1 day ago';
   if (typeof snapshot.daysAgo === 'number') return `Uploaded ${snapshot.daysAgo} days ago`;
   return `Uploaded ${formatDate(snapshot.uploadedAt)}`;
+}
+
+function formatClassSnapshotVesselOption(vessel: CertFleetDashboardVessel): string {
+  const name = String(vessel.name ?? '').trim();
+  const code = String(vessel.code ?? '').trim();
+  const imo = String(vessel.imo ?? '').trim();
+  const baseLabel = name || code || (imo ? `IMO ${imo}` : formatEntityLabel(vessel.id, 'Vessel'));
+  const details = [
+    code && code !== baseLabel ? code : null,
+    imo && baseLabel !== `IMO ${imo}` ? `IMO ${imo}` : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return details.length ? `${baseLabel} (${details.join(', ')})` : baseLabel;
 }
 
 function formatStatus(value: string | null | undefined): string {

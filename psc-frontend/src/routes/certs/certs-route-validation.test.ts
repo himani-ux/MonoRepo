@@ -21,4 +21,14 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).toContain('function CertClassReconciliationEntryCard');
     expect(certsRouteSource).toContain('to={ROUTES.CERTS_RECONCILIATION}');
   });
+
+  it('test_class_snapshot_upload_uses_vessel_dropdown_and_explains_pdf', () => {
+    expect(certsRouteSource).toContain('const vesselDashboard = useFleetDashboard(canUpload);');
+    expect(certsRouteSource).toContain('<Label htmlFor="classSnapshotVesselId">Vessel</Label>');
+    expect(certsRouteSource).toContain('onValueChange={setVesselId}');
+    expect(certsRouteSource).toContain('Select the vessel name. The system will use the correct vessel ID automatically.');
+    expect(certsRouteSource).toContain('<Label htmlFor="classSnapshotPdf">Class Status PDF</Label>');
+    expect(certsRouteSource).toContain('Do not upload an individual certificate PDF here.');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="classSnapshotVesselId">Vessel ID</Label>');
+  });
 });

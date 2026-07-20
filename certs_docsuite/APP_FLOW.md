@@ -336,7 +336,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - "Mark all PDFs uploaded" advances to step 4.
 
 **Step 4 — Class Status Report upload + reconciliation** (D-CERT-100, D-CERT-110, D-CERT-120, FEAT-CERT-WIZ-014, FEAT-CERT-WIZ-015)
-- Upload class status PDF (NK / KR / BV — auto-detected from format).
+- Select the vessel by name/code, then upload the official Class Status or Vessel Status PDF (NK / KR / BV — auto-detected from format). The selected vessel supplies the backend `vesselId`; users do not type raw vessel IDs.
 - Parser runs per FEAT-CERT-REC-002; results land in reconciliation panel.
 - Anniversary cross-validation: if DPA-entered anniversary disagrees with class report's implied dates, surface in panel (FEAT-CERT-WIZ-015 / D-CERT-110).
 
@@ -413,6 +413,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Columns: vessel, class society, snapshot date, parse status, parser version, matches count, mismatches count, missing-in-catalog count, missing-in-class count, conditional/STC detected, extended/postponed detected, unresolved flags, last reviewed by + when.
 - Per-row action: "Review" → §3.10. "Re-parse with current mapping" (manual, D-CERT-061).
 - "Export filtered list as CSV" button.
+- Upload class snapshot card (DPA / FM / Sup'tts): vessel dropdown from onboarded fleet data shows vessel name/code/IMO and submits the selected vessel's `vesselId` internally; class society selector; printed-on date; Class Status PDF file input. Helper copy states to upload the latest official Class Status or Vessel Status PDF downloaded from the class society portal, not an individual certificate PDF.
 
 **Surfaces (FIELD_MAP):** `vims_certs_reconciliation_run.*` columns, joined `vims_certs_class_status_snapshot`, joined `vims_certs_class_code_mapping.version`.
 

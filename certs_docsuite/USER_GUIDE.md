@@ -28,7 +28,7 @@
 - **Approval queue:** Open `/certs/approvals` to approve/reject pending certificate uploads when urgent office review is needed.
 - **Catalog edits:** `/certs/catalog` → add / deprecate / push to fleet. New rows save as all-rank-with-Master-approval, and all changes are audited.
 - **Onboarding new vessel:** `/certs/onboarding` → start wizard → 7 steps. Use save-as-draft between batches; takes 2–4 hours per vessel total.
-- **Class status snapshot upload:** every 3 months per vessel. Open vessel → "Upload class snapshot" → select PDF → parser runs → review reconciliation panel.
+- **Class status snapshot upload:** every 3 months per vessel. Open `/certs/reconciliation` or the vessel page → "Upload class snapshot" → select the vessel by name/code → upload the latest official Class Status or Vessel Status PDF from the class society portal. This is the full class-status report for the vessel, not an individual certificate PDF.
 - **Provisioning external auditors:** `/certs/auditor-access` → "New grant" → set scope + expiry. System emails auditor a one-time signup link.
 - **Settings:** `/certs/settings` to tune alert lead times, OCR thresholds, Slack routing.
 
