@@ -4265,44 +4265,8 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
   const [uploadReason, setUploadReason] = useState('');
   const [removeOpen, setRemoveOpen] = useState(false);
   const [removeReason, setRemoveReason] = useState('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewError, setPreviewError] = useState('');
-  const [previewLoading, setPreviewLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl: string | null = null;
-
-    setPreviewUrl(null);
-    setPreviewError('');
-    if (!activePdf?.id) {
-      setPreviewLoading(false);
-      return () => undefined;
-    }
-
-    setPreviewLoading(true);
-    certsApi
-      .getTrackedItemPdfBlob(item.id, activePdf.id)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setPreviewError(getErrorMessage(error));
-      })
-      .finally(() => {
-        if (!cancelled) setPreviewLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [activePdf?.id, item.id]);
+  const [viewError, setViewError] = useState('');
+  const [viewLoading, setViewLoading] = useState(false);
 
   const handleUploadSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -4343,6 +4307,33 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
     );
   };
 
+  const handleOpenPdf = async () => {
+    if (!activePdf?.id || viewLoading) {
+      return;
+    }
+
+    setViewError('');
+    const pdfWindow = window.open('', '_blank');
+    if (!pdfWindow) {
+      setViewError('Allow pop-ups for this site, then try again.');
+      return;
+    }
+    pdfWindow.opener = null;
+    setViewLoading(true);
+
+    try {
+      const blob = await certsApi.getTrackedItemPdfBlob(item.id, activePdf.id);
+      const objectUrl = URL.createObjectURL(blob);
+      pdfWindow.location.href = objectUrl;
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      pdfWindow.close();
+      setViewError(getErrorMessage(error));
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -4354,42 +4345,25 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
             <div className="space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-neutral-900">{activePdf.filename}</p>
+                  <button
+                    type="button"
+                    className="max-w-full truncate text-left font-medium text-primary-700 underline-offset-4 transition-colors hover:text-primary-800 hover:underline disabled:cursor-wait disabled:text-neutral-500"
+                    onClick={handleOpenPdf}
+                    disabled={viewLoading}
+                  >
+                    {activePdf.filename || 'View certificate PDF'}
+                  </button>
                   <p className="text-sm text-neutral-600">
                     Uploaded {formatDateTime(activePdf.uploadedAt)} by {formatPrincipalLabel(activePdf.uploadedByDisplay, activePdf.uploadedBy)}
                   </p>
                   <p className="text-xs text-neutral-500">{formatBytes(activePdf.sizeBytes)}</p>
                 </div>
-                {previewUrl ? (
-                  <Button asChild size="sm" variant="outline">
-                    <a href={previewUrl} target="_blank" rel="noreferrer">
-                      Open PDF
-                    </a>
-                  </Button>
-                ) : null}
+                <Button type="button" size="sm" variant="outline" onClick={handleOpenPdf} disabled={viewLoading}>
+                  <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {viewLoading ? 'Opening...' : 'View PDF'}
+                </Button>
               </div>
-              {previewLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-8 w-40" />
-                  <Skeleton className="h-96 w-full" />
-                </div>
-              ) : previewUrl ? (
-                <iframe
-                  className="h-[420px] w-full rounded-md border border-neutral-200 bg-white"
-                  src={previewUrl}
-                  title={`Preview of ${activePdf.filename ?? 'certificate PDF'}`}
-                />
-              ) : (
-                <div className="flex min-h-72 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-white p-4 text-center">
-                  <div className="space-y-2">
-                    <FileText className="mx-auto h-8 w-8 text-neutral-400" aria-hidden="true" />
-                    <p className="font-medium text-neutral-900">PDF preview unavailable</p>
-                    <p className="text-sm text-neutral-600">
-                      {previewError || 'The certificate file could not be shown here.'}
-                    </p>
-                  </div>
-                </div>
-              )}
+              {viewError ? <p className="rounded-md border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700">{viewError}</p> : null}
             </div>
           ) : (
             <div className="flex min-h-56 items-center justify-center text-center">

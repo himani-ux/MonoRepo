@@ -231,7 +231,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Form ID:** `CERT_F_002`
 **Process IDs:** `CERT_P_001` (Create), `CERT_P_002` (Submit), `CERT_P_003` (Approve), `CERT_P_004` (Reject)
 **Primary user:** Master (own vessel) RW; C/O/C/E/2/E submit; DPA/FM/MS/TS direct write; TM read-only.
-**Purpose:** Full per-cert editor with approval gate, PDF preview, hierarchy view, audit history.
+**Purpose:** Full per-cert editor with approval gate, on-demand PDF viewing, hierarchy view, audit history.
 
 **Layout (3-column desktop / stacked tablet):**
 - **Left col — Cert metadata:**
@@ -240,7 +240,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Status pill (D-CERT-135/136 color+shape) + days_to_go.
   - Hierarchy: parent breadcrumb (D-CERT-010 2-level UI cap); child rows list (STC, extensions, dispensations, sub-surveys).
 - **Middle col — Certificate file:**
-  - Active certificate PDF preview embedded in the card, loaded through the authenticated PDF endpoint, with an "Open PDF" action.
+  - Active certificate file name is shown as the view link. Clicking the file name or "View PDF" fetches the authenticated PDF and opens it in a new tab; the PDF is not loaded automatically.
   - Version history tray (D-CERT-019/020): previous files with `superseded_at` timestamps; deleted-pending blobs grayed out (7-day grace per D-CERT-021).
   - Upload certificate button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015).
 - **Right col — Review and history:**
@@ -624,7 +624,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Routes:**
 - `/auditor/<grant_token>/` — landing, scope summary, vessel list within scope.
 - `/auditor/<grant_token>/vessels/<imo>` — vessel cert dashboard (filtered to scope; mirrors §3.4 with redactions).
-- `/auditor/<grant_token>/cert/<tracked_item_id>` — TrackedItem detail (read-only; mirrors §3.5 with redactions; PDF preview + download enabled).
+- `/auditor/<grant_token>/cert/<tracked_item_id>` — TrackedItem detail (read-only; mirrors §3.5 with redactions; PDF view + download enabled).
 - `/auditor/<grant_token>/print` — generate AUDIT COPY watermarked print (D-CERT-138 / FEAT-CERT-EXT-010).
 
 **Auth:** Token-based (signed, expiry-bound per `vims_certs_external_auditor_access.expiry_at`); separate from main JWT auth. No federated SSO across modules (D-CERT-178 / FEAT-CERT-EXT-009).
@@ -680,7 +680,7 @@ Every screen MUST implement all 11 states (or inherit the module-wide N/A). Stan
 | **ERROR** | Inline error banner at top of content area: "Could not load <X>. <Retry>". Audit log captures fetch failure for ops surfacing on DPA dashboard. NEVER blank page; NEVER silent fail. |
 | **PERMISSION_DENIED** | Authenticated but role lacks the screen's `CERT_F_*`/`CERT_P_*` permission (§2 matrix): action surfaces (buttons, tabs, nav entries) are **hidden, not disabled-with-tooltip**, per the role-permission matrix. Field-level redaction follows D-CERT-180 (external auditor sees `[REDACTED — internal note]`). Direct API access without permission returns 403. ✅ **RESOLVED (B-FLOW-01, 2026-06-12):** URL-navigation to an unauthorized route renders a full-screen 403 page — "You don't have access to this page." + primary CTA **[Back to Fleet Dashboard]** (`/certs`). No request-access flow in V1. |
 | **OFFLINE** | **N/A — online-required architecture (D-CERT-156, Starlink fleet).** Network failure renders the ERROR state; transient drops ride the `master_notification` server-side queue and the D-CERT-082 re-auth modal's HTTP-level resilience. No offline UI exists by locked decision. |
-| **PARTIAL_DATA** | Module-wide policy: screens render **per-panel**, not all-or-nothing — a failed panel shows its own inline ERROR banner (+retry) while sibling panels render (e.g. §3.5 metadata loads, PDF preview fails → preview-pane error only). No silent omission of failed panels — every failed fetch is visible per the ERROR contract. |
+| **PARTIAL_DATA** | Module-wide policy: screens render **per-panel**, not all-or-nothing — a failed panel shows its own inline ERROR banner (+retry) while sibling panels render (e.g. §3.5 metadata loads, PDF view request fails → certificate-file card error only). No silent omission of failed panels — every failed fetch is visible per the ERROR contract. |
 | **RATE_LIMITED** | **N/A — no hard rate limiting exists in V1** (✅ confirmed by B-SEC-11 resolution, 2026-06-12: no DRF throttling). Print throttle is a soft audit-log signal, never a user-facing block (D-CERT-143); batch caps (≤10 ingest D-CERT-104, ≤50 bulk-delete D-CERT-092) surface as **validation errors**, not 429s. |
 | **SESSION_EXPIRED** | **Fully specified by D-CERT-082:** PMS-style modal overlay (NOT redirect); form state preserved; identifier pre-filled (CrewID vessel / Employee ID office); 15-min and 5-min toast warnings precede idle expiry (8h office / 24h vessel). External Auditor Portal (§3.20) differs — see §5.1. |
 | **MAINTENANCE** | ✅ **RESOLVED (B-FLOW-02, 2026-06-12):** platform-level static maintenance page (served at the Nginx layer so it works with Django down): "VIMS is under scheduled maintenance." + ETA line when known. **DPA-triggered** (coordinated with corporate IT); not module code — Certs inherits whatever VIMS-wide static page exists, and one MUST exist before Phase 9 cutover (Phase 8 checklist item). Unplanned outages still render the ERROR state. |
@@ -692,7 +692,7 @@ Screens not listed here implement the standard 11-state contract exactly.
 
 | Screen | Deviation |
 |--------|-----------|
-| §3.5 TrackedItem Detail | Adds domain banners ON TOP of the contract (see "Special states" below); PARTIAL_DATA per-panel split = metadata / PDF preview / workflow+audit panes. |
+| §3.5 TrackedItem Detail | Adds domain banners ON TOP of the contract (see "Special states" below); PARTIAL_DATA per-panel split = metadata / certificate file / review+history panes. |
 | §3.11 Print Builder | Generation progress bar with ETA (≤60s sync, ≤5min fleet async per D-CERT-144); generation failure = ERROR with retry; soft print-throttle is invisible to user (D-CERT-143). |
 | §3.17 Audit Log Read | Cold-tier (2–5y) rows load on explicit prompt (D-CERT-183) — that prompt is a SUCCESS-state affordance, not LOADING. External-auditor view applies D-CERT-180 redaction (PERMISSION_DENIED at field level). |
 | §3.20 External Auditor Portal | SESSION_EXPIRED ≠ D-CERT-082 modal: grant token is signed + expiry-bound; an expired/exhausted grant shows a terminal "Access expired — contact the DPA" screen (no re-auth path, no early revocation per D-CERT-195). ROUTE_GUARD: invalid/expired token = same terminal screen; portal never redirects into `/certs/*`. |
@@ -715,7 +715,7 @@ Screens not listed here implement the standard 11-state contract exactly.
 - Vessel: bridge tablet (Master flows for cert renewal upload, approval, share-bundle creation).
 
 **Tablet layout adjustments:**
-- TrackedItem Detail (§3.5) — 3-column desktop collapses to stacked vertical sections (Metadata → PDF preview → Workflow + audit). PDF preview stays full-width; pinch-zoom enabled.
+- TrackedItem Detail (§3.5) — 3-column desktop collapses to stacked vertical sections (Metadata → Certificate file → Review and history). Certificate PDF opens on demand from the file name or "View PDF" action.
 - Vessel Cert Dashboard (§3.4) — section accordion; per-section table becomes per-row card on narrow screens.
 - Onboarding Wizard (§3.7) — DPA primarily desktop; not optimized for mobile (acceptable scope).
 - Master upload flow (§3.5 PDF upload + §3.13 Share Bundle) — fully tablet-optimized; bridge-scanner integration via standard browser file API (D-CERT-166 / FEAT-CERT-OCR-013).

@@ -272,3 +272,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-17 | MAINTAIN | CR-096 | Added Certs Pending master approval filter and a dedicated approval queue for Master/office visibility | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/USER_GUIDE.md | exemptions: none
 2026-07-17 | MAINTAIN | CR-097 | Allowed Certs pending certificate approvals to be approved or rejected by Master, DPA, or PIC within vessel scope | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md, certs_docsuite/USER_GUIDE.md | exemptions: none
 2026-07-20 | MAINTAIN | CR-098 | Added inline Certs PDF preview and simplified certificate review/history wording for non-technical users | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md | exemptions: none
+2026-07-20 | MAINTAIN | CR-099 | Changed Certs PDF viewing to on-demand file-name/View PDF action instead of automatic embedded preview | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md | exemptions: none

@@ -635,7 +635,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | POST | `/api/certs/tracked-items/<id>/approve/` | CERT_P_003 | Master (own vessel), DPA, PIC | pending_master_approval â†’ approved |
 | POST | `/api/certs/tracked-items/<id>/reject/` | CERT_P_004 | Master (own vessel), DPA, PIC | pending_master_approval â†’ rejected; reason required |
 | POST | `/api/certs/tracked-items/<id>/upload-pdf/` | CERT_P_001 | Master direct / DPA / FM / Sup'tts | Renewal vs revision auto-detect |
-| GET | `/api/certs/tracked-items/<id>/pdfs/<blob_id>/view/` | (read-vessel) | Per RBAC scope | Inline authenticated PDF preview |
+| GET | `/api/certs/tracked-items/<id>/pdfs/<blob_id>/view/` | (read-vessel) | Per RBAC scope | Authenticated PDF view stream |
 | GET | `/api/certs/tracked-items/<id>/pdfs/` | (read-vessel) | Per RBAC | Active + superseded + pending-delete |
 | POST | `/api/certs/tracked-items/<id>/anniversary/` | CERT_P_008 | DPA | Rare; confirmation flow |
 | POST | `/api/certs/tracked-items/<id>/quarantine-resolve/` | CERT_P_001 | DPA | expired_at_onboarding â†’ expired or active |
