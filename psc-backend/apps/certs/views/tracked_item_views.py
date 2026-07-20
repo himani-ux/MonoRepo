@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
+from django.core.exceptions import SuspiciousFileOperation
 from django.db import transaction
+from django.http import FileResponse
 from django.utils import timezone
+from django.utils.text import get_valid_filename
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -43,7 +46,7 @@ from apps.certs.services.ocr_pipeline import (
     process_cert_pdf,
 )
 from apps.certs.services.pdf_blob_repository import PdfBlobRepository, ocr_confidence_map
-from apps.certs.services.pdf_blob_storage import delete_stored_blob, save_uploaded_cert_pdf
+from apps.certs.services.pdf_blob_storage import delete_stored_blob, resolve_pdf_blob_path, save_uploaded_cert_pdf
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 
 
@@ -248,6 +251,33 @@ class TrackedItemQuarantineResolveView(generics.GenericAPIView):
                 source_ref="api.certs.tracked_items.quarantine_resolve",
             )
         return Response(serialized_after)
+
+
+class TrackedItemPdfInlineView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, HasTrackedItemReadPermission]
+
+    def get(self, request, tracked_item_id: str, blob_id: str, *args, **kwargs):
+        row = repository.get_item(str(tracked_item_id))
+        if row is None:
+            return Response({"detail": "Tracked item not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not user_can_access_vessel(request.user, str(row.get("vessel_id"))):
+            return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
+
+        blob = pdf_repository.get_blob(str(blob_id))
+        if blob is None or str(blob.get("tracked_item_id") or "") != str(tracked_item_id):
+            return Response({"detail": "Certificate PDF not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            absolute_path = resolve_pdf_blob_path(blob)
+        except SuspiciousFileOperation:
+            return Response({"detail": "Certificate PDF path is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+        if not absolute_path.is_file():
+            return Response({"detail": "Certificate PDF file is missing from storage."}, status=status.HTTP_404_NOT_FOUND)
+
+        filename = get_valid_filename(str(blob.get("filename") or absolute_path.name or "certificate.pdf")) or "certificate.pdf"
+        response = FileResponse(absolute_path.open("rb"), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        return response
 
 
 class TrackedItemUploadPdfView(generics.GenericAPIView):

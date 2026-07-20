@@ -123,37 +123,38 @@ import {
   useVesselProfile,
 } from '@/hooks/certs/use-vessel-dashboard';
 import { useCertSettings, useUpdateCertSettings } from '@/hooks/certs/use-settings';
-import type {
-  CertCatalogAuditEntry,
-  CertAuditLogEntry,
-  CertAuditLogFilters,
-  CertAuditorAccessGrant,
-  CertCatalogInlinePromotionContext,
-  CertCatalogRow,
-  CertClassSnapshot,
-  CertGapFillFieldState,
-  CertGapFillPdf,
-  CertOnboardingBatch,
-  CertOnboardingHubRow,
-  CertReconciliationAnomalyBreach,
-  CertReconciliationFlag,
-  CertReconciliationRun,
-  CertReconciliationRunDetail,
-  CertTrackedItemAuditEvent,
-  CertTrackedItemDetail,
-  CertTrackedItem,
-  CertOnboardingWizardState,
-  CertPrintArtifact,
-  CertPrintScope,
-  CertPrintWatermark,
-  CertValidationEntry,
-  CertFleetDashboardResponse,
-  CertVesselLifecycleResponse,
-  CertVesselDashboardResponse,
-  CertVesselDashboardSection,
-  CertAlertConfig,
-  CertSettingsResponse,
-  CertSlackRoute,
+import {
+  certsApi,
+  type CertCatalogAuditEntry,
+  type CertAuditLogEntry,
+  type CertAuditLogFilters,
+  type CertAuditorAccessGrant,
+  type CertCatalogInlinePromotionContext,
+  type CertCatalogRow,
+  type CertClassSnapshot,
+  type CertGapFillFieldState,
+  type CertGapFillPdf,
+  type CertOnboardingBatch,
+  type CertOnboardingHubRow,
+  type CertReconciliationAnomalyBreach,
+  type CertReconciliationFlag,
+  type CertReconciliationRun,
+  type CertReconciliationRunDetail,
+  type CertTrackedItemAuditEvent,
+  type CertTrackedItemDetail,
+  type CertTrackedItem,
+  type CertOnboardingWizardState,
+  type CertPrintArtifact,
+  type CertPrintScope,
+  type CertPrintWatermark,
+  type CertValidationEntry,
+  type CertFleetDashboardResponse,
+  type CertVesselLifecycleResponse,
+  type CertVesselDashboardResponse,
+  type CertVesselDashboardSection,
+  type CertAlertConfig,
+  type CertSettingsResponse,
+  type CertSlackRoute,
 } from '@/lib/api/certs';
 import { getCertsHomeRoute, getCertsVesselIdentifier } from '@/lib/certs/navigation';
 import { ROUTES } from '@/lib/utils/constants';
@@ -4264,6 +4265,44 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
   const [uploadReason, setUploadReason] = useState('');
   const [removeOpen, setRemoveOpen] = useState(false);
   const [removeReason, setRemoveReason] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    setPreviewUrl(null);
+    setPreviewError('');
+    if (!activePdf?.id) {
+      setPreviewLoading(false);
+      return () => undefined;
+    }
+
+    setPreviewLoading(true);
+    certsApi
+      .getTrackedItemPdfBlob(item.id, activePdf.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setPreviewError(getErrorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [activePdf?.id, item.id]);
 
   const handleUploadSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -4310,21 +4349,55 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
         <CardTitle>Certificate file</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex min-h-56 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
+        <div className="rounded-md border border-neutral-200 bg-neutral-50/70 p-3">
           {activePdf ? (
-            <div className="space-y-2">
-              <FileText className="mx-auto h-8 w-8 text-neutral-500" aria-hidden="true" />
-              <p className="font-medium text-neutral-900">{activePdf.filename}</p>
-              <p className="text-sm text-neutral-600">
-                Uploaded {formatDateTime(activePdf.uploadedAt)} by {formatPrincipalLabel(activePdf.uploadedByDisplay, activePdf.uploadedBy)}
-              </p>
-              <p className="text-xs text-neutral-500">{formatBytes(activePdf.sizeBytes)}</p>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-neutral-900">{activePdf.filename}</p>
+                  <p className="text-sm text-neutral-600">
+                    Uploaded {formatDateTime(activePdf.uploadedAt)} by {formatPrincipalLabel(activePdf.uploadedByDisplay, activePdf.uploadedBy)}
+                  </p>
+                  <p className="text-xs text-neutral-500">{formatBytes(activePdf.sizeBytes)}</p>
+                </div>
+                {previewUrl ? (
+                  <Button asChild size="sm" variant="outline">
+                    <a href={previewUrl} target="_blank" rel="noreferrer">
+                      Open PDF
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+              {previewLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-40" />
+                  <Skeleton className="h-96 w-full" />
+                </div>
+              ) : previewUrl ? (
+                <iframe
+                  className="h-[420px] w-full rounded-md border border-neutral-200 bg-white"
+                  src={previewUrl}
+                  title={`Preview of ${activePdf.filename ?? 'certificate PDF'}`}
+                />
+              ) : (
+                <div className="flex min-h-72 items-center justify-center rounded-md border border-dashed border-neutral-300 bg-white p-4 text-center">
+                  <div className="space-y-2">
+                    <FileText className="mx-auto h-8 w-8 text-neutral-400" aria-hidden="true" />
+                    <p className="font-medium text-neutral-900">PDF preview unavailable</p>
+                    <p className="text-sm text-neutral-600">
+                      {previewError || 'The certificate file could not be shown here.'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="flex min-h-56 items-center justify-center text-center">
+              <div className="space-y-2">
               <FileText className="mx-auto h-8 w-8 text-neutral-400" aria-hidden="true" />
               <p className="font-medium text-neutral-900">No active certificate file</p>
               <p className="text-sm text-neutral-600">{item.pdfMissing ? 'This certificate is marked as missing.' : 'No certificate file has been uploaded yet.'}</p>
+              </div>
             </div>
           )}
         </div>
@@ -4475,7 +4548,7 @@ function CertTrackedItemWorkflowPanel({
   const approveMutation = useApproveTrackedItem(item.id, imo);
   const rejectMutation = useRejectTrackedItem(item.id, imo);
   const canSubmitCurrent = canSubmit && ['draft', 'rejected'].includes(item.approvalState ?? '');
-  const canMasterDecision = item.approvalState === 'pending_master_approval';
+  const canApprovalDecision = item.approvalState === 'pending_master_approval';
   const mutationError = submitMutation.error ?? approveMutation.error ?? rejectMutation.error;
 
   const transitionPayload = () => ({
@@ -4486,29 +4559,28 @@ function CertTrackedItemWorkflowPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Workflow + Audit</CardTitle>
+        <CardTitle>Review and history</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         <CertDetailGrid
           rows={[
-            ['Approval state', item.approvalState ? formatStatus(item.approvalState) : 'Not set'],
+            ['Approval status', item.approvalState ? formatStatus(item.approvalState) : 'Not set'],
             ['Submitted by', formatPrincipalLabel(item.submittedByDisplay, item.submittedBy, undefined, 'Not submitted')],
-            ['Submitted at', formatDateTime(item.submittedAt)],
+            ['Submitted on', formatDateTime(item.submittedAt)],
             ['Approved by', formatPrincipalLabel(item.approvedByDisplay, item.approvedBy, undefined, 'Not approved')],
-            ['Approved at', formatDateTime(item.approvedAt)],
-            ['Rejected count', String(item.rejectionCount ?? 0)],
-            ['Draft expires', formatDateTime(item.draftExpiresAt)],
-            ['Version', String(item.version ?? 'n/a')],
+            ['Approved on', formatDateTime(item.approvedAt)],
+            ['Times rejected', String(item.rejectionCount ?? 0)],
+            ['Draft expires on', formatDateTime(item.draftExpiresAt)],
           ]}
         />
-        {(canSubmitCurrent || (canMasterDecision && (canApprove || canReject))) ? (
+        {(canSubmitCurrent || (canApprovalDecision && (canApprove || canReject))) ? (
           <div className="space-y-3 rounded-md border border-neutral-200 p-3">
-            <Label htmlFor="trackedItemTransitionReason">Action reason</Label>
+            <Label htmlFor="trackedItemTransitionReason">Review note</Label>
             <Textarea
               id="trackedItemTransitionReason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="Reason for change"
+              placeholder="Add a short note for this review"
             />
             {mutationError ? <p className="text-sm text-error-700">{getErrorMessage(mutationError)}</p> : null}
             <div className="flex flex-wrap gap-2">
@@ -4517,12 +4589,12 @@ function CertTrackedItemWorkflowPanel({
                   Submit for approval
                 </Button>
               ) : null}
-              {canMasterDecision && canApprove ? (
+              {canApprovalDecision && canApprove ? (
                 <Button type="button" onClick={() => approveMutation.mutate(transitionPayload())} disabled={approveMutation.isPending}>
                   Approve
                 </Button>
               ) : null}
-              {canMasterDecision && canReject ? (
+              {canApprovalDecision && canReject ? (
                 <Button type="button" variant="destructive" onClick={() => rejectMutation.mutate(transitionPayload())} disabled={rejectMutation.isPending}>
                   Reject
                 </Button>
@@ -4553,15 +4625,15 @@ function CertDetailGrid({ rows }: { rows: Array<[string, ReactNode]> }) {
 function CertApprovalTimeline({ events }: { events: CertTrackedItemDetail['approvalEvents'] }) {
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-semibold uppercase text-neutral-500">Approval timeline</h2>
+      <h2 className="text-sm font-semibold uppercase text-neutral-500">Approval history</h2>
       {events.length === 0 ? (
-        <p className="text-sm text-neutral-600">No approval events recorded.</p>
+        <p className="text-sm text-neutral-600">No approval activity yet.</p>
       ) : (
         <div className="space-y-2">
           {events.map((event) => (
             <div key={event.id} className="rounded-md border border-neutral-200 p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={statusBadgeVariant(event.toState)}>{formatStatus(event.fromState)} to {formatStatus(event.toState)}</Badge>
+                <Badge variant={statusBadgeVariant(event.toState)}>{formatApprovalEventTitle(event)}</Badge>
                 <span className="text-neutral-600">{formatPrincipalLabel(event.actorDisplayName, event.actorUserId, event.actorRole)}</span>
               </div>
               <p className="mt-1 text-neutral-600">{formatDateTime(event.timestampUtc)}</p>
@@ -4577,9 +4649,9 @@ function CertApprovalTimeline({ events }: { events: CertTrackedItemDetail['appro
 function CertTrackedAuditEvents({ events }: { events: CertTrackedItemAuditEvent[] }) {
   return (
     <div className="space-y-2">
-      <h2 className="text-sm font-semibold uppercase text-neutral-500">Audit events</h2>
+      <h2 className="text-sm font-semibold uppercase text-neutral-500">Recent activity</h2>
       {events.length === 0 ? (
-        <p className="text-sm text-neutral-600">No audit events recorded.</p>
+        <p className="text-sm text-neutral-600">No activity recorded yet.</p>
       ) : (
         <div className="space-y-2">
           {events.map((event) => (
@@ -4588,6 +4660,9 @@ function CertTrackedAuditEvents({ events }: { events: CertTrackedItemAuditEvent[
                 <Badge variant="secondary">{formatAuditAction(event.action)}</Badge>
                 <span className="text-neutral-500">{formatDateTime(event.timestampUtc)}</span>
               </div>
+              <p className="mt-1 text-neutral-600">
+                By {formatPrincipalLabel(event.actorDisplayName, event.actorUserId, event.actorRole)}
+              </p>
               <p className="mt-2 text-neutral-700">{summarizeTrackedAuditDiff(event)}</p>
               {event.reason ? <p className="mt-1 text-neutral-600">{event.reason}</p> : null}
             </div>
@@ -6498,11 +6573,75 @@ function dashboardItemMatchesSearch(
     .some((value) => value.toLowerCase().includes(searchTerm));
 }
 
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  create_tracked_item: 'Certificate record created',
+  update_tracked_item: 'Certificate details updated',
+  submit_tracked_item: 'Submitted for approval',
+  approve_tracked_item: 'Approved',
+  reject_tracked_item: 'Rejected',
+  upload_tracked_item_pdf: 'Certificate file uploaded',
+  remove_tracked_item_pdf: 'Certificate file removed',
+  quarantine_resolve: 'Certificate status updated',
+};
+
+const TRACKED_AUDIT_FIELD_LABELS: Record<string, string> = {
+  approvalState: 'Approval status',
+  approvedAt: 'Approved on',
+  approvedBy: 'Approved by',
+  certificateNumber: 'Certificate number',
+  draftExpiresAt: 'Draft expiry',
+  expiryDate: 'Expiry date',
+  extensionAuthority: 'Extension authority',
+  extensionLetterPdfId: 'Extension letter',
+  extensionReason: 'Extension reason',
+  issuingAuthority: 'Issuing authority',
+  issueDate: 'Issue date',
+  lastDoneDate: 'Last completed',
+  nextDueDate: 'Next due date',
+  pdfAttachmentId: 'Certificate file',
+  pdfMissing: 'Certificate file status',
+  placeOfIssue: 'Place of issue',
+  postponedUntil: 'Postponed until',
+  rejectionCount: 'Rejection count',
+  rejectionReason: 'Rejection reason',
+  status: 'Certificate status',
+  submittedAt: 'Submitted on',
+  submittedBy: 'Submitted by',
+  supersedesId: 'Superseded certificate',
+  windowClose: 'Renewal deadline',
+  windowOpen: 'Renewal starts',
+};
+
+const TRACKED_AUDIT_TECHNICAL_FIELDS = new Set([
+  'createdAt',
+  'createdBy',
+  'createdByDisplay',
+  'id',
+  'rowVersion',
+  'updatedAt',
+  'updatedBy',
+  'updatedByDisplay',
+  'version',
+]);
+
 function formatAuditAction(action: string): string {
-  return action
+  const normalized = String(action || '').trim();
+  if (AUDIT_ACTION_LABELS[normalized]) {
+    return AUDIT_ACTION_LABELS[normalized];
+  }
+  return normalized
     .split('_')
+    .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+    .join(' ') || 'Activity recorded';
+}
+
+function formatApprovalEventTitle(event: CertTrackedItemDetail['approvalEvents'][number]): string {
+  if (event.toState === 'approved') return 'Approved';
+  if (event.toState === 'rejected') return 'Rejected';
+  if (event.toState === 'pending_master_approval') return 'Submitted for approval';
+  if (event.toState === 'draft') return 'Saved as draft';
+  return `${formatStatus(event.fromState)} to ${formatStatus(event.toState)}`;
 }
 
 function isUuidLike(value: string | null | undefined): boolean {
@@ -6556,14 +6695,21 @@ function summarizeAuditDiff(entry: CertCatalogAuditEntry): string {
 
 function summarizeTrackedAuditDiff(entry: CertTrackedItemAuditEvent): string {
   if (!entry.before && entry.after) {
-    return 'Created tracked item.';
+    return 'Certificate record was created.';
   }
   if (entry.before && entry.after) {
     const keys = new Set([...Object.keys(entry.before), ...Object.keys(entry.after)]);
-    const changed = Array.from(keys).filter((key) => JSON.stringify(entry.before?.[key]) !== JSON.stringify(entry.after?.[key]));
-    return changed.length ? `Changed: ${changed.join(', ')}` : 'No field-level diff.';
+    const changed = Array.from(keys)
+      .filter((key) => !TRACKED_AUDIT_TECHNICAL_FIELDS.has(key))
+      .filter((key) => JSON.stringify(entry.before?.[key]) !== JSON.stringify(entry.after?.[key]))
+      .map((key) => TRACKED_AUDIT_FIELD_LABELS[key] ?? formatAuditAction(key))
+      .filter((label, index, labels) => labels.indexOf(label) === index);
+    if (changed.length === 0) {
+      return 'Certificate record was reviewed.';
+    }
+    return `Updated: ${changed.join(', ')}.`;
   }
-  return 'Audit event recorded.';
+  return 'Activity recorded.';
 }
 
 function summarizeAuditLogDiff(entry: CertAuditLogEntry): string {

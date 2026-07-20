@@ -1,6 +1,9 @@
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.core.exceptions import SuspiciousFileOperation
+from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
+from pathlib import Path
+import tempfile
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
@@ -8,6 +11,7 @@ from unittest.mock import patch
 from apps.certs.permissions import can_approve_tracked_item
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
+from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
 
@@ -68,6 +72,19 @@ class TrackedItemApprovalAuthorityTests(SimpleTestCase):
         user = SimpleNamespace(user_type="OFFICE", role="CHIEF ACCOUNTING OFFICER", has_global_vessel_access=True)
 
         self.assertFalse(can_approve_tracked_item(user, {"vessel_id": "VESSEL-1"}))
+
+
+class PdfBlobStoragePathTests(SimpleTestCase):
+    def test_resolves_pdf_blob_path_inside_upload_root(self):
+        with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root):
+            resolved = resolve_pdf_blob_path({"blob_storage_path": "certs/vessel-1/class.pdf"})
+
+        self.assertEqual(resolved, Path(upload_root).resolve() / "certs" / "vessel-1" / "class.pdf")
+
+    def test_rejects_pdf_blob_path_outside_upload_root(self):
+        with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root):
+            with self.assertRaises(SuspiciousFileOperation):
+                resolve_pdf_blob_path({"blob_storage_path": "../outside.pdf"})
 
 
 class CatalogRowSubmissionScopeTests(SimpleTestCase):

@@ -240,20 +240,21 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Status pill (D-CERT-135/136 color+shape) + days_to_go.
   - Hierarchy: parent breadcrumb (D-CERT-010 2-level UI cap); child rows list (STC, extensions, dispensations, sub-surveys).
 - **Middle col — Certificate file:**
-  - Active certificate file embedded (with download button).
+  - Active certificate PDF preview embedded in the card, loaded through the authenticated PDF endpoint, with an "Open PDF" action.
   - Version history tray (D-CERT-019/020): previous files with `superseded_at` timestamps; deleted-pending blobs grayed out (7-day grace per D-CERT-021).
   - Upload certificate button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015).
-- **Right col — Workflow + audit:**
-  - Approval state pill (`draft / pending_master_approval / approved / rejected`).
-  - Submitted_by + submitted_at + approved_by + approved_at (when applicable).
+- **Right col — Review and history:**
+  - UI heading is **Review and history**.
+  - User-facing approval status (`draft / pending_master_approval / approved / rejected` rendered as readable labels).
+  - Submitted by/on + approved by/on + rejection count + draft expiry (when applicable); internal row version is not shown.
   - Action buttons gated by role + state:
     - Master: Approve / Reject (with reason) when state = `pending_master_approval`; Edit + Save direct (Master own write).
     - DPA / PIC: Approve / Reject (with reason) when state = `pending_master_approval` and vessel scope permits.
     - CO/CE/2E: Save as draft / Submit for approval (when own submission).
     - DPA / FM / MS / TS: Edit + Save direct (no approval gate).
-  - Approval event timeline (D-CERT-018 / D-CERT-076): full state transitions with timestamps + reasons.
+  - Approval history (D-CERT-018 / D-CERT-076): full state transitions with timestamps + reasons, rendered in plain user language.
   - Notification thread: alerts fired for this row (D-CERT-155 metadata).
-  - Field history: per-field change log (audit-driven; respects D-CERT-091/099 retention).
+  - Recent activity: audit-backed change summary with user-friendly field names; raw database field names are not displayed.
   - "Reset onboarding" button (DPA, only visible if vessel `lifecycle_status = onboarding_in_progress` per D-CERT-124 / FEAT-CERT-WIZ-019).
 
 **Surfaces (FIELD_MAP):** Every column on `vims_certs_tracked_item`, all `vims_certs_pdf_blob` rows for this tracked_item (active + superseded + delete-pending), `vims_certs_approval_event` rows, `vims_certs_audit_log` filtered to this entity, `vims_certs_notification_meta` joined.

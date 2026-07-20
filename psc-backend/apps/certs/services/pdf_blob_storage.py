@@ -156,3 +156,16 @@ def delete_stored_blob(relative_path: str) -> bool:
         absolute_path.unlink()
         return True
     raise SuspiciousFileOperation("Certificate blob delete path is not a file.")
+
+
+def resolve_pdf_blob_path(blob: dict) -> Path:
+    upload_base = Path(getattr(settings, "UPLOAD_BASE_PATH", settings.BASE_DIR / "uploads")).resolve(strict=False)
+    storage_path = str(blob.get("blob_storage_path") or "").replace("\\", "/").lstrip("/")
+    if not storage_path:
+        raise SuspiciousFileOperation("Certificate PDF path is empty.")
+    absolute_path = (upload_base / storage_path).resolve(strict=False)
+    try:
+        absolute_path.relative_to(upload_base)
+    except ValueError as exc:
+        raise SuspiciousFileOperation("Certificate PDF path is outside upload storage.") from exc
+    return absolute_path

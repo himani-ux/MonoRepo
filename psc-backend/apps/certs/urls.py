@@ -45,6 +45,7 @@ from apps.certs.views import (
     TrackedItemApproveView,
     TrackedItemDetailView,
     TrackedItemListCreateView,
+    TrackedItemPdfInlineView,
     TrackedItemQuarantineResolveView,
     TrackedItemRemovePdfView,
     TrackedItemRejectView,
@@ -85,6 +86,11 @@ urlpatterns = [
     path("tracked-items/<str:tracked_item_id>/reject/", TrackedItemRejectView.as_view(), name="tracked-item-reject"),
     path("tracked-items/<str:tracked_item_id>/upload-pdf/", TrackedItemUploadPdfView.as_view(), name="tracked-item-upload-pdf"),
     path("tracked-items/<str:tracked_item_id>/remove-pdf/", TrackedItemRemovePdfView.as_view(), name="tracked-item-remove-pdf"),
+    path(
+        "tracked-items/<str:tracked_item_id>/pdfs/<str:blob_id>/view/",
+        TrackedItemPdfInlineView.as_view(),
+        name="tracked-item-pdf-view",
+    ),
     path(
         "tracked-items/<str:tracked_item_id>/quarantine-resolve/",
         TrackedItemQuarantineResolveView.as_view(),

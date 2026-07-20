@@ -1493,6 +1493,14 @@ export const certsApi = {
     return response.data;
   },
 
+  async getTrackedItemPdfBlob(trackedItemId: string, blobId: string): Promise<Blob> {
+    const response = await apiClient.get<Blob>(
+      buildCertsApiUrl(`/tracked-items/${encodeURIComponent(trackedItemId)}/pdfs/${encodeURIComponent(blobId)}/view/`),
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
   async uploadTrackedItemPdf(id: string, payload: CertTrackedItemUploadPdfPayload): Promise<CertTrackedItemUploadPdfResponse> {
     const formData = new FormData();
     formData.append('file', payload.file);
