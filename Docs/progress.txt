@@ -274,3 +274,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-20 | MAINTAIN | CR-098 | Added inline Certs PDF preview and simplified certificate review/history wording for non-technical users | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md | exemptions: none
 2026-07-20 | MAINTAIN | CR-099 | Changed Certs PDF viewing to on-demand file-name/View PDF action instead of automatic embedded preview | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md | exemptions: none
 2026-07-20 | MAINTAIN | T1 | Fixed Certs route error-state and lint issues found during module validation | docs: none - runtime cleanup only | exemptions: none
+2026-07-20 | MAINTAIN | T1 | Added the missing Certs landing entry point for Class Reconciliation so users with reconciliation access can open it visibly | docs: none - restores documented navigation surface | exemptions: none

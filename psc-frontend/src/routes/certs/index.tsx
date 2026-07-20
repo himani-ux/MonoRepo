@@ -320,6 +320,7 @@ function CertsLandingStub() {
   const role = normalizeAuthRole(auth);
   const canReadCatalog = auth.hasForm?.(FORM_IDS.CERTS_CATALOG) === true;
   const canReadTrackedItems = auth.hasForm?.(FORM_IDS.CERTS_TRACKED_ITEMS) === true;
+  const canReadReconciliation = auth.hasForm?.(FORM_IDS.CERTS_RECONCILIATION) === true;
   const vesselDashboardIdentifier = getCertsVesselIdentifier(auth);
   const showOfficeVesselList = canReadTrackedItems && !vesselDashboardIdentifier;
   const showHighVolumePrintCard = isFleetManagerRole(role) && auth.hasForm?.(FORM_IDS.CERTS_PRINT_EXPORT);
@@ -347,6 +348,11 @@ function CertsLandingStub() {
                 <Link to={ROUTES.CERTS_CATALOG}>Open catalog</Link>
               </Button>
             ) : null}
+            {canReadReconciliation ? (
+              <Button asChild variant="outline">
+                <Link to={ROUTES.CERTS_RECONCILIATION}>Class reconciliation</Link>
+              </Button>
+            ) : null}
             {canReadTrackedItems && vesselDashboardIdentifier ? (
               <Button asChild>
                 <Link to={ROUTES.CERTS_VESSEL_DASHBOARD(vesselDashboardIdentifier)}>Open vessel certificates</Link>
@@ -360,12 +366,36 @@ function CertsLandingStub() {
           </div>
         </div>
         {showApprovalQueue ? <CertApprovalQueueSummaryCard /> : null}
+        {canReadReconciliation ? <CertClassReconciliationEntryCard /> : null}
         {showOfficeVesselList ? <CertOfficeVesselListCard /> : null}
         {showHeartbeatCard ? <CertFleetCadenceHeartbeatCard /> : null}
         {showBouncingEmailCard ? <CertFleetBouncingEmailCard /> : null}
         {showHighVolumePrintCard ? <CertFleetHighVolumePrintCard /> : null}
       </section>
     </RootLayout>
+  );
+}
+
+function CertClassReconciliationEntryCard() {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sky-50 text-sky-700">
+            <Activity className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-neutral-900">Class Reconciliation</h2>
+            <p className="text-sm text-neutral-600">
+              Upload class status PDFs and review mismatches, STC, extensions, and postponed items.
+            </p>
+          </div>
+        </div>
+        <Button asChild variant="outline">
+          <Link to={ROUTES.CERTS_RECONCILIATION}>Open Class Reconciliation</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

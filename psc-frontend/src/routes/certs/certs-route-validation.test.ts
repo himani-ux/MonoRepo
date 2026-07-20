@@ -15,4 +15,10 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).not.toContain('function formatJson(');
     expect(certsRouteSource).not.toContain('function formatJsonCompact(');
   });
+
+  it('test_certs_landing_exposes_class_reconciliation_when_permitted', () => {
+    expect(certsRouteSource).toContain('const canReadReconciliation = auth.hasForm?.(FORM_IDS.CERTS_RECONCILIATION) === true;');
+    expect(certsRouteSource).toContain('function CertClassReconciliationEntryCard');
+    expect(certsRouteSource).toContain('to={ROUTES.CERTS_RECONCILIATION}');
+  });
 });
