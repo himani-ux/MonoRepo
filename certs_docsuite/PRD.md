@@ -43,7 +43,7 @@
 **V1 scope (12 sub-feature domains):**
 - **Catalog management** — fleet-wide office-controlled master catalog of ~340 cert types across 9 sections; vessels cannot add types.
 - **TrackedItem lifecycle** — single entity per cert/survey/calibration instance per vessel; rich date model; validity types `full / conditional / short_term / permanent`; STC + class extension + flag dispensation modeled as separate linked rows.
-- **OCR pipeline** — text-OCR for vessel-uploaded cert PDFs (≥80% office migration / ≥85% vessel-side auto-accept thresholds); class-status snapshot PDFs are text-extracted (no OCR fallback).
+- **OCR pipeline** — text-OCR for vessel-uploaded cert PDFs (≥80% office migration / ≥85% vessel-side auto-accept thresholds); class-status snapshot PDFs are text-extracted first, with OCR fallback only when the full PDF exposes no text layer (D-CERT-200).
 - **Class status reconciliation** — manual upload + per-class parser (NK / KR / BV); 3-month cadence; mismatch alerts to Master + Marine Sup'tt; class is authoritative for `is_class_tracked: true` rows.
 - **RBAC & approval** — Master = onboard admin (PSC Inspection pattern); C/O + C/E + 2/E submit-with-Master-approval for non-class-tracked rows; office (DPA / FM / Tech / Marine Sup'tt) writes direct.
 - **7-step onboarding wizard** — vessel-locked, batch PDF ingest in batches of ≤10, gap-fill UI, mandatory-coverage gate before go-live.
@@ -165,7 +165,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-OCR-015 | NO camera capture path | OCR | OUT | D-CERT-166 |
 | FEAT-CERT-REC-001 | Manual class snapshot PDF upload (no portal API) | REC | V1 | D-CERT-005, D-CERT-169 |
 | FEAT-CERT-REC-002 | Per-class parser modules (NK / KR / BV) | REC | V1 | D-CERT-005, §7.2 SSOT |
-| FEAT-CERT-REC-003 | Class snapshot text-extract (no OCR for class PDFs) | REC | V1 | D-CERT-048 |
+| FEAT-CERT-REC-003 | Class snapshot text-extract first, with OCR fallback for PDFs that expose no text layer | REC | V1 | D-CERT-048, D-CERT-200 |
 | FEAT-CERT-REC-004 | Per-class date format whitelist (KR=ISO; NK+BV=DD Mon YYYY) | REC | V1 | D-CERT-049, D-CERT-049a |
 | FEAT-CERT-REC-005 | 3-month upload cadence + 1-month lead alert (DPA-configurable) | REC | V1 | D-CERT-006 |
 | FEAT-CERT-REC-006 | Event-driven snapshot refresh prompt (14d grace) | REC | V1 | D-CERT-007 |
@@ -857,7 +857,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 9. **Cross-module integration entirely out of V1** (D-CERT-176).
 10. **Crew PII NOT in Certs** (D-CERT-177). DMLC II row carries cert metadata only, no crew names/IDs/medical.
 11. **Print preserves "SQE S 633" form code verbatim** (D-CERT-125).
-12. **Class status PDFs are text-extracted, never OCR'd** (D-CERT-048). OCR reserved for vessel-uploaded cert PDFs.
+12. **Class status PDFs are text-extracted first; OCR fallback is allowed only when no PDF text layer exists** (D-CERT-048 superseded by D-CERT-200 for image-only class snapshots). OCR remains reserved for vessel-uploaded cert PDFs except this bounded class-snapshot fallback.
 13. **System computes survey windows; parser does NOT** (D-CERT-063, D-CERT-064).
 14. **Hard cutover to VIMS Certs at vessel go-live** (D-CERT-114). Legacy Excel = read-only frozen archive.
 15. **No 2FA, no break-glass, no quiet hours, no per-user notif prefs** (D-CERT-081, D-CERT-097, D-CERT-157, D-CERT-160).

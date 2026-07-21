@@ -51,7 +51,7 @@ If a sibling module bumps a shared dep, Certs adopts the same version in the sam
 
 | Layer | Component | Version target | Purpose | D-CERT-\* |
 |-------|-----------|----------------|---------|-----------|
-| Class snapshot parser | `pdfplumber` | latest stable (≥0.11.x) | Text extraction from NK / KR / BV class status PDFs | D-CERT-005, D-CERT-048, D-CERT-054 |
+| Class snapshot parser | `pdfplumber` + existing Tesseract OCR fallback (`pytesseract`, `Pillow`) | pdfplumber ≥0.11.x; pytesseract/Pillow per backend requirements | Text extraction from NK / KR / BV class status PDFs; OCR fallback only when the PDF exposes no text layer | D-CERT-005, D-CERT-048, D-CERT-054, D-CERT-200 |
 | Class snapshot parser fallback | `tabula-py` (optional) | latest stable | Table extraction fallback for complex layouts | D-CERT-054 |
 | Per-class parser modules | KSM-internal Python modules | own version | NK / KR / BV format parsers; one module per class society | D-CERT-005 |
 | OCR engine for cert PDFs | ⚙️ PHASE-0 PICK (plan step 0.7; benchmark protocol below; candidates: Tesseract via `pytesseract`, AWS Textract, Azure Form Recognizer, Google Document AI) | pick at 0.7 | OCR vessel-uploaded cert PDFs (NOT class snapshots) per D-CERT-101, D-CERT-105, D-CERT-106. B-TECH-01 reclassified 2026-06-12: a scheduled plan step with a decision protocol, not an open blocker | D-CERT-101, D-CERT-106, D-CERT-168 |

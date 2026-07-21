@@ -294,3 +294,13 @@ See PRD §19. Build-time deferrals (Phase 0 picks) listed in BACKEND_STRUCTURE �
 |-------------|--------------------|--------|
 | D-CERT-017 | Canonical catalog sections (9): Class · Statutory & Flag · Trade & Commercial · Equipment LSA/FFA/Nav/GMDSS · Calibrations · Te... | LOCKED |
 | D-CERT-030 | Class code mapping seed extracted by parser dev from 6 reference PDFs; | LOCKED |
+
+---
+
+## Amendment 2 - 2026-07-21
+
+**What changed:** CR-102 adds bounded OCR fallback for class-status snapshot PDFs when the uploaded PDF exposes no text layer. The primary path remains `pdfplumber` text extraction, and OCR fallback feeds the same NK/KR/BV parser modules and reconciliation schema.
+
+**Triggering discovery:** The real uploaded KR `class_Ayuthya.pdf` showed visible data from page 3 onward, but `pdfplumber` and `pypdf` extracted zero text characters across all 19 pages because each page is embedded as images. Tesseract OCR against the page image read the KR vessel-status content, proving that image-only class-status PDFs require OCR fallback to parse.
+
+**Supersedes:** D-CERT-048 and Phase 4.2 only where they prohibited OCR fallback for image-only class-status snapshot PDFs. The current behavior is D-CERT-200: class snapshots are text-extracted first; if the full PDF has no text layer, existing Tesseract/pytesseract OCR may be used as a fallback before the same NK/KR/BV parsers and reconciliation flow run.

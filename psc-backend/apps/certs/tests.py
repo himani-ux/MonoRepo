@@ -4,6 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 from contextlib import nullcontext
+from django.db import DatabaseError
 from pathlib import Path
 from rest_framework.test import APIRequestFactory, force_authenticate
 import tempfile
@@ -14,12 +15,13 @@ from unittest.mock import patch
 from apps.certs.permissions import can_approve_tracked_item
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
-from apps.certs.services.parsers.base import BaseClassParser, ClassSnapshotParseError
+from apps.certs.services.parsers.base import BaseClassParser, ClassSnapshotParseError, ExtractedClassSnapshotText
 from apps.certs.services.parsers.bv import BVClassParser
 from apps.certs.services.parsers.kr import KRClassParser
 from apps.certs.services.parsers.nk import NKClassParser
 from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
-from apps.certs.services.reconciliation import build_reconciliation_flags
+from apps.certs.services.reconciliation import build_reconciliation_flags, dispatch_parser_anomaly_notifications
+from apps.certs.services.notification_dispatcher import CertNotificationRecipient
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
 from apps.certs.views import snapshot_views
@@ -159,14 +161,39 @@ class ClassSnapshotUploadParsingTests(SimpleTestCase):
 
 
 class ClassSnapshotParserAndReconciliationSmokeTests(SimpleTestCase):
-    def test_class_snapshot_parser_reports_image_only_pdf_without_text_layer(self):
+    def test_class_snapshot_parser_reports_ocr_fallback_without_readable_text(self):
         parser = _NoopClassParser()
 
         with (
-            patch("apps.certs.services.parsers.base.extract_pdf_text", return_value=("", 19)),
-            self.assertRaisesRegex(ClassSnapshotParseError, "did not expose a text layer"),
+            patch("apps.certs.services.parsers.base.extract_pdf_text", return_value=ExtractedClassSnapshotText("", 19, "tesseract_ocr_fallback")),
+            self.assertRaisesRegex(ClassSnapshotParseError, "OCR fallback read no text"),
         ):
             parser.parse("image-only-class-status.pdf")
+
+    def test_class_snapshot_parser_uses_ocr_fallback_when_pdf_has_no_text_layer(self):
+        ocr_text = """KOREAN REGISTER
+Ship Name EAST AYUTTHAYA Work ID VANS004726
+Class No. 1000010 IMO No. 9584293
+Certificates
+Class Certificates
+Cargo Gear(CG2) Certificate CG2 Full 2026-02-27 2031-02-26 CL26001506350
+Statutory Certificates or Documents of Compliance issued by KR
+Load Line Certificate ILL Full 2025-08-11 2030-07-11 0N25015926559
+"""
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as pdf_file:
+            with (
+                patch("pdfplumber.open", return_value=_EmptyPdfPlumberDocument(page_count=3)),
+                patch("apps.certs.services.parsers.base.extract_pdf_image_ocr_text", return_value=ocr_text),
+            ):
+                parsed = KRClassParser().parse(pdf_file.name)
+
+        self.assertEqual(parsed.parse_status, "success")
+        self.assertEqual(parsed.payload["source"], "ocr_text")
+        self.assertEqual(parsed.payload["text_extraction"]["engine"], "tesseract_ocr_fallback")
+        self.assertEqual(parsed.payload["vessel"]["name"], "EAST AYUTTHAYA")
+        self.assertEqual(parsed.payload["vessel"]["imo"], "9584293")
+        self.assertGreaterEqual(len(parsed.payload["rows"]), 2)
 
     def test_class_parser_text_smoke_covers_supported_societies(self):
         samples = {
@@ -247,6 +274,22 @@ None
             },
         )
 
+    def test_parser_anomaly_notification_schema_failure_does_not_abort_reconciliation(self):
+        result = dispatch_parser_anomaly_notifications(
+            run={"run_id": "run-1", "vessel_id": "vessel-1", "vessel_name": "MV Test", "class_society": "KR"},
+            anomaly_breaches=[{"type": "parse_duration", "severity": "critical"}],
+            flags=[],
+            dispatcher=_FailingNotificationDispatcher(),
+            candidate_recipients=[
+                CertNotificationRecipient(user_id="dpa-1", role="DPA", side="office"),
+                CertNotificationRecipient(user_id="tech-1", role="Technical Superintendent", side="office"),
+            ],
+        )
+
+        self.assertFalse(result["dispatched"])
+        self.assertEqual(result["reason"], "notification_dispatch_failed")
+        self.assertEqual(result["notificationsSent"], [])
+
 
 class CatalogRowSubmissionScopeTests(SimpleTestCase):
     def test_catalog_row_create_rejects_master_only_under_all_rank_policy(self):
@@ -317,6 +360,27 @@ def _class_snapshot_row(
 class _NoopClassParser(BaseClassParser):
     def parse_text(self, text: str, *, page_count: int) -> dict[str, object]:
         return {"rows": [], "schema_version": 1}
+
+
+class _EmptyPdfPlumberDocument:
+    def __init__(self, *, page_count: int):
+        self.pages = [_EmptyPdfPlumberPage() for _ in range(page_count)]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+
+class _EmptyPdfPlumberPage:
+    def extract_text(self, **_kwargs):
+        return ""
+
+
+class _FailingNotificationDispatcher:
+    def dispatch(self, **_kwargs):
+        raise DatabaseError("Invalid column name 'module_code'.")
 
 
 class _FakeCatalogCursor:

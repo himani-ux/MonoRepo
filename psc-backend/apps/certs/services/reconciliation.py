@@ -8,10 +8,12 @@ import re
 from typing import Any
 
 from django.utils.dateparse import parse_datetime
-from django.db import connection
+from django.db import DatabaseError, connection
 
 from apps.certs.services.notification_dispatcher import CertNotificationDispatcher, CertNotificationRecipient
 
+
+logger = logging.getLogger(__name__)
 
 RECONCILIATION_CONFIDENCE_THRESHOLD = 0.95
 MISMATCH_RATE_THRESHOLD = 0.15
@@ -283,17 +285,27 @@ def dispatch_parser_anomaly_notifications(
         "anomalyBreaches": anomaly_breaches,
     }
 
-    result = (dispatcher or CertNotificationDispatcher()).dispatch(
-        trigger_event=PARSER_ANOMALY_TRIGGER_EVENT,
-        cert_row_id=None,
-        vessel_id=payload["vesselId"] or None,
-        recipients=recipients,
-        title=title,
-        message=message,
-        payload=payload,
-        escalation_level=1,
-        idempotency_scope=f"parser-anomaly:{run_id}",
-    )
+    try:
+        result = (dispatcher or CertNotificationDispatcher()).dispatch(
+            trigger_event=PARSER_ANOMALY_TRIGGER_EVENT,
+            cert_row_id=None,
+            vessel_id=payload["vesselId"] or None,
+            recipients=recipients,
+            title=title,
+            message=message,
+            payload=payload,
+            escalation_level=1,
+            idempotency_scope=f"parser-anomaly:{run_id}",
+        )
+    except DatabaseError as exc:
+        logger.warning("Certs parser anomaly notification dispatch failed for run %s: %s", run_id, exc)
+        return {
+            "dispatched": False,
+            "reason": "notification_dispatch_failed",
+            "recipientIds": [recipient.user_id for recipient in recipients],
+            "notificationsSent": [],
+            "error": str(exc),
+        }
     return {
         "dispatched": bool(result.notification_rows),
         "reason": "dispatched" if result.notification_rows else "already_dispatched",

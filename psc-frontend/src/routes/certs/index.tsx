@@ -3144,7 +3144,14 @@ function CertReconciliationDashboardPage() {
                       <Label htmlFor="classSnapshotVesselId">Vessel</Label>
                       <Select
                         value={vesselId}
-                        onValueChange={setVesselId}
+                        onValueChange={(nextVesselId) => {
+                          setVesselId(nextVesselId);
+                          const selectedVessel = uploadVessels.find((vessel) => vessel.id === nextVesselId);
+                          const supportedClassSociety = normalizeSupportedClassSociety(selectedVessel?.classSociety);
+                          if (supportedClassSociety) {
+                            setClassSociety(supportedClassSociety);
+                          }
+                        }}
                         disabled={vesselDashboard.isLoading || uploadVessels.length === 0}
                       >
                         <SelectTrigger id="classSnapshotVesselId">
@@ -6504,8 +6511,8 @@ function formatClassSnapshotUploadResult(snapshot: CertClassSnapshot): string {
 
 function formatClassSnapshotParseFailure(snapshot: CertClassSnapshot): string {
   const failureReason = getClassSnapshotParseFailureReason(snapshot);
-  if (failureReason?.includes('did not expose a text layer')) {
-    return 'Snapshot uploaded, but this PDF has no selectable text. Upload the digital Class Status PDF downloaded/exported from NK, KR, or BV; scanned/image-only PDFs cannot be parsed here.';
+  if (failureReason?.includes('OCR fallback read no text')) {
+    return 'Snapshot uploaded, but neither text extraction nor OCR could read usable class-status data from this PDF. Upload the official Class Status PDF exported from NK, KR, or BV, then retry.';
   }
   return 'Snapshot uploaded, but the parser could not read this PDF. Check the snapshot row and try Reparse after correcting the file.';
 }
@@ -6541,6 +6548,11 @@ function formatClassSnapshotVesselOption(vessel: CertFleetDashboardVessel): stri
   ].filter((value): value is string => Boolean(value));
 
   return details.length ? `${baseLabel} (${details.join(', ')})` : baseLabel;
+}
+
+function normalizeSupportedClassSociety(value: string | null | undefined): string | null {
+  const normalized = String(value ?? '').trim().toUpperCase();
+  return ['NK', 'KR', 'BV'].includes(normalized) ? normalized : null;
 }
 
 function formatStatus(value: string | null | undefined): string {

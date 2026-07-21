@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 import re
 from typing import Any
@@ -17,16 +18,25 @@ class ParsedClassSnapshot:
     parse_status: str
 
 
+@dataclass(frozen=True)
+class ExtractedClassSnapshotText:
+    text: str
+    page_count: int
+    engine: str
+
+
 class BaseClassParser:
     class_society = "UNKNOWN"
     parser_version = "class-parser-v1"
     date_pattern = re.compile(r"$^")
 
     def parse(self, pdf_path: str | Path) -> ParsedClassSnapshot:
-        text, page_count = extract_pdf_text(pdf_path)
+        extracted = extract_pdf_text(pdf_path)
+        text = extracted.text
         if not text.strip():
-            raise ClassSnapshotParseError("Class status PDF did not expose a text layer.")
-        payload = self.parse_text(text, page_count=page_count)
+            raise ClassSnapshotParseError("Class status PDF did not expose a text layer and OCR fallback read no text.")
+        payload = self.parse_text(text, page_count=extracted.page_count)
+        stamp_text_extraction_metadata(payload, extracted)
         return ParsedClassSnapshot(
             payload=payload,
             parser_version=self.parser_version,
@@ -37,7 +47,7 @@ class BaseClassParser:
         raise NotImplementedError
 
 
-def extract_pdf_text(pdf_path: str | Path) -> tuple[str, int]:
+def extract_pdf_text(pdf_path: str | Path) -> ExtractedClassSnapshotText:
     try:
         import pdfplumber
     except ImportError as exc:
@@ -50,7 +60,69 @@ def extract_pdf_text(pdf_path: str | Path) -> tuple[str, int]:
     with pdfplumber.open(str(path)) as pdf:
         for page in pdf.pages:
             pages.append(page.extract_text(x_tolerance=1, y_tolerance=3) or "")
-        return "\n".join(pages), len(pdf.pages)
+        page_count = len(pdf.pages)
+    text = "\n".join(pages)
+    if text.strip():
+        return ExtractedClassSnapshotText(text=text, page_count=page_count, engine="pdfplumber")
+    ocr_text = extract_pdf_image_ocr_text(path)
+    return ExtractedClassSnapshotText(text=ocr_text, page_count=page_count, engine="tesseract_ocr_fallback")
+
+
+def extract_pdf_image_ocr_text(pdf_path: str | Path) -> str:
+    try:
+        from PIL import Image
+        import pytesseract
+        from PyPDF2 import PdfReader
+    except ImportError as exc:
+        raise ClassSnapshotParseError("Pillow, pytesseract, and PyPDF2 are required for class status OCR fallback.") from exc
+
+    try:
+        reader = PdfReader(str(pdf_path))
+    except Exception as exc:  # pragma: no cover - PyPDF2 exception classes vary by version.
+        raise ClassSnapshotParseError("Class status OCR fallback could not open this PDF.") from exc
+
+    page_text: list[str] = []
+    for page_number, page in enumerate(reader.pages, start=1):
+        image_text: list[str] = []
+        for image in iter_pdf_page_images(page, Image):
+            if image.width * image.height < 50_000:
+                continue
+            try:
+                text = pytesseract.image_to_string(image.convert("RGB"))
+            except pytesseract.pytesseract.TesseractNotFoundError as exc:
+                raise ClassSnapshotParseError("Tesseract is required for class status OCR fallback.") from exc
+            if text.strip():
+                image_text.append(text)
+        if image_text:
+            page_text.append(f"--- PAGE {page_number} OCR ---\n" + "\n".join(image_text))
+    return "\n\n".join(page_text)
+
+
+def iter_pdf_page_images(page: Any, image_module: Any):
+    resources = page.get("/Resources") or {}
+    xobjects = resources.get("/XObject")
+    if not xobjects:
+        return
+    for _name, obj in sorted(xobjects.get_object().items(), key=lambda item: str(item[0])):
+        stream = obj.get_object()
+        if stream.get("/Subtype") != "/Image":
+            continue
+        try:
+            image = image_module.open(BytesIO(stream.get_data()))
+            image.load()
+        except Exception:
+            continue
+        yield image
+
+
+def stamp_text_extraction_metadata(payload: dict[str, Any], extracted: ExtractedClassSnapshotText) -> None:
+    if extracted.engine != "pdfplumber":
+        payload["source"] = "ocr_text"
+    payload["text_extraction"] = {
+        "engine": extracted.engine,
+        "page_count": extracted.page_count,
+        "char_count": len(extracted.text),
+    }
 
 
 def parse_class_snapshot_pdf(pdf_path: str | Path, class_society: str | None = None) -> ParsedClassSnapshot:
@@ -73,7 +145,8 @@ def parser_for(class_society: str | None, pdf_path: str | Path) -> BaseClassPars
 
         return BVClassParser()
 
-    sample, _ = extract_pdf_text(pdf_path)
+    extracted = extract_pdf_text(pdf_path)
+    sample = extracted.text
     upper = sample[:3000].upper()
     if "KOREAN REGISTER" in upper:
         from apps.certs.services.parsers.kr import KRClassParser
