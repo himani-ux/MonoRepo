@@ -4,12 +4,9 @@ import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Download, CheckCircle2, ArrowLeft } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
+import { configurePdfJsWorker } from "../../utils/circular/pdfWorker";
 
-// Set worker for PDF.js (adjust path if needed)
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+configurePdfJsWorker(pdfjsLib);
 
 const PdfViewer = ({
   user,

@@ -38,7 +38,7 @@ This module renders the legacy circular system inside the modern React shell. It
 - `Dashboard.jsx`: ship dashboard state container
 - `FilterBar.jsx`: ship filter controls and report download trigger
 - `KsmLibrary.jsx`: ship circular card list, crew status modal, and reminder UI
-- `PdfViewer.jsx`: PDF rendering, scroll-to-bottom gating, and acknowledgement
+- `PdfViewer.jsx`: PDF rendering with a bundled PDF.js worker, scroll-to-bottom gating, and acknowledgement
 - `permissionUtils.js`: parses `form_ids` and `process_ids` from auth state and exposes permission helpers
 - `circular-header-actions.tsx`: shell-level create/history/drafts shortcuts; the create affordance now uses a custom inline SVG file-plus style icon without visible text
 - `notification-item.tsx`: shared notification-center click handling for `entity_type === 'CIRCULAR'`
@@ -159,7 +159,7 @@ Circular workflow notifications are rendered inside the same shared notification
 - non-masters call `/api/crew/notifications/`
 - masters can open crew list and send reminders
 
-`PdfViewer.jsx` fetches the attachment URL, renders the PDF with PDF.js, and only exposes the acknowledge button once the viewer is scrolled to the bottom.
+`PdfViewer.jsx` fetches the attachment URL, renders the PDF with PDF.js, and only exposes the acknowledge button once the viewer is scrolled to the bottom. Both circular PDF viewer entry points use a Vite-bundled PDF.js worker instance so production does not depend on the server MIME type for a separate `.mjs` worker asset.
 
 ## Permission Model In The Frontend
 

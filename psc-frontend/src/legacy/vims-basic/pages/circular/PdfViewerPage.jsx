@@ -3,9 +3,9 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import { useAuth } from "../../hooks/auth/useAuth";
+import { configurePdfJsWorker } from "../../utils/circular/pdfWorker";
 
-// IMPORTANT: Set worker source (adjust path if needed)
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+configurePdfJsWorker(pdfjsLib);
 
 export default function PdfViewerPage() {
 
