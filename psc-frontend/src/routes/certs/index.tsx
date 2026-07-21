@@ -209,13 +209,13 @@ const ACTION_STATUSES = new Set([
   'pending_supersession',
 ]);
 const RECONCILIATION_BUCKET_TABS = [
-  { bucket: 'match', label: 'Matches', countKey: 'matchesCount' },
-  { bucket: 'mismatch', label: 'Mismatches', countKey: 'mismatchesCount' },
-  { bucket: 'missing_in_catalog', label: 'Missing in Catalog', countKey: 'missingInCatalogCount' },
-  { bucket: 'missing_in_class', label: 'Missing in Class', countKey: 'missingInClassCount' },
-  { bucket: 'conditional_stc', label: 'Conditional/STC detected', countKey: 'conditionalStcDetectedCount' },
-  { bucket: 'extended_postponed', label: 'Extended/Postponed detected', countKey: 'extendedPostponedDetectedCount' },
-  { bucket: 'unmapped_low_confidence', label: 'Unmapped low confidence', countKey: 'unmappedLowConfidenceCount' },
+  { bucket: 'match', label: 'Already matched', countKey: 'matchesCount' },
+  { bucket: 'mismatch', label: 'Details differ', countKey: 'mismatchesCount' },
+  { bucket: 'missing_in_catalog', label: 'Needs setup in VIMS', countKey: 'missingInCatalogCount' },
+  { bucket: 'missing_in_class', label: 'Not found in class report', countKey: 'missingInClassCount' },
+  { bucket: 'conditional_stc', label: 'Short-term certificate', countKey: 'conditionalStcDetectedCount' },
+  { bucket: 'extended_postponed', label: 'Extended or postponed', countKey: 'extendedPostponedDetectedCount' },
+  { bucket: 'unmapped_low_confidence', label: 'Needs manual check', countKey: 'unmappedLowConfidenceCount' },
 ] as const;
 
 type CertAuthContext = {
@@ -3505,8 +3505,8 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
           <CardContent className="space-y-4 p-4">
             <div
               role="tablist"
-              aria-label="Reconciliation buckets"
-              className="grid gap-2 md:grid-cols-2 xl:grid-cols-7"
+              aria-label="Review groups"
+              className="grid gap-2 md:grid-cols-2 xl:grid-cols-4"
             >
               {RECONCILIATION_BUCKET_TABS.map((tab) => {
                 const count = getReconciliationBucketCount(run.data, tab.countKey);
@@ -3517,7 +3517,7 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
                     type="button"
                     role="tab"
                     aria-selected={selected}
-                    className={`flex min-h-14 items-center justify-between rounded-md border px-3 py-2 text-left text-sm font-medium transition ${
+                    className={`flex min-h-16 items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm font-medium transition ${
                       selected
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
                         : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
@@ -3535,14 +3535,14 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
 
             {run.data.flags.length === 0 ? (
               <div className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-600">
-                No reconciliation flags were produced for this run.
+                No items need review for this check.
               </div>
             ) : bucketFlags.length === 0 ? (
               <div className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-600">
-                No rows in this reconciliation bucket.
+                No items in this group.
               </div>
             ) : (
-              <div className="grid gap-4 xl:grid-cols-[0.85fr_1fr_1fr]">
+              <div className="grid gap-4 xl:grid-cols-[0.9fr_1.05fr_1.05fr]">
                 <CertReconciliationFlagList
                   flags={bucketFlags}
                   selectedFlagId={selectedFlag?.id ?? null}
@@ -3576,11 +3576,11 @@ function CertReconciliationRunHeader({ run }: { run: CertReconciliationRunDetail
           <div>
             <h1 className="text-xl font-semibold text-neutral-900">{run.vesselName ?? formatEntityLabel(run.vesselId, 'Vessel')}</h1>
             <p className="text-sm text-neutral-600">
-              IMO {run.imo ?? 'not set'} - {run.classSociety ?? 'Class not set'} - snapshot {formatDate(run.printedOnDate)}
+              IMO {run.imo ?? 'not set'} - {run.classSociety ?? 'Class not set'} - report date {formatDate(run.printedOnDate)}
             </p>
           </div>
           <p className="text-sm text-neutral-600">
-            Parser {run.parserVersion ?? 'not stamped'} - reconciled {formatDateTime(run.ranAt)} - mapping v{run.mappingVersionUsed ?? 'n/a'}
+            Checked {formatDateTime(run.ranAt)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -3590,7 +3590,7 @@ function CertReconciliationRunHeader({ run }: { run: CertReconciliationRunDetail
           </Badge>
           <Button type="button" variant="outline" disabled>
             <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
-            Open original Class Status PDF
+            Open class report PDF
           </Button>
         </div>
       </CardContent>
@@ -3605,14 +3605,14 @@ function CertReconciliationAnomalyBanner({ breaches }: { breaches: CertReconcili
       <div className="flex items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
         <div className="space-y-2">
-          <p className="font-semibold">Parser anomaly threshold breached</p>
+          <p className="font-semibold">Many items need attention</p>
           <ul className="space-y-1">
             {breaches.map((breach, index) => (
               <li key={`${breach.type ?? 'breach'}-${index}`} className="flex flex-wrap items-center gap-2">
                 <Badge variant={breach.severity === 'critical' ? 'destructive' : 'warning'}>
                   {breach.severity ?? 'warning'}
                 </Badge>
-                <span>{formatAnomalyBreach(breach)}</span>
+                <span>{formatReviewAlert(breach)}</span>
               </li>
             ))}
           </ul>
@@ -3632,7 +3632,7 @@ function CertReconciliationFlagList({
   onSelect: (flagId: string) => void;
 }) {
   return (
-    <aside className="space-y-2" aria-label="Reconciliation flag list">
+    <aside className="space-y-2" aria-label="Items needing review">
       {flags.map((flag) => {
         const selected = flag.id === selectedFlagId;
         const resolved = Boolean(flag.resolvedAt);
@@ -3646,12 +3646,12 @@ function CertReconciliationFlagList({
             onClick={() => onSelect(flag.id)}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={flag.bucket === 'match' ? 'success' : 'warning'}>{formatStatus(flag.bucket)}</Badge>
-              {resolved ? <Badge variant="success">Resolved</Badge> : <Badge variant="secondary">Open</Badge>}
+              <Badge variant={flag.bucket === 'match' ? 'success' : 'warning'}>{formatReconciliationBucketLabel(flag.bucket)}</Badge>
+              {resolved ? <Badge variant="success">Done</Badge> : <Badge variant="secondary">Needs review</Badge>}
             </div>
-            <p className="mt-2 text-sm font-semibold text-neutral-900">{flag.catalogDisplayName ?? 'Unmapped class row'}</p>
+            <p className="mt-2 text-sm font-semibold text-neutral-900">{formatClassReportItemTitle(flag)}</p>
             <p className="text-xs text-neutral-500">
-              {flag.trackedItemId ? formatEntityLabel(flag.trackedItemId, 'Tracked item linked') : 'Tracked item not linked'}
+              {flag.trackedItemId ? 'Linked to a VIMS certificate' : 'Not linked to a VIMS certificate'}
             </p>
           </button>
         );
@@ -3670,33 +3670,33 @@ function CertReconciliationCatalogPanel({
   if (!flag) return null;
   const hasTrackedLink = Boolean(flag.trackedItemId && run.imo);
   return (
-    <section className="rounded-md border border-neutral-200 bg-white p-4" aria-label="Catalog and tracked item state">
+    <section className="rounded-md border border-neutral-200 bg-white p-4" aria-label="VIMS certificate record">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-neutral-900">Catalog / tracked item</h2>
-          <p className="text-sm text-neutral-600">{flag.catalogDisplayName ?? 'No catalog row linked'}</p>
+          <h2 className="text-base font-semibold text-neutral-900">VIMS certificate record</h2>
+          <p className="text-sm text-neutral-600">{flag.catalogDisplayName ?? 'No matching VIMS certificate yet'}</p>
         </div>
         {hasTrackedLink ? (
           <Button asChild size="sm" variant="outline">
             <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(String(run.imo), String(flag.trackedItemId))}>
-              Open tracked item
+              Open VIMS certificate
             </Link>
           </Button>
         ) : null}
       </div>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <CertReconciliationDefinition
-          label="Catalog"
-          value={flag.catalogId ? formatEntityLabel(flag.catalogId, flag.catalogDisplayName ? 'Catalog row linked' : 'Catalog linked') : 'Not linked'}
+          label="Certificate type"
+          value={flag.catalogId ? formatEntityLabel(flag.catalogId, flag.catalogDisplayName ? 'Certificate type linked' : 'Certificate type linked') : 'Not linked yet'}
         />
         <CertReconciliationDefinition
-          label="Tracked item"
-          value={flag.trackedItemId ? formatEntityLabel(flag.trackedItemId, 'Tracked item linked') : 'Not linked'}
+          label="Vessel certificate"
+          value={flag.trackedItemId ? formatEntityLabel(flag.trackedItemId, 'Linked') : 'Not linked yet'}
         />
-        <CertReconciliationDefinition label="Resolution" value={flag.resolutionAction ? formatStatus(flag.resolutionAction) : 'Open'} />
+        <CertReconciliationDefinition label="Review status" value={flag.resolutionAction ? formatStatus(flag.resolutionAction) : 'Needs review'} />
         <CertReconciliationDefinition
           label="Reviewed"
-          value={flag.reviewedAt ? `${formatDateTime(flag.reviewedAt)} by ${formatPrincipalLabel(undefined, flag.reviewedBy, undefined, 'unknown')}` : 'Not reviewed'}
+          value={flag.reviewedAt ? `${formatDateTime(flag.reviewedAt)} by ${formatPrincipalLabel(undefined, flag.reviewedBy, undefined, 'unknown')}` : 'Not reviewed yet'}
         />
       </dl>
       <CertReconciliationSpecialPrefill flag={flag} />
@@ -3706,19 +3706,18 @@ function CertReconciliationCatalogPanel({
 
 function CertReconciliationClassPanel({ flag }: { flag: CertReconciliationFlag | null }) {
   if (!flag) return null;
-  const extract = normalizeRecord(flag.classRowExtract);
-  const fields = extract ? Object.entries(extract).slice(0, 10) : [];
+  const fields = getClassReportReviewFields(flag);
   return (
-    <section className="rounded-md border border-neutral-200 bg-white p-4" aria-label="Class snapshot extracted state">
-      <h2 className="text-base font-semibold text-neutral-900">Class snapshot extract</h2>
+    <section className="rounded-md border border-neutral-200 bg-white p-4" aria-label="Class report item">
+      <h2 className="text-base font-semibold text-neutral-900">Class report item</h2>
       {fields.length > 0 ? (
         <dl className="mt-4 grid gap-3 text-sm">
-          {fields.map(([key, value]) => (
-            <CertReconciliationDefinition key={key} label={humanizeKey(key)} value={formatUnknown(value)} />
+          {fields.map((field) => (
+            <CertReconciliationDefinition key={field.label} label={field.label} value={field.value} />
           ))}
         </dl>
       ) : (
-        <p className="mt-4 text-sm text-neutral-600">No class-side row extract was stored for this flag.</p>
+        <p className="mt-4 text-sm text-neutral-600">No class report details were stored for this item.</p>
       )}
     </section>
   );
@@ -3728,14 +3727,14 @@ function CertReconciliationSpecialPrefill({ flag }: { flag: CertReconciliationFl
   if (flag.bucket === 'conditional_stc') {
     return (
       <div className="mt-4 rounded-md border border-info-200 bg-info-50 p-3 text-sm text-info-800">
-        Conditional/STC row detected. Master upload flow will use this row as a short-term child pre-fill when the pending update path is wired.
+        Short-term certificate found. Review it before asking the vessel to upload supporting evidence.
       </div>
     );
   }
   if (flag.bucket === 'extended_postponed') {
     return (
       <div className="mt-4 rounded-md border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800">
-        Extended/postponed row detected. Review the class extract before notifying the Master to upload extension evidence.
+        Extension or postponement found. Review the class report item before asking the vessel to upload supporting evidence.
       </div>
     );
   }
@@ -3768,8 +3767,8 @@ function CertReconciliationActionPanel({
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900">Diff and actions</h2>
-            <p className="text-sm text-neutral-600">{flag.catalogDisplayName ?? 'Unmapped class row'} - {formatStatus(flag.bucket)}</p>
+            <h2 className="text-base font-semibold text-neutral-900">Review action</h2>
+            <p className="text-sm text-neutral-600">{flag.catalogDisplayName ?? formatClassReportItemTitle(flag)} - {formatReconciliationBucketLabel(flag.bucket)}</p>
           </div>
           {alreadyResolved ? <Badge variant="success">Resolved {formatDateTime(flag.resolvedAt)}</Badge> : null}
         </div>
@@ -3780,8 +3779,8 @@ function CertReconciliationActionPanel({
               <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase text-neutral-500">
                 <tr>
                   <th className="px-3 py-2">Field</th>
-                  <th className="px-3 py-2">Tracked / catalog</th>
-                  <th className="px-3 py-2">Class snapshot</th>
+                  <th className="px-3 py-2">VIMS record</th>
+                  <th className="px-3 py-2">Class report</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -3800,14 +3799,14 @@ function CertReconciliationActionPanel({
           </div>
         ) : (
           <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">
-            No field-level differences were recorded for this flag.
+            No detailed differences were recorded for this item.
           </div>
         )}
 
         {canReview && !alreadyResolved ? (
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor={`reconciliationReason-${flag.id}`}>Review reason</Label>
+              <Label htmlFor={`reconciliationReason-${flag.id}`}>Review note</Label>
               <Textarea id={`reconciliationReason-${flag.id}`} value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} />
             </div>
             {mutationError ? <p className="text-sm text-error-700">{getErrorMessage(mutationError)}</p> : null}
@@ -3824,7 +3823,7 @@ function CertReconciliationActionPanel({
               {showMasterUploadLink ? (
                 <Button asChild type="button" variant="outline">
                   <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(String(run.imo), String(flag.trackedItemId))}>
-                    Resolve via Master upload
+                    Ask vessel to update
                   </Link>
                 </Button>
               ) : null}
@@ -3884,24 +3883,24 @@ function CertClassMappingDialog({ flag, run }: { flag: CertReconciliationFlag; r
       <DialogTrigger asChild>
         <Button type="button" variant="outline">
           <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-          Add to ClassCodeMapping
+          Link to VIMS certificate type
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add to ClassCodeMapping</DialogTitle>
+          <DialogTitle>Link class report item</DialogTitle>
           <DialogDescription>
-            Map class row {classCode} to a canonical Certs catalog row and rerun reconciliation with the new mapping version.
+            Connect {classCode} from the class report to the correct VIMS certificate type. Future checks will use this link automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor={`mappingCatalogSearch-${flag.id}`}>Catalog search</Label>
+            <Label htmlFor={`mappingCatalogSearch-${flag.id}`}>Search certificate types</Label>
             <Input
               id={`mappingCatalogSearch-${flag.id}`}
               value={catalogSearch}
               onChange={(event) => setCatalogSearch(event.target.value)}
-              placeholder="Search active catalog rows"
+              placeholder="Search VIMS certificate types"
             />
           </div>
           {rows.length > 0 ? (
@@ -3922,17 +3921,17 @@ function CertClassMappingDialog({ flag, run }: { flag: CertReconciliationFlag; r
             </div>
           ) : null}
           <div className="space-y-2">
-            <Label htmlFor={`mappingCatalogId-${flag.id}`}>Catalog row ID</Label>
+            <Label htmlFor={`mappingCatalogId-${flag.id}`}>Selected certificate type</Label>
             <Input
               id={`mappingCatalogId-${flag.id}`}
               value={catalogId}
               onChange={(event) => setCatalogId(event.target.value)}
-              placeholder="Paste catalog row UUID"
+              placeholder="Select from search results"
             />
             {selectedCatalog ? <p className="text-xs text-neutral-600">Selected: {selectedCatalog.displayName}</p> : null}
           </div>
           <div className="space-y-2">
-            <Label htmlFor={`mappingKind-${flag.id}`}>Survey kind</Label>
+            <Label htmlFor={`mappingKind-${flag.id}`}>Certificate or survey kind</Label>
             <Select value={certOrSurveyKind} onValueChange={setCertOrSurveyKind}>
               <SelectTrigger id={`mappingKind-${flag.id}`}><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -3947,7 +3946,7 @@ function CertClassMappingDialog({ flag, run }: { flag: CertReconciliationFlag; r
             <Textarea id={`mappingNotes-${flag.id}`} value={notes} onChange={(event) => setNotes(event.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor={`mappingReason-${flag.id}`}>Mapping reason</Label>
+            <Label htmlFor={`mappingReason-${flag.id}`}>Why this is the correct link</Label>
             <Textarea
               id={`mappingReason-${flag.id}`}
               value={mappingReason}
@@ -3980,7 +3979,7 @@ function CertClassMappingDialog({ flag, run }: { flag: CertReconciliationFlag; r
             }
           >
             <Save className="mr-2 h-4 w-4" aria-hidden="true" />
-            Save mapping
+            Save link
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -6368,6 +6367,60 @@ function formatReconciliationFindingSummary(run: CertReconciliationRun): string 
 function normalizeRecord(value: unknown): Record<string, unknown> | null {
   if (!value || Array.isArray(value) || typeof value !== 'object') return null;
   return value as Record<string, unknown>;
+}
+
+function formatReconciliationBucketLabel(bucket: string | null | undefined): string {
+  return RECONCILIATION_BUCKET_TABS.find((tab) => tab.bucket === bucket)?.label ?? formatStatus(bucket);
+}
+
+function formatClassReportItemTitle(flag: CertReconciliationFlag): string {
+  const extract = normalizeRecord(flag.classRowExtract);
+  const displayName = cleanDisplayValue(extract?.display_name ?? extract?.displayName ?? extract?.name);
+  const code = cleanDisplayValue(extract?.class_code_or_name ?? extract?.classCodeOrName ?? extract?.class_code);
+  if (displayName && code && !displayName.includes(code)) return `${displayName} (${code})`;
+  return displayName || code || flag.catalogDisplayName || 'Class report item';
+}
+
+function getClassReportReviewFields(flag: CertReconciliationFlag): Array<{ label: string; value: unknown }> {
+  const extract = normalizeRecord(flag.classRowExtract);
+  if (!extract) return [];
+  const displayName = cleanDisplayValue(extract.display_name ?? extract.displayName ?? extract.name);
+  const code = cleanDisplayValue(extract.class_code_or_name ?? extract.classCodeOrName ?? extract.class_code);
+  return [
+    { label: 'Class', value: extract.class_society ?? extract.classSociety },
+    { label: 'Item', value: displayName && code && !displayName.includes(code) ? `${displayName} (${code})` : displayName || code },
+    { label: 'Section in class report', value: extract.source_section ?? extract.sourceSection },
+    { label: 'Item type', value: extract.row_type ? formatStatus(String(extract.row_type)) : extract.rowType ? formatStatus(String(extract.rowType)) : null },
+    { label: 'Issue date', value: extract.issue_date ?? extract.issueDate },
+    { label: 'Expiry date', value: extract.expiry_date ?? extract.expiryDate },
+    { label: 'Last done', value: extract.last_done_date ?? extract.lastDoneDate },
+    { label: 'Next due', value: extract.next_due_date ?? extract.nextDueDate },
+    { label: 'Postponed until', value: extract.postponed_until ?? extract.postponedUntil },
+    { label: 'Text found in class report', value: extract.raw_text ?? extract.rawText },
+  ].filter((field) => hasDisplayValue(field.value));
+}
+
+function cleanDisplayValue(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function hasDisplayValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return true;
+}
+
+function formatReviewAlert(breach: CertReconciliationAnomalyBreach): string {
+  if (typeof breach.count === 'number' && typeof breach.total === 'number' && breach.total > 0) {
+    return `${breach.count} of ${breach.total} class report items need attention (${formatPercent(breach.value)}). Review the items below.`;
+  }
+  if (breach.type === 'parse_duration') {
+    return 'This check took longer than usual. You can continue reviewing the results.';
+  }
+  if (breach.type === 'parsed_row_count_shortfall') {
+    return 'The class report had fewer readable items than expected. Review the results before taking action.';
+  }
+  return 'This class report needs attention. Review the items below.';
 }
 
 function formatAnomalyBreach(breach: CertReconciliationAnomalyBreach): string {

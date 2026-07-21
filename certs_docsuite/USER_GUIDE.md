@@ -122,10 +122,10 @@
 4. You may still need to follow up by uploading the renewal cert when issued — ack ≠ resolution.
 
 ### 2.7 Reviewing a reconciliation run (Marine Sup'tt)
-1. Notification: "Reconciliation completed — N mismatches, M unmapped".
+1. Notification: "Class report check completed — N items need review".
 2. Open `/certs/reconciliation/<run_id>`.
-3. Tabs across the top: Matches / Mismatches / Missing-in-Catalog / etc.
-4. Per row: side-by-side diff. Action: "Notify Master to update", "Mark as reviewed", "Add to ClassCodeMapping" (DPA only).
+3. Review groups across the top: Already matched / Details differ / Needs setup in VIMS / Not found in class report / etc.
+4. Per item: compare the VIMS certificate record with the class report item. Actions: "Notify Master", "Mark reviewed", "Ask vessel to update", or "Link to VIMS certificate type" (DPA only).
 5. Master receives the notification → updates the cert from their side.
 
 ### 2.8 Decommissioning a vessel (DPA)

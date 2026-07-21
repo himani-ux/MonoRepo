@@ -424,17 +424,17 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Route:** `/certs/reconciliation/<run_id>`
 **Form ID:** `CERT_F_003`
 **Primary user:** Marine Sup'tt.
-**Purpose:** Per-run review of class snapshot reconciliation; resolve mismatches / unmapped (per D-CERT-068 / FEAT-CERT-REC-022).
+**Purpose:** Per-run review of class report checks; help users confirm what already matches, what differs, what needs setup in VIMS, and what is not found in the class report (per D-CERT-068 / FEAT-CERT-REC-022).
 
 **Layout:**
-- Header: vessel, class society, snapshot date, parser version, status counts, "Open original Class Status PDF" button (D-CERT-148 / FEAT-CERT-PRT-031).
-- Tabs: **Matches** (audit only, no action) / **Mismatches** / **Missing in Catalog** / **Missing in Class** / **Conditional/STC detected** / **Extended/Postponed detected** / **Unmapped (low confidence)**.
-- Per-tab: side-by-side per-row diff panel:
-  - Left: catalog/TrackedItem state.
-  - Right: class snapshot extracted state.
-  - Highlighted diff fields.
-  - Action buttons: `[Notify Master to update]` (sends per-side routed alert per D-CERT-161; vessel side gets in-app+email, office side gets in-app+Slack), `[Mark as reviewed]` (records reviewer + timestamp; for matches/audit rows), `[Resolve via Master upload]` (creates a pending TrackedItem update awaiting Master per D-CERT-008), `[Add to ClassCodeMapping]` (DPA only, opens mapping editor per D-CERT-061).
-- Anomaly banner at top if D-CERT-073 / FEAT-CERT-REC-031 thresholds breached (mismatch_rate > 15%, parse_time > 3min, count < expected×0.7).
+- Header: vessel, class society, class report date, checked-at timestamp, status counts, and "Open class report PDF" button (D-CERT-148 / FEAT-CERT-PRT-031). Parser version and mapping version are not shown on the normal reviewer page.
+- Review groups use plain language: **Already matched**, **Details differ**, **Needs setup in VIMS**, **Not found in class report**, **Short-term certificate**, **Extended or postponed**, and **Needs manual check**.
+- Per-group review layout:
+  - Left: item list with "Needs review" / "Done" badges.
+  - Middle: VIMS certificate record state.
+  - Right: class report item details using user-facing labels such as item, section in class report, issue date, expiry date, next due, and text found in class report.
+  - Action buttons: `[Notify Master]`, `[Mark reviewed]`, `[Ask vessel to update]`, `[Link to VIMS certificate type]` (DPA only).
+- Alert banner says "Many items need attention" and explains counts in plain language when review volume is high.
 
 **Special handling:**
 - `Conditional/STC detected` → pre-fills an STC TrackedItem form (`relationship_type=short_term_for`, linked to parent) per D-CERT-008 / D-CERT-012; Master confirms + uploads PDF.

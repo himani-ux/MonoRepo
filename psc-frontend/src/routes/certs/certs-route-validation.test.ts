@@ -34,4 +34,16 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).toContain('neither text extraction nor OCR could read usable class-status data');
     expect(certsRouteSource).not.toContain('<Label htmlFor="classSnapshotVesselId">Vessel ID</Label>');
   });
+
+  it('test_reconciliation_review_uses_plain_language_labels', () => {
+    expect(certsRouteSource).toContain('Many items need attention');
+    expect(certsRouteSource).toContain('Needs setup in VIMS');
+    expect(certsRouteSource).toContain('VIMS certificate record');
+    expect(certsRouteSource).toContain('Class report item');
+    expect(certsRouteSource).toContain('Link to VIMS certificate type');
+    expect(certsRouteSource).not.toContain('Parser anomaly threshold breached');
+    expect(certsRouteSource).not.toContain('Catalog / tracked item');
+    expect(certsRouteSource).not.toContain('Class snapshot extract');
+    expect(certsRouteSource).not.toContain('Add to ClassCodeMapping');
+  });
 });
