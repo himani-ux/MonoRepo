@@ -282,3 +282,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-21 | MAINTAIN | T1 | Fixed ship-side Circular PDF viewer to use a Vite-bundled PDF.js worker instead of a production .mjs asset URL | docs: Docs/modules/frontend/circular-workflow.md | exemptions: none
 2026-07-21 | MAINTAIN | T1 | Fixed ship-side Circular API calls to use relative production paths instead of localhost URLs | docs: Docs/modules/frontend/circular-workflow.md | exemptions: none
 2026-07-21 | MAINTAIN | T1 | Limited the Circular localhost URL hotfix to the PDF viewer files requested for the server patch | docs: Docs/modules/frontend/circular-workflow.md | exemptions: none
+2026-07-21 | MAINTAIN | T1 | Hardened Circular PDF viewer URL construction so server hotfixes cannot leave an http prefix before the relative API path | docs: none - existing circular workflow doc already states the relative PDF viewer API behavior | exemptions: none

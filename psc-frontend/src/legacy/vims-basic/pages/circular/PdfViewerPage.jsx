@@ -7,6 +7,18 @@ import { configurePdfJsWorker } from "../../utils/circular/pdfWorker";
 
 configurePdfJsWorker(pdfjsLib);
 
+const CIRCULAR_PDF_URL_ENDPOINT = "/api/circular/api/msc/pdf-url/";
+const CIRCULAR_READ_ACK_ENDPOINT = "/api/circular/api/msc/read-ack/";
+
+const buildCircularPdfUrl = (notificationId, crewId) => {
+  const params = new URLSearchParams({
+    notificationId,
+    crew_id: crewId,
+  });
+
+  return `${CIRCULAR_PDF_URL_ENDPOINT}?${params.toString()}`;
+};
+
 export default function PdfViewerPage() {
 
   const { user } = useAuth();
@@ -46,9 +58,7 @@ export default function PdfViewerPage() {
         console.log("PdfViewerPage loaded â€” notificationId:", notificationId);
         console.log("crew_id:", currentUser.crew_id)
         console.log("crew_role:", currentUser.role)
-        const res = await fetch(
-          `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notificationId)}&crew_id=${encodeURIComponent(currentUser.crew_id)}`
-        );
+        const res = await fetch(buildCircularPdfUrl(notificationId, currentUser.crew_id));
         console.log("Fetch response:", res.status);
 
         if (!res.ok) {
@@ -160,7 +170,7 @@ export default function PdfViewerPage() {
     }
 
     try {
-      const response = await fetch("/api/circular/api/msc/read-ack/", {
+      const response = await fetch(CIRCULAR_READ_ACK_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

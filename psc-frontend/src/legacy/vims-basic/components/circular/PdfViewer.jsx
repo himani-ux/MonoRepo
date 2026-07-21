@@ -8,6 +8,18 @@ import { configurePdfJsWorker } from "../../utils/circular/pdfWorker";
 
 configurePdfJsWorker(pdfjsLib);
 
+const CIRCULAR_PDF_URL_ENDPOINT = "/api/circular/api/msc/pdf-url/";
+const CIRCULAR_READ_ACK_ENDPOINT = "/api/circular/api/msc/read-ack/";
+
+const buildCircularPdfUrl = (notificationId, crewId) => {
+  const params = new URLSearchParams({
+    notificationId,
+    crew_id: crewId,
+  });
+
+  return `${CIRCULAR_PDF_URL_ENDPOINT}?${params.toString()}`;
+};
+
 const PdfViewer = ({
   user,
   notification,
@@ -31,9 +43,7 @@ const PdfViewer = ({
       try {
         console.log('notification.id', notification.id);
         console.log('user.crew_id', user.crew_id);
-        const res = await fetch(
-          `/api/circular/api/msc/pdf-url/?notificationId=${encodeURIComponent(notification.id)}&crew_id=${encodeURIComponent(user.crew_id)}`
-        );
+        const res = await fetch(buildCircularPdfUrl(notification.id, user.crew_id));
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -118,7 +128,7 @@ const PdfViewer = ({
     if (hasAcknowledged) return;
 console.log('Acknowledging notification:', notification.id,user.crew_id,user.role);
     try {
-      const res = await fetch('/api/circular/api/msc/read-ack/', {
+      const res = await fetch(CIRCULAR_READ_ACK_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

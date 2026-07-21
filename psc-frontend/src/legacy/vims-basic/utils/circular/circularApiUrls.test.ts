@@ -13,7 +13,11 @@ const readSource = (relativePath: string) =>
 describe('Circular ship-side API URLs', () => {
   it('test_circular_pdf_viewers_do_not_call_localhost_api_in_production', () => {
     for (const relativePath of circularPdfHotfixFiles) {
-      expect(readSource(relativePath), relativePath).not.toContain('localhost:8000');
+      const source = readSource(relativePath);
+      expect(source, relativePath).not.toContain('localhost:8000');
+      expect(source, relativePath).not.toContain('http://');
+      expect(source, relativePath).not.toContain('//api/circular');
+      expect(source, relativePath).not.toMatch(/http:\s*\/\/\s*\/api\/circular/);
     }
   });
 
@@ -23,7 +27,9 @@ describe('Circular ship-side API URLs', () => {
 
     expect(pdfViewerSource).toContain('/api/circular/api/msc/pdf-url/');
     expect(pdfViewerSource).toContain('/api/circular/api/msc/read-ack/');
+    expect(pdfViewerSource).toContain('new URLSearchParams');
     expect(standaloneViewerSource).toContain('/api/circular/api/msc/pdf-url/');
     expect(standaloneViewerSource).toContain('/api/circular/api/msc/read-ack/');
+    expect(standaloneViewerSource).toContain('new URLSearchParams');
   });
 });
