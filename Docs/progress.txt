@@ -276,3 +276,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-20 | MAINTAIN | T1 | Fixed Certs route error-state and lint issues found during module validation | docs: none - runtime cleanup only | exemptions: none
 2026-07-20 | MAINTAIN | T1 | Added the missing Certs landing entry point for Class Reconciliation so users with reconciliation access can open it visibly | docs: none - restores documented navigation surface | exemptions: none
 2026-07-20 | MAINTAIN | CR-100 | Changed Class Reconciliation snapshot upload from raw Vessel ID entry to a vessel name/code dropdown and clarified the required class-status PDF | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/USER_GUIDE.md | exemptions: none
+2026-07-21 | MAINTAIN | CR-101 | Made Class Reconciliation snapshot upload run parser/reconciliation immediately and show a specific no-text-layer PDF failure | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/BACKEND_STRUCTURE.md, certs_docsuite/USER_GUIDE.md | exemptions: none

@@ -413,7 +413,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Columns: vessel, class society, snapshot date, parse status, parser version, matches count, mismatches count, missing-in-catalog count, missing-in-class count, conditional/STC detected, extended/postponed detected, unresolved flags, last reviewed by + when.
 - Per-row action: "Review" → §3.10. "Re-parse with current mapping" (manual, D-CERT-061).
 - "Export filtered list as CSV" button.
-- Upload class snapshot card (DPA / FM / Sup'tts): vessel dropdown from onboarded fleet data shows vessel name/code/IMO and submits the selected vessel's `vesselId` internally; class society selector; printed-on date; Class Status PDF file input. Helper copy states to upload the latest official Class Status or Vessel Status PDF downloaded from the class society portal, not an individual certificate PDF.
+- Upload class snapshot card (DPA / FM / Sup'tts): vessel dropdown from onboarded fleet data shows vessel name/code/IMO and submits the selected vessel's `vesselId` internally; class society selector; printed-on date; Class Status PDF file input. Helper copy states to upload the latest official Class Status or Vessel Status PDF downloaded/exported from the class society portal, not an individual certificate PDF. Upload immediately runs the class snapshot parser and reconciliation path; success shows a parsed/reconciled message, while failed text extraction shows that scanned/image-only PDFs cannot be parsed because class snapshots are text-extract only per D-CERT-048.
 
 **Surfaces (FIELD_MAP):** `vims_certs_reconciliation_run.*` columns, joined `vims_certs_class_status_snapshot`, joined `vims_certs_class_code_mapping.version`.
 

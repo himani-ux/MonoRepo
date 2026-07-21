@@ -1,8 +1,11 @@
 from django.conf import settings
 from django.core.exceptions import SuspiciousFileOperation
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
+from contextlib import nullcontext
 from pathlib import Path
+from rest_framework.test import APIRequestFactory, force_authenticate
 import tempfile
 from types import SimpleNamespace
 from unittest import TestCase
@@ -11,9 +14,15 @@ from unittest.mock import patch
 from apps.certs.permissions import can_approve_tracked_item
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
+from apps.certs.services.parsers.base import BaseClassParser, ClassSnapshotParseError
+from apps.certs.services.parsers.bv import BVClassParser
+from apps.certs.services.parsers.kr import KRClassParser
+from apps.certs.services.parsers.nk import NKClassParser
 from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
+from apps.certs.services.reconciliation import build_reconciliation_flags
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
+from apps.certs.views import snapshot_views
 
 
 class CertsAppRegistrationTests(SimpleTestCase):
@@ -87,6 +96,158 @@ class PdfBlobStoragePathTests(SimpleTestCase):
                 resolve_pdf_blob_path({"blob_storage_path": "../outside.pdf"})
 
 
+class ClassSnapshotUploadParsingTests(SimpleTestCase):
+    def test_upload_immediately_reparses_and_returns_run_ready_snapshot(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        snapshot_id = "22222222-2222-2222-2222-222222222222"
+        run_id = "33333333-3333-3333-3333-333333333333"
+        blob_id = "44444444-4444-4444-4444-444444444444"
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="OFFICE",
+            role="DPA",
+            form_ids=["CERT_F_003"],
+            process_ids=["CERT_P_001"],
+            has_global_vessel_access=True,
+        )
+        request = APIRequestFactory().post(
+            "/api/certs/class-snapshots/",
+            data={
+                "vesselId": vessel_id,
+                "classSociety": "NK",
+                "printedOnDate": "2026-07-20",
+                "file": SimpleUploadedFile("class-status.pdf", b"%PDF-1.4\n%", content_type="application/pdf"),
+            },
+            format="multipart",
+        )
+        force_authenticate(request, user=user)
+        pending_snapshot = _class_snapshot_row(
+            snapshot_id=snapshot_id,
+            vessel_id=vessel_id,
+            blob_id=blob_id,
+            parse_status="pending",
+            reconciliation_run_id=None,
+        )
+        parsed_snapshot = _class_snapshot_row(
+            snapshot_id=snapshot_id,
+            vessel_id=vessel_id,
+            blob_id=blob_id,
+            parse_status="success",
+            reconciliation_run_id=run_id,
+            parser_version="nk-pdfplumber-v1",
+        )
+
+        with (
+            patch(
+                "apps.certs.views.snapshot_views.save_uploaded_class_snapshot_pdf",
+                return_value={"relative_path": "certs/vessels/test/class-status.pdf", "filename": "class-status.pdf", "sha256": "sha", "size": 10},
+            ),
+            patch("apps.certs.views.snapshot_views.resolve_actor_id", return_value="actor-1"),
+            patch.object(snapshot_views.pdf_repository, "create_snapshot_blob", return_value={"blob_id": blob_id}),
+            patch.object(snapshot_views.repository, "create_snapshot", return_value=pending_snapshot) as create_snapshot,
+            patch("apps.certs.views.snapshot_views.run_class_snapshot_parser", return_value=(parsed_snapshot, {"run_id": run_id})) as parser_worker,
+            patch("apps.certs.views.snapshot_views.record_audit_event"),
+            patch("apps.certs.views.snapshot_views.transaction.atomic", return_value=nullcontext()),
+        ):
+            response = snapshot_views.ClassSnapshotListCreateView.as_view()(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["parseStatus"], "success")
+        self.assertEqual(response.data["reconciliationRunId"], run_id)
+        create_snapshot.assert_called_once()
+        parser_worker.assert_called_once_with(snapshot_id, repository=snapshot_views.repository)
+
+
+class ClassSnapshotParserAndReconciliationSmokeTests(SimpleTestCase):
+    def test_class_snapshot_parser_reports_image_only_pdf_without_text_layer(self):
+        parser = _NoopClassParser()
+
+        with (
+            patch("apps.certs.services.parsers.base.extract_pdf_text", return_value=("", 19)),
+            self.assertRaisesRegex(ClassSnapshotParseError, "did not expose a text layer"),
+        ):
+            parser.parse("image-only-class-status.pdf")
+
+    def test_class_parser_text_smoke_covers_supported_societies(self):
+        samples = {
+            "NK": (
+                NKClassParser(),
+                """NK-SHIPS Information Service
+Name of Ship: TEST VESSEL Class No. : NK 123456 IMO No. : 1234567
+Printed on 01.Jan.2026
+Survey Status:: Class
+Hull Annual Survey 01 Jan 2027
+Condition & Note
+""",
+            ),
+            "KR": (
+                KRClassParser(),
+                """VESSEL STATUS FOR SHIP'S OWNER TEST VESSEL Class No : 98765 IMO No : 1234567 Printed on 01-Jan-2026
+Certificates
+International Oil Pollution Prevention Certificate IOPP Full 2024-01-01 2029-01-01
+Class Surveys
+Ship Name Work ID
+Hull Annual Survey 2025-01-01 2026-01-01
+""",
+            ),
+            "BV": (
+                BVClassParser(),
+                """Ship name: TEST VESSEL BV Nr BV123 IMO Number: 1234567 Generated on 1 Jan 2026
+Classification Surveys
+Hull Annual Survey 1 Jan 2025 1 Jan 2026
+Conditions of Class / Statutory Recommendations
+None
+""",
+            ),
+        }
+
+        for society, (parser, text) in samples.items():
+            with self.subTest(society=society):
+                payload = parser.parse_text(text, page_count=1)
+                self.assertEqual(payload["class_society"], society)
+                self.assertGreaterEqual(len(payload["rows"]), 1)
+
+    def test_reconciliation_buckets_snapshot_rows_against_tracked_items(self):
+        result = build_reconciliation_flags(
+            parsed_payload={
+                "rows": [
+                    {"class_code_or_name": "IOPP", "certificate_number": "C-001", "expiry_date": "2029-01-01", "confidence": 1.0},
+                    {"class_code_or_name": "LOADLINE", "certificate_number": "C-002", "expiry_date": "2028-01-01", "confidence": 1.0},
+                    {"class_code_or_name": "UNKNOWN", "confidence": 1.0},
+                    {"class_code_or_name": "LOWCONF", "confidence": 0.5},
+                    {"class_code_or_name": "STCROW", "type": "STC", "confidence": 1.0},
+                    {"class_code_or_name": "POSTROW", "status": "POSTPONED", "postponed_until": "2027-01-01", "confidence": 1.0},
+                ]
+            },
+            tracked_items=[
+                {"tracked_item_id": "ti-1", "catalog_id": "cat-1", "catalog_is_class_tracked": True, "certificate_number": "C-001", "expiry_date": "2029-01-01"},
+                {"tracked_item_id": "ti-2", "catalog_id": "cat-2", "catalog_is_class_tracked": True, "certificate_number": "C-002", "expiry_date": "2029-01-01"},
+                {"tracked_item_id": "ti-3", "catalog_id": "cat-3", "catalog_is_class_tracked": True},
+                {"tracked_item_id": "ti-4", "catalog_id": "cat-4", "catalog_is_class_tracked": True},
+                {"tracked_item_id": "ti-5", "catalog_id": "cat-5", "catalog_is_class_tracked": True},
+            ],
+            mappings=[
+                {"class_code_or_name": "IOPP", "catalog_id": "cat-1", "version": 1},
+                {"class_code_or_name": "LOADLINE", "catalog_id": "cat-2", "version": 1},
+                {"class_code_or_name": "STCROW", "catalog_id": "cat-3", "version": 1},
+                {"class_code_or_name": "POSTROW", "catalog_id": "cat-4", "version": 1},
+            ],
+        )
+
+        self.assertEqual(
+            result.counts,
+            {
+                "matches_count": 1,
+                "mismatches_count": 1,
+                "missing_in_catalog_count": 1,
+                "missing_in_class_count": 1,
+                "conditional_stc_detected_count": 1,
+                "extended_postponed_detected_count": 1,
+                "unmapped_low_confidence_count": 1,
+            },
+        )
+
+
 class CatalogRowSubmissionScopeTests(SimpleTestCase):
     def test_catalog_row_create_rejects_master_only_under_all_rank_policy(self):
         serializer = CatalogRowWriteSerializer(
@@ -116,6 +277,46 @@ def _catalog_row_payload(submission_scope: str) -> dict[str, object]:
         "issuingAuthorityType": "flag",
         "submissionScope": submission_scope,
     }
+
+
+def _class_snapshot_row(
+    *,
+    snapshot_id: str,
+    vessel_id: str,
+    blob_id: str,
+    parse_status: str,
+    reconciliation_run_id: str | None,
+    parser_version: str = "pending-parser-v1",
+) -> dict[str, object]:
+    return {
+        "snapshot_id": snapshot_id,
+        "vessel_id": vessel_id,
+        "vessel_name": "MV Test",
+        "imo_number": "1234567",
+        "class_society": "NK",
+        "pdf_blob_id": blob_id,
+        "filename": "class-status.pdf",
+        "content_size_bytes": 10,
+        "printed_on_date": "2026-07-20",
+        "uploaded_by": "actor-1",
+        "uploaded_at": "2026-07-20T10:00:00Z",
+        "parser_version": parser_version,
+        "parse_status": parse_status,
+        "parse_started_at": None,
+        "parse_completed_at": "2026-07-20T10:00:05Z" if parse_status != "pending" else None,
+        "parser_timeout": False,
+        "retry_count": 0,
+        "parsed_payload_json": None,
+        "parsed_payload_schema_version": 1,
+        "reconciliation_run_id": reconciliation_run_id,
+        "upload_sha256": "sha",
+        "superseded_user_error": False,
+    }
+
+
+class _NoopClassParser(BaseClassParser):
+    def parse_text(self, text: str, *, page_count: int) -> dict[str, object]:
+        return {"rows": [], "schema_version": 1}
 
 
 class _FakeCatalogCursor:

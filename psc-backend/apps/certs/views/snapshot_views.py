@@ -14,6 +14,7 @@ from apps.certs.permissions import (
     is_reconciliation_uploader,
     user_can_access_vessel,
 )
+from apps.certs.jobs.parser_worker import run_class_snapshot_parser
 from apps.certs.serializers.snapshot import (
     ClassSnapshotUploadSerializer,
     serialize_class_snapshot,
@@ -82,6 +83,9 @@ class ClassSnapshotListCreateView(generics.GenericAPIView):
                 uploaded_by=actor_id,
                 upload_sha256=str(stored["sha256"]),
             )
+            parsed_snapshot, _run = run_class_snapshot_parser(str(snapshot["snapshot_id"]), repository=repository)
+            if parsed_snapshot is not None:
+                snapshot = parsed_snapshot
             serialized = serialize_class_snapshot(snapshot)
             record_audit_event(
                 actor=request.user,
@@ -128,7 +132,7 @@ class ClassSnapshotReparseView(generics.GenericAPIView):
         if not user_can_access_vessel(request.user, str(before.get("vessel_id"))):
             return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
         with transaction.atomic():
-            snapshot, run = repository.reparse_snapshot(str(snapshot_id))
+            snapshot, run = run_class_snapshot_parser(str(snapshot_id), repository=repository)
             if snapshot is None:
                 return Response({"detail": "Class snapshot not found."}, status=status.HTTP_404_NOT_FOUND)
             serialized_snapshot = serialize_class_snapshot(snapshot)

@@ -3197,7 +3197,11 @@ function CertReconciliationDashboardPage() {
                     </div>
                     {uploadError ? <p className="text-sm text-error-700">{uploadError}</p> : null}
                     {uploadMutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(uploadMutation.error)}</p> : null}
-                    {uploadMutation.isSuccess ? <p className="text-sm text-success-700">Snapshot uploaded.</p> : null}
+                    {uploadMutation.isSuccess ? (
+                      <p className={uploadMutation.data.parseStatus === 'failed' ? 'text-sm text-error-700' : 'text-sm text-success-700'}>
+                        {formatClassSnapshotUploadResult(uploadMutation.data)}
+                      </p>
+                    ) : null}
                     <Button type="submit" disabled={uploadMutation.isPending || vesselDashboard.isLoading || uploadVessels.length === 0}>
                       <UploadCloud className="mr-2 h-4 w-4" aria-hidden="true" />
                       Upload snapshot
@@ -6483,6 +6487,47 @@ function formatSnapshotAge(snapshot: CertVesselDashboardResponse['lastClassSnaps
   if (snapshot.daysAgo === 1) return 'Uploaded 1 day ago';
   if (typeof snapshot.daysAgo === 'number') return `Uploaded ${snapshot.daysAgo} days ago`;
   return `Uploaded ${formatDate(snapshot.uploadedAt)}`;
+}
+
+function formatClassSnapshotUploadResult(snapshot: CertClassSnapshot): string {
+  if (snapshot.parseStatus === 'success' && snapshot.reconciliationRunId) {
+    return 'Snapshot uploaded, parsed, and reconciled.';
+  }
+  if (snapshot.parseStatus === 'partial' && snapshot.reconciliationRunId) {
+    return 'Snapshot uploaded with partial parser output; reconciliation is ready for review.';
+  }
+  if (snapshot.parseStatus === 'failed') {
+    return formatClassSnapshotParseFailure(snapshot);
+  }
+  return 'Snapshot uploaded. Parser is pending.';
+}
+
+function formatClassSnapshotParseFailure(snapshot: CertClassSnapshot): string {
+  const failureReason = getClassSnapshotParseFailureReason(snapshot);
+  if (failureReason?.includes('did not expose a text layer')) {
+    return 'Snapshot uploaded, but this PDF has no selectable text. Upload the digital Class Status PDF downloaded/exported from NK, KR, or BV; scanned/image-only PDFs cannot be parsed here.';
+  }
+  return 'Snapshot uploaded, but the parser could not read this PDF. Check the snapshot row and try Reparse after correcting the file.';
+}
+
+function getClassSnapshotParseFailureReason(snapshot: CertClassSnapshot): string | null {
+  const payload = snapshot.parsedPayload;
+  if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
+    return null;
+  }
+  const rows = (payload as { unmapped_rows?: unknown }).unmapped_rows;
+  if (!Array.isArray(rows)) {
+    return null;
+  }
+  for (const row of rows) {
+    if (row && typeof row === 'object' && 'error' in row) {
+      const error = String((row as { error?: unknown }).error ?? '').trim();
+      if (error) {
+        return error;
+      }
+    }
+  }
+  return null;
 }
 
 function formatClassSnapshotVesselOption(vessel: CertFleetDashboardVessel): string {

@@ -127,18 +127,25 @@ class ClassSnapshotRepository:
             )
         try:
             parsed = self._parse_snapshot_pdf(snapshot)
-        except ClassSnapshotParseError:
+        except ClassSnapshotParseError as exc:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE dbo.vims_certs_class_status_snapshot
                     SET parse_status = %s,
-                        parse_completed_at = SYSUTCDATETIME()
+                        parse_completed_at = SYSUTCDATETIME(),
+                        parsed_payload_json = %s,
+                        parsed_payload_schema_version = %s
                     WHERE snapshot_id = %s
                     """,
-                    ["failed", snapshot_id],
+                    [
+                        "failed",
+                        json.dumps(_failed_parse_payload(str(exc), snapshot), default=str),
+                        1,
+                        snapshot_id,
+                    ],
                 )
-            raise
+            return self.get_snapshot(snapshot_id), None
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -205,3 +212,17 @@ def _json_object(value: Any) -> dict[str, Any] | list[Any] | None:
     except (TypeError, ValueError):
         return None
     return parsed if isinstance(parsed, (dict, list)) else None
+
+
+def _failed_parse_payload(message: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "parser_version": snapshot.get("parser_version") or "pending-parser-v1",
+        "class_society": snapshot.get("class_society"),
+        "source": "pdfplumber_text",
+        "vessel": {},
+        "rows": [],
+        "conditions_of_class": [],
+        "unmapped_rows": [{"error": message or "Class status PDF could not be parsed."}],
+        "text_extraction": {"engine": "pdfplumber", "page_count": None, "char_count": None},
+    }

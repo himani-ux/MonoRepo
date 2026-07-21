@@ -644,7 +644,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### 5.3 Class Snapshots & Reconciliation
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
-| POST | `/api/certs/class-snapshots/` | CERT_P_001 | DPA / FM / Sup'tts | Upload + queue parser |
+| POST | `/api/certs/class-snapshots/` | CERT_P_001 | DPA / FM / Sup'tts | Upload + invoke parser/reconciliation worker path immediately |
 | GET | `/api/certs/class-snapshots/` | (read-vessel) | Per RBAC | Filter list |
 | GET | `/api/certs/class-snapshots/<id>/` | (read-vessel) | Per RBAC | Detail |
 | POST | `/api/certs/class-snapshots/<id>/reparse/` | CERT_P_001 | DPA + Tech Sup'tt | Manual re-parse trigger |
@@ -735,9 +735,10 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 - Engine choice deferred to Phase 0 (TECH_STACK Â§2). Wrapper interface stable.
 
 ### `services/parsers/`
-- `BaseClassParser` interface: `parse(blob_id) â†’ ParsedSnapshot`.
+- `BaseClassParser` interface: `parse(pdf_path) â†’ ParsedSnapshot`.
 - One concrete parser per class society (NK / KR / BV) per D-CERT-005.
 - Output normalized to common intermediate schema â†’ reconciliation engine.
+- Class snapshot PDFs are text-extracted only per D-CERT-048; scanned/image-only PDFs fail with parse_status=`failed` and store the parser reason in `parsed_payload_json.unmapped_rows[]`.
 - Test fixtures = 6 reference PDFs (D-CERT-057); CI runs full corpus on every parser PR.
 
 ### `services/reconciliation.py`
@@ -824,9 +825,9 @@ Class snapshot uploaded â†’ ClassStatusSnapshot inserted
         â”‚
         â–¼
    Parser worker job (jobs/parser_worker.py)
-        â”‚  - 5-min hard timeout (D-CERT-059)
-        â”‚  - 2x retry: 30s + 90s backoff
-        â”‚  - parser_version stamped
+        â”‚  - invoked synchronously by upload and manual Reparse endpoints in this deployment
+        â”‚  - parser_version stamped on success
+        â”‚  - text-extraction failures store parse_status=failed + unmapped_rows[] reason
         â–¼
    Class society parser â†’ common intermediate schema
         â”‚
@@ -854,6 +855,7 @@ Class snapshot uploaded â†’ ClassStatusSnapshot inserted
 ```
 
 **Format-change FAIL SOFT:** Unparseable rows â†’ `unmapped_rows[]` in parsed_payload; reconciliation continues for mapped rows; DPA notified; >25% unmapped â†’ critical escalation (D-CERT-031).
+**Whole-PDF text failure:** if `pdfplumber` extracts no text from the snapshot, the snapshot remains stored with `parse_status=failed`, no reconciliation run is created, and the UI tells the user to upload a digital/text-selectable class-status PDF.
 
 **No fuzzy fallback:** Per D-CERT-031, parser does NOT attempt fuzzy mapping when class format changes. Workshop expansion of ClassCodeMapping is the human-in-loop path.
 
