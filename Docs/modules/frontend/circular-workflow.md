@@ -159,7 +159,7 @@ Circular workflow notifications are rendered inside the same shared notification
 - non-masters call `/api/crew/notifications/`
 - masters can open crew list and send reminders
 
-Ship-side circular list, crew-list, reminder, acknowledgement, PDF URL, and report-download calls use relative `/api/circular/` paths so production browsers call the deployed VIMS host instead of localhost.
+The circular PDF viewer and standalone PDF viewer fetch the PDF URL and submit read acknowledgement through relative `/api/circular/` paths so production browsers call the deployed VIMS host instead of localhost.
 
 `PdfViewer.jsx` fetches the attachment URL, renders the PDF with PDF.js, and only exposes the acknowledge button once the viewer is scrolled to the bottom. Both circular PDF viewer entry points use a Vite-bundled PDF.js worker instance so production does not depend on the server MIME type for a separate `.mjs` worker asset.
 
@@ -210,9 +210,9 @@ That affects:
 
 Draft edit, pending edit, supersede, and approval all persist ephemeral state into `localStorage`. That makes flows brittle across tabs, reloads, and stale-session scenarios.
 
-### 5. Hard-coded backend URLs still exist in legacy office paths
+### 5. Hard-coded backend URLs are everywhere
 
-Several legacy office paths still point directly at `http://localhost:8000/api/circular/...` instead of using a shared API client. This makes environment changes and testing harder. The ship-side circular dashboard and PDF viewer paths now use relative `/api/circular/` URLs.
+Most requests point directly at `http://localhost:8000/api/circular/...` instead of using a shared API client. This makes environment changes and testing harder. The circular PDF viewer hotfix now uses relative `/api/circular/` URLs for its PDF URL and read acknowledgement calls.
 
 ### 6. There are duplicate approval implementations
 

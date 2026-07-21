@@ -281,3 +281,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-07-21 | MAINTAIN | T1 | Simplified Class Reconciliation review page wording and layout to remove technical parser/catalog wording from normal users | docs: certs_docsuite/APP_FLOW.md, certs_docsuite/USER_GUIDE.md | exemptions: none
 2026-07-21 | MAINTAIN | T1 | Fixed ship-side Circular PDF viewer to use a Vite-bundled PDF.js worker instead of a production .mjs asset URL | docs: Docs/modules/frontend/circular-workflow.md | exemptions: none
 2026-07-21 | MAINTAIN | T1 | Fixed ship-side Circular API calls to use relative production paths instead of localhost URLs | docs: Docs/modules/frontend/circular-workflow.md | exemptions: none
+2026-07-21 | MAINTAIN | T1 | Limited the Circular localhost URL hotfix to the PDF viewer files requested for the server patch | docs: Docs/modules/frontend/circular-workflow.md | exemptions: none

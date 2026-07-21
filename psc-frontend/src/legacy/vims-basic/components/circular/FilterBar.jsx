@@ -42,7 +42,7 @@ const FilterBar = ({
       only_unread: onlyUnread.toString(),
     });
 
-    window.open(`/api/circular/api/reports/download-pdf/?${params.toString()}`, '_blank');
+    window.open(`http://localhost:8000/api/circular/api/reports/download-pdf/?${params.toString()}`, '_blank');
   };
 
   return (
