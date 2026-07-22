@@ -738,7 +738,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 - `BaseClassParser` interface: `parse(pdf_path) â†’ ParsedSnapshot`.
 - One concrete parser per class society (NK / KR / BV) per D-CERT-005.
 - Output normalized to common intermediate schema â†’ reconciliation engine.
-- Class snapshot PDFs are text-extracted first per D-CERT-048. If the full PDF exposes no text layer, D-CERT-200 allows PaddleOCR fallback against rendered page images before the same NK/KR/BV parser modules run.
+- Class snapshot PDFs are text-extracted first per D-CERT-048. If the full PDF exposes no text layer, D-CERT-200 allows PaddleOCR fallback. The fallback reads embedded page images first, reconstructs PaddleOCR text boxes into row-like lines, and uses the KR parser's supported data-page selector before falling back to rendered page images for the same NK/KR/BV parser modules.
 - Test fixtures = 6 reference PDFs (D-CERT-057); CI runs full corpus on every parser PR.
 
 ### `services/reconciliation.py`

@@ -21,6 +21,7 @@ class KRClassParser(BaseClassParser):
     class_society = "KR"
     parser_version = "kr-pdfplumber-v1"
     date_pattern = re.compile(ISO_DATE)
+    ocr_page_numbers = (5, 6, 7, 8)
 
     def parse_text(self, text: str, *, page_count: int) -> dict[str, Any]:
         lines = strip_ignored_sections([clean_space(line) for line in text.splitlines() if clean_space(line)])
@@ -94,20 +95,31 @@ def _is_group_heading(line: str) -> bool:
 
 
 def _parse_certificate_line(line: str, current_section: str) -> dict[str, Any] | None:
+    if "Certificate" not in current_section and "Documents" not in current_section:
+        return None
     match = re.match(
-        rf"(?P<name>.+?)\s+(?P<code>[A-Z0-9()/-]+)\s+(?P<kind>Full|Permanence|-)\s+(?P<issue>{ISO_DATE})\s+(?P<expiry>{ISO_DATE}|-)\b",
+        rf"(?P<name>.+?)\s+(?P<code>[A-Z0-9()/-]+)\s+(?P<kind>Full|Permanence|-)\s+(?P<issue>{ISO_DATE})(?:\s+(?P<expiry>{ISO_DATE}|-))?\b",
         line,
+        re.IGNORECASE,
     )
     if not match:
+        match = re.match(
+            rf"(?P<name>.+?)\s+(?P<code>[A-Z0-9()/-]+)\s+(?P<issue>{ISO_DATE})(?:\s+(?P<expiry>{ISO_DATE}|-))?\b",
+            line,
+            re.IGNORECASE,
+        )
+    if not match:
         return None
+    expiry = match.groupdict().get("expiry")
+    kind = match.groupdict().get("kind") or "-"
     return row(
         class_society="KR",
-        class_code_or_name=match.group("code"),
+        class_code_or_name=match.group("code").upper(),
         source_section=current_section or "Certificates",
         row_type="certificate",
-        type=match.group("kind").lower(),
+        type=kind.lower(),
         issue_date=match.group("issue"),
-        expiry_date=None if match.group("expiry") == "-" else match.group("expiry"),
+        expiry_date=None if not expiry or expiry == "-" else expiry,
         raw_text=line,
         display_name=match.group("name"),
     )
@@ -127,10 +139,22 @@ def _parse_survey_line(line: str, current_section: str, current_group: str) -> d
         class_code_or_name=class_code_or_name,
         source_section=current_section or "Survey Information",
         row_type="survey",
-        last_done_date=dates[0] if len(dates) > 1 else None,
-        next_due_date=dates[1] if len(dates) > 1 else dates[0],
+        last_done_date=_survey_last_done_date(dates),
+        next_due_date=_survey_next_due_date(dates),
         raw_text=line,
     )
+
+
+def _survey_last_done_date(dates: list[str]) -> str | None:
+    if len(dates) == 2 or len(dates) >= 4:
+        return dates[0]
+    return None
+
+
+def _survey_next_due_date(dates: list[str]) -> str | None:
+    if len(dates) == 2 or len(dates) >= 4:
+        return dates[1]
+    return dates[0] if dates else None
 
 
 def _is_ship_work_group(value: str) -> bool:

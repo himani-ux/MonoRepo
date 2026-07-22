@@ -4,7 +4,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 from contextlib import nullcontext
+from decimal import Decimal
 from django.db import DatabaseError
+from io import BytesIO
 from pathlib import Path
 from rest_framework.test import APIRequestFactory, force_authenticate
 import tempfile
@@ -24,10 +26,15 @@ from apps.certs.services.ocr_pipeline import (
     process_cert_pdf,
 )
 from apps.certs.services.parsers.base import (
+    CLASS_SNAPSHOT_OCR_DET_LIMIT_SIDE_LEN,
+    CLASS_SNAPSHOT_OCR_LANGUAGE,
     CLASS_SNAPSHOT_OCR_MAX_PAGES,
+    CLASS_SNAPSHOT_OCR_REC_BATCH_SIZE,
+    CLASS_SNAPSHOT_OCR_VERSION,
     BaseClassParser,
     ClassSnapshotParseError,
     ExtractedClassSnapshotText,
+    extract_pdf_embedded_image_ocr_text,
     extract_pdf_image_ocr_text,
 )
 from apps.certs.services.parsers.bv import BVClassParser
@@ -221,8 +228,46 @@ Load Line Certificate ILL Full 2025-08-11 2030-07-11 0N25015926559
         with patch("apps.certs.services.parsers.base.PaddleOcrEngine", return_value=fake_engine) as engine_class:
             text = extract_pdf_image_ocr_text("image-only-class-status.pdf")
 
-        engine_class.assert_called_once_with(max_pdf_pages=CLASS_SNAPSHOT_OCR_MAX_PAGES)
+        engine_class.assert_called_once_with(**_class_snapshot_ocr_kwargs())
         self.assertIn("KOREAN REGISTER", text)
+
+    def test_class_snapshot_ocr_fallback_reads_embedded_page_images(self):
+        page_image = _png_bytes(width=1273, height=1800)
+        logo_image = _png_bytes(width=583, height=73)
+        fake_reader = _FakePdfReader([_FakePdfPage([_FakePdfImage(logo_image), _FakePdfImage(page_image)])])
+        fake_engine = _FakeClassSnapshotOcrEngine("KOREAN REGISTER\nIMO No. 9584293")
+
+        with (
+            patch("PyPDF2.PdfReader", return_value=fake_reader),
+            patch("apps.certs.services.parsers.base.PaddleOcrEngine", return_value=fake_engine) as engine_class,
+        ):
+            text = extract_pdf_embedded_image_ocr_text("image-only-class-status.pdf")
+
+        engine_class.assert_called_once_with(**_class_snapshot_ocr_kwargs())
+        self.assertEqual(fake_engine.calls, 1)
+        self.assertIn("--- PAGE 1 OCR ---", text)
+        self.assertIn("IMO No. 9584293", text)
+
+    def test_class_snapshot_embedded_ocr_can_limit_pages(self):
+        first_page = _png_bytes(width=1273, height=1800)
+        second_page = _png_bytes(width=1273, height=1800)
+        fake_reader = _FakePdfReader(
+            [
+                _FakePdfPage([_FakePdfImage(first_page)]),
+                _FakePdfPage([_FakePdfImage(second_page)]),
+            ]
+        )
+        fake_engine = _FakeClassSnapshotOcrEngine("Certificate row")
+
+        with (
+            patch("PyPDF2.PdfReader", return_value=fake_reader),
+            patch("apps.certs.services.parsers.base.PaddleOcrEngine", return_value=fake_engine),
+        ):
+            text = extract_pdf_embedded_image_ocr_text("image-only-class-status.pdf", ocr_page_numbers=(2,))
+
+        self.assertEqual(fake_engine.calls, 1)
+        self.assertNotIn("--- PAGE 1 OCR ---", text)
+        self.assertIn("--- PAGE 2 OCR ---", text)
 
     def test_process_cert_pdf_defaults_to_paddleocr_payload_contract(self):
         output = OcrEngineOutput(
@@ -267,6 +312,41 @@ Load Line Certificate ILL Full 2025-08-11 2030-07-11 0N25015926559
         self.assertEqual(text, "KOREAN REGISTER\nIMO No. 9584293")
         self.assertAlmostEqual(confidence, 0.94)
 
+    def test_paddleocr_prediction_reconstructs_table_rows_from_boxes(self):
+        text, confidence = _paddle_prediction_to_text(
+            [
+                {
+                    "res": {
+                        "rec_texts": [
+                            "Classification Certificate(Full)",
+                            "CC",
+                            "Full",
+                            "2025-08-11",
+                            "2030-07-11",
+                            "Annual Survey",
+                            "2026-07-11",
+                        ],
+                        "rec_scores": [0.96, 0.95, 0.97, 0.98, 0.99, 0.94, 0.93],
+                        "rec_boxes": _TruthlessBoxes(
+                            [
+                                [Decimal("10"), Decimal("10"), Decimal("260"), Decimal("30")],
+                                [Decimal("300"), Decimal("11"), Decimal("330"), Decimal("30")],
+                                [Decimal("360"), Decimal("10"), Decimal("410"), Decimal("30")],
+                                [Decimal("450"), Decimal("10"), Decimal("540"), Decimal("30")],
+                                [Decimal("570"), Decimal("10"), Decimal("660"), Decimal("30")],
+                                [Decimal("10"), Decimal("55"), Decimal("120"), Decimal("75")],
+                                [Decimal("450"), Decimal("55"), Decimal("540"), Decimal("75")],
+                            ]
+                        ),
+                    }
+                }
+            ]
+        )
+
+        self.assertIn("Classification Certificate(Full) CC Full 2025-08-11 2030-07-11", text)
+        self.assertIn("Annual Survey 2026-07-11", text)
+        self.assertAlmostEqual(confidence, 0.96, places=2)
+
     def test_class_parser_text_smoke_covers_supported_societies(self):
         samples = {
             "NK": (
@@ -305,6 +385,34 @@ None
                 payload = parser.parse_text(text, page_count=1)
                 self.assertEqual(payload["class_society"], society)
                 self.assertGreaterEqual(len(payload["rows"]), 1)
+
+    def test_kr_parser_accepts_ocr_table_rows(self):
+        payload = KRClassParser().parse_text(
+            """Ship Name EAST AYUTTHAYA Work ID VANS004726
+Class No. 1000010 IMO No. 9584293
+Certificates
+Class Certificates
+Cargo Ship Safety Construction Certificate Sc Full 2025-08-11 2030-07-11 CN25015925557
+Loading Instrument Certificate LI Permanence 2025-08-11 CL25004894584
+Vessel General Permit VGP 2025-08-11 CN25015890568
+Class Surveys
+Annual Survey 2026-07-11 2026-04-11-2026-10-11
+Hull Annual Survey 2025-01-01 2026-01-01
+""",
+            page_count=19,
+        )
+
+        rows_by_code = {row["class_code_or_name"]: row for row in payload["rows"]}
+        self.assertEqual(rows_by_code["SC"]["expiry_date"], "2030-07-11")
+        self.assertNotIn("expiry_date", rows_by_code["LI"])
+        self.assertEqual(rows_by_code["VGP"]["issue_date"], "2025-08-11")
+
+        annual = next(row for row in payload["rows"] if row["raw_text"].startswith("Annual Survey"))
+        self.assertNotIn("last_done_date", annual)
+        self.assertEqual(annual["next_due_date"], "2026-07-11")
+        hull = next(row for row in payload["rows"] if row["raw_text"].startswith("Hull Annual Survey"))
+        self.assertEqual(hull["last_done_date"], "2025-01-01")
+        self.assertEqual(hull["next_due_date"], "2026-01-01")
 
     def test_reconciliation_buckets_snapshot_rows_against_tracked_items(self):
         result = build_reconciliation_flags(
@@ -463,6 +571,78 @@ class _FakeOcrEngine:
 
     def extract(self, _source_path):
         return self.output
+
+
+class _FakeClassSnapshotOcrEngine:
+    def __init__(self, text: str):
+        self.text = text
+        self.calls = 0
+
+    def extract_image_text(self, _source_path):
+        self.calls += 1
+        return self.text, 0.95
+
+
+class _FakePdfReader:
+    def __init__(self, pages):
+        self.pages = pages
+
+
+class _FakePdfPage:
+    def __init__(self, images):
+        self._images = images
+
+    def get(self, key):
+        if key == "/Resources":
+            return {"/XObject": _FakePdfXObjects(self._images)}
+        return None
+
+
+class _FakePdfXObjects:
+    def __init__(self, images):
+        self._images = images
+
+    def get_object(self):
+        return {f"/X{index}": image for index, image in enumerate(self._images, start=1)}
+
+
+class _FakePdfImage:
+    def __init__(self, content: bytes):
+        self._content = content
+
+    def get_object(self):
+        return self
+
+    def get(self, key):
+        if key == "/Subtype":
+            return "/Image"
+        return None
+
+    def get_data(self):
+        return self._content
+
+
+class _TruthlessBoxes(list):
+    def __bool__(self):
+        raise ValueError("array truth value is ambiguous")
+
+
+def _png_bytes(*, width: int, height: int) -> bytes:
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (width, height), "white").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _class_snapshot_ocr_kwargs() -> dict[str, object]:
+    return {
+        "language": CLASS_SNAPSHOT_OCR_LANGUAGE,
+        "max_pdf_pages": CLASS_SNAPSHOT_OCR_MAX_PAGES,
+        "ocr_version": CLASS_SNAPSHOT_OCR_VERSION,
+        "text_det_limit_side_len": CLASS_SNAPSHOT_OCR_DET_LIMIT_SIDE_LEN,
+        "text_recognition_batch_size": CLASS_SNAPSHOT_OCR_REC_BATCH_SIZE,
+    }
 
 
 class _FakeCatalogCursor:

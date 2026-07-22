@@ -294,10 +294,20 @@ class PaddleOcrEngine:
         language: str | None = None,
         max_pdf_pages: int | None = 5,
         pdf_render_scale: float = 2.4,
+        ocr_version: str | None = None,
+        text_det_limit_side_len: int | None = None,
+        text_recognition_batch_size: int | None = None,
     ) -> None:
         self.language = language
         self.max_pdf_pages = None if max_pdf_pages is None else max(1, int(max_pdf_pages))
         self.pdf_render_scale = max(1.0, float(pdf_render_scale))
+        self.ocr_version = ocr_version
+        self.text_det_limit_side_len = (
+            None if text_det_limit_side_len is None else max(1, int(text_det_limit_side_len))
+        )
+        self.text_recognition_batch_size = (
+            None if text_recognition_batch_size is None else max(1, int(text_recognition_batch_size))
+        )
         self._runner: Any | None = None
 
     def is_available(self) -> bool:
@@ -359,6 +369,12 @@ class PaddleOcrEngine:
         }
         if self.language:
             kwargs["lang"] = self.language
+        if self.ocr_version:
+            kwargs["ocr_version"] = self.ocr_version
+        if self.text_det_limit_side_len is not None:
+            kwargs["text_det_limit_side_len"] = self.text_det_limit_side_len
+        if self.text_recognition_batch_size is not None:
+            kwargs["text_recognition_batch_size"] = self.text_recognition_batch_size
         try:
             self._runner = PaddleOCR(**kwargs)
         except TypeError:
@@ -636,9 +652,15 @@ def _collect_paddle_text_scores(value: Any, texts: list[str], scores: list[float
         if rec_texts is not None:
             rec_scores_value = nested.get("rec_scores")
             rec_scores = list(rec_scores_value) if rec_scores_value is not None else []
-            for index, text in enumerate(list(rec_texts)):
+            rec_texts_list = list(rec_texts)
+            rec_boxes = nested.get("rec_boxes")
+            if rec_boxes is None:
+                rec_boxes = nested.get("rec_polys")
+            if rec_boxes is None:
+                rec_boxes = nested.get("dt_polys")
+            texts.extend(_paddle_rec_texts_to_lines(rec_texts_list, rec_boxes))
+            for index, text in enumerate(rec_texts_list):
                 if str(text or "").strip():
-                    texts.append(str(text))
                     if index < len(rec_scores):
                         score = _numeric_score(rec_scores[index])
                         if score is not None:
@@ -688,6 +710,74 @@ def _collect_paddle_text_scores(value: Any, texts: list[str], scores: list[float
             _collect_paddle_text_scores(json_value(), texts, scores)
         except Exception:
             return
+
+
+def _paddle_rec_texts_to_lines(rec_texts: list[Any], rec_boxes: Any) -> list[str]:
+    fallback = [str(text).strip() for text in rec_texts if str(text or "").strip()]
+    if rec_boxes is None:
+        return fallback
+
+    boxes = list(rec_boxes)
+    items: list[dict[str, Any]] = []
+    for index, text in enumerate(rec_texts):
+        cleaned = str(text or "").strip()
+        if not cleaned or index >= len(boxes):
+            continue
+        bounds = _paddle_box_bounds(boxes[index])
+        if bounds is None:
+            return fallback
+        left, top, right, bottom = bounds
+        items.append(
+            {
+                "text": cleaned,
+                "left": left,
+                "center_y": (top + bottom) / 2.0,
+                "height": max(1.0, bottom - top),
+            }
+        )
+    if not items:
+        return fallback
+
+    heights = sorted(item["height"] for item in items)
+    median_height = heights[len(heights) // 2]
+    row_threshold = max(8.0, median_height * 0.65)
+    rows: list[dict[str, Any]] = []
+    for item in sorted(items, key=lambda value: (value["center_y"], value["left"])):
+        if rows and abs(item["center_y"] - rows[-1]["center_y"]) <= row_threshold:
+            row = rows[-1]
+            row["items"].append(item)
+            row["center_y"] = sum(child["center_y"] for child in row["items"]) / len(row["items"])
+        else:
+            rows.append({"center_y": item["center_y"], "items": [item]})
+
+    return [
+        " ".join(child["text"] for child in sorted(row["items"], key=lambda value: value["left"]))
+        for row in rows
+    ]
+
+
+def _paddle_box_bounds(box: Any) -> tuple[float, float, float, float] | None:
+    try:
+        values = list(box)
+    except TypeError:
+        return None
+    if len(values) == 4:
+        try:
+            left, top, right, bottom = (float(value) for value in values)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return left, top, right, bottom
+
+    points = [point for point in values if isinstance(point, (list, tuple)) and len(point) >= 2]
+    if not points:
+        return None
+    try:
+        xs = [float(point[0]) for point in points]
+        ys = [float(point[1]) for point in points]
+    except (TypeError, ValueError):
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def _numeric_score(value: Any) -> float | None:
