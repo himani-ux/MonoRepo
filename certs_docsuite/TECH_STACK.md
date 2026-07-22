@@ -2,9 +2,9 @@
 
 > **Platform: WEB** — responsive browser app (office desktop + vessel bridge tablet, same codebase). No native/mobile target, no offline mode (D-CERT-156). Other docs re-read this field before applying platform-conditional rules (CLAUDE.md → Platform Adherence).
 >
-> **Version:** 1.2
-> **Last Updated:** 2026-06-24 (v1.3 — Phase 0.8 PDF renderer pick resolved: ReportLab 4.2.0 fallback after WeasyPrint 68.1 + MSYS2/Pango runtime verification failed on Windows. v1.2 — closure session: worker queue NAMED (Celery 5.4.0 + Redis 5.0.8 + django-celery-beat 2.6.0 per Safety lock); B-TECH-01/02 reclassified as scheduled Phase-0 picks (steps 0.7/0.8). v1.1 — Platform field added; TBD→BLOCKED. v1.0: 2026-05-13)
-> **Status:** 🟢 Locked — Ready for Build (Phase-0 picks resolved through 0.8: Tesseract OCR at 0.7, ReportLab PDF renderer at 0.8; Slack channel naming remains Step 0.9)
+> **Version:** 1.4
+> **Last Updated:** 2026-07-22 (v1.4 — Certs OCR engine changed to PaddleOCR via CR-103. v1.3 — Phase 0.8 PDF renderer pick resolved: ReportLab 4.2.0 fallback after WeasyPrint 68.1 + MSYS2/Pango runtime verification failed on Windows. v1.2 — closure session: worker queue NAMED (Celery 5.4.0 + Redis 5.0.8 + django-celery-beat 2.6.0 per Safety lock); B-TECH-01/02 reclassified as scheduled Phase-0 picks (steps 0.7/0.8). v1.1 — Platform field added; TBD→BLOCKED. v1.0: 2026-05-13)
+> **Status:** 🟢 Locked — Ready for Build (Phase-0 picks resolved through CR-103: PaddleOCR for Certs OCR, ReportLab PDF renderer at 0.8; Slack channel naming remains Step 0.9)
 > **Source:** `../VIMS-CERTIFICATES-MODULE-SSOT.md` §14 (D-CERT-022) + sibling lock files (`VIMS-Reporting-Module/TECH_STACK.md`, `VIMS-Safety-Module/TECH_STACK.md`).
 > **Inheritance rule:** Certs inherits the entire Reporting + Safety stack (Django, DRF, React, TypeScript, SQL Server, JWT, S3-compatible blob, `master_notification`). Certs adds parser + OCR + Slack libs only. **Never bump a shared dep without coordinating across all VIMS modules.**
 
@@ -51,10 +51,10 @@ If a sibling module bumps a shared dep, Certs adopts the same version in the sam
 
 | Layer | Component | Version target | Purpose | D-CERT-\* |
 |-------|-----------|----------------|---------|-----------|
-| Class snapshot parser | `pdfplumber` + existing Tesseract OCR fallback (`pytesseract`, `Pillow`) | pdfplumber ≥0.11.x; pytesseract/Pillow per backend requirements | Text extraction from NK / KR / BV class status PDFs; OCR fallback only when the PDF exposes no text layer | D-CERT-005, D-CERT-048, D-CERT-054, D-CERT-200 |
+| Class snapshot parser | `pdfplumber` + PaddleOCR fallback (`paddleocr`, `paddlepaddle`, `Pillow`) | pdfplumber ≥0.11.x; paddleocr/paddlepaddle/Pillow per backend requirements | Text extraction from NK / KR / BV class status PDFs; OCR fallback only when the PDF exposes no text layer | D-CERT-005, D-CERT-048, D-CERT-054, D-CERT-200 |
 | Class snapshot parser fallback | `tabula-py` (optional) | latest stable | Table extraction fallback for complex layouts | D-CERT-054 |
 | Per-class parser modules | KSM-internal Python modules | own version | NK / KR / BV format parsers; one module per class society | D-CERT-005 |
-| OCR engine for cert PDFs | ⚙️ PHASE-0 PICK (plan step 0.7; benchmark protocol below; candidates: Tesseract via `pytesseract`, AWS Textract, Azure Form Recognizer, Google Document AI) | pick at 0.7 | OCR vessel-uploaded cert PDFs (NOT class snapshots) per D-CERT-101, D-CERT-105, D-CERT-106. B-TECH-01 reclassified 2026-06-12: a scheduled plan step with a decision protocol, not an open blocker | D-CERT-101, D-CERT-106, D-CERT-168 |
+| OCR engine for cert PDFs | PaddleOCR (`paddleocr`, `paddlepaddle`) | paddleocr 3.7.0; paddlepaddle 3.2.0 | OCR vessel-uploaded cert PDFs per D-CERT-101, D-CERT-105, D-CERT-106, using the same payload and confidence-band contract | D-CERT-101, D-CERT-106, D-CERT-168 |
 | Print PDF renderer | ReportLab | 4.2.0 | Phase 0.8 pick: WeasyPrint 68.1 preferred path was attempted, but Windows native runtime verification failed even after MSYS2/Pango remediation; use the already-pinned ReportLab fallback for SQE S 633 print export per D-CERT-125 and D-CERT-144. | D-CERT-125, D-CERT-144 |
 | Excel renderer (data-only) | `openpyxl` | latest stable | Data-only Excel companion to print PDF (no live formulas) per D-CERT-141 | D-CERT-141 |
 | ZIP bundle | `zipfile` (Python stdlib) | with Python 3.x | Manifest PDF + cert PDFs bundle per D-CERT-145 | D-CERT-145 |
@@ -64,7 +64,7 @@ If a sibling module bumps a shared dep, Certs adopts the same version in the sam
 | Survey-window computation | KSM-internal Python module (`apps/certs/services/survey_window.py`) | own | Compute `window_open` / `window_close` from anniversary + cadence + IMO rules per D-CERT-063, D-CERT-064 | D-CERT-063, D-CERT-064 |
 
 **Phase 0 picks — choose at scaffold time (plan steps 0.7 / 0.8; formerly B-TECH-01/02, reclassified at closure 2026-06-12):**
-1. **OCR engine** — benchmark against the 6 reference class PDFs (text-extract baseline) and a sample of 20 vessel-uploaded cert PDFs (real OCR target). Pick the engine that hits ≥80% per-field auto-accept rate at acceptable cost. Encode choice in `BACKEND_STRUCTURE.md`.
+1. **OCR engine** — **RESOLVED 2026-07-22: PaddleOCR.** Certs uses PaddleOCR for vessel-uploaded certificate PDF OCR and for bounded class-snapshot fallback when a class-status PDF has no text layer. The wrapper interface remains stable for future benchmarking.
 2. **HTML-to-PDF renderer** — **RESOLVED 2026-06-24: ReportLab 4.2.0 fallback.** WeasyPrint 68.1 installed, MSYS2 + `mingw-w64-x86_64-pango` installed, and MSYS2 DLL preload attempted; render still failed on Windows due DLL conflict/access violation. Do not add WeasyPrint to project requirements unless a future runtime smoke test passes.
 
 ---

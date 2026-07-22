@@ -304,3 +304,13 @@ See PRD ยง19. Build-time deferrals (Phase 0 picks) listed in BACKEND_STRUCTURE ย
 **Triggering discovery:** The real uploaded KR `class_Ayuthya.pdf` showed visible data from page 3 onward, but `pdfplumber` and `pypdf` extracted zero text characters across all 19 pages because each page is embedded as images. Tesseract OCR against the page image read the KR vessel-status content, proving that image-only class-status PDFs require OCR fallback to parse.
 
 **Supersedes:** D-CERT-048 and Phase 4.2 only where they prohibited OCR fallback for image-only class-status snapshot PDFs. The current behavior is D-CERT-200: class snapshots are text-extracted first; if the full PDF has no text layer, existing Tesseract/pytesseract OCR may be used as a fallback before the same NK/KR/BV parsers and reconciliation flow run.
+
+---
+
+## Amendment 3 - 2026-07-22
+
+**What changed:** CR-103 replaces the Certs OCR runtime from Tesseract/pytesseract to PaddleOCR. PaddleOCR is now the default engine for vessel-uploaded certificate PDF OCR and the bounded fallback engine for image-only class-status snapshot PDFs.
+
+**Triggering discovery:** Users need better OCR accuracy for class-status snapshot and certificate document extraction, while preserving the shipped parser payloads, confidence routing, upload responses, and reconciliation contract.
+
+**Supersedes:** Amendment 2 and TECH_STACK Phase 0.7 only where they name Tesseract/pytesseract as the OCR engine. D-CERT-200 remains unchanged: class snapshots are text-extracted first, and OCR fallback runs only when the full PDF has no text layer before the same NK/KR/BV parsers and reconciliation flow run.

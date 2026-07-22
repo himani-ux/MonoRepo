@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from io import BytesIO
 from pathlib import Path
 import re
 from typing import Any
+
+from apps.certs.services.ocr_pipeline import OcrPipelineError, PaddleOcrEngine
+
+
+CLASS_SNAPSHOT_OCR_MAX_PAGES = 50
 
 
 class ClassSnapshotParseError(RuntimeError):
@@ -65,54 +69,15 @@ def extract_pdf_text(pdf_path: str | Path) -> ExtractedClassSnapshotText:
     if text.strip():
         return ExtractedClassSnapshotText(text=text, page_count=page_count, engine="pdfplumber")
     ocr_text = extract_pdf_image_ocr_text(path)
-    return ExtractedClassSnapshotText(text=ocr_text, page_count=page_count, engine="tesseract_ocr_fallback")
+    return ExtractedClassSnapshotText(text=ocr_text, page_count=page_count, engine="paddleocr_fallback")
 
 
 def extract_pdf_image_ocr_text(pdf_path: str | Path) -> str:
     try:
-        from PIL import Image
-        import pytesseract
-        from PyPDF2 import PdfReader
-    except ImportError as exc:
-        raise ClassSnapshotParseError("Pillow, pytesseract, and PyPDF2 are required for class status OCR fallback.") from exc
-
-    try:
-        reader = PdfReader(str(pdf_path))
-    except Exception as exc:  # pragma: no cover - PyPDF2 exception classes vary by version.
-        raise ClassSnapshotParseError("Class status OCR fallback could not open this PDF.") from exc
-
-    page_text: list[str] = []
-    for page_number, page in enumerate(reader.pages, start=1):
-        image_text: list[str] = []
-        for image in iter_pdf_page_images(page, Image):
-            if image.width * image.height < 50_000:
-                continue
-            try:
-                text = pytesseract.image_to_string(image.convert("RGB"))
-            except pytesseract.pytesseract.TesseractNotFoundError as exc:
-                raise ClassSnapshotParseError("Tesseract is required for class status OCR fallback.") from exc
-            if text.strip():
-                image_text.append(text)
-        if image_text:
-            page_text.append(f"--- PAGE {page_number} OCR ---\n" + "\n".join(image_text))
-    return "\n\n".join(page_text)
-
-
-def iter_pdf_page_images(page: Any, image_module: Any):
-    resources = page.get("/Resources") or {}
-    xobjects = resources.get("/XObject")
-    if not xobjects:
-        return
-    for _name, obj in sorted(xobjects.get_object().items(), key=lambda item: str(item[0])):
-        stream = obj.get_object()
-        if stream.get("/Subtype") != "/Image":
-            continue
-        try:
-            image = image_module.open(BytesIO(stream.get_data()))
-            image.load()
-        except Exception:
-            continue
-        yield image
+        output = PaddleOcrEngine(max_pdf_pages=CLASS_SNAPSHOT_OCR_MAX_PAGES).extract(pdf_path)
+    except OcrPipelineError as exc:
+        raise ClassSnapshotParseError(str(exc)) from exc
+    return output.raw_text
 
 
 def stamp_text_extraction_metadata(payload: dict[str, Any], extracted: ExtractedClassSnapshotText) -> None:

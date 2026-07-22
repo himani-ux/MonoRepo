@@ -15,7 +15,21 @@ from unittest.mock import patch
 from apps.certs.permissions import can_approve_tracked_item
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
-from apps.certs.services.parsers.base import BaseClassParser, ClassSnapshotParseError, ExtractedClassSnapshotText
+from apps.certs.services.ocr_pipeline import (
+    DEFAULT_OCR_ENGINE_NAME,
+    OcrEngineOutput,
+    OcrFieldCandidate,
+    OcrThresholds,
+    _paddle_prediction_to_text,
+    process_cert_pdf,
+)
+from apps.certs.services.parsers.base import (
+    CLASS_SNAPSHOT_OCR_MAX_PAGES,
+    BaseClassParser,
+    ClassSnapshotParseError,
+    ExtractedClassSnapshotText,
+    extract_pdf_image_ocr_text,
+)
 from apps.certs.services.parsers.bv import BVClassParser
 from apps.certs.services.parsers.kr import KRClassParser
 from apps.certs.services.parsers.nk import NKClassParser
@@ -165,7 +179,7 @@ class ClassSnapshotParserAndReconciliationSmokeTests(SimpleTestCase):
         parser = _NoopClassParser()
 
         with (
-            patch("apps.certs.services.parsers.base.extract_pdf_text", return_value=ExtractedClassSnapshotText("", 19, "tesseract_ocr_fallback")),
+            patch("apps.certs.services.parsers.base.extract_pdf_text", return_value=ExtractedClassSnapshotText("", 19, "paddleocr_fallback")),
             self.assertRaisesRegex(ClassSnapshotParseError, "OCR fallback read no text"),
         ):
             parser.parse("image-only-class-status.pdf")
@@ -190,10 +204,68 @@ Load Line Certificate ILL Full 2025-08-11 2030-07-11 0N25015926559
 
         self.assertEqual(parsed.parse_status, "success")
         self.assertEqual(parsed.payload["source"], "ocr_text")
-        self.assertEqual(parsed.payload["text_extraction"]["engine"], "tesseract_ocr_fallback")
+        self.assertEqual(parsed.payload["text_extraction"]["engine"], "paddleocr_fallback")
         self.assertEqual(parsed.payload["vessel"]["name"], "EAST AYUTTHAYA")
         self.assertEqual(parsed.payload["vessel"]["imo"], "9584293")
         self.assertGreaterEqual(len(parsed.payload["rows"]), 2)
+
+    def test_class_snapshot_ocr_fallback_uses_paddleocr_page_cap(self):
+        fake_engine = _FakeOcrEngine(
+            OcrEngineOutput(
+                raw_text="KOREAN REGISTER\nIMO No. 9584293",
+                mean_confidence=0.93,
+                fields={},
+            )
+        )
+
+        with patch("apps.certs.services.parsers.base.PaddleOcrEngine", return_value=fake_engine) as engine_class:
+            text = extract_pdf_image_ocr_text("image-only-class-status.pdf")
+
+        engine_class.assert_called_once_with(max_pdf_pages=CLASS_SNAPSHOT_OCR_MAX_PAGES)
+        self.assertIn("KOREAN REGISTER", text)
+
+    def test_process_cert_pdf_defaults_to_paddleocr_payload_contract(self):
+        output = OcrEngineOutput(
+            raw_text=(
+                "Certificate Type: Certificate of Classification\n"
+                "Vessel Name: EAST AYUTTHAYA\n"
+                "IMO No. 9584293\n"
+                "Issue Date: 01/07/2026\n"
+                "Expiry Date: 01/07/2031\n"
+                "Certificate No.: KR-001\n"
+                "Place of Issue: Busan\n"
+                "Issuing Authority: Korean Register\n"
+            ),
+            mean_confidence=0.92,
+            fields={"certificate_number": OcrFieldCandidate("KR-001", 0.94)},
+        )
+
+        with patch("apps.certs.services.ocr_pipeline.PaddleOcrEngine", return_value=_FakeOcrEngine(output)) as engine_class:
+            payload = process_cert_pdf(
+                "certificate.png",
+                thresholds=OcrThresholds(office_auto_accept=0.80, vessel_auto_accept=0.85, manual_floor=0.60),
+            )
+
+        engine_class.assert_called_once_with()
+        self.assertEqual(payload["engine"], DEFAULT_OCR_ENGINE_NAME)
+        self.assertEqual(payload["status"], "processed")
+        self.assertEqual(payload["fields"]["certificate_number"]["value"], "KR-001")
+        self.assertEqual(payload["fields"]["imo_number"]["value"], "9584293")
+
+    def test_paddleocr_v3_prediction_result_is_flattened_to_text_and_confidence(self):
+        text, confidence = _paddle_prediction_to_text(
+            [
+                {
+                    "res": {
+                        "rec_texts": ["KOREAN REGISTER", "IMO No. 9584293"],
+                        "rec_scores": [0.96, 0.92],
+                    }
+                }
+            ]
+        )
+
+        self.assertEqual(text, "KOREAN REGISTER\nIMO No. 9584293")
+        self.assertAlmostEqual(confidence, 0.94)
 
     def test_class_parser_text_smoke_covers_supported_societies(self):
         samples = {
@@ -381,6 +453,16 @@ class _EmptyPdfPlumberPage:
 class _FailingNotificationDispatcher:
     def dispatch(self, **_kwargs):
         raise DatabaseError("Invalid column name 'module_code'.")
+
+
+class _FakeOcrEngine:
+    engine_name = DEFAULT_OCR_ENGINE_NAME
+
+    def __init__(self, output: OcrEngineOutput):
+        self.output = output
+
+    def extract(self, _source_path):
+        return self.output
 
 
 class _FakeCatalogCursor:

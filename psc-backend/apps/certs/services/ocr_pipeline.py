@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-import os
 from pathlib import Path
 import re
-import shutil
-from typing import Any, Mapping, Protocol
+import tempfile
+from typing import Any, Protocol
 
 
 SCHEMA_VERSION = "certs-ocr-v1"
+DEFAULT_OCR_ENGINE_NAME = "paddleocr"
 
 OFFICE_CONTEXT = "office"
 VESSEL_CONTEXT = "vessel"
@@ -197,7 +198,7 @@ def process_cert_pdf(
     This does not write DB state. Phase 3 workers will persist this payload to
     vims_certs_pdf_blob.ocr_payload_json after blob storage is wired.
     """
-    selected_engine = engine or TesseractOcrEngine()
+    selected_engine = engine or PaddleOcrEngine()
     output = selected_engine.extract(source_path)
     detected_fields = dict(_parse_fields_from_text(output.raw_text, output.mean_confidence))
     detected_fields.update(output.fields)
@@ -282,38 +283,33 @@ def _threshold_value(value: Any, fallback: float) -> float:
     return max(0.0, min(numeric, 1.0))
 
 
-class TesseractOcrEngine:
-    """Tesseract-backed OCR adapter selected for Phase 0.7."""
+class PaddleOcrEngine:
+    """PaddleOCR-backed OCR adapter selected for Certs document OCR."""
 
-    engine_name = "tesseract"
+    engine_name = DEFAULT_OCR_ENGINE_NAME
 
     def __init__(
         self,
         *,
-        language: str = "eng",
-        timeout_seconds: float = 30.0,
-        max_pdf_pages: int = 5,
+        language: str | None = None,
+        max_pdf_pages: int | None = 5,
         pdf_render_scale: float = 2.4,
     ) -> None:
         self.language = language
-        self.timeout_seconds = timeout_seconds
-        self.max_pdf_pages = max(1, int(max_pdf_pages))
+        self.max_pdf_pages = None if max_pdf_pages is None else max(1, int(max_pdf_pages))
         self.pdf_render_scale = max(1.0, float(pdf_render_scale))
+        self._runner: Any | None = None
 
     def is_available(self) -> bool:
         return self.availability_error() is None
 
     def availability_error(self) -> str | None:
         try:
-            import pytesseract
+            self._paddle_ocr_class()
         except ImportError:
-            return "Tesseract OCR Python package pytesseract is not installed."
-
-        _configure_tesseract_command(pytesseract)
-        try:
-            pytesseract.get_tesseract_version()
-        except Exception as exc:  # pytesseract raises several runtime-specific errors.
-            return f"Tesseract OCR runtime is not available: {exc}"
+            return "PaddleOCR Python package paddleocr is not installed."
+        except OcrEngineUnavailable as exc:
+            return str(exc)
 
         return None
 
@@ -323,34 +319,67 @@ class TesseractOcrEngine:
             try:
                 return _extract_searchable_pdf_text(path)
             except OcrPipelineError:
-                return _extract_pdf_pages_with_tesseract(path, self)
+                return _extract_pdf_pages_with_paddleocr(path, self)
 
-        try:
-            import pytesseract
-        except ImportError as exc:
-            raise OcrEngineUnavailable(
-                "Tesseract OCR Python package pytesseract is not installed."
-            ) from exc
-
-        _configure_tesseract_command(pytesseract)
-        runtime_error = self.availability_error()
-        if runtime_error:
-            raise OcrEngineUnavailable(runtime_error)
-
-        text = pytesseract.image_to_string(
-            str(path),
-            lang=self.language,
-            timeout=self.timeout_seconds,
-        )
-        mean_confidence = _mean_tesseract_confidence(
-            pytesseract.image_to_data(str(path), lang=self.language, timeout=self.timeout_seconds)
-        )
+        text, mean_confidence = self.extract_image_text(path)
+        if not text.strip():
+            raise OcrPipelineError("Certificate image OCR produced no readable text.")
 
         return OcrEngineOutput(
             raw_text=text,
             mean_confidence=mean_confidence,
             fields=dict(_parse_fields_from_text(text, mean_confidence)),
         )
+
+    def extract_image_text(self, source_path: str | Path) -> tuple[str, float]:
+        return _predict_with_paddleocr(source_path, self)
+
+    def _predict(self, source_path: str | Path) -> Any:
+        runner = self._ocr_runner()
+        source = str(source_path)
+        try:
+            return runner.predict(source)
+        except TypeError:
+            try:
+                return runner.predict(input=source)
+            except TypeError:
+                return runner.ocr(source, cls=False)
+        except AttributeError:
+            return runner.ocr(source, cls=False)
+
+    def _ocr_runner(self) -> Any:
+        if self._runner is not None:
+            return self._runner
+
+        PaddleOCR = self._paddle_ocr_class()
+        kwargs: dict[str, Any] = {
+            "use_doc_orientation_classify": False,
+            "use_doc_unwarping": False,
+            "use_textline_orientation": False,
+        }
+        if self.language:
+            kwargs["lang"] = self.language
+        try:
+            self._runner = PaddleOCR(**kwargs)
+        except TypeError:
+            fallback_kwargs: dict[str, Any] = {"use_angle_cls": False}
+            if self.language:
+                fallback_kwargs["lang"] = self.language
+            try:
+                self._runner = PaddleOCR(**fallback_kwargs)
+            except Exception as exc:
+                raise OcrEngineUnavailable(f"PaddleOCR runtime is not available: {exc}") from exc
+        except Exception as exc:
+            raise OcrEngineUnavailable(f"PaddleOCR runtime is not available: {exc}") from exc
+        return self._runner
+
+    @staticmethod
+    def _paddle_ocr_class() -> Any:
+        try:
+            from paddleocr import PaddleOCR
+        except ImportError as exc:
+            raise OcrEngineUnavailable("PaddleOCR Python package paddleocr is not installed.") from exc
+        return PaddleOCR
 
 
 def _parse_fields_from_text(
@@ -386,27 +415,6 @@ def _parse_fields_from_text(
         fields.setdefault(field_name, OcrFieldCandidate(value=value, confidence=confidence))
 
     return fields
-
-
-def _configure_tesseract_command(pytesseract_module: Any) -> None:
-    current = str(getattr(getattr(pytesseract_module, "pytesseract", None), "tesseract_cmd", "") or "")
-    if current and Path(current).exists():
-        return
-
-    candidates = [
-        os.environ.get("TESSERACT_CMD"),
-        os.environ.get("TESSERACT_EXE"),
-        shutil.which("tesseract"),
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-    ]
-    for candidate in candidates:
-        if not candidate:
-            continue
-        candidate_path = Path(str(candidate))
-        if candidate_path.exists():
-            pytesseract_module.pytesseract.tesseract_cmd = str(candidate_path)
-            return
 
 
 def _parse_common_certificate_layouts(raw_text: str) -> dict[str, str]:
@@ -558,35 +566,7 @@ def _add_year_to_ocr_date(value: str | None) -> str | None:
     return next_year.strftime("%d %B %Y").lstrip("0")
 
 
-def _mean_tesseract_confidence(tsv_output: str) -> float:
-    confidences = []
-    for row in tsv_output.splitlines()[1:]:
-        columns = row.split("\t")
-        if len(columns) < 11:
-            continue
-        try:
-            confidence = float(columns[10])
-        except ValueError:
-            continue
-        if confidence >= 0:
-            confidences.append(confidence / 100.0)
-
-    if not confidences:
-        return 0.0
-
-    return sum(confidences) / len(confidences)
-
-
-def _extract_pdf_pages_with_tesseract(path: Path, engine: TesseractOcrEngine) -> OcrEngineOutput:
-    try:
-        import pytesseract
-    except ImportError as exc:
-        raise OcrEngineUnavailable("Tesseract OCR Python package pytesseract is not installed.") from exc
-
-    runtime_error = engine.availability_error()
-    if runtime_error:
-        raise OcrEngineUnavailable(runtime_error)
-
+def _extract_pdf_pages_with_paddleocr(path: Path, engine: PaddleOcrEngine) -> OcrEngineOutput:
     try:
         import pypdfium2 as pdfium
     except ImportError as exc:
@@ -596,32 +576,25 @@ def _extract_pdf_pages_with_tesseract(path: Path, engine: TesseractOcrEngine) ->
     confidences: list[float] = []
     document = pdfium.PdfDocument(str(path))
     try:
-        page_count = min(len(document), engine.max_pdf_pages)
-        for page_index in range(page_count):
-            page = document[page_index]
-            try:
-                bitmap = page.render(scale=engine.pdf_render_scale)
-                image = bitmap.to_pil()
-                text_chunks.append(
-                    pytesseract.image_to_string(
-                        image,
-                        lang=engine.language,
-                        timeout=engine.timeout_seconds,
-                    )
-                )
-                confidence = _mean_tesseract_confidence(
-                    pytesseract.image_to_data(
-                        image,
-                        lang=engine.language,
-                        timeout=engine.timeout_seconds,
-                    )
-                )
-                if confidence > 0:
-                    confidences.append(confidence)
-            finally:
-                close = getattr(page, "close", None)
-                if callable(close):
-                    close()
+        page_count = len(document) if engine.max_pdf_pages is None else min(len(document), engine.max_pdf_pages)
+        with tempfile.TemporaryDirectory(prefix="certs-paddleocr-") as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for page_index in range(page_count):
+                page = document[page_index]
+                try:
+                    bitmap = page.render(scale=engine.pdf_render_scale)
+                    image = bitmap.to_pil()
+                    image_path = tmp_path / f"page-{page_index + 1}.png"
+                    image.save(image_path)
+                    text, confidence = engine.extract_image_text(image_path)
+                    if text.strip():
+                        text_chunks.append(text)
+                    if confidence > 0:
+                        confidences.append(confidence)
+                finally:
+                    close = getattr(page, "close", None)
+                    if callable(close):
+                        close()
     finally:
         close_document = getattr(document, "close", None)
         if callable(close_document):
@@ -637,6 +610,96 @@ def _extract_pdf_pages_with_tesseract(path: Path, engine: TesseractOcrEngine) ->
         mean_confidence=mean_confidence,
         fields=dict(_parse_fields_from_text(raw_text, mean_confidence)),
     )
+
+
+def _predict_with_paddleocr(source_path: str | Path, engine: PaddleOcrEngine) -> tuple[str, float]:
+    result = engine._predict(source_path)
+    return _paddle_prediction_to_text(result)
+
+
+def _paddle_prediction_to_text(result: Any) -> tuple[str, float]:
+    texts: list[str] = []
+    scores: list[float] = []
+    _collect_paddle_text_scores(result, texts, scores)
+    text = "\n".join(item.strip() for item in texts if item and item.strip()).strip()
+    confidence = sum(scores) / len(scores) if scores else 0.0
+    return text, confidence
+
+
+def _collect_paddle_text_scores(value: Any, texts: list[str], scores: list[float]) -> None:
+    if value is None:
+        return
+
+    if isinstance(value, Mapping):
+        nested = value.get("res") if isinstance(value.get("res"), Mapping) else value
+        rec_texts = nested.get("rec_texts")
+        if rec_texts is not None:
+            rec_scores_value = nested.get("rec_scores")
+            rec_scores = list(rec_scores_value) if rec_scores_value is not None else []
+            for index, text in enumerate(list(rec_texts)):
+                if str(text or "").strip():
+                    texts.append(str(text))
+                    if index < len(rec_scores):
+                        score = _numeric_score(rec_scores[index])
+                        if score is not None:
+                            scores.append(score)
+            return
+        rec_text = nested.get("rec_text")
+        if rec_text is not None:
+            texts.append(str(rec_text))
+            score = _numeric_score(nested.get("rec_score"))
+            if score is not None:
+                scores.append(score)
+            return
+        for child in value.values():
+            _collect_paddle_text_scores(child, texts, scores)
+        return
+
+    if isinstance(value, tuple) and len(value) >= 2 and isinstance(value[1], tuple) and len(value[1]) >= 2:
+        text = value[1][0]
+        score = _numeric_score(value[1][1])
+        if str(text or "").strip():
+            texts.append(str(text))
+            if score is not None:
+                scores.append(score)
+        return
+
+    if isinstance(value, list):
+        if len(value) >= 2 and isinstance(value[1], tuple) and len(value[1]) >= 2:
+            text = value[1][0]
+            score = _numeric_score(value[1][1])
+            if str(text or "").strip():
+                texts.append(str(text))
+                if score is not None:
+                    scores.append(score)
+            return
+        for child in value:
+            _collect_paddle_text_scores(child, texts, scores)
+        return
+
+    res = getattr(value, "res", None)
+    if isinstance(res, Mapping):
+        _collect_paddle_text_scores({"res": res}, texts, scores)
+        return
+
+    json_value = getattr(value, "json", None)
+    if callable(json_value):
+        try:
+            _collect_paddle_text_scores(json_value(), texts, scores)
+        except Exception:
+            return
+
+
+def _numeric_score(value: Any) -> float | None:
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+    if score < 0:
+        return None
+    if score > 1:
+        score = score / 100.0
+    return max(0.0, min(score, 1.0))
 
 
 def _extract_searchable_pdf_text(path: Path) -> OcrEngineOutput:

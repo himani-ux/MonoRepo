@@ -39,6 +39,7 @@ from apps.certs.services.audit_log import record_audit_event, resolve_actor_id
 from apps.certs.services.approval_events import record_approval_event
 from apps.certs.services.cert_change_log import record_cert_change_log
 from apps.certs.services.ocr_pipeline import (
+    DEFAULT_OCR_ENGINE_NAME,
     OFFICE_CONTEXT,
     VESSEL_CONTEXT,
     OcrPipelineError,
@@ -343,7 +344,7 @@ class TrackedItemUploadPdfView(generics.GenericAPIView):
             except OcrPipelineError as exc:
                 ocr_payload = manual_entry_payload(
                     context=context,
-                    engine_name="tesseract",
+                    engine_name=DEFAULT_OCR_ENGINE_NAME,
                     reason=str(exc),
                 )
             processed_blob = pdf_repository.update_ocr_result(blob_id, ocr_payload)

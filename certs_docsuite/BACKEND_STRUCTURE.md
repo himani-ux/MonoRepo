@@ -732,13 +732,13 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 
 ### `services/ocr_pipeline.py`
 - `process_cert_pdf(blob_id, vessel_context, threshold_band='office')` â†’ returns OCR result (per-field value + confidence + 80/85/60 banding); writes to `vims_certs_pdf_blob.ocr_payload_json`.
-- Engine choice deferred to Phase 0 (TECH_STACK Â§2). Wrapper interface stable.
+- Default engine is PaddleOCR through `PaddleOcrEngine`; wrapper interface remains stable.
 
 ### `services/parsers/`
 - `BaseClassParser` interface: `parse(pdf_path) â†’ ParsedSnapshot`.
 - One concrete parser per class society (NK / KR / BV) per D-CERT-005.
 - Output normalized to common intermediate schema â†’ reconciliation engine.
-- Class snapshot PDFs are text-extracted first per D-CERT-048. If the full PDF exposes no text layer, D-CERT-200 allows OCR fallback using embedded page images and existing Tesseract/pytesseract before the same NK/KR/BV parser modules run.
+- Class snapshot PDFs are text-extracted first per D-CERT-048. If the full PDF exposes no text layer, D-CERT-200 allows PaddleOCR fallback against rendered page images before the same NK/KR/BV parser modules run.
 - Test fixtures = 6 reference PDFs (D-CERT-057); CI runs full corpus on every parser PR.
 
 ### `services/reconciliation.py`
@@ -812,7 +812,7 @@ DPA / Master uploads PDF â†’ /api/certs/onboarding/<vessel>/batch/  OR
    TrackedItem inserts/updates within transaction; AuditLog writes
 ```
 
-**OCR engine pluggability:** Engine selection deferred to Phase 0 (TECH_STACK Â§2 candidates). Interface in `services/ocr_pipeline.py` stable; concrete impl swappable.
+**OCR engine pluggability:** PaddleOCR is the current default engine (TECH_STACK Â§2). Interface in `services/ocr_pipeline.py` remains stable; concrete impl remains swappable.
 
 **Concurrency:** Worker queue concurrency controlled at platform level. Per-vessel advisory lock (`vims_certs_class_status_snapshot.snapshot_upload_in_progress` or analogous) for class snapshot uploads (D-CERT-056) â€” does NOT apply to per-cert PDF uploads.
 
@@ -827,7 +827,7 @@ Class snapshot uploaded â†’ ClassStatusSnapshot inserted
    Parser worker job (jobs/parser_worker.py)
         â”‚  - invoked synchronously by upload and manual Reparse endpoints in this deployment
         â”‚  - parser_version stamped on success
-        â”‚  - no-text-layer PDFs run bounded OCR fallback before parser failure is recorded
+        â”‚  - no-text-layer PDFs run bounded PaddleOCR fallback before parser failure is recorded
         â–¼
    Class society parser â†’ common intermediate schema
         â”‚
@@ -855,7 +855,7 @@ Class snapshot uploaded â†’ ClassStatusSnapshot inserted
 ```
 
 **Format-change FAIL SOFT:** Unparseable rows â†’ `unmapped_rows[]` in parsed_payload; reconciliation continues for mapped rows; DPA notified; >25% unmapped â†’ critical escalation (D-CERT-031).
-**Whole-PDF text failure:** if `pdfplumber` extracts no text from the snapshot, OCR fallback runs against embedded page images. If OCR also reads no usable text, the snapshot remains stored with `parse_status=failed`, no reconciliation run is created, and the UI reports that the parser could not read the PDF.
+**Whole-PDF text failure:** if `pdfplumber` extracts no text from the snapshot, PaddleOCR fallback runs against rendered page images. If OCR also reads no usable text, the snapshot remains stored with `parse_status=failed`, no reconciliation run is created, and the UI reports that the parser could not read the PDF.
 
 **No fuzzy fallback:** Per D-CERT-031, parser does NOT attempt fuzzy mapping when class format changes. Workshop expansion of ClassCodeMapping is the human-in-loop path.
 
@@ -1012,7 +1012,7 @@ Separate routing tree at `/api/auditor/<grant_token>/...`. Backed by `services/a
 
 Phase 0 picks (encoded in IMPLEMENTATION_PLAN.md):
 
-1. **OCR engine** â€” benchmark candidates (Tesseract / Textract / Form Recognizer / Document AI) against a sample of 20 vessel-uploaded cert PDFs. Pick by per-field auto-accept rate at acceptable cost. Wrapper interface stable; concrete impl swappable.
+1. **OCR engine** â€” **RESOLVED 2026-07-22: PaddleOCR.** Certs uses PaddleOCR for certificate PDF OCR and for bounded class-snapshot fallback. Wrapper interface stable; concrete impl swappable.
 2. **HTML-to-PDF renderer for print** â€” **RESOLVED 2026-06-24:** ReportLab 4.2.0 fallback encoded in `apps.certs.services.pdf_renderer.ReportLabPdfRenderer`; WeasyPrint rejected after failed Windows native-runtime smoke test.
 3. **Worker queue runtime** â€” match platform default (Celery / RQ / custom). Already inherited; no Certs-specific decision.
 4. **Cold storage** â€” S3 Glacier vs equivalent for audit log + snapshot blob 5y+. Match platform default (D-CERT-183, D-CERT-191, D-CERT-193).
