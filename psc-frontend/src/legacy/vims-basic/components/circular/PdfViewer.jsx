@@ -8,8 +8,8 @@ import { configurePdfJsWorker } from "../../utils/circular/pdfWorker";
 
 configurePdfJsWorker(pdfjsLib);
 
-const CIRCULAR_PDF_URL_ENDPOINT = "/api/circular/api/msc/pdf-url/";
-const CIRCULAR_READ_ACK_ENDPOINT = "/api/circular/api/msc/read-ack/";
+const CIRCULAR_PDF_URL_ENDPOINT = "http://localhost:8000/api/circular/api/msc/pdf-url/";
+const CIRCULAR_READ_ACK_ENDPOINT = "http://localhost:8000/api/circular/api/msc/read-ack/";
 
 const buildCircularPdfUrl = (notificationId, crewId) => {
   const params = new URLSearchParams({

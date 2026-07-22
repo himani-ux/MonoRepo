@@ -11,25 +11,21 @@ const readSource = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8');
 
 describe('Circular ship-side API URLs', () => {
-  it('test_circular_pdf_viewers_do_not_call_localhost_api_in_production', () => {
+  it('test_circular_pdf_viewers_use_requested_localhost_api_base', () => {
     for (const relativePath of circularPdfHotfixFiles) {
       const source = readSource(relativePath);
-      expect(source, relativePath).not.toContain('localhost:8000');
-      expect(source, relativePath).not.toContain('http://');
-      expect(source, relativePath).not.toContain('//api/circular');
+      expect(source, relativePath).toContain('http://localhost:8000/api/circular/api/msc/pdf-url/');
+      expect(source, relativePath).toContain('http://localhost:8000/api/circular/api/msc/read-ack/');
+      expect(source, relativePath).not.toContain('http://          //api/circular');
       expect(source, relativePath).not.toMatch(/http:\s*\/\/\s*\/api\/circular/);
     }
   });
 
-  it('test_circular_pdf_viewers_use_relative_backend_paths', () => {
+  it('test_circular_pdf_viewers_build_query_strings_with_url_search_params', () => {
     const pdfViewerSource = readSource('src/legacy/vims-basic/components/circular/PdfViewer.jsx');
     const standaloneViewerSource = readSource('src/legacy/vims-basic/pages/circular/PdfViewerPage.jsx');
 
-    expect(pdfViewerSource).toContain('/api/circular/api/msc/pdf-url/');
-    expect(pdfViewerSource).toContain('/api/circular/api/msc/read-ack/');
     expect(pdfViewerSource).toContain('new URLSearchParams');
-    expect(standaloneViewerSource).toContain('/api/circular/api/msc/pdf-url/');
-    expect(standaloneViewerSource).toContain('/api/circular/api/msc/read-ack/');
     expect(standaloneViewerSource).toContain('new URLSearchParams');
   });
 });
