@@ -29,6 +29,7 @@
 - **Catalog edits:** `/certs/catalog` → add / deprecate / push to fleet. New rows save as all-rank-with-Master-approval, and all changes are audited.
 - **Onboarding new vessel:** `/certs/onboarding` → start wizard → 7 steps. Use save-as-draft between batches; takes 2–4 hours per vessel total.
 - **Class status snapshot upload:** every 3 months per vessel. Open `/certs/reconciliation` or the vessel page → "Upload class snapshot" → select the vessel by name/code → confirm the class selector (auto-filled when the vessel's class is NK/KR/BV) → upload the latest official Class Status or Vessel Status PDF downloaded/exported from the class society portal. This must be the full class-status report for the vessel, not an individual certificate PDF. Upload starts parsing and comparison automatically; text-selectable PDFs use direct extraction, and image-only portal PDFs use OCR fallback. Use Reparse when a stored PDF needs retry after a parser or mapping correction.
+- **KR class-code baseline:** before reviewing KR snapshots, make sure the approved KR mapping seed has been applied. This lets the system compare parsed KR rows with VIMS certificate rows instead of showing them as not set up in the catalog. Mapping corrections still go through the normal DPA mapping edit path.
 - **Provisioning external auditors:** `/certs/auditor-access` → "New grant" → set scope + expiry. System emails auditor a one-time signup link.
 - **Settings:** `/certs/settings` to tune alert lead times, OCR thresholds, Slack routing.
 

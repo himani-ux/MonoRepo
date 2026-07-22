@@ -239,6 +239,8 @@ Types use SQL Server compatible expressions; Django field types in parens.
 
 **Indexes:** UQ on `(class_society, class_code_or_name, version)`.
 
+**Baseline seed:** `apps.certs.class_code_mapping_seed.KR_CLASS_CODE_MAPPING_ROWS` contains the approved KR mappings extracted from the Ayuthya class-status PDF under D-CERT-030. Run `python manage.py seed_class_code_mappings --society KR --apply` to insert missing rows. The command is idempotent: active mappings are skipped, inactive history is preserved through the next version number, and the run stops if any target catalog row is missing.
+
 ### 3.4 `vims_certs_tracked_item` (FEAT-CERT-TRK-001 / D-CERT-010, D-CERT-011)
 
 | Column | Type | Constraints | Notes |
@@ -744,6 +746,10 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### `services/reconciliation.py`
 - `reconcile(snapshot_id) â†’ ReconciliationRun` â€” applies ClassCodeMapping (versioned per D-CERT-061), buckets into Match / Mismatch / Missing-in-catalog / Missing-in-class / Conditional-STC / Extended-Postponed / Unmapped-low-conf.
 - Anomaly detection per D-CERT-073; raises critical events when thresholds breached.
+
+### `class_code_mapping_seed.py`
+- Stores approved baseline ClassCodeMapping rows. Current shipped baseline is KR from the Ayuthya class-status PDF; no NK/BV baseline is seeded until approved reference data is available.
+- `seed_class_code_mappings(cursor, rows, actor_id, dry_run)` inserts missing active mappings only and writes `add_class_mapping` audit rows. It does not update tracked-item validity dates.
 
 ### `services/survey_window.py`
 - `compute_window(tracked_item) â†’ (window_open, window_close, next_due_date)` â€” central source of truth per D-CERT-063 / D-CERT-064.

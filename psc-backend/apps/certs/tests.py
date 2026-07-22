@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
+from apps.certs.class_code_mapping_seed import KR_CLASS_CODE_MAPPING_ROWS, validate_class_code_mapping_seed_rows
 from apps.certs.permissions import can_approve_tracked_item
 from apps.certs.serializers.catalog import CatalogRowWriteSerializer
 from apps.certs.services.catalog_repository import CatalogRepository
@@ -453,6 +454,114 @@ Hull Annual Survey 2025-01-01 2026-01-01
                 "unmapped_low_confidence_count": 1,
             },
         )
+
+    def test_kr_class_code_mapping_seed_covers_ayuthya_parser_rows(self):
+        expected_codes = {
+            "Air Pollution Prevention Annual Survey",
+            "Air Pollution Prevention Intermediate Survey",
+            "Air Pollution Prevention Renewal Survey",
+            "Annual Survey",
+            "BWM",
+            "Ballast Water Management Annual Survey",
+            "Ballast Water Management Intermediate Survey",
+            "Ballast Water Management Renewal Survey",
+            "CC",
+            "CDG",
+            "CG2",
+            "Cargo Gear Survey(Annual)",
+            "Cargo Ship Safety Construction Annual Survey",
+            "Cargo Ship Safety Construction Intermediate Survey",
+            "Cargo Ship Safety Construction Renewal Survey",
+            "Cargo Ship Safety Equipment Annual Survey",
+            "Cargo Ship Safety Equipment Periodical Survey",
+            "Cargo Ship Safety Equipment Renewal Survey",
+            "Cargo Ship Safety Radio Periodical Survey",
+            "Cargo Ship Safety Radio Renewal Survey",
+            "Docking Survey",
+            "Garbage Pollution Prevention Renewal Survey",
+            "IAFS",
+            "IAPP",
+            "IEE",
+            "IGPP",
+            "IHM(EU)",
+            "IIHM",
+            "ILL",
+            "IMSBC",
+            "IOPP-A",
+            "ISPP",
+            "Intermediate Survey",
+            "Inventory of Hazardous Materials Occasional Survey",
+            "Inventory of Hazardous Materials Renewal Survey",
+            "LI",
+            "Maritime Solid Bulk Cargoes Code Renewal Survey",
+            "No.1 Aux.Boiler Survey",
+            "No.1 Propeller Shaft Survey",
+            "Oil Pollution Prevention Annual Survey",
+            "Oil Pollution Prevention Intermediate Survey",
+            "Oil Pollution Prevention Renewal Survey",
+            "Renewal Survey",
+            "SC",
+            "SE",
+            "SR",
+            "Sewage Pollution Prevention Renewal Survey",
+            "Special Survey",
+            "VGP",
+        }
+
+        validate_class_code_mapping_seed_rows(KR_CLASS_CODE_MAPPING_ROWS)
+        rows_by_code = {row.class_code_or_name: row for row in KR_CLASS_CODE_MAPPING_ROWS}
+
+        self.assertEqual(set(rows_by_code), expected_codes)
+        self.assertEqual(rows_by_code["CC"].catalog_code, "CLASS-COC")
+        self.assertEqual(rows_by_code["IOPP-A"].catalog_code, "STAT-INTERNATIONAL-OIL-POLLUTION-PREVENTION-IOPP-WITH")
+        self.assertEqual(rows_by_code["Cargo Ship Safety Radio Periodical Survey"].cert_or_survey_kind, "periodic")
+
+    def test_kr_seeded_mappings_turn_known_rows_into_matches(self):
+        seed_by_code = {row.class_code_or_name: row for row in KR_CLASS_CODE_MAPPING_ROWS}
+        parsed_rows = [
+            {"class_code_or_name": "CC", "certificate_number": "KR-CC", "expiry_date": "2030-07-11", "confidence": 1.0},
+            {"class_code_or_name": "IOPP-A", "certificate_number": "KR-IOPP", "expiry_date": "2030-07-11", "confidence": 1.0},
+            {"class_code_or_name": "Air Pollution Prevention Annual Survey", "next_due_date": "2026-07-11", "confidence": 1.0},
+            {"class_code_or_name": "No.1 Propeller Shaft Survey", "next_due_date": "2026-07-11", "confidence": 1.0},
+        ]
+        mappings = [
+            {"class_code_or_name": row["class_code_or_name"], "catalog_id": seed_by_code[row["class_code_or_name"]].catalog_code, "version": 1}
+            for row in parsed_rows
+        ]
+        tracked_items = [
+            {
+                "tracked_item_id": "ti-class",
+                "catalog_id": "CLASS-COC",
+                "catalog_is_class_tracked": True,
+                "certificate_number": "KR-CC",
+                "expiry_date": "2030-07-11",
+            },
+            {
+                "tracked_item_id": "ti-iopp",
+                "catalog_id": "STAT-INTERNATIONAL-OIL-POLLUTION-PREVENTION-IOPP-WITH",
+                "catalog_is_class_tracked": True,
+                "certificate_number": "KR-IOPP",
+                "expiry_date": "2030-07-11",
+            },
+            {
+                "tracked_item_id": "ti-iapp-survey",
+                "catalog_id": "TRADE-IAPP-ANNUAL-PERIODICAL",
+                "catalog_is_class_tracked": True,
+                "next_due_date": "2026-07-11",
+            },
+            {
+                "tracked_item_id": "ti-prop-shaft",
+                "catalog_id": "CLASS-PROP-SHAFT-SURVEY",
+                "catalog_is_class_tracked": True,
+                "next_due_date": "2026-07-11",
+            },
+        ]
+
+        result = build_reconciliation_flags(parsed_payload={"rows": parsed_rows}, tracked_items=tracked_items, mappings=mappings)
+
+        self.assertEqual(result.counts["matches_count"], 4)
+        self.assertEqual(result.counts["missing_in_catalog_count"], 0)
+        self.assertEqual(result.counts["mismatches_count"], 0)
 
     def test_parser_anomaly_notification_schema_failure_does_not_abort_reconciliation(self):
         result = dispatch_parser_anomaly_notifications(
