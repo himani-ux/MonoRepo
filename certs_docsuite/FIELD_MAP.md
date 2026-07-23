@@ -338,7 +338,7 @@ This is the largest table; every column matters.
 |--------|---------|-----------|--------------|-----------------|--------|-------|
 | print_id | `id` | `PrintHistoryTable.row`, share/email subject, download filename | `/certs/print/history`, email, downloads | Per RBAC | âœ… | (D-CERT-128, D-CERT-202) single-vessel format `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel format `SQE-S633-FLEET-<yyyymmdd>-<seq>`; not printed inside normal visible PDFs |
 | scope | `scope` | `PrintHistoryTable.col`, `PrintBuilder.scopeChip` | several | Per RBAC | âœ… | |
-| vessels_json | `vessels` | `PrintHistoryTable.col`, `PrintBuilder.vesselPickerState` | several | Per RBAC | âœ… | |
+| vessels_json | `vessels` | `PrintHistoryTable.col`, contextual vessel scope from vessel dashboard or ship-side login | several | Per RBAC | âœ… | Vessel-scoped print/share actions do not show a vessel dropdown; the selected/logged-in vessel is submitted internally. |
 | sections_json | `sections` | `PrintHistoryTable.col` | `/certs/print/history` | Per RBAC | âœ… | |
 | filters_json | `filters` | `PrintHistoryTable.row.filterDrawer` | `/certs/print/history` | Per RBAC | âœ… | |
 | custom_cert_ids_json | `customCertIds` | `PrintHistoryTable.row.detailsDrawer` | `/certs/print/history` | Per RBAC | âœ… | |

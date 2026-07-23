@@ -61,18 +61,19 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).toContain("ST: 'Short term'");
   });
 
-  it('test_print_and_share_forms_use_pickers_and_email_validation', () => {
+  it('test_print_and_share_forms_use_context_vessel_certificate_pickers_and_email_validation', () => {
     expect(certsRouteSource).toContain('function CertMultiSelectDropdown');
-    expect(certsRouteSource).toContain('<Label htmlFor="printVessels">Vessels</Label>');
-    expect(certsRouteSource).toContain('<Label htmlFor="bundleVessels">Vessels</Label>');
+    expect(certsRouteSource).toContain('const contextVesselId = resolveContextVesselId(initialVesselId, auth.vesselId);');
+    expect(certsRouteSource).toContain('Open a vessel first to print that vessel.');
+    expect(certsRouteSource).toContain('Open a vessel first to create a share bundle.');
     expect(certsRouteSource).toContain('<Label htmlFor="printCustomCerts">Certificates</Label>');
     expect(certsRouteSource).toContain('<Label htmlFor="bundleCerts">Certificates</Label>');
-    expect(certsRouteSource).toContain('placeholder="Choose vessels"');
     expect(certsRouteSource).toContain('placeholder="Choose certificates"');
     expect(certsRouteSource).toContain('<Input id="printRecipientEmail" type="email" inputMode="email" autoComplete="email"');
     expect(certsRouteSource).toContain('<Input id="bundleEmail" type="email" inputMode="email" autoComplete="email"');
-    expect(certsRouteSource).not.toContain('<Label htmlFor="printVessels">Vessel IDs</Label>');
-    expect(certsRouteSource).not.toContain('<Label htmlFor="bundleVessels">Vessel IDs</Label>');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="printVessels">');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="bundleVessels">');
+    expect(certsRouteSource).not.toContain('placeholder="Choose vessels"');
     expect(certsRouteSource).not.toContain('<Label htmlFor="printCustomCerts">Custom certificate IDs</Label>');
     expect(certsRouteSource).not.toContain('<Label htmlFor="bundleCerts">Certificate IDs</Label>');
   });
@@ -82,8 +83,10 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).toContain('Select all');
     expect(certsRouteSource).toContain('Clear all');
     expect(certsRouteSource).toContain('function formatCertificatePickerGroup');
-    expect(certsRouteSource).toContain('group: formatCertificatePickerGroup(item)');
-    expect(certsRouteSource).toContain("return vessel || section || 'Other certificates';");
+    expect(certsRouteSource).toContain('function formatCertificatePickerCategory');
+    expect(certsRouteSource).toContain('group: formatCertificatePickerGroup(item, includeVesselInGroup)');
+    expect(certsRouteSource).toContain("section || 'Other section'");
+    expect(certsRouteSource).toContain("if (item.daysToGo <= 30) return 'Due within 30 days';");
     expect(certsRouteSource).toContain('const groupedOptions = groupPickerOptions(resolvedOptions);');
   });
 

@@ -1920,24 +1920,12 @@ interface CertPickerOption {
 }
 
 function useCertPrintSelectionOptions(enabled: boolean) {
-  const fleetDashboard = useFleetDashboard(enabled);
   const trackedItems = useTrackedItems({}, enabled);
 
   return {
-    vesselOptions: buildCertVesselPickerOptions(fleetDashboard.data?.onboardedVessels ?? []),
     certificateItems: trackedItems.data?.results ?? [],
-    isVesselsLoading: fleetDashboard.isLoading,
     isCertificatesLoading: trackedItems.isLoading,
   };
-}
-
-function buildCertVesselPickerOptions(vessels: CertFleetDashboardVessel[]): CertPickerOption[] {
-  return vessels
-    .filter((vessel) => Boolean(vessel.id))
-    .map((vessel) => ({
-      value: vessel.id,
-      label: formatClassSnapshotVesselOption(vessel),
-    }));
 }
 
 function buildCertCertificatePickerOptions(
@@ -1945,6 +1933,7 @@ function buildCertCertificatePickerOptions(
   selectedVesselIds: string[]
 ): CertPickerOption[] {
   const selectedVessels = new Set(selectedVesselIds);
+  const includeVesselInGroup = selectedVessels.size !== 1;
   return items
     .filter((item) => Boolean(item.id))
     .filter((item) => selectedVessels.size === 0 || Boolean(item.vesselId && selectedVessels.has(item.vesselId)))
@@ -1952,7 +1941,7 @@ function buildCertCertificatePickerOptions(
       value: item.id,
       label: formatCertificatePickerLabel(item),
       description: formatCertificatePickerDescription(item),
-      group: formatCertificatePickerGroup(item),
+      group: formatCertificatePickerGroup(item, includeVesselInGroup),
     }));
 }
 
@@ -1970,13 +1959,51 @@ function formatCertificatePickerDescription(item: CertTrackedItem): string | nul
   return parts.length ? parts.join(' | ') : null;
 }
 
-function formatCertificatePickerGroup(item: CertTrackedItem): string {
+function formatCertificatePickerGroup(item: CertTrackedItem, includeVessel: boolean): string {
   const vessel = String(item.vesselName ?? item.vesselCode ?? item.vesselImo ?? '').trim();
   const section = String(item.sectionName ?? item.sectionCode ?? '').trim();
-  if (vessel && section) {
-    return `${vessel} - ${section}`;
+  const category = formatCertificatePickerCategory(item);
+  const parts = [
+    includeVessel ? vessel : '',
+    section || 'Other section',
+    category,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' - ') : 'Other certificates';
+}
+
+function formatCertificatePickerCategory(item: CertTrackedItem): string {
+  const status = String(item.status ?? '').trim().toLowerCase();
+  if (status === 'expired') return 'Expired';
+  if (status === 'overdue') return 'Overdue';
+  if (status === 'window_closing') return 'Renewal urgent';
+  if (status === 'window_open') return 'Renewal due';
+  if (status === 'pending_first_upload') return 'PDF missing';
+  if (status === 'pending_master_approval') return 'Waiting for Master review';
+  if (!item.expiryDate && item.validityType === 'permanent') return 'Permanent';
+  if (typeof item.daysToGo === 'number') {
+    if (item.daysToGo <= 0) return 'Expired';
+    if (item.daysToGo <= 30) return 'Due within 30 days';
+    if (item.daysToGo <= 90) return 'Due within 90 days';
+    return 'Current';
   }
-  return vessel || section || 'Other certificates';
+  return status ? formatStatus(status) : 'Other status';
+}
+
+function resolveContextVesselId(initialVesselId: string, authVesselId: string | null | undefined): string {
+  return String(initialVesselId || authVesselId || '').trim();
+}
+
+function formatContextVesselLabel(
+  vesselId: string,
+  queryImo: string | null,
+  authVesselName: string | null | undefined,
+  items: CertTrackedItem[]
+): string {
+  const matchedItem = items.find((item) => item.vesselId === vesselId);
+  const name = String(matchedItem?.vesselName ?? authVesselName ?? '').trim();
+  const imo = String(matchedItem?.vesselImo ?? queryImo ?? '').trim();
+  if (name && imo) return `${name} - IMO ${imo}`;
+  return name || (imo ? `IMO ${imo}` : 'Selected vessel');
 }
 
 function togglePickerValue(values: string[], optionValue: string, checked: boolean): string[] {
@@ -2127,10 +2154,14 @@ function CertMultiSelectDropdown({
 
 function CertPrintBuilderPage() {
   const canPrint = useCertsPermission(FORM_IDS.CERTS_PRINT_EXPORT, PROCESS_IDS.CERTS_PRINT);
+  const auth = useAuth();
   const location = useLocation();
-  const initialVesselId = new URLSearchParams(location.search).get('vesselId') ?? '';
+  const queryParams = new URLSearchParams(location.search);
+  const initialVesselId = queryParams.get('vesselId') ?? '';
+  const queryImo = queryParams.get('imo');
+  const contextVesselId = resolveContextVesselId(initialVesselId, auth.vesselId);
+  const vesselIds = contextVesselId ? [contextVesselId] : [];
   const [scope, setScope] = useState<Exclude<CertPrintScope, 'share_bundle'>>('per_vessel_full');
-  const [vesselIds, setVesselIds] = useState<string[]>(initialVesselId ? [initialVesselId] : []);
   const [sections, setSections] = useState('');
   const [customCertIds, setCustomCertIds] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -2140,23 +2171,23 @@ function CertPrintBuilderPage() {
   const printSelection = useCertPrintSelectionOptions(canPrint);
   const mutation = useGeneratePrintArtifact();
   const certificateOptions = buildCertCertificatePickerOptions(printSelection.certificateItems, vesselIds);
+  const vesselContextLabel = contextVesselId
+    ? formatContextVesselLabel(contextVesselId, queryImo, auth.user?.vessel_name, printSelection.certificateItems)
+    : '';
+  const requiresVesselContext = scope !== 'per_section_fleetwide';
+  const shareBundleHref = contextVesselId
+    ? `${ROUTES.CERTS_SHARE_BUNDLE}?vesselId=${encodeURIComponent(contextVesselId)}${queryImo ? `&imo=${encodeURIComponent(queryImo)}` : ''}`
+    : ROUTES.CERTS_SHARE_BUNDLE;
 
   if (!canPrint) {
     return <CertsPermissionDenied />;
   }
 
-  const changeVesselIds = (nextVesselIds: string[]) => {
-    setVesselIds(nextVesselIds);
-    if (printSelection.certificateItems.length > 0) {
-      const allowedCertificateIds = new Set(
-        buildCertCertificatePickerOptions(printSelection.certificateItems, nextVesselIds).map((option) => option.value)
-      );
-      setCustomCertIds((current) => current.filter((certificateId) => allowedCertificateIds.has(certificateId)));
-    }
-  };
-
   const submitPrint = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (requiresVesselContext && vesselIds.length === 0) {
+      return;
+    }
     mutation.mutate({
       scope,
       vesselIds,
@@ -2181,7 +2212,7 @@ function CertPrintBuilderPage() {
             </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to={ROUTES.CERTS_SHARE_BUNDLE}>
+            <Link to={shareBundleHref}>
               <Share2 className="mr-2 h-4 w-4" aria-hidden="true" />
               Share bundle
             </Link>
@@ -2222,20 +2253,15 @@ function CertPrintBuilderPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="printVessels">Vessels</Label>
-                  <CertMultiSelectDropdown
-                    id="printVessels"
-                    value={vesselIds}
-                    options={printSelection.vesselOptions}
-                    onChange={changeVesselIds}
-                    placeholder="Choose vessels"
-                    fallbackLabel="Vessel"
-                    pluralLabel="vessels"
-                    loading={printSelection.isVesselsLoading}
-                    noOptionsText="No vessels available."
-                  />
-                </div>
+                {vesselContextLabel ? (
+                  <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                    Vessel: <span className="font-medium text-neutral-900">{vesselContextLabel}</span>
+                  </div>
+                ) : requiresVesselContext ? (
+                  <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900">
+                    Open a vessel first to print that vessel.
+                  </div>
+                ) : null}
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="printSections">Sections</Label>
@@ -2279,7 +2305,7 @@ function CertPrintBuilderPage() {
                   </div>
                 </div>
                 {mutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(mutation.error)}</p> : null}
-                <Button type="submit" disabled={mutation.isPending}>
+                <Button type="submit" disabled={mutation.isPending || (requiresVesselContext && vesselIds.length === 0)}>
                   <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
                   {mutation.isPending ? 'Generating' : 'Generate PDF and Excel'}
                 </Button>
@@ -2497,32 +2523,31 @@ function CertPrintHistoryPage() {
 
 function CertShareBundlePage() {
   const canShareBundle = useCertsPermission(FORM_IDS.CERTS_PRINT_EXPORT, PROCESS_IDS.CERTS_EXPORT_BUNDLE);
+  const auth = useAuth();
   const location = useLocation();
-  const initialVesselId = new URLSearchParams(location.search).get('vesselId') ?? '';
-  const [vesselIds, setVesselIds] = useState<string[]>(initialVesselId ? [initialVesselId] : []);
+  const queryParams = new URLSearchParams(location.search);
+  const initialVesselId = queryParams.get('vesselId') ?? '';
+  const contextVesselId = resolveContextVesselId(initialVesselId, auth.vesselId);
+  const vesselIds = contextVesselId ? [contextVesselId] : [];
   const [customCertIds, setCustomCertIds] = useState<string[]>([]);
   const [watermarkRecipient, setWatermarkRecipient] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const bundleSelection = useCertPrintSelectionOptions(canShareBundle);
   const mutation = useGenerateShareBundle();
   const certificateOptions = buildCertCertificatePickerOptions(bundleSelection.certificateItems, vesselIds);
+  const vesselContextLabel = contextVesselId
+    ? formatContextVesselLabel(contextVesselId, queryParams.get('imo'), auth.user?.vessel_name, bundleSelection.certificateItems)
+    : '';
 
   if (!canShareBundle) {
     return <CertsPermissionDenied />;
   }
 
-  const changeVesselIds = (nextVesselIds: string[]) => {
-    setVesselIds(nextVesselIds);
-    if (bundleSelection.certificateItems.length > 0) {
-      const allowedCertificateIds = new Set(
-        buildCertCertificatePickerOptions(bundleSelection.certificateItems, nextVesselIds).map((option) => option.value)
-      );
-      setCustomCertIds((current) => current.filter((certificateId) => allowedCertificateIds.has(certificateId)));
-    }
-  };
-
   const submitBundle = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (vesselIds.length === 0) {
+      return;
+    }
     mutation.mutate({
       vesselIds,
       customCertIds,
@@ -2548,20 +2573,15 @@ function CertShareBundlePage() {
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={submitBundle}>
-                <div className="space-y-2">
-                  <Label htmlFor="bundleVessels">Vessels</Label>
-                  <CertMultiSelectDropdown
-                    id="bundleVessels"
-                    value={vesselIds}
-                    options={bundleSelection.vesselOptions}
-                    onChange={changeVesselIds}
-                    placeholder="Choose vessels"
-                    fallbackLabel="Vessel"
-                    pluralLabel="vessels"
-                    loading={bundleSelection.isVesselsLoading}
-                    noOptionsText="No vessels available."
-                  />
-                </div>
+                {vesselContextLabel ? (
+                  <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                    Vessel: <span className="font-medium text-neutral-900">{vesselContextLabel}</span>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900">
+                    Open a vessel first to create a share bundle.
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="bundleCerts">Certificates</Label>
                   <CertMultiSelectDropdown
@@ -2587,7 +2607,7 @@ function CertShareBundlePage() {
                   </div>
                 </div>
                 {mutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(mutation.error)}</p> : null}
-                <Button type="submit" disabled={mutation.isPending}>
+                <Button type="submit" disabled={mutation.isPending || vesselIds.length === 0}>
                   <Share2 className="mr-2 h-4 w-4" aria-hidden="true" />
                   {mutation.isPending ? 'Generating' : 'Generate ZIP bundle'}
                 </Button>
