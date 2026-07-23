@@ -113,6 +113,7 @@
 5. Enter recipient email only if you want an emailed copy; the field checks email format before submit.
 6. Generate (async; ETA shown). You'll be notified in-app + Slack when ready.
 7. Download PDF + Excel companion from the result panel or Print History. If an email was entered, check the email status line on the result panel.
+8. The PDF is the clean user-facing copy: it shows `Printed by`, omits internal IDs/hash/footer details, and prints any selected watermark at the bottom-right of each page.
 
 ### 2.5 Sharing certs with a port agent (Master)
 1. `/certs/share-bundle`.
@@ -237,7 +238,7 @@ You cannot personally tune channel preference (D-CERT-160) — DPA centrally con
 | D-CERT-120 | Per-vessel onboarding wizard sequence (7 steps, no Master acknowledgment step): (1) Vessel selection from `master_vessel` (or c... | LOCKED |
 | D-CERT-121 | Already-expired certs at onboarding = quarantine state. | LOCKED |
 | D-CERT-131 | Date format throughout print = `dd-Mmm-yyyy` (e.g., `15-Mar-2027`). | LOCKED |
-| D-CERT-132 | Validity codes printed as legacy short forms: `A` · `Bi-A` · `5-Y` · `10-Y` · `Perm.` · `ST` · `6-Mth`. | LOCKED |
+| D-CERT-132 | Validity codes remain system data; normal visible PDFs omit the validity-code column/glossary per D-CERT-202. | LOCKED |
 | D-CERT-135 | Status visualization = color + shape hybrid (B/W-photocopy-resilient). | LOCKED |
 | D-CERT-145 | Third-party deliverable = ZIP bundle (manifest PDF + cert PDFs). | LOCKED |
 | D-CERT-154 | Email-to-action = magic-link one-click ack. | LOCKED |

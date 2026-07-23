@@ -464,9 +464,9 @@ Types use SQL Server compatible expressions; Django field types in parens.
 | user_id | UNIQUEIDENTIFIER | NN, FK â†’ master_user.id | |
 | user_role | NVARCHAR(32) | NN | |
 | timestamp_utc | DATETIME2 | NN | |
-| system_state_hash | CHAR(8) | NN | (D-CERT-128) |
+| system_state_hash | CHAR(8) | NN | (D-CERT-128, D-CERT-202) Stored for artifact identity/audit/history; not printed inside normal visible PDFs. |
 | watermark_applied | NVARCHAR(32) | NN | enum: `none \| INTERNAL \| AUDIT_COPY \| MASTER_COPY \| DRAFT` |
-| watermark_recipient | NVARCHAR(128) | NULL | For MASTER_COPY / AUDIT_COPY |
+| watermark_recipient | NVARCHAR(128) | NULL | Stored for request metadata when supplied; not printed inside normal visible PDFs per D-CERT-202. |
 | pdf_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | |
 | excel_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | |
 | bundle_zip_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | For share-bundle |

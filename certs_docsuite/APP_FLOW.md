@@ -482,9 +482,10 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Per-section fleet-wide (single section, all vessels — DPA + FM only per D-CERT-141 / FEAT-CERT-PRT-021)
   - Custom selection (multi-select cert rows from in-scope vessels)
 - Step 2 — **Filters & options:** sections, status bands, cadence, vessel dropdowns by vessel name/code/IMO (depending on scope), and certificate dropdowns by certificate name/number for custom selection. Dropdown panels are opaque and include Select all / Clear all; certificate choices are grouped by vessel and section when available. Watermark toggle (DPA can override default scope-driven watermark per D-CERT-138 / FEAT-CERT-PRT-018); recipient email field with browser email-format validation (optional, opt-in email per D-CERT-149 / FEAT-CERT-PRT-032).
-- Step 3 — **Preview & generate:** sample first page rendering with `print_id` placeholder; "Generate" button.
+- Step 3 — **Preview & generate:** sample first page rendering; "Generate" button.
 - During generation: progress bar for sync per-vessel scope ("Generating PDF (page X of Y)…", hard cap 60s per D-CERT-144 / FEAT-CERT-PRT-025); for fleet-wide async, "Submitted — you'll be notified when ready" + queue position.
 - On success: download buttons fetch the generated PDF and Excel through the authenticated print-artifact download API; confirmation that artifact is auto-archived in vessel-scoped "Archived Reports" folder; if recipient email entered, the result shows whether email was sent or failed.
+- Normal Print Builder PDFs show vessel context, certificate rows, and `Printed by: <user> (<role>)`. They do not print internal header/title, scope wording, print ID, hash, validity glossary/column, recipient name, or generation-footer page. When a watermark is selected, the watermark label prints at the bottom-right of each page without the recipient name (D-CERT-202).
 
 **Throttling:** Soft-throttle surface at >10/hour per user → audit log entry "high-volume print activity by user X" surfaces in FM dashboard for governance review (D-CERT-143 / FEAT-CERT-PRT-024); no hard block.
 
@@ -770,5 +771,5 @@ Screens not listed here implement the standard 11-state contract exactly.
 | D-CERT-079 | Submission scope by catalog row: new field `submission_scope`. | LOCKED |
 | D-CERT-101 | OCR-based PDF auto-matching to cert rows. | LOCKED |
 | D-CERT-111 | IMO sourcing & vessel-cert binding. | LOCKED |
-| D-CERT-128 | Print identifiability — full audit trail in footer: Each printed page footer contains: (a) print date + time UTC, (b) print use... | LOCKED |
+| D-CERT-128 | Print identifiability retained in DB/API/audit/history/download records; visible normal print PDF footer identifiers are superseded by D-CERT-202. | LOCKED |
 | D-CERT-171 | Catalog change fan-out = aggregate office + per-vessel Master. | LOCKED |

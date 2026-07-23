@@ -368,6 +368,58 @@ class ShareBundleManifestRendererTests(SimpleTestCase):
         self.assertNotIn("User:", text)
 
 
+class PrintArtifactRendererTests(SimpleTestCase):
+    def test_normal_print_pdf_removes_internal_metadata_and_prints_bottom_right_watermark(self):
+        result = ReportLabPdfRenderer().render_print_artifact(
+            print_id="SQE-S633-TEST-001",
+            rows=[
+                {
+                    "vessel_name": "MV Test",
+                    "vessel_imo": "1234567",
+                    "vessel_flag": "PANAMA",
+                    "class_society": "KR",
+                    "catalog_section_name": "Statutory",
+                    "catalog_display_name": "Safety Management Certificate",
+                    "catalog_print_order": 1,
+                    "tracked_item_id": "tracked-1",
+                    "certificate_number": "SMC-001",
+                    "issuing_authority": "Class Society",
+                    "issue_date": "2026-01-01",
+                    "expiry_date": "2031-01-01",
+                    "last_done_date": "2026-01-01",
+                    "next_due_date": "2031-01-01",
+                    "validity_type": "full",
+                    "status": "valid",
+                }
+            ],
+            payload={
+                "scope": "per_vessel_full",
+                "watermarkApplied": "MASTER_COPY",
+                "watermarkRecipient": "Port Agent",
+            },
+            actor_id="Harman.S",
+            actor_role="DPA",
+            system_state_hash="ABC12345",
+        )
+
+        from PyPDF2 import PdfReader
+
+        text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(result.content)).pages)
+        self.assertIn("Printed by: Harman.S (DPA)", text)
+        self.assertIn("Safety Management Certificate", text)
+        self.assertIn("MASTER COPY", text)
+        self.assertNotIn("SQE S 633 - Certificates and Surveys", text)
+        self.assertNotIn("Scope:", text)
+        self.assertNotIn("Print ID:", text)
+        self.assertNotIn("SQE-S633-TEST-001", text)
+        self.assertNotIn("Hash:", text)
+        self.assertNotIn("ABC12345", text)
+        self.assertNotIn("Validity", text)
+        self.assertNotIn("Port Agent", text)
+        self.assertNotIn("Generation Footer", text)
+        self.assertNotIn("User:", text)
+
+
 class ClassSnapshotUploadParsingTests(SimpleTestCase):
     def test_upload_immediately_reparses_and_returns_run_ready_snapshot(self):
         vessel_id = "11111111-1111-1111-1111-111111111111"

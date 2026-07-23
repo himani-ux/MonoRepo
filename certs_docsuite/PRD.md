@@ -47,7 +47,7 @@
 - **Class status reconciliation** — manual upload + per-class parser (NK / KR / BV); 3-month cadence; mismatch alerts to Master + Marine Sup'tt; class is authoritative for `is_class_tracked: true` rows.
 - **RBAC & approval** — Master = onboard admin (PSC Inspection pattern); C/O + C/E + 2/E submit-with-Master-approval for non-class-tracked rows; office (DPA / FM / Tech / Marine Sup'tt) writes direct.
 - **7-step onboarding wizard** — vessel-locked, batch PDF ingest in batches of ≤10, gap-fill UI, mandatory-coverage gate before go-live.
-- **Print, export & share bundle** — SQE S 633 form code preserved verbatim; 11-column layout; status color+shape hybrid; ZIP bundle (manifest PDF + cert PDFs) for external distribution.
+- **Print, export & share bundle** — SQE S 633 artifact identity retained in stored records/filenames; clean 10-column normal PDF layout; ZIP bundle (manifest PDF + cert PDFs) for external distribution.
 - **Notification engine** — per-side channel routing (vessel = in-app + email; office = in-app + Slack); escalation cadence DPA + Technical Manager + Marine Sup'tt; 24/7 (no quiet hours); always-grouped multi-cert alerts.
 - **Audit log** — append-only DB role separation (`vims_app` INSERT+SELECT only); 5-year rolling retention; hot 2y + cold 3y tiering; redacted view for external auditors.
 - **External auditor access** — Marine Sup'tt self-service provisioning (DPA override); time-bound (7d default, 30d max); vessel + doc-set scope; auto-expire only (no early revocation); no activity tracking.
@@ -247,13 +247,13 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-PRT-003 | Vessel header block on every page | PRT | V1 | D-CERT-126, D-CERT-127 |
 | FEAT-CERT-PRT-004 | Company logo from shared endpoint (PSC Inspection pattern) | PRT | V1 | D-CERT-127 |
 | FEAT-CERT-PRT-005 | Logo size 30mm × 15mm top-left | PRT | V1 | D-CERT-127 |
-| FEAT-CERT-PRT-006 | Footer with print_id + state hash + user + UTC timestamp | PRT | V1 | D-CERT-128 |
+| FEAT-CERT-PRT-006 | Stored print identity with print_id, state hash, user, role, and UTC timestamp in DB/API/audit/history; normal visible PDFs print only `Printed by` | PRT | V1 | D-CERT-128, D-CERT-202 |
 | FEAT-CERT-PRT-007 | `print_id` format `SQE-S633-<imo>-<yyyymmdd>-<seq>` for single-vessel artifacts; `SQE-S633-FLEET-<yyyymmdd>-<seq>` for fleet/multi-vessel artifacts | PRT | V1 | D-CERT-128; B-PRT-01 |
 | FEAT-CERT-PRT-008 | Empty-section banner ("no certs in this section") | PRT | V1 | D-CERT-129 |
-| FEAT-CERT-PRT-009 | 11-column print schema (D-CERT-130) | PRT | V1 | D-CERT-130 |
+| FEAT-CERT-PRT-009 | Clean 10-column normal print PDF schema without validity-code column | PRT | V1 | D-CERT-130, D-CERT-202 |
 | FEAT-CERT-PRT-010 | Date format `dd-Mmm-yyyy` throughout | PRT | V1 | D-CERT-131 |
 | FEAT-CERT-PRT-011 | Legacy validity short codes (A / Bi-A / 5-Y / 10-Y / Perm. / ST / 6-Mth) | PRT | V1 | D-CERT-132 |
-| FEAT-CERT-PRT-012 | Validity glossary on page-1 footer only | PRT | V1 | D-CERT-132 |
+| FEAT-CERT-PRT-012 | Validity data remains in system records; normal visible PDFs omit the validity code column and glossary | PRT | V1 | D-CERT-132, D-CERT-202 |
 | FEAT-CERT-PRT-013 | Cert hierarchy sub-numbering (`19`, `19.a`, `19.b`) | PRT | V1 | D-CERT-133 |
 | FEAT-CERT-PRT-014 | Section-row ordering by `print_order` with parent-child grouping | PRT | V1 | D-CERT-134 |
 | FEAT-CERT-PRT-015 | Status visualization = color + shape hybrid (B/W resilient) | PRT | V1 | D-CERT-135 |

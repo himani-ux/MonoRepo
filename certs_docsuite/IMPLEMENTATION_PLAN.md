@@ -324,3 +324,13 @@ See PRD ยง19. Build-time deferrals (Phase 0 picks) listed in BACKEND_STRUCTURE ย
 **Triggering discovery:** The shipped print/share UI showed "PDF ready", "Excel ready", or "ZIP ready" after generation, but users could not access the generated file from that screen. The recipient email field was persisted on the artifact record but did not send mail, making the field misleading.
 
 **Supersedes:** Phase 5 print/export behavior only where readiness status was sufficient as the user-facing result. The current behavior is D-CERT-201: a successful print/share generation must provide direct authenticated artifact access, and a non-empty recipient email triggers delivery through the existing platform email configuration.
+
+---
+
+## Amendment 5 - 2026-07-23
+
+**What changed:** CR-109 simplifies the visible normal Print Builder PDF output. The generated PDF no longer prints the report title/header, scope wording, print ID, state hash, validity legend/column, watermark recipient name, or generation-footer page. The visible generator line is `Printed by: <user> (<role>)`. When a watermark is selected, the watermark label prints at the bottom-right of each normal print PDF page.
+
+**Triggering discovery:** The shipped normal print PDF exposed internal artifact labels and footer metadata that users did not want on the operational copy. The same cleanup had already been requested for the share-bundle manifest, and the normal print PDF needed the same user-facing treatment while preserving auditability in the database and API.
+
+**Supersedes:** Phase 5.2, D-CERT-128, and D-CERT-132 only where they required visible print-PDF footer identifiers or a visible validity glossary/column. The current behavior is D-CERT-202: print artifacts remain identifiable through stored `print_id`, `system_state_hash`, audit metadata, download filenames, and Print History, while normal user-facing PDFs omit those internal labels from the visible page content.

@@ -81,7 +81,7 @@ Each `vims_certs_*` table gets one section. Each row in the section is one DB co
 | display_name | `displayName` | `CatalogTable.col`, `CatalogRowDetail`, `CertCard.title`, `GapFillForm.certTypeDropdown`, `PrintBuilder` | most screens | All Cert | âœ… | Primary human label |
 | short_name | `shortName` | `CertCard.acronymChip`, `PrintBuilder.compactView` | `/certs/vessels/<imo>`, `/certs/print` | All Cert | âœ… | Optional; hidden if null |
 | print_section_label | `printSectionLabel` | `PrintArtifactPdfTemplate` (server-side renderer) | print PDF output | DPA edit | âœ… | Renders into print artifact, not interactive UI |
-| validity_type | `validityType` | `CatalogRowDetail.metadata`, `TrackedItemDetail.metadataPanel`, `PrintArtifactPdfTemplate.validityCol` | several | All Cert | âœ… | Enum dropdown in editor |
+| validity_type | `validityType` | `CatalogRowDetail.metadata`, `TrackedItemDetail.metadataPanel` | several | All Cert | âœ… | Enum dropdown in editor; not printed inside normal visible PDFs per D-CERT-202 |
 | cadence_months | `cadenceMonths` | `CatalogRowDetail`, `TrackedItemDetail.metadataPanel` | `/certs/catalog/<id>`, `/certs/vessels/<imo>/cert/<id>` | All Cert | âœ… | Numeric input |
 | cadence_custom_days | `cadenceCustomDays` | `CatalogRowDetail` (conditional render when type = custom_days) | `/certs/catalog/<id>` | DPA edit | âœ… | |
 | issuing_authority_type | `issuingAuthorityType` | `CatalogRowDetail`, `GapFillForm` | several | DPA edit | âœ… | Enum dropdown |
@@ -336,17 +336,17 @@ This is the largest table; every column matters.
 
 | Column | API key | Component | Screen route | Role visibility | Status | Notes |
 |--------|---------|-----------|--------------|-----------------|--------|-------|
-| print_id | `id` | `PrintHistoryTable.row`, `PrintArtifactPdfTemplate.footer`, share/email subject | `/certs/print/history`, print PDF, email | Per RBAC | âœ… | (D-CERT-128) single-vessel format `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel format `SQE-S633-FLEET-<yyyymmdd>-<seq>` (B-PRT-01 resolved 2026-06-29) |
+| print_id | `id` | `PrintHistoryTable.row`, share/email subject, download filename | `/certs/print/history`, email, downloads | Per RBAC | âœ… | (D-CERT-128, D-CERT-202) single-vessel format `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel format `SQE-S633-FLEET-<yyyymmdd>-<seq>`; not printed inside normal visible PDFs |
 | scope | `scope` | `PrintHistoryTable.col`, `PrintBuilder.scopeChip` | several | Per RBAC | âœ… | |
 | vessels_json | `vessels` | `PrintHistoryTable.col`, `PrintBuilder.vesselPickerState` | several | Per RBAC | âœ… | |
 | sections_json | `sections` | `PrintHistoryTable.col` | `/certs/print/history` | Per RBAC | âœ… | |
 | filters_json | `filters` | `PrintHistoryTable.row.filterDrawer` | `/certs/print/history` | Per RBAC | âœ… | |
 | custom_cert_ids_json | `customCertIds` | `PrintHistoryTable.row.detailsDrawer` | `/certs/print/history` | Per RBAC | âœ… | |
-| user_id, user_role | `userId`, `userRole` | `PrintHistoryTable.col`, `PrintArtifactPdfTemplate.footer` | several | Per RBAC; FM dashboard for high-volume surfacing | âœ… | (D-CERT-128, D-CERT-143) |
-| timestamp_utc | `timestampUtc` | `PrintHistoryTable.col`, `PrintArtifactPdfTemplate.footer` | several | Per RBAC | âœ… | |
-| system_state_hash | `systemStateHash` | `PrintArtifactPdfTemplate.footer` (printed on every page) | print PDF | Visible on artifact | âœ… | (D-CERT-128) |
-| watermark_applied | `watermarkApplied` | `PrintHistoryTable.watermarkBadge`, `PrintArtifactPdfTemplate.watermarkOverlay` | several | Per RBAC | âœ… | |
-| watermark_recipient | `watermarkRecipient` | `PrintArtifactPdfTemplate.watermarkOverlay` | print PDF | On artifact | âœ… | |
+| user_id, user_role | `userId`, `userRole` | `PrintHistoryTable.col`, `PrintArtifactPdfTemplate.printedByLine` | several | Per RBAC; FM dashboard for high-volume surfacing | âœ… | (D-CERT-128, D-CERT-143, D-CERT-202); visible normal PDF label is `Printed by` |
+| timestamp_utc | `timestampUtc` | `PrintHistoryTable.col` | several | Per RBAC | âœ… | Stored for history/audit; not printed inside normal visible PDFs per D-CERT-202 |
+| system_state_hash | `systemStateHash` | `PrintHistoryTable.row`, audit metadata | `/certs/print/history`, audit log | Per RBAC | âœ… | (D-CERT-128, D-CERT-202) stored for artifact identity; not printed inside normal visible PDFs |
+| watermark_applied | `watermarkApplied` | `PrintHistoryTable.watermarkBadge`, `PrintArtifactPdfTemplate.bottomRightWatermark` | several | Per RBAC | âœ… | When selected for normal print PDF, prints the watermark label at the bottom-right of each page |
+| watermark_recipient | `watermarkRecipient` | `PrintBuilder.watermarkRecipient`, share/email metadata | print/share generation | Per RBAC | âœ… | Stored for request metadata where supplied; not printed inside normal visible PDFs per D-CERT-202 |
 | pdf_blob_id | `pdfBlobId`, `downloadUrls.pdf` | `PrintHistoryTable.downloadPdfButton`, print result download button | `/certs/print/history`, print result page | Per RBAC | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/pdf/`; raw storage path is never sent to the browser. |
 | excel_blob_id | `excelBlobId`, `downloadUrls.excel` | `PrintHistoryTable.downloadExcelButton`, print result download button | several | Per RBAC | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/excel/`; audit-log exports label this secondary file as CSV. |
 | bundle_zip_blob_id | `bundleZipBlobId`, `downloadUrls.zip` | `PrintHistoryTable.downloadBundleButton`, share-bundle result download button | `/certs/print/history`, share-bundle result | Master / DPA / FM | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/zip/`. |
@@ -678,7 +678,7 @@ When all 11 checks pass, FIELD_MAP is GREEN and the COVERAGE audit can include "
 | Blob download endpoints/URLs | pdf_blob.blob_storage_path (**API-only**) | Raw storage path never sent; authenticated endpoint or signed URL minted per request (Â§5) | Every request |
 | Mandatory coverage % | `services/coverage.py` (**API-only**) | `compute_mandatory_coverage(vessel_id)` from `mandatory_for_all_vessels` rows vs tracked items; drives onboarding step-6 gate + `CoverageBanner` (D-CERT-119) | Read time; override stores reason on vessel_config |
 | `vessel_acked` | notification_meta ack fields (**API-only**) | Office dashboard derives yes/no from vessel-side copy ack â€” independent ack model (D-CERT-087) | Read time; flips on vessel ack |
-| `systemStateHash` | `services/system_state_hash.py` â†’ print_artifact (**persisted-derived**) | 8-char hash of vessel cert state for print identifiability (D-CERT-128); printed in footer | Once at generation; immutable |
+| `systemStateHash` | `services/system_state_hash.py` â†’ print_artifact (**persisted-derived**) | 8-char hash of vessel cert state for print identifiability (D-CERT-128); stored in artifact/audit/history, not printed inside normal visible PDFs per D-CERT-202 | Once at generation; immutable |
 | `print_id` | print_artifact PK (**persisted-derived**) | Single-vessel: `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel: `SQE-S633-FLEET-<yyyymmdd>-<seq>` (D-CERT-128; B-PRT-01 resolved 2026-06-29) | Once at generation |
 | `scheduledDeleteAt` | pdf_blob (**persisted-derived**) | From retention_policy + supersession (Â§3.5) | Supersession; DPA retention override (D-CERT-021) |
 | `idempotency_key` | notification_meta (**persisted-derived**) | `(cert_row_id, cadence, sent_date)` at dispatch (D-CERT-174) | Once per dispatch attempt |

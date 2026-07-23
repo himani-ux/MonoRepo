@@ -375,3 +375,8 @@
 <!-- Session close review completed 2026-04-30 17:15. No new lesson added for Step 7.7. Existing L-006, L-051, and L-064 already cover the progress-handoff and permission-registry drifts handled in this session. -->
 <!-- Session close review completed 2026-04-30 17:29. Added L-067 for the Step 7.8 retention-audit summary conflict with parent-bound field-history purge. Session closure confirmed after tracker sync and verification-backed Step 7.8 completion in the handover workspace. -->
 2026-07-21 | Certs class snapshot PDFs | User correction showed that visible page data from page 3 onward can still be image-only PDF content with zero extractable text. Before declaring a class-status upload unusable, inspect all pages for extractable text and image objects, then test OCR on embedded page images; if OCR reads the class table, add a bounded OCR fallback instead of rejecting the PDF.
+
+## L-081 - PDF copy changes can supersede canonical artifact controls
+**What happened:** A Certs print PDF cleanup was initially classified as Tier 1 because it looked like a renderer text change, but discovery showed the implementation plan, PRD, design system, security, and field map explicitly required visible print ID, state hash, footer, and validity output.
+**Why:** Report labels can encode audit and identifiability decisions even when they look like visual clutter.
+**Rule:** Before removing labels from generated PDFs, search canonical docs for the exact labels and related control IDs. If the labels are tied to artifact identity, security, footer, watermark, or glossary decisions, reclassify to Tier 3 and supersede only the visible-output behavior while preserving DB/API/audit traceability.

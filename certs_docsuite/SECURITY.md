@@ -23,7 +23,7 @@
 |---|-----------|-----------|--------|
 | 1 | Vessel statutory/class/flag certificates (operational documents, not personal data) | YES — core domain | SSOT §1–2, D-CERT-001, D-CERT-014 |
 | 2 | Vessel identity & config (IMO, name, class society, flag, anniversary date) | YES | BACKEND_STRUCTURE §3.4, §3.16 |
-| 3 | **Internal KSM employee data ONLY** — VIMS user accounts (~30–50 employees: names, emails, roles), audit-log actor names, print-footer identities, approval/rejection actor logs, notification recipient logs | YES — the module's entire personal-data footprint | **D-CERT-184** |
+| 3 | **Internal KSM employee data ONLY** — VIMS user accounts (~30–50 employees: names, emails, roles), audit-log actor names, print artifact identities, approval/rejection actor logs, notification recipient logs | YES — the module's entire personal-data footprint | **D-CERT-184** |
 | 4 | **Crew PII** (COC competency, COP, GMDSS, medicals, STCW, vaccinations) | **NO — zero crew PII.** Crew certs live in CMS (Crew Management System, separate platform). DMLC II row stores PDF + cert-level metadata only. | **D-CERT-001, D-CERT-177** |
 | 5 | Free-text audit content (DPA reasons, Master rejection reasons) | YES — internal-sensitive; redacted from external auditors | D-CERT-180 |
 | 6 | PHI / PCI / financial / minors' / biometric data | NO — none touched | SSOT scope §1 |
@@ -125,7 +125,7 @@ The Certs module introduces **no password surface of its own** — login is the 
 | Export | DPA only — watermarked PDF + CSV for ISM external audit | D-CERT-091 |
 | External-auditor view | Free-text reasons rendered `[REDACTED — internal note]` at serializer layer | **D-CERT-180** |
 | Cross-module writeback attribution | `vims_certs_cert_change_log` (append-only, same GRANT regime) records `source_module ∈ {CERTS, AUDIT, SYSTEM}` + `version_after` CAS trail | BACKEND_STRUCTURE §3.19 (D-AUDRS-236/239) |
-| Print artifact identifiability | Every printed page footer: UTC date/time, user name + role, 8-char system-state hash, unique `print_id` | **D-CERT-128** |
+| Print artifact identifiability | Stored artifact/audit/history records retain UTC date/time, user name + role, 8-char system-state hash, and unique `print_id`; normal visible PDFs omit these internal identifiers except `Printed by` | **D-CERT-128, D-CERT-202** |
 | Notification audit trail | Trigger event, recipients, channels, delivery/ack status, escalation level; metadata 5y, body content 1y | D-CERT-155, D-CERT-181 |
 
 ---
@@ -161,7 +161,7 @@ The Certs module introduces **no password surface of its own** — login is the 
 | Auditor activity | **NOT tracked** (deliberate): grant event logged; in-window reads/downloads opaque; only grant-level `last_accessed_at` | **D-CERT-196** |
 | Auditor revocation | Auto-expire only; expiry-edit = effective revocation | D-CERT-195 |
 | Master share-bundle | ZIP with auto-generated manifest PDF (title, issuer, dates, file ref per cert); for port agents / charterers / vetting inspectors | D-CERT-096, D-CERT-145 |
-| Watermarking | Share-bundle = `MASTER COPY` + recipient name; auditor/print scoping per watermark matrix | D-CERT-138 |
+| Watermarking | Normal print PDFs show selected watermark label at the bottom-right of each page without recipient name; auditor/print scoping remains per watermark matrix | D-CERT-138, D-CERT-202 |
 | Email-out of reports | Opt-in checkbox at print time; recipient + subject + attachment audit-logged | D-CERT-149 |
 | Class-society portals | **NO API integration, EVER** (BV MOVE, KR e-Fleet, NK-SHIPS, ABS Eagle, RINA — all banned). Manual PDF upload in perpetuity. | **D-CERT-169** |
 | Cross-module V1 | No sibling-module API calls in or out; URL cross-links only | D-CERT-176, D-CERT-178 |
@@ -187,7 +187,7 @@ The Certs module introduces **no password surface of its own** — login is the 
 | SEC-CERT-06 | No auditor activity tracking (grant-level only) | D-CERT-196 |
 | SEC-CERT-07 | Audit free-text redaction for external view | D-CERT-180 |
 | SEC-CERT-08 | Magic-link single-use 24h signed URLs | D-CERT-154 |
-| SEC-CERT-09 | Print artifact identifiability footer | D-CERT-128 |
+| SEC-CERT-09 | Print artifact identifiability in stored artifact/audit/history records | D-CERT-128, D-CERT-202 |
 | SEC-CERT-10 | Soft-limit print throttle + FM surfacing | D-CERT-143 |
 | SEC-CERT-11 | Bulk-delete cap (≤50) + ingest cap (≤10) | D-CERT-092, D-CERT-104 |
 | SEC-CERT-12 | No MFA / no break-glass / no acting-Master | D-CERT-081, D-CERT-097, D-CERT-077 |

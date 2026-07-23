@@ -71,60 +71,52 @@ The status-tier colors and shape encoding in Section 2 remain unchanged. Their s
 
 ## 4. Watermark Scope (D-CERT-138)
 
-Diagonal text overlay, ~30% opacity, light gray (`#a3a3a3`, `text-neutral-400/30`). Font-size large enough to read across page (~96pt on letter/A4). Never obscures data.
+Normal Print Builder PDFs print the selected watermark as a small bottom-right label on each page. The label is red, does not include the recipient name, and must not obscure table data (D-CERT-202). External auditor exports may keep the separate auditor watermark pattern where required by grant policy.
 
 | Watermark | Scope | Color | Text format |
 |-----------|-------|-------|-------------|
 | (none) | Post-go-live default per-vessel | — | — |
 | `INTERNAL` | DPA fleet-wide internal print | neutral-400 | `INTERNAL` |
 | `AUDIT COPY` | External auditor export (D-CERT-096) | neutral-400 | `AUDIT COPY — <VESSEL NAME>\n<auditor name>\nAccess expires <dd-Mmm-yyyy>` |
-| `MASTER COPY` | Master share-bundle (D-CERT-096) | neutral-400 | `MASTER COPY — <recipient name>` |
+| `MASTER COPY` | Master share-bundle / selected print watermark (D-CERT-096, D-CERT-202) | red-700 for normal print PDF | `MASTER COPY` |
 | `DRAFT` | Pre-go-live during onboarding | neutral-400 | `DRAFT — NOT FINAL` |
 
 ---
 
 ## 5. Print Layout (D-CERT-125 → D-CERT-135)
 
-**Form code on every print:** `SQE S 633` preserved verbatim (D-CERT-125). Free design beyond that.
+**Stored form identity:** `SQE S 633` remains in stored print IDs, filenames, audit/history records, and API responses. Normal visible PDFs do not print the form-code title/header per D-CERT-202.
 
 ### 5.1 Paper / Margins
 - **Paper size:** A4 (default) or US Letter (DPA-configurable). Detected from print job.
-- **Orientation:** Landscape (11-column schema fits better landscape; portrait acceptable for partial scopes with fewer columns).
+- **Orientation:** Landscape for the normal 10-column certificate table; portrait acceptable for partial scopes with fewer columns.
 - **Margins:** ≥0.6" left binding edge (D-CERT-129); 0.4" right/top/bottom.
 
-### 5.2 Header (page 1)
-- **Top-left logo:** 30mm × 15mm sourced from `GET /api/auth/company-logo/` (D-CERT-127, matches PSC Inspection pattern).
-- **Top-right vessel block (large):**
-  - Vessel name — `text-2xl font-bold`
-  - IMO — `text-base`
-  - Flag — `text-base`
-  - Class society — `text-base`
-  - Ship type — `text-base`
-  - Current Master at print time — `text-base`
-  - Print date — `text-sm`
-- **Form code identifier:** `SQE S 633 — Certificates and Surveys` in `text-lg font-semibold` below header.
+### 5.2 Visible Start (page 1)
+- Vessel context line: vessel name, IMO, flag, and class society when available.
+- Printed-by line: `Printed by: <user> (<role>)`.
+- No company-logo header, report title, scope label, print ID, hash, recipient name, or generation-footer page in the normal visible PDF.
 
-### 5.3 Header (pages 2+)
-Compact one-line: `<Vessel Name> · IMO <num> · Page X of Y · <Current Section Banner>`. Font: `text-xs`.
+### 5.3 Continuing Pages
+No repeating report header. The table header repeats as needed, and the selected watermark label appears bottom-right on each page.
 
 ### 5.4 Section Banner
 Each section repeats on its first page: full-width strip, KSM brand color, `text-base font-semibold text-white`. Section code + display name (e.g. "STATUTORY & FLAG").
 
-### 5.5 11-Column Schema (D-CERT-130)
+### 5.5 10-Column Schema (D-CERT-130, D-CERT-202)
 
 | # | Column | Width (relative) | Source |
 |---|--------|------------------|--------|
-| 1 | S/No | 4% | resets per section |
-| 2 | Certificate name | 24% | `display_name` (wraps 2 lines if needed) |
-| 3 | Cert number | 8% | `certificate_number` (empty if bypassed) |
-| 4 | Issued by | 11% | `issuing_authority` |
-| 5 | Place of issue | 8% | `place_of_issue` |
-| 6 | Date of issue | 9% | `issue_date` formatted `dd-Mmm-yyyy` |
-| 7 | Date of expiry | 9% | `expiry_date` ("Permanent" if applicable) |
-| 8 | Validity | 6% | short code per §6 |
-| 9 | Days to go | 6% | computed; negative when expired |
-| 10 | Status | 5% | small color dot + 1-letter G/Y/R (B/W-printer-friendly) |
-| 11 | Remarks | 10% | `legacy_remarks` + manual notes |
+| 1 | Section | 10% | catalog section name/code |
+| 2 | Sub No. | 5% | row number in the printed set |
+| 3 | Certificate / Survey | 21% | `display_name` or catalog code |
+| 4 | Cert No. | 10% | `certificate_number` |
+| 5 | Issued By | 10% | `issuing_authority` |
+| 6 | Issue | 8% | `issue_date` |
+| 7 | Expiry | 8% | `expiry_date` or `PERM` |
+| 8 | Last Done | 8% | `last_done_date` |
+| 9 | Next Due | 8% | `next_due_date` |
+| 10 | Status | 12% | text status |
 
 ### 5.6 Sub-numbering (D-CERT-133)
 Parent: section-relative serial (e.g. `19`). Children: sub-letters (e.g. `19.a Last Annual Survey`, `19.b Last Intermediate Survey`). Flat row format; no indentation tricks; sub-numbering carries hierarchy semantics.
@@ -135,14 +127,11 @@ Within each section: rows by `catalog.print_order`. Children always immediately 
 ### 5.8 Empty Sections (D-CERT-129)
 Section banner always printed even if empty. Body shows: `— no certs in this section for this vessel —` in italic gray text. Auditor sees that the section was checked, not omitted.
 
-### 5.9 Footer (every page)
-- Left: `print_id` (full string per D-CERT-128, e.g. single-vessel `SQE-S633-9876543-20260507-001`; fleet/multi-vessel `SQE-S633-FLEET-20260507-001`)
-- Center: print user name + role (e.g. "DPA John Smith")
-- Right: print date/time UTC + system-state hash (8-char per D-CERT-128)
-- All footer text `text-xs text-neutral-600`.
+### 5.9 Visible Print Metadata (D-CERT-202)
+Normal Print Builder PDFs do not print an internal header/title, scope label, `print_id`, system-state hash, recipient name, or generation-footer page. The only generator line in the visible PDF is `Printed by: <user> (<role>)`. The stored artifact still carries `print_id`, hash, timestamp, role, and audit metadata in DB/API/history.
 
-### 5.10 Page-1 Validity Glossary (D-CERT-132)
-At bottom of page 1 only (not subsequent pages): `Validity codes: A=Annual, Bi-A=Biennial, 5-Y=5-Yearly, 10-Y=10-Yearly, Perm.=Permanent, ST=Short-Term, 6-Mth=6-Monthly`. Font `text-xs italic`.
+### 5.10 Validity Glossary (D-CERT-132, D-CERT-202)
+Validity data remains in system records, but normal visible PDFs do not print the validity code column or page-1 glossary.
 
 ### 5.11 Digital Signature Block (D-CERT-139)
 End-of-print: three lines
@@ -167,13 +156,13 @@ No wet-signature lines.
 | Short-Term | `ST` |
 | 6-Monthly | `6-Mth` |
 
-Glossary on page 1 footer only (D-CERT-132).
+Normal visible PDFs omit the validity code column and glossary per D-CERT-202.
 
 ---
 
 ## 7. Date Format
 
-`dd-Mmm-yyyy` throughout (D-CERT-131). Examples: `15-Mar-2027`, `01-Jan-2026`. Header dates, table dates, footer dates all use this format. No US/EU collision.
+`dd-Mmm-yyyy` throughout where dates are printed (D-CERT-131). Examples: `15-Mar-2027`, `01-Jan-2026`. No US/EU collision.
 
 ---
 
@@ -201,8 +190,8 @@ All Certs-specific components live under `src/components/certs/shared/` and foll
 | `CertStatusBadge` | current / expiring-90 / expiring-30 / expiring-7 / expired / permanent / postponed / superseded / quarantine / pending-upload / re-flag-pending / class-change-pending / pdf-missing | CertCard, TrackedItemDetail, PrintTemplate, Dashboard |
 | `OcrConfidenceBadge` | high / gap / low / unprocessable | GapFillForm |
 | `ClassSocietyChip` | NK / KR / BV | SnapshotList, ReconciliationReview |
-| `WatermarkOverlay` | INTERNAL / AUDIT-COPY / MASTER-COPY / DRAFT | PrintArtifactPdfTemplate |
-| `PrintIdFooter` | with print_id, user, role, UTC timestamp, state hash | PrintArtifactPdfTemplate |
+| `BottomRightWatermark` | INTERNAL / AUDIT-COPY / MASTER-COPY / DRAFT label without recipient name | PrintArtifactPdfTemplate |
+| `PrintedByLine` | `Printed by: <user> (<role>)` | PrintArtifactPdfTemplate |
 | `BatchProgressBar` | OCR running / ready / committed / cancelled | Onboarding step 3 |
 | `ApprovalStateChip` | draft / pending_master_approval / approved / rejected | TrackedItemDetail, ApprovalQueueTable |
 | `CertExpiryTier` | (composed of CertStatusBadge + days_to_go text) | CertCard, Dashboard |
@@ -243,8 +232,8 @@ All Certs-specific components live under `src/components/certs/shared/` and foll
 
 | Decision ID | SSOT topic (terse) | Status |
 |-------------|--------------------|--------|
-| D-CERT-002 | Print/export retains SQE S 633 layout. | LOCKED |
+| D-CERT-002 | Print/export retains SQE S 633 artifact identity; visible normal PDF form-code header is superseded by D-CERT-202. | LOCKED |
 | D-CERT-113 | Missing-PDF cert rows allowed at onboarding. | LOCKED |
 | D-CERT-119 | Per-vessel onboarding completion = hybrid auto-enable / override. | LOCKED |
 | D-CERT-121 | Already-expired certs at onboarding = quarantine state. | LOCKED |
-| D-CERT-126 | Vessel header block (every page): Top of page 1 carries: vessel name (large), IMO, flag, class society, ship type, current Mast... | LOCKED |
+| D-CERT-126 | Vessel context remains visible on normal PDFs; full header block/every-page header is superseded by D-CERT-202. | LOCKED |
