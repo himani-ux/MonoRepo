@@ -40,6 +40,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
   Input,
   Label,
   Select,
@@ -1906,31 +1910,194 @@ function AuditorTerminalPage() {
   );
 }
 
+interface CertPickerOption {
+  value: string;
+  label: string;
+  description?: string | null;
+}
+
+function useCertPrintSelectionOptions(enabled: boolean) {
+  const fleetDashboard = useFleetDashboard(enabled);
+  const trackedItems = useTrackedItems({}, enabled);
+
+  return {
+    vesselOptions: buildCertVesselPickerOptions(fleetDashboard.data?.onboardedVessels ?? []),
+    certificateItems: trackedItems.data?.results ?? [],
+    isVesselsLoading: fleetDashboard.isLoading,
+    isCertificatesLoading: trackedItems.isLoading,
+  };
+}
+
+function buildCertVesselPickerOptions(vessels: CertFleetDashboardVessel[]): CertPickerOption[] {
+  return vessels
+    .filter((vessel) => Boolean(vessel.id))
+    .map((vessel) => ({
+      value: vessel.id,
+      label: formatClassSnapshotVesselOption(vessel),
+    }));
+}
+
+function buildCertCertificatePickerOptions(
+  items: CertTrackedItem[],
+  selectedVesselIds: string[]
+): CertPickerOption[] {
+  const selectedVessels = new Set(selectedVesselIds);
+  return items
+    .filter((item) => Boolean(item.id))
+    .filter((item) => selectedVessels.size === 0 || Boolean(item.vesselId && selectedVessels.has(item.vesselId)))
+    .map((item) => ({
+      value: item.id,
+      label: formatCertificatePickerLabel(item),
+      description: formatCertificatePickerDescription(item),
+    }));
+}
+
+function formatCertificatePickerLabel(item: CertTrackedItem): string {
+  const name = String(item.displayName ?? item.catalogDisplayName ?? item.catalogShortName ?? item.catalogCode ?? '').trim();
+  const number = String(item.certificateNumber ?? '').trim();
+  const baseLabel = name || formatEntityLabel(item.id, 'Certificate');
+  return number && !baseLabel.includes(number) ? `${baseLabel} - ${number}` : baseLabel;
+}
+
+function formatCertificatePickerDescription(item: CertTrackedItem): string | null {
+  const vessel = String(item.vesselName ?? item.vesselCode ?? item.vesselImo ?? '').trim();
+  const status = String(item.status ?? '').trim();
+  const expiry = item.expiryDate ? `Expires ${formatDate(item.expiryDate)}` : '';
+  const parts = [vessel, status ? formatStatus(status) : '', expiry].filter(Boolean);
+  return parts.length ? parts.join(' | ') : null;
+}
+
+function togglePickerValue(values: string[], optionValue: string, checked: boolean): string[] {
+  if (checked) {
+    return values.includes(optionValue) ? values : [...values, optionValue];
+  }
+  return values.filter((value) => value !== optionValue);
+}
+
+function includeSelectedFallbackOptions(
+  options: CertPickerOption[],
+  selectedValues: string[],
+  fallback: string
+): CertPickerOption[] {
+  const knownValues = new Set(options.map((option) => option.value));
+  const missingOptions = selectedValues
+    .filter((value) => !knownValues.has(value))
+    .map((value) => ({ value, label: formatEntityLabel(value, fallback) }));
+  return missingOptions.length ? [...missingOptions, ...options] : options;
+}
+
+function formatPickerSummary(
+  selectedValues: string[],
+  options: CertPickerOption[],
+  placeholder: string,
+  fallback: string,
+  pluralLabel: string
+): string {
+  if (selectedValues.length === 0) {
+    return placeholder;
+  }
+  if (selectedValues.length === 1) {
+    const selected = options.find((option) => option.value === selectedValues[0]);
+    return selected?.label ?? formatEntityLabel(selectedValues[0], fallback);
+  }
+  return `${selectedValues.length} ${pluralLabel} selected`;
+}
+
+function CertMultiSelectDropdown({
+  id,
+  value,
+  options,
+  onChange,
+  placeholder,
+  fallbackLabel,
+  pluralLabel,
+  loading,
+  noOptionsText,
+}: {
+  id: string;
+  value: string[];
+  options: CertPickerOption[];
+  onChange: (value: string[]) => void;
+  placeholder: string;
+  fallbackLabel: string;
+  pluralLabel: string;
+  loading: boolean;
+  noOptionsText: string;
+}) {
+  const resolvedOptions = includeSelectedFallbackOptions(options, value, fallbackLabel);
+  const summary = loading && resolvedOptions.length === 0
+    ? 'Loading'
+    : formatPickerSummary(value, resolvedOptions, placeholder, fallbackLabel, pluralLabel);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button id={id} type="button" variant="outline" className="w-full justify-between font-normal">
+          <span className="truncate">{summary}</span>
+          <ListFilter className="ml-2 h-4 w-4 shrink-0" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-72 w-[var(--radix-dropdown-menu-trigger-width)]">
+        {resolvedOptions.length > 0 ? (
+          resolvedOptions.map((option) => (
+            <DropdownMenuCheckboxItem
+              key={option.value}
+              checked={value.includes(option.value)}
+              onCheckedChange={(checked) => onChange(togglePickerValue(value, option.value, Boolean(checked)))}
+              onSelect={(event) => event.preventDefault()}
+              className="items-start"
+            >
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate font-medium">{option.label}</span>
+                {option.description ? <span className="truncate text-xs text-neutral-500">{option.description}</span> : null}
+              </span>
+            </DropdownMenuCheckboxItem>
+          ))
+        ) : (
+          <div className="px-2 py-3 text-sm text-neutral-500">{loading ? 'Loading' : noOptionsText}</div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function CertPrintBuilderPage() {
   const canPrint = useCertsPermission(FORM_IDS.CERTS_PRINT_EXPORT, PROCESS_IDS.CERTS_PRINT);
   const location = useLocation();
   const initialVesselId = new URLSearchParams(location.search).get('vesselId') ?? '';
   const [scope, setScope] = useState<Exclude<CertPrintScope, 'share_bundle'>>('per_vessel_full');
-  const [vesselIds, setVesselIds] = useState(initialVesselId);
+  const [vesselIds, setVesselIds] = useState<string[]>(initialVesselId ? [initialVesselId] : []);
   const [sections, setSections] = useState('');
-  const [customCertIds, setCustomCertIds] = useState('');
+  const [customCertIds, setCustomCertIds] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [watermark, setWatermark] = useState<CertPrintWatermark>('NONE');
   const [watermarkRecipient, setWatermarkRecipient] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
+  const printSelection = useCertPrintSelectionOptions(canPrint);
   const mutation = useGeneratePrintArtifact();
+  const certificateOptions = buildCertCertificatePickerOptions(printSelection.certificateItems, vesselIds);
 
   if (!canPrint) {
     return <CertsPermissionDenied />;
   }
 
+  const changeVesselIds = (nextVesselIds: string[]) => {
+    setVesselIds(nextVesselIds);
+    if (printSelection.certificateItems.length > 0) {
+      const allowedCertificateIds = new Set(
+        buildCertCertificatePickerOptions(printSelection.certificateItems, nextVesselIds).map((option) => option.value)
+      );
+      setCustomCertIds((current) => current.filter((certificateId) => allowedCertificateIds.has(certificateId)));
+    }
+  };
+
   const submitPrint = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     mutation.mutate({
       scope,
-      vesselIds: parseCsvValues(vesselIds),
+      vesselIds,
       sections: parseCsvValues(sections),
-      customCertIds: parseCsvValues(customCertIds),
+      customCertIds,
       filters: { status: statusFilter },
       watermarkApplied: watermark,
       watermarkRecipient,
@@ -1992,8 +2159,18 @@ function CertPrintBuilderPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="printVessels">Vessel IDs</Label>
-                  <Textarea id="printVessels" value={vesselIds} onChange={(event) => setVesselIds(event.target.value)} rows={2} />
+                  <Label htmlFor="printVessels">Vessels</Label>
+                  <CertMultiSelectDropdown
+                    id="printVessels"
+                    value={vesselIds}
+                    options={printSelection.vesselOptions}
+                    onChange={changeVesselIds}
+                    placeholder="Choose vessels"
+                    fallbackLabel="Vessel"
+                    pluralLabel="vessels"
+                    loading={printSelection.isVesselsLoading}
+                    noOptionsText="No vessels available."
+                  />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
@@ -2014,8 +2191,18 @@ function CertPrintBuilderPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="printCustomCerts">Custom certificate IDs</Label>
-                  <Textarea id="printCustomCerts" value={customCertIds} onChange={(event) => setCustomCertIds(event.target.value)} rows={3} />
+                  <Label htmlFor="printCustomCerts">Certificates</Label>
+                  <CertMultiSelectDropdown
+                    id="printCustomCerts"
+                    value={customCertIds}
+                    options={certificateOptions}
+                    onChange={setCustomCertIds}
+                    placeholder="Choose certificates"
+                    fallbackLabel="Certificate"
+                    pluralLabel="certificates"
+                    loading={printSelection.isCertificatesLoading}
+                    noOptionsText="No certificates available."
+                  />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
@@ -2024,7 +2211,7 @@ function CertPrintBuilderPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="printRecipientEmail">Recipient email</Label>
-                    <Input id="printRecipientEmail" type="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} />
+                    <Input id="printRecipientEmail" type="email" inputMode="email" autoComplete="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} />
                   </div>
                 </div>
                 {mutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(mutation.error)}</p> : null}
@@ -2179,21 +2366,33 @@ function CertShareBundlePage() {
   const canShareBundle = useCertsPermission(FORM_IDS.CERTS_PRINT_EXPORT, PROCESS_IDS.CERTS_EXPORT_BUNDLE);
   const location = useLocation();
   const initialVesselId = new URLSearchParams(location.search).get('vesselId') ?? '';
-  const [vesselIds, setVesselIds] = useState(initialVesselId);
-  const [customCertIds, setCustomCertIds] = useState('');
+  const [vesselIds, setVesselIds] = useState<string[]>(initialVesselId ? [initialVesselId] : []);
+  const [customCertIds, setCustomCertIds] = useState<string[]>([]);
   const [watermarkRecipient, setWatermarkRecipient] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
+  const bundleSelection = useCertPrintSelectionOptions(canShareBundle);
   const mutation = useGenerateShareBundle();
+  const certificateOptions = buildCertCertificatePickerOptions(bundleSelection.certificateItems, vesselIds);
 
   if (!canShareBundle) {
     return <CertsPermissionDenied />;
   }
 
+  const changeVesselIds = (nextVesselIds: string[]) => {
+    setVesselIds(nextVesselIds);
+    if (bundleSelection.certificateItems.length > 0) {
+      const allowedCertificateIds = new Set(
+        buildCertCertificatePickerOptions(bundleSelection.certificateItems, nextVesselIds).map((option) => option.value)
+      );
+      setCustomCertIds((current) => current.filter((certificateId) => allowedCertificateIds.has(certificateId)));
+    }
+  };
+
   const submitBundle = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     mutation.mutate({
-      vesselIds: parseCsvValues(vesselIds),
-      customCertIds: parseCsvValues(customCertIds),
+      vesselIds,
+      customCertIds,
       watermarkRecipient,
       recipientEmail,
     });
@@ -2217,12 +2416,32 @@ function CertShareBundlePage() {
             <CardContent>
               <form className="space-y-4" onSubmit={submitBundle}>
                 <div className="space-y-2">
-                  <Label htmlFor="bundleVessels">Vessel IDs</Label>
-                  <Textarea id="bundleVessels" value={vesselIds} onChange={(event) => setVesselIds(event.target.value)} rows={2} />
+                  <Label htmlFor="bundleVessels">Vessels</Label>
+                  <CertMultiSelectDropdown
+                    id="bundleVessels"
+                    value={vesselIds}
+                    options={bundleSelection.vesselOptions}
+                    onChange={changeVesselIds}
+                    placeholder="Choose vessels"
+                    fallbackLabel="Vessel"
+                    pluralLabel="vessels"
+                    loading={bundleSelection.isVesselsLoading}
+                    noOptionsText="No vessels available."
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bundleCerts">Certificate IDs</Label>
-                  <Textarea id="bundleCerts" value={customCertIds} onChange={(event) => setCustomCertIds(event.target.value)} rows={4} />
+                  <Label htmlFor="bundleCerts">Certificates</Label>
+                  <CertMultiSelectDropdown
+                    id="bundleCerts"
+                    value={customCertIds}
+                    options={certificateOptions}
+                    onChange={setCustomCertIds}
+                    placeholder="Choose certificates"
+                    fallbackLabel="Certificate"
+                    pluralLabel="certificates"
+                    loading={bundleSelection.isCertificatesLoading}
+                    noOptionsText="No certificates available."
+                  />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
@@ -2231,7 +2450,7 @@ function CertShareBundlePage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="bundleEmail">Recipient email</Label>
-                    <Input id="bundleEmail" type="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} />
+                    <Input id="bundleEmail" type="email" inputMode="email" autoComplete="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} />
                   </div>
                 </div>
                 {mutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(mutation.error)}</p> : null}

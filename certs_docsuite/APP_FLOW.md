@@ -481,7 +481,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Per-vessel partial (single vessel, filtered by section / status / cadence)
   - Per-section fleet-wide (single section, all vessels — DPA + FM only per D-CERT-141 / FEAT-CERT-PRT-021)
   - Custom selection (multi-select cert rows from in-scope vessels)
-- Step 2 — **Filters & options:** sections, status bands, cadence, vessel pickers (depending on scope); watermark toggle (DPA can override default scope-driven watermark per D-CERT-138 / FEAT-CERT-PRT-018); recipient field (optional, opt-in email per D-CERT-149 / FEAT-CERT-PRT-032).
+- Step 2 — **Filters & options:** sections, status bands, cadence, vessel dropdowns by vessel name/code/IMO (depending on scope), and certificate dropdowns by certificate name/number for custom selection; watermark toggle (DPA can override default scope-driven watermark per D-CERT-138 / FEAT-CERT-PRT-018); recipient email field with browser email-format validation (optional, opt-in email per D-CERT-149 / FEAT-CERT-PRT-032).
 - Step 3 — **Preview & generate:** sample first page rendering with `print_id` placeholder; "Generate" button.
 - During generation: progress bar for sync per-vessel scope ("Generating PDF (page X of Y)…", hard cap 60s per D-CERT-144 / FEAT-CERT-PRT-025); for fleet-wide async, "Submitted — you'll be notified when ready" + queue position.
 - On success: download buttons (PDF + Excel companion); confirmation that artifact is auto-archived in vessel-scoped "Archived Reports" folder; if recipient email entered, "Email sent to <addr>".
@@ -517,9 +517,10 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Purpose:** Generate ZIP bundle (manifest PDF + cert PDFs) for outbound distribution to charterers / port agents / vetting / P&I (D-CERT-145 / FEAT-CERT-PRT-026).
 
 **Layout:**
-- Vessel picker (own vessel for Master; any for DPA/FM).
-- Cert selection table: bulk + single multi-select (D-CERT-096 / FEAT-CERT-PRT-027) with section grouping, expiry status visible.
+- Vessel dropdown by vessel name/code/IMO (own vessel for Master; any for DPA/FM).
+- Certificate dropdown by certificate name/number: bulk + single multi-select (D-CERT-096 / FEAT-CERT-PRT-027) with section grouping, expiry status visible.
 - Recipient name field (optional; populates `MASTER COPY` watermark recipient per D-CERT-138).
+- Recipient email field uses browser email-format validation.
 - "Generate ZIP" button → `VIMS_CertBundle_<vessel_name>_<yyyymmdd>_<print_id>.zip` (D-CERT-145 / FEAT-CERT-PRT-028).
 - Inside ZIP: manifest PDF (cert title, issuer, issue date, expiry, file reference) + cert PDFs.
 

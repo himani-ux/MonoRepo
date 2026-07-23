@@ -108,16 +108,19 @@
 ### 2.4 Generating a fleet-wide section print (DPA / FM)
 1. `/certs/print` → Choose scope: "Per-section fleet-wide".
 2. Pick section (e.g. "Statutory & Flag").
-3. Generate (async; ETA shown). You'll be notified in-app + Slack when ready.
-4. Download PDF + Excel companion.
+3. Choose vessels by vessel name if the scope asks for vessels. For custom selection, choose certificates by certificate name/number.
+4. Enter recipient email only if you want an emailed copy; the field checks email format before submit.
+5. Generate (async; ETA shown). You'll be notified in-app + Slack when ready.
+6. Download PDF + Excel companion.
 
 ### 2.5 Sharing certs with a port agent (Master)
 1. `/certs/share-bundle`.
-2. Multi-select the certs to share (e.g. all certs needed for upcoming PSC inspection).
-3. Enter recipient name (port agent).
-4. "Generate ZIP".
-5. Bundle filename: `VIMS_CertBundle_<vessel>_<yyyymmdd>_<print_id>.zip`.
-6. Share via your usual channel (email, etc.); recipient sees manifest + cert PDFs.
+2. Choose the vessel by name if a vessel choice is shown.
+3. Multi-select the certs to share by certificate name/number (e.g. all certs needed for upcoming PSC inspection).
+4. Enter recipient name (port agent) and recipient email if needed; the email field checks format before submit.
+5. "Generate ZIP".
+6. Bundle filename: `VIMS_CertBundle_<vessel>_<yyyymmdd>_<print_id>.zip`.
+7. Share via your usual channel (email, etc.); recipient sees manifest + cert PDFs.
 
 ### 2.6 Acknowledging a critical alert via email (Master at sea)
 1. Email arrives: "[VIMS Certs] URGENT — IOPP expires in 7 days — YC FORTITUDE".

@@ -60,4 +60,20 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).not.toContain('<span className="text-neutral-500">Days: </span>');
     expect(certsRouteSource).toContain("ST: 'Short term'");
   });
+
+  it('test_print_and_share_forms_use_pickers_and_email_validation', () => {
+    expect(certsRouteSource).toContain('function CertMultiSelectDropdown');
+    expect(certsRouteSource).toContain('<Label htmlFor="printVessels">Vessels</Label>');
+    expect(certsRouteSource).toContain('<Label htmlFor="bundleVessels">Vessels</Label>');
+    expect(certsRouteSource).toContain('<Label htmlFor="printCustomCerts">Certificates</Label>');
+    expect(certsRouteSource).toContain('<Label htmlFor="bundleCerts">Certificates</Label>');
+    expect(certsRouteSource).toContain('placeholder="Choose vessels"');
+    expect(certsRouteSource).toContain('placeholder="Choose certificates"');
+    expect(certsRouteSource).toContain('<Input id="printRecipientEmail" type="email" inputMode="email" autoComplete="email"');
+    expect(certsRouteSource).toContain('<Input id="bundleEmail" type="email" inputMode="email" autoComplete="email"');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="printVessels">Vessel IDs</Label>');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="bundleVessels">Vessel IDs</Label>');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="printCustomCerts">Custom certificate IDs</Label>');
+    expect(certsRouteSource).not.toContain('<Label htmlFor="bundleCerts">Certificate IDs</Label>');
+  });
 });
