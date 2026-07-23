@@ -112,6 +112,34 @@ def serialize_reconciliation_flag(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def serialize_master_reconciliation_message(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("flag_id")),
+        "runId": str(row["run_id"]) if row.get("run_id") else None,
+        "snapshotId": str(row["snapshot_id"]) if row.get("snapshot_id") else None,
+        "vesselId": str(row["vessel_id"]) if row.get("vessel_id") else None,
+        "vesselName": row.get("vessel_name"),
+        "imo": row.get("imo_number"),
+        "classSociety": row.get("class_society"),
+        "printedOnDate": row.get("printed_on_date"),
+        "ranAt": row.get("ran_at"),
+        "bucket": row.get("bucket"),
+        "catalogId": str(row["catalog_id"]) if row.get("catalog_id") else None,
+        "catalogDisplayName": row.get("catalog_display_name"),
+        "trackedItemId": str(row["tracked_item_id"]) if row.get("tracked_item_id") else None,
+        "classRowExtract": _json_object(row.get("class_row_extract_json")),
+        "diff": _json_object(row.get("diff_json")) or {},
+        "officeNotifiedAt": row.get("office_notified_at") or row.get("reviewed_at"),
+        "officeNotifiedBy": row.get("office_notified_by") or row.get("reviewed_by"),
+        "officeNotifiedRole": row.get("office_notified_role"),
+        "officeNote": row.get("office_note"),
+        "masterReviewedAt": row.get("master_reviewed_at"),
+        "masterReviewedBy": row.get("master_reviewed_by"),
+        "masterReviewedRole": row.get("master_reviewed_role"),
+        "masterReviewNote": row.get("master_review_note"),
+    }
+
+
 def _json_object(value: Any) -> dict[str, Any] | list[Any] | None:
     if not value:
         return None

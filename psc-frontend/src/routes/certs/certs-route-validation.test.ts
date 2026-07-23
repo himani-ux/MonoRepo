@@ -46,4 +46,12 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).not.toContain('Class snapshot extract');
     expect(certsRouteSource).not.toContain('Add to ClassCodeMapping');
   });
+
+  it('test_ship_side_master_messages_page_is_routed_and_plain_language', () => {
+    expect(certsRouteSource).toContain('if (path === ROUTES.CERTS_MASTER_MESSAGES)');
+    expect(certsRouteSource).toContain('function CertMasterMessagesPage');
+    expect(certsRouteSource).toContain('Office review messages');
+    expect(certsRouteSource).toContain('Class status messages from office');
+    expect(certsRouteSource).toContain('Mark reviewed');
+  });
 });

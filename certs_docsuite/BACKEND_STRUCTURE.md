@@ -653,9 +653,11 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | POST | `/api/certs/class-snapshots/<id>/rollback/` | CERT_P_010 | Marine Sup'tt + DPA | Wrong-vessel rollback (D-CERT-058) |
 | GET | `/api/certs/reconciliation/runs/` | (read-vessel) | Per RBAC | List runs |
 | GET | `/api/certs/reconciliation/runs/<run_id>/` | (read-vessel) | Per RBAC | Detail + flags |
-| POST | `/api/certs/reconciliation/flags/<flag_id>/notify-master/` | CERT_P_002 | Marine Sup'tt + DPA | Fire alert |
+| POST | `/api/certs/reconciliation/flags/<flag_id>/notify-master/` | CERT_P_002 | Marine Sup'tt + DPA | Mark the flag as sent to Master and audit the office note |
 | POST | `/api/certs/reconciliation/flags/<flag_id>/mark-reviewed/` | CERT_P_002 | Marine Sup'tt + DPA | Resolve |
 | POST | `/api/certs/reconciliation/flags/<flag_id>/add-mapping/` | CERT_P_008 | DPA | Update ClassCodeMapping |
+| GET | `/api/certs/reconciliation/master-messages/` | (read-vessel) | Vessel users with CERT_F_003 | List own-vessel office messages created by Notify Master; reviewed messages are hidden unless `includeReviewed=true` |
+| POST | `/api/certs/reconciliation/master-messages/<flag_id>/ack/` | (read-vessel) | Master own vessel | Record vessel Master review note in audit log; does not update certificate validity |
 
 ### 5.4 Onboarding
 | Method | Path | Process ID | Roles | Notes |
@@ -746,6 +748,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### `services/reconciliation.py`
 - `reconcile(snapshot_id) â†’ ReconciliationRun` â€” applies ClassCodeMapping (versioned per D-CERT-061), buckets into Match / Mismatch / Missing-in-catalog / Missing-in-class / Conditional-STC / Extended-Postponed / Unmapped-low-conf.
 - Anomaly detection per D-CERT-073; raises critical events when thresholds breached.
+- `review_flag(..., action='notified_master')` is the office-side source for Master messages. Vessel-side message APIs read flags with `resolution_action='notified_master'` and audit-log reason text, then record Master acknowledgement as an audit event with `resolution_action='master_reviewed'`. This acknowledgement does not write tracked-item validity fields.
 
 ### `class_code_mapping_seed.py`
 - Stores approved baseline ClassCodeMapping rows. Current shipped baseline is KR from the Ayuthya class-status PDF; no NK/BV baseline is seeded until approved reference data is available.

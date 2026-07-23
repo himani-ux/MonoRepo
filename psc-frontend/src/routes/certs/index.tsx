@@ -95,7 +95,9 @@ import {
 } from '@/hooks/certs/use-print';
 import {
   useAddClassCodeMappingForFlag,
+  useAcknowledgeMasterReconciliationMessage,
   useClassSnapshots,
+  useMasterReconciliationMessages,
   useMarkReconciliationFlagReviewed,
   useNotifyMasterForReconciliationFlag,
   useReconciliationRun,
@@ -136,6 +138,7 @@ import {
   type CertGapFillPdf,
   type CertOnboardingBatch,
   type CertOnboardingHubRow,
+  type CertMasterReconciliationMessage,
   type CertReconciliationAnomalyBreach,
   type CertReconciliationFlag,
   type CertReconciliationRun,
@@ -2308,12 +2311,15 @@ function CertVesselDashboardError({ message, onRetry }: { message: string; onRet
 
 function CertVesselDashboardPage({ imo }: { imo: string }) {
   const canReadTrackedItems = useCertsPermission(FORM_IDS.CERTS_TRACKED_ITEMS);
+  const canReadReconciliation = useCertsPermission(FORM_IDS.CERTS_RECONCILIATION);
   const canPrint = useCertsPermission(FORM_IDS.CERTS_PRINT_EXPORT, PROCESS_IDS.CERTS_PRINT);
   const canShareBundle = useCertsPermission(FORM_IDS.CERTS_PRINT_EXPORT, PROCESS_IDS.CERTS_EXPORT_BUNDLE);
   const auth = useAuth();
   const role = String(auth.role ?? auth.user?.role_name ?? auth.user?.safety_role_name ?? '').trim().toUpperCase();
   const canShareThisVessel = canShareBundle && ['MASTER', 'VESSEL_MASTER', 'DPA', 'FM', 'FLEET MANAGER'].some((marker) => role.includes(marker));
   const dashboard = useVesselDashboard(canReadTrackedItems ? imo : undefined);
+  const showOfficeMessages = auth.isVessel && canReadReconciliation;
+  const officeMessages = useMasterReconciliationMessages({ pageSize: 10 }, showOfficeMessages);
   const [statusFilter, setStatusFilter] = useState('all');
   const [sectionFilter, setSectionFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
@@ -2360,6 +2366,7 @@ function CertVesselDashboardPage({ imo }: { imo: string }) {
           canShareBundle={canShareThisVessel}
         />
         <CertVesselSpecialBanners data={data} imo={imo} />
+        <CertVesselOfficeMessagesCard enabled={showOfficeMessages} messages={officeMessages.data?.results ?? []} isLoading={officeMessages.isLoading} />
         <CertVesselKpis data={data} />
         <CertVesselFilters
           sections={data.sections}
@@ -6400,6 +6407,33 @@ function getClassReportReviewFields(flag: CertReconciliationFlag): Array<{ label
   ].filter((field) => hasDisplayValue(field.value));
 }
 
+function formatMasterMessageTitle(message: CertMasterReconciliationMessage): string {
+  const extract = normalizeRecord(message.classRowExtract);
+  const displayName = cleanDisplayValue(extract?.display_name ?? extract?.displayName ?? extract?.name);
+  const code = cleanDisplayValue(extract?.class_code_or_name ?? extract?.classCodeOrName ?? extract?.class_code);
+  if (displayName && code && !displayName.includes(code)) return `${displayName} (${code})`;
+  return displayName || code || message.catalogDisplayName || 'Class status item';
+}
+
+function getMasterMessageClassFields(message: CertMasterReconciliationMessage): Array<{ label: string; value: unknown }> {
+  const extract = normalizeRecord(message.classRowExtract);
+  if (!extract) return [];
+  const displayName = cleanDisplayValue(extract.display_name ?? extract.displayName ?? extract.name);
+  const code = cleanDisplayValue(extract.class_code_or_name ?? extract.classCodeOrName ?? extract.class_code);
+  return [
+    { label: 'Vessel', value: message.vesselName ?? message.imo },
+    { label: 'Class', value: message.classSociety ?? extract.class_society ?? extract.classSociety },
+    { label: 'Item', value: displayName && code && !displayName.includes(code) ? `${displayName} (${code})` : displayName || code },
+    { label: 'Section in class report', value: extract.source_section ?? extract.sourceSection },
+    { label: 'Issue date', value: extract.issue_date ?? extract.issueDate },
+    { label: 'Expiry date', value: extract.expiry_date ?? extract.expiryDate },
+    { label: 'Last done', value: extract.last_done_date ?? extract.lastDoneDate },
+    { label: 'Next due', value: extract.next_due_date ?? extract.nextDueDate },
+    { label: 'Postponed until', value: extract.postponed_until ?? extract.postponedUntil },
+    { label: 'Text found in class report', value: extract.raw_text ?? extract.rawText },
+  ].filter((field) => hasDisplayValue(field.value));
+}
+
 function cleanDisplayValue(value: unknown): string {
   return String(value ?? '').trim();
 }
@@ -7090,6 +7124,10 @@ function CertsRouteContent() {
     return <CertCatalogAdminPage rowId={rowId} />;
   }
 
+  if (path === ROUTES.CERTS_MASTER_MESSAGES) {
+    return <CertMasterMessagesPage />;
+  }
+
   if (path === ROUTES.CERTS_RECONCILIATION) {
     return <CertReconciliationDashboardPage />;
   }
@@ -7177,6 +7215,204 @@ export function CertsDashboardStubPage() {
     <div className="certs-theme">
       <CertsRouteContent />
     </div>
+  );
+}
+
+function CertVesselOfficeMessagesCard({
+  enabled,
+  messages,
+  isLoading,
+}: {
+  enabled: boolean;
+  messages: CertMasterReconciliationMessage[];
+  isLoading: boolean;
+}) {
+  if (!enabled) return null;
+  const pendingCount = messages.filter((message) => !message.masterReviewedAt).length;
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-warning-50 text-warning-700">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-neutral-900">Office review messages</h2>
+            <p className="text-sm text-neutral-600">
+              {isLoading
+                ? 'Checking for office messages.'
+                : pendingCount > 0
+                  ? `${pendingCount} message${pendingCount === 1 ? '' : 's'} from office need review.`
+                  : 'No pending office messages.'}
+            </p>
+          </div>
+        </div>
+        <Button asChild variant={pendingCount > 0 ? 'default' : 'outline'}>
+          <Link to={ROUTES.CERTS_MASTER_MESSAGES}>Open messages</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CertMasterMessagesPage() {
+  const canRead = useCertsPermission(FORM_IDS.CERTS_RECONCILIATION);
+  const auth = useAuth();
+  const [includeReviewed, setIncludeReviewed] = useState(false);
+  const messages = useMasterReconciliationMessages({ includeReviewed, pageSize: 100 }, canRead && auth.isVessel);
+  const canAcknowledgeMessages = isMasterRole(normalizeAuthRole(auth));
+
+  if (!canRead || !auth.isVessel) {
+    return <CertsPermissionDenied />;
+  }
+
+  return (
+    <RootLayout>
+      <PageHeader title="Office Review Messages" />
+      <div className="space-y-4 p-4">
+        <Card>
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-neutral-900">Class status messages from office</h2>
+              <p className="text-sm text-neutral-600">Review the items office sent after checking the class status PDF.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-neutral-700">
+              <Checkbox checked={includeReviewed} onCheckedChange={(checked) => setIncludeReviewed(Boolean(checked))} />
+              Show reviewed messages
+            </label>
+          </CardContent>
+        </Card>
+
+        {messages.isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-36 w-full" />
+            <Skeleton className="h-36 w-full" />
+          </div>
+        ) : messages.isError ? (
+          <CertsInlineError
+            title="Could not load office messages"
+            message={getErrorMessage(messages.error)}
+            onRetry={() => messages.refetch()}
+          />
+        ) : !messages.data?.results.length ? (
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-neutral-600">
+              {includeReviewed ? 'No office messages found.' : 'No pending office messages.'}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {messages.data.results.map((message) => (
+              <CertMasterMessageCard key={message.id} message={message} canAcknowledge={canAcknowledgeMessages && !message.masterReviewedAt} />
+            ))}
+          </div>
+        )}
+      </div>
+    </RootLayout>
+  );
+}
+
+function CertMasterMessageCard({
+  message,
+  canAcknowledge,
+}: {
+  message: CertMasterReconciliationMessage;
+  canAcknowledge: boolean;
+}) {
+  const [note, setNote] = useState('');
+  const acknowledge = useAcknowledgeMasterReconciliationMessage();
+  const diffRows = Object.entries(message.diff ?? {});
+  const classFields = getMasterMessageClassFields(message);
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={message.masterReviewedAt ? 'success' : 'warning'}>
+                {message.masterReviewedAt ? 'Reviewed' : 'Needs review'}
+              </Badge>
+              <Badge variant="secondary">{formatReconciliationBucketLabel(message.bucket)}</Badge>
+            </div>
+            <h2 className="text-base font-semibold text-neutral-900">{formatMasterMessageTitle(message)}</h2>
+            <p className="text-sm text-neutral-600">
+              Sent {formatDateTime(message.officeNotifiedAt)} by {formatPrincipalLabel(undefined, message.officeNotifiedBy, undefined, 'office')}
+            </p>
+          </div>
+          {message.trackedItemId && message.imo ? (
+            <Button asChild size="sm" variant="outline">
+              <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(message.imo, message.trackedItemId)}>Open certificate</Link>
+            </Button>
+          ) : null}
+        </div>
+
+        <section className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+          <h3 className="text-sm font-semibold text-neutral-900">Office note</h3>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-700">{message.officeNote || 'No note added.'}</p>
+        </section>
+
+        {diffRows.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-neutral-200 text-sm">
+              <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase text-neutral-500">
+                <tr>
+                  <th className="px-3 py-2">Item</th>
+                  <th className="px-3 py-2">VIMS record</th>
+                  <th className="px-3 py-2">Class report</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {diffRows.map(([field, value]) => {
+                  const diff = normalizeRecord(value);
+                  return (
+                    <tr key={field}>
+                      <td className="px-3 py-2 font-medium text-neutral-900">{humanizeKey(field)}</td>
+                      <td className="px-3 py-2 text-neutral-700">{formatUnknown(diff?.tracked ?? diff?.catalog ?? 'not set')}</td>
+                      <td className="px-3 py-2 text-neutral-700">{formatUnknown(diff?.class ?? diff?.snapshot ?? value)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : classFields.length > 0 ? (
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            {classFields.map((field) => (
+              <CertReconciliationDefinition key={field.label} label={field.label} value={field.value} />
+            ))}
+          </dl>
+        ) : null}
+
+        {message.masterReviewedAt ? (
+          <div className="rounded-md border border-success-200 bg-success-50 p-3 text-sm text-success-800">
+            Reviewed {formatDateTime(message.masterReviewedAt)}
+            {message.masterReviewNote ? ` - ${message.masterReviewNote}` : ''}
+          </div>
+        ) : canAcknowledge ? (
+          <div className="space-y-3 border-t border-neutral-200 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor={`masterReviewNote-${message.id}`}>Review note</Label>
+              <Textarea
+                id={`masterReviewNote-${message.id}`}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Add a short note for office"
+              />
+            </div>
+            {acknowledge.error ? <p className="text-sm text-error-700">{getErrorMessage(acknowledge.error)}</p> : null}
+            <Button
+              type="button"
+              disabled={acknowledge.isPending}
+              onClick={() => acknowledge.mutate({ messageId: message.id, note })}
+            >
+              <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden="true" />
+              Mark reviewed
+            </Button>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

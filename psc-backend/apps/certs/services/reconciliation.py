@@ -453,6 +453,53 @@ def _fetch_one(cursor) -> dict[str, Any] | None:
     return rows[0] if rows else None
 
 
+def _master_message_select_sql() -> str:
+    return """
+        SELECT
+            f.flag_id, f.run_id, f.bucket, f.catalog_id, c.display_name AS catalog_display_name,
+            f.tracked_item_id, f.class_row_extract_json, f.diff_json,
+            f.reviewed_by, f.reviewed_at, f.resolution_action, f.resolved_at,
+            r.snapshot_id, r.ran_at,
+            s.vessel_id, v.vesselName AS vessel_name, v.imoNumber AS imo_number,
+            s.class_society, s.printed_on_date,
+            office_review.timestamp_utc AS office_notified_at,
+            office_review.actor_user_id AS office_notified_by,
+            office_review.actor_role AS office_notified_role,
+            office_review.reason AS office_note,
+            master_review.timestamp_utc AS master_reviewed_at,
+            master_review.actor_user_id AS master_reviewed_by,
+            master_review.actor_role AS master_reviewed_role,
+            master_review.reason AS master_review_note
+        FROM dbo.vims_certs_reconciliation_flag f
+        INNER JOIN dbo.vims_certs_reconciliation_run r ON r.run_id = f.run_id
+        INNER JOIN dbo.vims_certs_class_status_snapshot s ON s.snapshot_id = r.snapshot_id
+        LEFT JOIN dbo.VesselData v ON v.id = s.vessel_id
+        LEFT JOIN dbo.vims_certs_catalog_row c ON c.catalog_id = f.catalog_id
+        OUTER APPLY (
+            SELECT TOP 1
+                a.timestamp_utc, a.actor_user_id, a.actor_role, a.reason
+            FROM dbo.vims_certs_audit_log a
+            WHERE a.entity_type = N'reconciliation_flag'
+              AND a.entity_id = f.flag_id
+              AND a.action = N'reconciliation_review'
+              AND ISJSON(a.event_metadata) = 1
+              AND JSON_VALUE(a.event_metadata, '$.resolution_action') = N'notified_master'
+            ORDER BY a.timestamp_utc DESC
+        ) office_review
+        OUTER APPLY (
+            SELECT TOP 1
+                a.timestamp_utc, a.actor_user_id, a.actor_role, a.reason
+            FROM dbo.vims_certs_audit_log a
+            WHERE a.entity_type = N'reconciliation_flag'
+              AND a.entity_id = f.flag_id
+              AND a.action = N'reconciliation_review'
+              AND ISJSON(a.event_metadata) = 1
+              AND JSON_VALUE(a.event_metadata, '$.resolution_action') = N'master_reviewed'
+            ORDER BY a.timestamp_utc DESC
+        ) master_review
+    """
+
+
 class ReconciliationRepository:
     def list_runs(
         self,
@@ -568,6 +615,64 @@ class ReconciliationRepository:
                 INNER JOIN dbo.vims_certs_reconciliation_run r ON r.run_id = f.run_id
                 INNER JOIN dbo.vims_certs_class_status_snapshot s ON s.snapshot_id = r.snapshot_id
                 WHERE f.flag_id = %s
+                """,
+                [flag_id],
+            )
+            return _fetch_one(cursor)
+
+    def list_master_messages(
+        self,
+        *,
+        vessel_id: str,
+        include_reviewed: bool = False,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        safe_page = max(int(page or 1), 1)
+        safe_page_size = max(1, min(int(page_size or 50), 100))
+        offset = (safe_page - 1) * safe_page_size
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                WITH messages AS (
+                    {_master_message_select_sql()}
+                    WHERE s.vessel_id = %s
+                      AND f.resolution_action = N'notified_master'
+                )
+                SELECT COUNT(*)
+                FROM messages
+                WHERE (%s = 1 OR master_reviewed_at IS NULL)
+                """,
+                [vessel_id, int(include_reviewed)],
+            )
+            count = int(cursor.fetchone()[0] or 0)
+            cursor.execute(
+                f"""
+                WITH messages AS (
+                    {_master_message_select_sql()}
+                    WHERE s.vessel_id = %s
+                      AND f.resolution_action = N'notified_master'
+                )
+                SELECT *
+                FROM messages
+                WHERE (%s = 1 OR master_reviewed_at IS NULL)
+                ORDER BY
+                    CASE WHEN master_reviewed_at IS NULL THEN 0 ELSE 1 END,
+                    COALESCE(office_notified_at, reviewed_at) DESC,
+                    flag_id
+                OFFSET {offset} ROWS FETCH NEXT {safe_page_size} ROWS ONLY
+                """,
+                [vessel_id, int(include_reviewed)],
+            )
+            return {"count": count, "results": _fetch_all(cursor)}
+
+    def get_master_message(self, flag_id: str) -> dict[str, Any] | None:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                {_master_message_select_sql()}
+                WHERE f.flag_id = %s
+                  AND f.resolution_action = N'notified_master'
                 """,
                 [flag_id],
             )

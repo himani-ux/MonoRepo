@@ -5,6 +5,7 @@ import {
   type CertAddClassMappingPayload,
   type CertClassSnapshotFilters,
   type CertClassSnapshotUploadPayload,
+  type CertMasterReconciliationMessageFilters,
   type CertReconciliationRunFilters,
 } from '@/lib/api/certs';
 
@@ -14,6 +15,8 @@ export const certReconciliationKeys = {
   snapshot: (id: string) => [...certReconciliationKeys.all, 'snapshot', id] as const,
   runs: (filters: CertReconciliationRunFilters = {}) => [...certReconciliationKeys.all, 'runs', filters] as const,
   run: (id: string) => [...certReconciliationKeys.all, 'run', id] as const,
+  masterMessages: (filters: CertMasterReconciliationMessageFilters = {}) =>
+    [...certReconciliationKeys.all, 'master-messages', filters] as const,
 };
 
 export function useClassSnapshots(filters: CertClassSnapshotFilters = {}) {
@@ -46,6 +49,18 @@ export function useReconciliationRun(id: string | undefined) {
     queryKey: certReconciliationKeys.run(id ?? ''),
     queryFn: () => certsApi.getReconciliationRun(id!),
     enabled: Boolean(id),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useMasterReconciliationMessages(
+  filters: CertMasterReconciliationMessageFilters = {},
+  enabled = true
+) {
+  return useQuery({
+    queryKey: certReconciliationKeys.masterMessages(filters),
+    queryFn: () => certsApi.getMasterReconciliationMessages(filters),
+    enabled,
     staleTime: 60 * 1000,
   });
 }
@@ -97,6 +112,17 @@ export function useNotifyMasterForReconciliationFlag(runId: string | undefined) 
       if (runId) {
         queryClient.invalidateQueries({ queryKey: certReconciliationKeys.run(runId) });
       }
+      queryClient.invalidateQueries({ queryKey: certReconciliationKeys.all });
+    },
+  });
+}
+
+export function useAcknowledgeMasterReconciliationMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, note }: { messageId: string; note: string }) =>
+      certsApi.acknowledgeMasterReconciliationMessage(messageId, note),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: certReconciliationKeys.all });
     },
   });

@@ -39,6 +39,8 @@ from apps.certs.views import (
     ReconciliationFlagAddMappingView,
     ReconciliationFlagMarkReviewedView,
     ReconciliationFlagNotifyMasterView,
+    ReconciliationMasterMessageAcknowledgeView,
+    ReconciliationMasterMessageListView,
     ReconciliationRunDetailView,
     ReconciliationRunListView,
     SettingsView,
@@ -123,6 +125,16 @@ urlpatterns = [
     path("auditor-access/<uuid:grant_id>/", AuditorAccessDetailView.as_view(), name="auditor-access-detail"),
     path("reconciliation/runs/", ReconciliationRunListView.as_view(), name="reconciliation-runs"),
     path("reconciliation/runs/<str:run_id>/", ReconciliationRunDetailView.as_view(), name="reconciliation-run-detail"),
+    path(
+        "reconciliation/master-messages/",
+        ReconciliationMasterMessageListView.as_view(),
+        name="reconciliation-master-messages",
+    ),
+    path(
+        "reconciliation/master-messages/<str:flag_id>/ack/",
+        ReconciliationMasterMessageAcknowledgeView.as_view(),
+        name="reconciliation-master-message-ack",
+    ),
     path(
         "reconciliation/flags/<str:flag_id>/notify-master/",
         ReconciliationFlagNotifyMasterView.as_view(),

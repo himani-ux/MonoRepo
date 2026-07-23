@@ -17,6 +17,8 @@
 - **Sharing certs externally:** Use `/certs/share-bundle` → multi-select certs → enter recipient name → "Generate ZIP". Recipient gets manifest PDF + cert PDFs.
 - **Magic-link email ack:** When you get an email alert, tap "Acknowledge" — single-use link, expires in 24h.
 
+**Office class-status messages:** Open the "Office review messages" card on your vessel certificate dashboard, or go to `/certs/master-messages`, to see items office sent after checking a Class Status PDF. Add a short note and click "Mark reviewed" after checking the item onboard.
+
 ### 1.2 C/O / C/E / 2/E (onboard sub-officers)
 - You can upload certificate updates for any certificate on your vessel when your login has Certs write access.
 - Every upload you submit goes to the Master for approval before it becomes final.
@@ -29,6 +31,7 @@
 - **Catalog edits:** `/certs/catalog` → add / deprecate / push to fleet. New rows save as all-rank-with-Master-approval, and all changes are audited.
 - **Onboarding new vessel:** `/certs/onboarding` → start wizard → 7 steps. Use save-as-draft between batches; takes 2–4 hours per vessel total.
 - **Class status snapshot upload:** every 3 months per vessel. Open `/certs/reconciliation` or the vessel page → "Upload class snapshot" → select the vessel by name/code → confirm the class selector (auto-filled when the vessel's class is NK/KR/BV) → upload the latest official Class Status or Vessel Status PDF downloaded/exported from the class society portal. This must be the full class-status report for the vessel, not an individual certificate PDF. Upload starts parsing and comparison automatically; text-selectable PDFs use direct extraction, and image-only portal PDFs use OCR fallback. Use Reparse when a stored PDF needs retry after a parser or mapping correction.
+- **Notify Master from class-status review:** on `/certs/reconciliation/<run_id>`, use "Notify Master" only when the vessel needs to check an item. The selected item appears on the vessel side under Office review messages. "Mark reviewed" is office-only and does not send a vessel message.
 - **KR class-code baseline:** before reviewing KR snapshots, make sure the approved KR mapping seed has been applied. This lets the system compare parsed KR rows with VIMS certificate rows instead of showing them as not set up in the catalog. Mapping corrections still go through the normal DPA mapping edit path.
 - **Provisioning external auditors:** `/certs/auditor-access` → "New grant" → set scope + expiry. System emails auditor a one-time signup link.
 - **Settings:** `/certs/settings` to tune alert lead times, OCR thresholds, Slack routing.
@@ -127,7 +130,13 @@
 2. Open `/certs/reconciliation/<run_id>`.
 3. Review groups across the top: Already matched / Details differ / Needs setup in VIMS / Not found in class report / etc.
 4. Per item: compare the VIMS certificate record with the class report item. Actions: "Notify Master", "Mark reviewed", "Ask vessel to update", or "Link to VIMS certificate type" (DPA only).
-5. Master receives the notification → updates the cert from their side.
+5. If office clicks "Notify Master", the item appears for the vessel under Office review messages (`/certs/master-messages`). The Master reviews the office note and marks it reviewed after checking onboard records.
+
+### 2.7a Reviewing office class-status messages (Master)
+1. Open the "Office review messages" card on your vessel certificate dashboard, or go to `/certs/master-messages`.
+2. Read the office note and compare the VIMS record with the class report values shown on the card.
+3. Open the certificate if the card includes a link.
+4. Add a short note for office and click "Mark reviewed" after checking the onboard file. This records your review only; it does not change certificate validity or expiry dates.
 
 ### 2.8 Decommissioning a vessel (DPA)
 1. Vessel Profile → "Decommission" button.

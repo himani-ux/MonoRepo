@@ -185,6 +185,7 @@ export const ROUTES = {
   CERTS_VESSEL_DASHBOARD: (imo: string) => `/certs/vessels/${imo}`,
   CERTS_VESSEL_PROFILE: (imo: string) => `/certs/vessels/${imo}/profile`,
   CERTS_TRACKED_ITEM_DETAIL: (imo: string, id: string) => `/certs/vessels/${imo}/cert/${id}`,
+  CERTS_MASTER_MESSAGES: '/certs/master-messages',
   CERTS_RECONCILIATION: '/certs/reconciliation',
   CERTS_PARSER_OPS: '/certs/reconciliation/parser-ops',
   CERTS_RECONCILIATION_RUN: (id: string) => `/certs/reconciliation/${id}`,

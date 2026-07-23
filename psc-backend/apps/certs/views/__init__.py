@@ -35,6 +35,8 @@ from .reconciliation_views import (
     ReconciliationFlagAddMappingView,
     ReconciliationFlagMarkReviewedView,
     ReconciliationFlagNotifyMasterView,
+    ReconciliationMasterMessageAcknowledgeView,
+    ReconciliationMasterMessageListView,
     ReconciliationRunDetailView,
     ReconciliationRunListView,
 )
@@ -112,6 +114,8 @@ __all__ = [
     "ReconciliationFlagMarkReviewedView",
     "ReconciliationFlagAddMappingView",
     "ReconciliationFlagNotifyMasterView",
+    "ReconciliationMasterMessageAcknowledgeView",
+    "ReconciliationMasterMessageListView",
     "ReconciliationRunDetailView",
     "ReconciliationRunListView",
     "SettingsView",

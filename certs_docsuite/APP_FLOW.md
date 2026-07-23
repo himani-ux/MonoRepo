@@ -24,6 +24,7 @@
    - 3.8 Gap-Fill UI `/certs/onboarding/<imo>/batch/<batch_id>/gap-fill`
    - 3.9 Reconciliation Dashboard `/certs/reconciliation`
    - 3.10 Reconciliation Review (3-panel) `/certs/reconciliation/<run_id>`
+   - 3.10a Office Review Messages `/certs/master-messages`
    - 3.11 Print Builder `/certs/print`
    - 3.12 Print History `/certs/print/history`
    - 3.13 Master Share-Bundle `/certs/share-bundle`
@@ -64,6 +65,8 @@ Top-level VIMS nav (existing)
    │   └─ Grant detail        → /certs/auditor-access/<grant_id>
    ├─ Audit Log               → /certs/audit-log (DPA + FM full; Sup'tts own-vessel)
    └─ Settings                → /certs/settings (DPA only)
+
+Ship-side office review messages route: `/certs/master-messages` for vessel users with Certs reconciliation read access.
 
 Notification Inbox (shared platform bell)
    - Filter: "Module = Certs" surfaces vims_certs_notification_meta-tagged rows from master_notification
@@ -106,6 +109,8 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 | 3.20 External Auditor Portal | — (uses portal as themselves only via test grant) | — | — | — | — | — | — | — | RW within scope |
 
 **Notation:** `RW` = read+write; `R` = read-only; `assigned` = vessels per `master_RoleByVessel`; `own vessel` = `vessel.master_user_id = current_user OR vessel.<role>_user_id = current_user`; `scoped` = per `vims_certs_external_auditor_access.scope_json`.
+
+**3.10a Office Review Messages permission note:** `/certs/master-messages` is vessel-side only. Vessel users with `CERT_F_003` can read own-vessel office messages; only the Master can mark a message reviewed.
 
 ---
 
@@ -210,6 +215,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - Per-section table: expanded by default for sections with action items (overdue / window_open / window_closing); collapsed for healthy sections.
 - Per-row columns use user-facing certificate language: Certificate, Cert number, Issued by, Issue date, Expiry date, Days, Status, Valid for, and Action. Internal labels such as tracked item, PDF, validity type, and class-tracked are not shown on the normal vessel dashboard; where needed they are translated to certificate-focused wording such as certificate file, fixed expiry, survey based, or class certificates.
 - Toolbar: "Print this vessel" (D-CERT-140 per-vessel scope), "Share bundle" (Master self / DPA / FM only per D-CERT-142), "Upload class snapshot" (DPA / FM / Sup'tts), filter chips (status / section / `is_class_tracked` / `pdf_missing`).
+- Vessel users with pending class-status messages from office see an "Office review messages" card linking to `/certs/master-messages`.
 
 **Surfaces (FIELD_MAP):**
 - `vims_certs_tracked_item.*` rendered: id, catalog_code (joined to display_name), certificate_number, issuing_authority, place_of_issue, issue_date, expiry_date, anniversary_date (read-only display), status (computed), days_to_go (computed), validity_type → short code, parent_id grouping, pdf_attachment_id presence indicator.
@@ -433,7 +439,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Left: item list with "Needs review" / "Done" badges.
   - Middle: VIMS certificate record state.
   - Right: class report item details using user-facing labels such as item, section in class report, issue date, expiry date, next due, and text found in class report.
-  - Action buttons: `[Notify Master]`, `[Mark reviewed]`, `[Ask vessel to update]`, `[Link to VIMS certificate type]` (DPA only).
+  - Action buttons: `[Notify Master]`, `[Mark reviewed]`, `[Ask vessel to update]`, `[Link to VIMS certificate type]` (DPA only). `Notify Master` creates a vessel-side office review message for the selected flag; `Mark reviewed` is an office-side review action only.
 - Alert banner says "Many items need attention" and explains counts in plain language when review volume is high.
 
 **Special handling:**
@@ -441,6 +447,23 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - `Extended/Postponed detected` → for NK Extended → child `extension_of` row pre-fill; for NK Postponed → parent's `postponed_until` field pre-fill (D-CERT-065 / FEAT-CERT-REC-024).
 
 **Surfaces (FIELD_MAP):** `vims_certs_reconciliation_flag.*`, joined `vims_certs_tracked_item`, parsed_payload field paths from `vims_certs_class_status_snapshot.parsed_payload_json`.
+
+---
+
+### 3.10a Office Review Messages `/certs/master-messages`
+
+**Route:** `/certs/master-messages`
+**Form ID:** `CERT_F_003`
+**Primary user:** Master for own vessel; other vessel Certs users read own-vessel messages when granted reconciliation read access.
+**Purpose:** Vessel-side window for office messages created from the class-status reconciliation review.
+
+**Layout:**
+- The vessel certificate dashboard shows an "Office review messages" card with the pending message count and an "Open messages" action.
+- The messages page lists office-sent class-status items. Each card shows the office note, who sent it, the class report item, VIMS-vs-class differences, and an "Open certificate" link when the item is already linked to a certificate.
+- The Master can add a short review note and click "Mark reviewed". This records vessel acknowledgement in the Certs audit log and removes the item from the default pending list. It does not change certificate validity or expiry dates.
+- A "Show reviewed messages" checkbox lets vessel users see already reviewed office messages.
+
+**Surfaces (FIELD_MAP):** Reads `vims_certs_reconciliation_flag.*`, joined `vims_certs_reconciliation_run`, joined `vims_certs_class_status_snapshot`, joined `vims_certs_catalog_row`, and audit-log rows for office notify / Master review reasons. No new persistent fields are introduced.
 
 ---
 

@@ -744,6 +744,43 @@ export interface CertReconciliationRunDetail extends CertReconciliationRun {
   flags: CertReconciliationFlag[];
 }
 
+export interface CertMasterReconciliationMessage {
+  id: string;
+  runId: string | null;
+  snapshotId: string | null;
+  vesselId: string | null;
+  vesselName: string | null;
+  imo: string | null;
+  classSociety: string | null;
+  printedOnDate: string | null;
+  ranAt: string | null;
+  bucket: string | null;
+  catalogId: string | null;
+  catalogDisplayName: string | null;
+  trackedItemId: string | null;
+  classRowExtract: Record<string, unknown> | unknown[] | null;
+  diff: Record<string, unknown>;
+  officeNotifiedAt: string | null;
+  officeNotifiedBy: string | null;
+  officeNotifiedRole: string | null;
+  officeNote: string | null;
+  masterReviewedAt: string | null;
+  masterReviewedBy: string | null;
+  masterReviewedRole: string | null;
+  masterReviewNote: string | null;
+}
+
+export interface CertMasterReconciliationMessageFilters {
+  includeReviewed?: boolean;
+  vesselId?: string | null;
+  pageSize?: number | null;
+}
+
+export interface CertMasterReconciliationMessagesResponse {
+  count: number;
+  results: CertMasterReconciliationMessage[];
+}
+
 export interface CertClassCodeMapping {
   id: string;
   classSociety: string | null;
@@ -1397,6 +1434,28 @@ export const certsApi = {
     const response = await apiClient.post<CertReconciliationFlag>(
       buildCertsApiUrl(`/reconciliation/flags/${encodeURIComponent(id)}/notify-master/`),
       { reason }
+    );
+    return response.data;
+  },
+
+  async getMasterReconciliationMessages(
+    filters: CertMasterReconciliationMessageFilters = {}
+  ): Promise<CertMasterReconciliationMessagesResponse> {
+    const params = new URLSearchParams();
+    if (filters.includeReviewed) params.set('includeReviewed', 'true');
+    if (filters.vesselId) params.set('vesselId', filters.vesselId);
+    if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiClient.get<CertMasterReconciliationMessagesResponse>(
+      buildCertsApiUrl(`/reconciliation/master-messages/${suffix}`)
+    );
+    return response.data;
+  },
+
+  async acknowledgeMasterReconciliationMessage(id: string, note: string): Promise<CertMasterReconciliationMessage> {
+    const response = await apiClient.post<CertMasterReconciliationMessage>(
+      buildCertsApiUrl(`/reconciliation/master-messages/${encodeURIComponent(id)}/ack/`),
+      { note }
     );
     return response.data;
   },

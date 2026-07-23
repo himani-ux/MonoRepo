@@ -46,7 +46,7 @@ from apps.certs.services.reconciliation import build_reconciliation_flags, dispa
 from apps.certs.services.notification_dispatcher import CertNotificationRecipient
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
-from apps.certs.views import snapshot_views
+from apps.certs.views import reconciliation_views, snapshot_views
 
 
 class CertsAppRegistrationTests(SimpleTestCase):
@@ -180,6 +180,82 @@ class ClassSnapshotUploadParsingTests(SimpleTestCase):
         self.assertEqual(response.data["reconciliationRunId"], run_id)
         create_snapshot.assert_called_once()
         parser_worker.assert_called_once_with(snapshot_id, repository=snapshot_views.repository)
+
+
+class ReconciliationMasterMessageApiTests(SimpleTestCase):
+    def test_vessel_user_can_list_office_messages_for_own_vessel(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        user = _vessel_master_user(vessel_id=vessel_id)
+        request = APIRequestFactory().get("/api/certs/reconciliation/master-messages/")
+        force_authenticate(request, user=user)
+        row = _master_message_row(vessel_id=vessel_id, master_reviewed_at=None)
+
+        with patch.object(
+            reconciliation_views.repository,
+            "list_master_messages",
+            return_value={"count": 1, "results": [row]},
+        ) as list_messages:
+            response = reconciliation_views.ReconciliationMasterMessageListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["id"], row["flag_id"])
+        self.assertEqual(response.data["results"][0]["officeNote"], "Please check expiry date with the vessel file.")
+        list_messages.assert_called_once_with(
+            vessel_id=vessel_id,
+            include_reviewed=False,
+            page=1,
+            page_size=50,
+        )
+
+    def test_master_can_mark_office_message_reviewed(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        flag_id = "22222222-2222-2222-2222-222222222222"
+        user = _vessel_master_user(vessel_id=vessel_id)
+        request = APIRequestFactory().post(
+            f"/api/certs/reconciliation/master-messages/{flag_id}/ack/",
+            data={"note": "Checked with the onboard class file."},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+        before = _master_message_row(flag_id=flag_id, vessel_id=vessel_id, master_reviewed_at=None)
+        after = _master_message_row(
+            flag_id=flag_id,
+            vessel_id=vessel_id,
+            master_reviewed_at="2026-07-22T10:15:00Z",
+            master_reviewed_by="KSM0229",
+            master_review_note="Checked with the onboard class file.",
+        )
+
+        with (
+            patch.object(reconciliation_views.repository, "get_master_message", side_effect=[before, after]),
+            patch("apps.certs.views.reconciliation_views.record_audit_event") as audit_event,
+        ):
+            response = reconciliation_views.ReconciliationMasterMessageAcknowledgeView.as_view()(request, flag_id=flag_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["masterReviewedAt"], "2026-07-22T10:15:00Z")
+        audit_event.assert_called_once()
+        self.assertEqual(audit_event.call_args.kwargs["action"], "reconciliation_review")
+        self.assertEqual(audit_event.call_args.kwargs["entity_id"], flag_id)
+        self.assertEqual(audit_event.call_args.kwargs["metadata"]["resolution_action"], "master_reviewed")
+
+    def test_non_master_vessel_user_cannot_mark_office_message_reviewed(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        flag_id = "22222222-2222-2222-2222-222222222222"
+        user = _vessel_master_user(vessel_id=vessel_id, role="CHIEF OFFICER", rank="CHIEF OFFICER")
+        request = APIRequestFactory().post(
+            f"/api/certs/reconciliation/master-messages/{flag_id}/ack/",
+            data={"note": "Checked."},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        with patch.object(reconciliation_views.repository, "get_master_message") as get_message:
+            response = reconciliation_views.ReconciliationMasterMessageAcknowledgeView.as_view()(request, flag_id=flag_id)
+
+        self.assertEqual(response.status_code, 403)
+        get_message.assert_not_called()
 
 
 class ClassSnapshotParserAndReconciliationSmokeTests(SimpleTestCase):
@@ -643,6 +719,68 @@ def _class_snapshot_row(
         "reconciliation_run_id": reconciliation_run_id,
         "upload_sha256": "sha",
         "superseded_user_error": False,
+    }
+
+
+def _vessel_master_user(
+    *,
+    vessel_id: str,
+    role: str = "VESSEL_MASTER",
+    rank: str = "MASTER",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        is_authenticated=True,
+        user_type="VESSEL",
+        role=role,
+        role_name=role,
+        rank=rank,
+        crew_id="KSM0229",
+        vessel_id=vessel_id,
+        form_ids=["CERT_F_003"],
+        process_ids=[],
+    )
+
+
+def _master_message_row(
+    *,
+    flag_id: str = "55555555-5555-5555-5555-555555555555",
+    vessel_id: str,
+    master_reviewed_at: str | None,
+    master_reviewed_by: str | None = None,
+    master_review_note: str | None = None,
+) -> dict[str, object]:
+    return {
+        "flag_id": flag_id,
+        "run_id": "33333333-3333-3333-3333-333333333333",
+        "snapshot_id": "44444444-4444-4444-4444-444444444444",
+        "vessel_id": vessel_id,
+        "vessel_name": "MV Test",
+        "imo_number": "1234567",
+        "class_society": "KR",
+        "printed_on_date": "2026-07-20",
+        "ran_at": "2026-07-22T09:00:00Z",
+        "bucket": "mismatch",
+        "catalog_id": "cat-1",
+        "catalog_display_name": "Load Line Certificate",
+        "tracked_item_id": "tracked-1",
+        "class_row_extract_json": {
+            "display_name": "Load Line Certificate",
+            "class_code_or_name": "ILL",
+            "expiry_date": "2030-07-11",
+        },
+        "diff_json": {"expiry_date": {"tracked": "2029-07-11", "class": "2030-07-11"}},
+        "reviewed_by": "office-1",
+        "reviewed_at": "2026-07-22T09:05:00Z",
+        "resolution_action": "notified_master",
+        "resolved_at": "2026-07-22T09:05:00Z",
+        "office_notified_at": "2026-07-22T09:05:00Z",
+        "office_notified_by": "office-1",
+        "office_notified_role": "DPA",
+        "office_note": "Please check expiry date with the vessel file.",
+        "master_reviewed_at": master_reviewed_at,
+        "master_reviewed_by": master_reviewed_by,
+        "master_reviewed_role": "VESSEL_MASTER" if master_reviewed_by else None,
+        "master_review_note": master_review_note,
     }
 
 
