@@ -108,15 +108,16 @@
 ### 2.4 Generating a fleet-wide section print (DPA / FM)
 1. `/certs/print` → Choose scope: "Per-section fleet-wide".
 2. Pick section (e.g. "Statutory & Flag").
-3. Choose vessels by vessel name if the scope asks for vessels. For custom selection, choose certificates by certificate name/number.
-4. Enter recipient email only if you want an emailed copy; the field checks email format before submit.
-5. Generate (async; ETA shown). You'll be notified in-app + Slack when ready.
-6. Download PDF + Excel companion.
+3. Choose vessels by vessel name if the scope asks for vessels. Use Select all / Clear all when you need a bulk change.
+4. For custom selection, choose certificates by certificate name/number from the grouped certificate dropdown.
+5. Enter recipient email only if you want an emailed copy; the field checks email format before submit.
+6. Generate (async; ETA shown). You'll be notified in-app + Slack when ready.
+7. Download PDF + Excel companion.
 
 ### 2.5 Sharing certs with a port agent (Master)
 1. `/certs/share-bundle`.
 2. Choose the vessel by name if a vessel choice is shown.
-3. Multi-select the certs to share by certificate name/number (e.g. all certs needed for upcoming PSC inspection).
+3. Multi-select the certs to share by certificate name/number from the grouped certificate dropdown (e.g. all certs needed for upcoming PSC inspection). Use Select all / Clear all when needed.
 4. Enter recipient name (port agent) and recipient email if needed; the email field checks format before submit.
 5. "Generate ZIP".
 6. Bundle filename: `VIMS_CertBundle_<vessel>_<yyyymmdd>_<print_id>.zip`.

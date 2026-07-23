@@ -76,4 +76,14 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).not.toContain('<Label htmlFor="printCustomCerts">Custom certificate IDs</Label>');
     expect(certsRouteSource).not.toContain('<Label htmlFor="bundleCerts">Certificate IDs</Label>');
   });
+
+  it('test_print_and_share_pickers_are_opaque_grouped_and_support_bulk_selection', () => {
+    expect(certsRouteSource).toContain('className="max-h-80 w-[var(--radix-dropdown-menu-trigger-width)] border border-neutral-200 bg-white p-0 text-neutral-900 shadow-xl');
+    expect(certsRouteSource).toContain('Select all');
+    expect(certsRouteSource).toContain('Clear all');
+    expect(certsRouteSource).toContain('function formatCertificatePickerGroup');
+    expect(certsRouteSource).toContain('group: formatCertificatePickerGroup(item)');
+    expect(certsRouteSource).toContain("return vessel || section || 'Other certificates';");
+    expect(certsRouteSource).toContain('const groupedOptions = groupPickerOptions(resolvedOptions);');
+  });
 });

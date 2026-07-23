@@ -1914,6 +1914,7 @@ interface CertPickerOption {
   value: string;
   label: string;
   description?: string | null;
+  group?: string | null;
 }
 
 function useCertPrintSelectionOptions(enabled: boolean) {
@@ -1949,6 +1950,7 @@ function buildCertCertificatePickerOptions(
       value: item.id,
       label: formatCertificatePickerLabel(item),
       description: formatCertificatePickerDescription(item),
+      group: formatCertificatePickerGroup(item),
     }));
 }
 
@@ -1960,11 +1962,19 @@ function formatCertificatePickerLabel(item: CertTrackedItem): string {
 }
 
 function formatCertificatePickerDescription(item: CertTrackedItem): string | null {
-  const vessel = String(item.vesselName ?? item.vesselCode ?? item.vesselImo ?? '').trim();
   const status = String(item.status ?? '').trim();
   const expiry = item.expiryDate ? `Expires ${formatDate(item.expiryDate)}` : '';
-  const parts = [vessel, status ? formatStatus(status) : '', expiry].filter(Boolean);
+  const parts = [status ? formatStatus(status) : '', expiry].filter(Boolean);
   return parts.length ? parts.join(' | ') : null;
+}
+
+function formatCertificatePickerGroup(item: CertTrackedItem): string {
+  const vessel = String(item.vesselName ?? item.vesselCode ?? item.vesselImo ?? '').trim();
+  const section = String(item.sectionName ?? item.sectionCode ?? '').trim();
+  if (vessel && section) {
+    return `${vessel} - ${section}`;
+  }
+  return vessel || section || 'Other certificates';
 }
 
 function togglePickerValue(values: string[], optionValue: string, checked: boolean): string[] {
@@ -1984,6 +1994,25 @@ function includeSelectedFallbackOptions(
     .filter((value) => !knownValues.has(value))
     .map((value) => ({ value, label: formatEntityLabel(value, fallback) }));
   return missingOptions.length ? [...missingOptions, ...options] : options;
+}
+
+function groupPickerOptions(options: CertPickerOption[]): Array<{ group: string | null; options: CertPickerOption[] }> {
+  const grouped = new Map<string, CertPickerOption[]>();
+  const ungrouped: CertPickerOption[] = [];
+
+  for (const option of options) {
+    const group = String(option.group ?? '').trim();
+    if (!group) {
+      ungrouped.push(option);
+      continue;
+    }
+    grouped.set(group, [...(grouped.get(group) ?? []), option]);
+  }
+
+  return [
+    ...Array.from(grouped.entries()).map(([group, groupOptions]) => ({ group, options: groupOptions })),
+    ...(ungrouped.length ? [{ group: null, options: ungrouped }] : []),
+  ];
 }
 
 function formatPickerSummary(
@@ -2028,31 +2057,64 @@ function CertMultiSelectDropdown({
   const summary = loading && resolvedOptions.length === 0
     ? 'Loading'
     : formatPickerSummary(value, resolvedOptions, placeholder, fallbackLabel, pluralLabel);
+  const visibleValues = resolvedOptions.map((option) => option.value);
+  const selectedVisibleCount = visibleValues.filter((optionValue) => value.includes(optionValue)).length;
+  const allVisibleSelected = visibleValues.length > 0 && selectedVisibleCount === visibleValues.length;
+  const groupedOptions = groupPickerOptions(resolvedOptions);
+  const selectAllVisible = () => onChange(Array.from(new Set([...value, ...visibleValues])));
+  const clearVisible = () => onChange(value.filter((selectedValue) => !visibleValues.includes(selectedValue)));
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button id={id} type="button" variant="outline" className="w-full justify-between font-normal">
+        <Button id={id} type="button" variant="outline" className="w-full justify-between border-neutral-300 bg-white font-normal text-neutral-900 hover:bg-neutral-50">
           <span className="truncate">{summary}</span>
           <ListFilter className="ml-2 h-4 w-4 shrink-0" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 w-[var(--radix-dropdown-menu-trigger-width)]">
+      <DropdownMenuContent
+        align="start"
+        className="max-h-80 w-[var(--radix-dropdown-menu-trigger-width)] border border-neutral-200 bg-white p-0 text-neutral-900 shadow-xl ring-1 ring-neutral-900/5"
+      >
         {resolvedOptions.length > 0 ? (
-          resolvedOptions.map((option) => (
-            <DropdownMenuCheckboxItem
-              key={option.value}
-              checked={value.includes(option.value)}
-              onCheckedChange={(checked) => onChange(togglePickerValue(value, option.value, Boolean(checked)))}
-              onSelect={(event) => event.preventDefault()}
-              className="items-start"
-            >
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="truncate font-medium">{option.label}</span>
-                {option.description ? <span className="truncate text-xs text-neutral-500">{option.description}</span> : null}
-              </span>
-            </DropdownMenuCheckboxItem>
-          ))
+          <>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-neutral-200 bg-white p-2">
+              <span className="text-xs font-medium text-neutral-600">{selectedVisibleCount} selected</span>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={allVisibleSelected} onClick={selectAllVisible}>
+                  Select all
+                </Button>
+                <Button type="button" variant="ghost" size="sm" disabled={selectedVisibleCount === 0} onClick={clearVisible}>
+                  Clear all
+                </Button>
+              </div>
+            </div>
+            <div className="py-1">
+              {groupedOptions.map((group) => (
+                <div key={group.group ?? 'ungrouped'} className="py-1">
+                  {group.group ? (
+                    <div className="bg-neutral-50 px-3 py-1.5 text-xs font-semibold uppercase text-neutral-500">
+                      {group.group}
+                    </div>
+                  ) : null}
+                  {group.options.map((option) => (
+                    <DropdownMenuCheckboxItem
+                      key={option.value}
+                      checked={value.includes(option.value)}
+                      onCheckedChange={(checked) => onChange(togglePickerValue(value, option.value, Boolean(checked)))}
+                      onSelect={(event) => event.preventDefault()}
+                      className="items-start bg-white text-neutral-900 focus:bg-neutral-100 focus:text-neutral-900 data-[state=checked]:bg-primary-50"
+                    >
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate font-medium">{option.label}</span>
+                        {option.description ? <span className="truncate text-xs text-neutral-500">{option.description}</span> : null}
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="px-2 py-3 text-sm text-neutral-500">{loading ? 'Loading' : noOptionsText}</div>
         )}
