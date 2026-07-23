@@ -263,11 +263,11 @@ This is the largest table; every column matters.
 | actor_role | `actorRole` | `AuditLogTable.col` | `/certs/audit-log` | Per RBAC | âœ… | Snapshot of role at event time |
 | action | `action` | `AuditLogTable.col`, filter dropdown | `/certs/audit-log` | Per RBAC | âœ… | |
 | entity_type | `entityType` | `AuditLogTable.col`, filter dropdown | `/certs/audit-log` | Per RBAC | âœ… | |
-| entity_id | `entityId` | `AuditLogTable.entityLink` (clickable to entity detail) | `/certs/audit-log` | Per RBAC | âœ… | |
+| entity_id | `entityId` | `AuditLogTable.entityLink` (clickable to entity detail) | `/certs/audit-log` | Per RBAC | âœ… | UUID-backed entity reference. Text-keyed entities such as print artifacts keep this NULL and expose the text reference in `eventMetadata.entityRef`. |
 | before_json | `before` | `AuditLogTable.row.expandedDiff` | `/certs/audit-log` | Per RBAC | âœ… | Collapsible JSON viewer |
 | after_json | `after` | same | same | Per RBAC | âœ… | |
 | reason | `reason` | `AuditLogTable.row.reasonCol` | `/certs/audit-log` | DPA + FM full text; Sup'tts (own-vessel) full text; **ðŸ”’ redacted to `[REDACTED â€” internal note]` for external auditor view** per D-CERT-180 | ðŸ”’ | |
-| event_metadata | `eventMetadata` | `AuditLogTable.row.metadataDrawer` | `/certs/audit-log` | Per RBAC | âœ… | |
+| event_metadata | `eventMetadata` | `AuditLogTable.row.metadataDrawer` | `/certs/audit-log` | Per RBAC | âœ… | Includes `entityRef` for text-keyed entities such as `vims_certs_print_artifact.print_id`. |
 | retention_tier | `retentionTier` | `AuditLogTable.tierBadge`, fetch-from-cold prompt | `/certs/audit-log` | Per RBAC | âœ… | |
 | archived_at | `archivedAt` | `AuditLogTable.tierBadge.tooltip` | `/certs/audit-log` | Per RBAC | âœ… | |
 | schema_version | (not displayed) | â€” | â€” | â€” | ðŸ”§ | |

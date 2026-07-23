@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 from django.db import connection
 
 
@@ -33,6 +34,7 @@ def record_audit_event(
     reason: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> None:
+    db_entity_id, metadata_payload = _audit_entity_payload(entity_id, metadata)
 
     params = [
         vessel_id,
@@ -40,11 +42,11 @@ def record_audit_event(
         resolve_actor_role(actor),
         action,
         entity_type,
-        entity_id,
+        db_entity_id,
         json.dumps(before, default=str) if before is not None else None,
         json.dumps(after, default=str) if after is not None else None,
         reason,
-        json.dumps(metadata, default=str) if metadata is not None else None,
+        json.dumps(metadata_payload, default=str) if metadata_payload is not None else None,
     ]
 
     print("\n========== AUDIT LOG ==========")
@@ -75,3 +77,30 @@ def record_audit_event(
             """,
             params,
         )
+
+
+def _audit_entity_payload(
+    entity_id: str | None,
+    metadata: dict[str, Any] | None,
+) -> tuple[str | None, dict[str, Any] | None]:
+    db_entity_id = _uuid_text_or_none(entity_id)
+    if db_entity_id is not None:
+        return db_entity_id, metadata
+
+    text_entity_id = str(entity_id or "").strip()
+    if not text_entity_id:
+        return None, metadata
+
+    metadata_payload = dict(metadata or {})
+    metadata_payload.setdefault("entityRef", text_entity_id)
+    return None, metadata_payload
+
+
+def _uuid_text_or_none(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return str(UUID(text))
+    except (TypeError, ValueError):
+        return None

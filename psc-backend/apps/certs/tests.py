@@ -7,6 +7,7 @@ from contextlib import nullcontext
 from decimal import Decimal
 from django.db import DatabaseError
 from io import BytesIO
+import json
 from pathlib import Path
 from rest_framework.test import APIRequestFactory, force_authenticate
 import tempfile
@@ -45,6 +46,7 @@ from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
 from apps.certs.services.reconciliation import build_reconciliation_flags, dispatch_parser_anomaly_notifications
 from apps.certs.services.notification_dispatcher import CertNotificationRecipient
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
+from apps.certs.services.audit_log import record_audit_event
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
 from apps.certs.views import reconciliation_views, snapshot_views
 
@@ -105,6 +107,54 @@ class TrackedItemApprovalAuthorityTests(SimpleTestCase):
         user = SimpleNamespace(user_type="OFFICE", role="CHIEF ACCOUNTING OFFICER", has_global_vessel_access=True)
 
         self.assertFalse(can_approve_tracked_item(user, {"vessel_id": "VESSEL-1"}))
+
+
+class AuditLogWriteTests(SimpleTestCase):
+    def test_non_uuid_entity_id_is_stored_as_metadata_entity_ref(self):
+        cursor = _FakeAuditLogCursor()
+        actor = SimpleNamespace(user_id="Harman.S", role="DPA")
+
+        with patch("apps.certs.services.audit_log.connection", SimpleNamespace(cursor=lambda: cursor)):
+            record_audit_event(
+                actor=actor,
+                action="print_artifact_created",
+                entity_type="print_artifact",
+                entity_id="SQE-S633-9584293-20260723-009",
+                vessel_id="11111111-1111-1111-1111-111111111111",
+                before=None,
+                after={"printId": "SQE-S633-9584293-20260723-009"},
+                reason="Generated SQE S 633 print artifact.",
+                metadata={"source": "api.certs.print"},
+            )
+
+        params = cursor.executed[0][1]
+        self.assertIsNone(params[5])
+        metadata = json.loads(params[9])
+        self.assertEqual(metadata["source"], "api.certs.print")
+        self.assertEqual(metadata["entityRef"], "SQE-S633-9584293-20260723-009")
+
+    def test_uuid_entity_id_is_stored_in_entity_id_column(self):
+        cursor = _FakeAuditLogCursor()
+        actor = SimpleNamespace(user_id="Harman.S", role="DPA")
+        entity_id = "22222222-2222-2222-2222-222222222222"
+
+        with patch("apps.certs.services.audit_log.connection", SimpleNamespace(cursor=lambda: cursor)):
+            record_audit_event(
+                actor=actor,
+                action="upload_class_snapshot",
+                entity_type="class_status_snapshot",
+                entity_id=entity_id,
+                vessel_id="11111111-1111-1111-1111-111111111111",
+                before=None,
+                after={"id": entity_id},
+                reason="Uploaded class snapshot.",
+                metadata={"source": "api.certs.class_snapshots"},
+            )
+
+        params = cursor.executed[0][1]
+        self.assertEqual(params[5], entity_id)
+        metadata = json.loads(params[9])
+        self.assertNotIn("entityRef", metadata)
 
 
 class PdfBlobStoragePathTests(SimpleTestCase):
@@ -911,6 +961,20 @@ class _FakeCatalogCursor:
 
     def fetchall(self):
         return [("catalog-1",)]
+
+
+class _FakeAuditLogCursor:
+    def __init__(self):
+        self.executed = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, list(params or [])))
 
 
 class _FakeTrackedItemCursor:

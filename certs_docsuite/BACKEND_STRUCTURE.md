@@ -384,11 +384,11 @@ Types use SQL Server compatible expressions; Django field types in parens.
 | actor_role | NVARCHAR(32) | NN | Snapshot of actor's role at event time |
 | action | NVARCHAR(64) | NN | enum: `create_catalog_row \| update_catalog_row \| deprecate_catalog_row \| hard_purge_catalog_row \| create_tracked_item \| update_tracked_item \| submit_tracked_item \| approve_tracked_item \| reject_tracked_item \| upload_pdf \| supersede_pdf \| upload_class_snapshot \| reparse_snapshot \| reconciliation_review \| notify_master \| add_class_mapping \| edit_class_mapping \| print \| share_bundle \| grant_auditor_access \| edit_auditor_access \| onboarding_step_complete \| fm_signoff \| onboarding_rollback \| flag_change_event \| class_change_event \| sale_initiated \| sale_completed \| decommission \| catalog_push_to_fleet \| anniversary_recompute \| bulk_soft_delete \| ocr_processed \| validation_block \| settings_change \| draft_expired \| retention_purge` |
 | entity_type | NVARCHAR(32) | NN | enum: `catalog_row \| tracked_item \| pdf_blob \| class_status_snapshot \| reconciliation_flag \| auditor_access \| print_artifact \| batch_ingest \| approval_event \| vessel_config \| settings \| notification` |
-| entity_id | UNIQUEIDENTIFIER | NULL | NULL when action is fleet-wide |
+| entity_id | UNIQUEIDENTIFIER | NULL | UUID-backed entity reference. NULL when action is fleet-wide or when the entity uses a text key such as `vims_certs_print_artifact.print_id`. |
 | before_json | NVARCHAR(MAX) | NULL | |
 | after_json | NVARCHAR(MAX) | NULL | |
 | reason | NVARCHAR(MAX) | NULL | DPA reason / Master rejection / etc. |
-| event_metadata | NVARCHAR(MAX) | NULL | Extra context JSON |
+| event_metadata | NVARCHAR(MAX) | NULL | Extra context JSON. For text-keyed entities such as print artifacts, stores `entityRef=<print_id>` because `entity_id` is UUID-only. |
 | retention_tier | NVARCHAR(8) | NN, default 'hot' | enum: `hot \| cold` (D-CERT-183) |
 | archived_at | DATETIME2 | NULL | When tier flipped to cold |
 | schema_version | SMALLINT | NN, default 1 | |
