@@ -50,8 +50,14 @@ describe('Certs route validation guards', () => {
   it('test_ship_side_master_messages_page_is_routed_and_plain_language', () => {
     expect(certsRouteSource).toContain('if (path === ROUTES.CERTS_MASTER_MESSAGES)');
     expect(certsRouteSource).toContain('function CertMasterMessagesPage');
-    expect(certsRouteSource).toContain('Office review messages');
-    expect(certsRouteSource).toContain('Class status messages from office');
+    expect(certsRouteSource).toContain('Messages from office');
+    expect(certsRouteSource).toContain('Class status items from office');
     expect(certsRouteSource).toContain('Mark reviewed');
+  });
+
+  it('test_vessel_certificate_table_avoids_unclear_days_and_validity_codes', () => {
+    expect(certsRouteSource).not.toContain('<th className="px-3 py-3">Days</th>');
+    expect(certsRouteSource).not.toContain('<span className="text-neutral-500">Days: </span>');
+    expect(certsRouteSource).toContain("ST: 'Short term'");
   });
 });

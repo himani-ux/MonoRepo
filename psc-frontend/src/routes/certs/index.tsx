@@ -2888,7 +2888,6 @@ function CertVesselSectionAccordion({ section, imo, defaultOpen }: { section: Ce
                   <th className="px-3 py-3">Issued by</th>
                   <th className="px-3 py-3">Issue date</th>
                   <th className="px-3 py-3">Expiry date</th>
-                  <th className="px-3 py-3">Days</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Valid for</th>
                   <th className="px-3 py-3">Action</th>
@@ -2925,7 +2924,6 @@ function CertVesselTableRow({ item, imo }: { item: CertTrackedItem; imo: string 
       <td className="px-3 py-3 text-neutral-700">{item.issuingAuthority ?? 'Not set'}</td>
       <td className="px-3 py-3 text-neutral-700">{formatDate(item.issueDate)}</td>
       <td className="px-3 py-3 text-neutral-700">{formatExpiry(item)}</td>
-      <td className="px-3 py-3 text-neutral-700">{item.daysToGo ?? 'Permanent'}</td>
       <td className="px-3 py-3"><CertStatusBadge status={item.status} /></td>
       <td className="px-3 py-3 text-neutral-700">{formatCertificateValidity(item)}</td>
       <td className="px-3 py-3">
@@ -2953,7 +2951,6 @@ function CertVesselItemCard({ item, imo }: { item: CertTrackedItem; imo: string 
         <div className="grid gap-2 text-sm sm:grid-cols-2">
           <div><span className="text-neutral-500">Issued by: </span>{item.issuingAuthority ?? 'Not set'}</div>
           <div><span className="text-neutral-500">Expiry: </span>{formatExpiry(item)}</div>
-          <div><span className="text-neutral-500">Days: </span>{item.daysToGo ?? 'Permanent'}</div>
           <div><span className="text-neutral-500">Valid for: </span>{formatCertificateValidity(item)}</div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -6553,7 +6550,7 @@ function formatExpiry(item: CertTrackedItem): string {
 
 function formatCertificateValidity(item: CertTrackedItem): string {
   if (item.validityShortCode) {
-    return item.validityShortCode;
+    return formatValidityShortCode(item.validityShortCode);
   }
   if (item.validityType === 'permanent') {
     return 'Permanent';
@@ -6565,6 +6562,22 @@ function formatCertificateValidity(item: CertTrackedItem): string {
     return 'Fixed expiry';
   }
   return item.validityType ? formatStatus(item.validityType) : 'n/a';
+}
+
+function formatValidityShortCode(value: string): string {
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
+  const labels: Record<string, string> = {
+    A: 'Annual',
+    'BI-A': 'Bi-annual',
+    '5-Y': '5 years',
+    '10-Y': '10 years',
+    PERM: 'Permanent',
+    'PERM.': 'Permanent',
+    ST: 'Short term',
+    '6-MTH': '6 months',
+    '6MTH': '6 months',
+  };
+  return labels[normalized] ?? value;
 }
 
 function formatShipType(value: string | null | undefined): string {
@@ -7237,7 +7250,7 @@ function CertVesselOfficeMessagesCard({
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-neutral-900">Office review messages</h2>
+            <h2 className="text-base font-semibold text-neutral-900">Messages from office</h2>
             <p className="text-sm text-neutral-600">
               {isLoading
                 ? 'Checking for office messages.'
@@ -7268,12 +7281,12 @@ function CertMasterMessagesPage() {
 
   return (
     <RootLayout>
-      <PageHeader title="Office Review Messages" />
+      <PageHeader title="Messages from Office" />
       <div className="space-y-4 p-4">
         <Card>
           <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-neutral-900">Class status messages from office</h2>
+              <h2 className="text-base font-semibold text-neutral-900">Class status items from office</h2>
               <p className="text-sm text-neutral-600">Review the items office sent after checking the class status PDF.</p>
             </div>
             <label className="flex items-center gap-2 text-sm text-neutral-700">

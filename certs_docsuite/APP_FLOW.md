@@ -213,12 +213,12 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - Header card: vessel name + IMO + flag + class society + ship type + current Master at top. "Last class snapshot uploaded N days ago" with link to `/certs/reconciliation` filtered to this vessel. Mandatory-coverage % (D-CERT-119) with override banner if applicable.
 - Section accordion (9 sections, D-CERT-017): each section header shows section_name + active TrackedItem count + status-band breakdown badges (per D-CERT-136).
 - Per-section table: expanded by default for sections with action items (overdue / window_open / window_closing); collapsed for healthy sections.
-- Per-row columns use user-facing certificate language: Certificate, Cert number, Issued by, Issue date, Expiry date, Days, Status, Valid for, and Action. Internal labels such as tracked item, PDF, validity type, and class-tracked are not shown on the normal vessel dashboard; where needed they are translated to certificate-focused wording such as certificate file, fixed expiry, survey based, or class certificates.
+- Per-row columns use user-facing certificate language: Certificate, Cert number, Issued by, Issue date, Expiry date, Status, Valid for, and Action. Internal labels such as tracked item, PDF, validity type, and class-tracked are not shown on the normal vessel dashboard; where needed they are translated to certificate-focused wording such as certificate file, fixed expiry, survey based, short term, or class certificates.
 - Toolbar: "Print this vessel" (D-CERT-140 per-vessel scope), "Share bundle" (Master self / DPA / FM only per D-CERT-142), "Upload class snapshot" (DPA / FM / Sup'tts), filter chips (status / section / `is_class_tracked` / `pdf_missing`).
-- Vessel users with pending class-status messages from office see an "Office review messages" card linking to `/certs/master-messages`.
+- Vessel users with pending class-status messages from office see a "Messages from office" card linking to `/certs/master-messages`.
 
 **Surfaces (FIELD_MAP):**
-- `vims_certs_tracked_item.*` rendered: id, catalog_code (joined to display_name), certificate_number, issuing_authority, place_of_issue, issue_date, expiry_date, anniversary_date (read-only display), status (computed), days_to_go (computed), validity_type → short code, parent_id grouping, pdf_attachment_id presence indicator.
+- `vims_certs_tracked_item.*` rendered: id, catalog_code (joined to display_name), certificate_number, issuing_authority, place_of_issue, issue_date, expiry_date, anniversary_date (read-only display), status (computed), validity_type / validity short code rendered as readable validity text, parent_id grouping, pdf_attachment_id presence indicator.
 - Hidden but available via row expansion: window_open, window_close, last_done_date, next_due_date, postponed_until, supersedes_id, extension_authority, extension_letter_pdf_id, extension_reason, source, last_class_sync_id.
 - Approval state badge (`approval_state`) on rows where != `approved`.
 - D-CERT-087 `vessel_acked` indicator on alert-bearing rows (office-side view).
@@ -458,7 +458,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Purpose:** Vessel-side window for office messages created from the class-status reconciliation review.
 
 **Layout:**
-- The vessel certificate dashboard shows an "Office review messages" card with the pending message count and an "Open messages" action.
+- The vessel certificate dashboard shows a "Messages from office" card with the pending message count and an "Open messages" action.
 - The messages page lists office-sent class-status items. Each card shows the office note, who sent it, the class report item, VIMS-vs-class differences, and an "Open certificate" link when the item is already linked to a certificate.
 - The Master can add a short review note and click "Mark reviewed". This records vessel acknowledgement in the Certs audit log and removes the item from the default pending list. It does not change certificate validity or expiry dates.
 - A "Show reviewed messages" checkbox lets vessel users see already reviewed office messages.
