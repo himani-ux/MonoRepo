@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.core.exceptions import SuspiciousFileOperation
+from django.http import FileResponse
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -19,11 +21,13 @@ from apps.certs.serializers.print import (
     serialize_print_artifact,
 )
 from apps.certs.services.audit_log import record_audit_event
+from apps.certs.services.print_delivery import PrintArtifactDeliveryError, PrintArtifactDeliveryService
 from apps.certs.services.print_artifacts import PrintGenerationFailed, PrintArtifactRepository, PrintArtifactService
 
 
 repository = PrintArtifactRepository()
 service = PrintArtifactService(repository=repository)
+delivery_service = PrintArtifactDeliveryService()
 FLEET_SCOPE_ROLES = {"DPA", "FM", "FLEET MANAGER", "SUPER ADMIN", "SYSTEM ADMIN"}
 
 
@@ -47,7 +51,9 @@ class PrintArtifactCreateView(generics.GenericAPIView):
             return Response({"detail": serialized["failureMessage"], "artifact": serialized}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        email_result = _send_generated_artifact_email(row)
         serialized = serialize_print_artifact(row)
+        _apply_email_result(serialized, email_result)
         record_audit_event(
             actor=request.user,
             action="print_artifact_created",
@@ -57,7 +63,13 @@ class PrintArtifactCreateView(generics.GenericAPIView):
             before=None,
             after=_artifact_audit_payload(serialized),
             reason="Generated SQE S 633 print artifact.",
-            metadata={"source": "api.certs.print", "systemStateHash": serialized["systemStateHash"]},
+            metadata={
+                "source": "api.certs.print",
+                "systemStateHash": serialized["systemStateHash"],
+                "emailDeliveryStatus": email_result["status"],
+                "emailRecipient": email_result["recipient"],
+                "emailAttachmentKinds": email_result["attachmentKinds"],
+            },
         )
         return Response(serialized, status=status.HTTP_201_CREATED)
 
@@ -87,6 +99,35 @@ class PrintArtifactDetailView(generics.GenericAPIView):
         return Response(serialized)
 
 
+class PrintArtifactDownloadView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, print_id: str, artifact_kind: str, *args, **kwargs):
+        if not has_request_certs_perm(request, PRINT_EXPORT_FORM_ID):
+            return Response({"detail": "You do not have access to Certs print artifacts."}, status=status.HTTP_403_FORBIDDEN)
+        row = repository.get_artifact(str(print_id))
+        if row is None:
+            return Response({"detail": "Print artifact not found."}, status=status.HTTP_404_NOT_FOUND)
+        serialized = serialize_print_artifact(row)
+        access_error = _artifact_vessel_access_error(request.user, serialized["vessels"])
+        if access_error:
+            return access_error
+
+        try:
+            artifact_file = delivery_service.get_download_file(row, str(artifact_kind))
+        except SuspiciousFileOperation:
+            return Response({"detail": "Print artifact file path is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+        except PrintArtifactDeliveryError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+
+        return FileResponse(
+            artifact_file.absolute_path.open("rb"),
+            as_attachment=True,
+            filename=artifact_file.filename,
+            content_type=artifact_file.content_type,
+        )
+
+
 class PrintShareBundleView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ShareBundleRequestSerializer
@@ -109,7 +150,9 @@ class PrintShareBundleView(generics.GenericAPIView):
             return Response({"detail": serialized["failureMessage"], "artifact": serialized}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        email_result = _send_generated_artifact_email(row)
         serialized = serialize_print_artifact(row)
+        _apply_email_result(serialized, email_result)
         record_audit_event(
             actor=request.user,
             action="share_bundle_created",
@@ -119,7 +162,13 @@ class PrintShareBundleView(generics.GenericAPIView):
             before=None,
             after=_artifact_audit_payload(serialized),
             reason="Generated Master share bundle.",
-            metadata={"source": "api.certs.print.share_bundle", "systemStateHash": serialized["systemStateHash"]},
+            metadata={
+                "source": "api.certs.print.share_bundle",
+                "systemStateHash": serialized["systemStateHash"],
+                "emailDeliveryStatus": email_result["status"],
+                "emailRecipient": email_result["recipient"],
+                "emailAttachmentKinds": email_result["attachmentKinds"],
+            },
         )
         return Response(serialized, status=status.HTTP_201_CREATED)
 
@@ -168,4 +217,23 @@ def _artifact_audit_payload(serialized: dict) -> dict:
         "bundleZipBlobId": serialized.get("bundleZipBlobId"),
         "pageCount": serialized.get("pageCount"),
         "generationStatus": serialized.get("generationStatus"),
+        "emailDeliveryStatus": serialized.get("emailDeliveryStatus"),
+        "emailRecipient": serialized.get("recipientEmail") or "",
     }
+
+
+def _send_generated_artifact_email(row: dict) -> dict:
+    try:
+        return delivery_service.send_artifact_email(row)
+    except PrintArtifactDeliveryError as exc:
+        return {
+            "status": "failed",
+            "message": str(exc),
+            "recipient": str(row.get("recipient_email") or ""),
+            "attachmentKinds": [],
+        }
+
+
+def _apply_email_result(serialized: dict, email_result: dict) -> None:
+    serialized["emailDeliveryStatus"] = email_result.get("status") or "not_requested"
+    serialized["emailDeliveryMessage"] = email_result.get("message") or ""

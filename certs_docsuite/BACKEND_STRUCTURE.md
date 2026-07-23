@@ -90,6 +90,7 @@ apps/certs/
 â”‚   â”œâ”€â”€ pdf_renderer.py           # Print PDF generation
 â”‚   â”œâ”€â”€ excel_renderer.py         # Companion Excel data-only export
 â”‚   â”œâ”€â”€ zip_bundler.py            # Manifest PDF + cert PDFs ZIP
+â”‚   â”œâ”€â”€ print_delivery.py         # Authenticated artifact download + recipient email attachments
 â”‚   â”œâ”€â”€ system_state_hash.py      # 8-char hash for print identifiability
 â”‚   â”œâ”€â”€ coverage.py               # Mandatory-coverage % computation
 â”‚   â”œâ”€â”€ auditor_token.py          # External auditor token signing + verification
@@ -469,7 +470,7 @@ Types use SQL Server compatible expressions; Django field types in parens.
 | pdf_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | |
 | excel_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | |
 | bundle_zip_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | For share-bundle |
-| recipient_email | NVARCHAR(256) | NULL | Opt-in email (D-CERT-149) |
+| recipient_email | NVARCHAR(256) | NULL | Opt-in email (D-CERT-149). When present on print/share generation, `print_delivery.py` sends the generated files through the same Django SMTP settings used by Circular/platform email. Send result is returned immediately and captured in audit metadata; no schema column is added for delivery status. |
 | page_count | INT | NULL | |
 | generation_status | NVARCHAR(16) | NN, default 'success' | enum: `success \| failed` |
 | failure_message | NVARCHAR(MAX) | NULL | (D-CERT-150) |
@@ -677,11 +678,12 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### 5.5 Print / Export
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
-| POST | `/api/certs/print/` | CERT_P_005 | Per scope RBAC | Generate (sync per-vessel; async fleet-wide) |
+| POST | `/api/certs/print/` | CERT_P_005 | Per scope RBAC | Generate PDF + Excel; returns `downloadUrls`; sends both files when `recipientEmail` is present |
 | GET | `/api/certs/print/jobs/<job_id>/` | (read) | Per scope | Async status |
 | GET | `/api/certs/print/artifacts/` | (read) | Per scope | History |
 | GET | `/api/certs/print/artifacts/<print_id>/` | (read) | Per scope | Detail + download links |
-| POST | `/api/certs/print/share-bundle/` | CERT_P_006 | Master / DPA / FM | ZIP bundle |
+| GET | `/api/certs/print/artifacts/<print_id>/download/<pdf\|excel\|zip>/` | (read) | Per scope | Streams the stored artifact as an authenticated attachment |
+| POST | `/api/certs/print/share-bundle/` | CERT_P_006 | Master / DPA / FM | ZIP bundle; returns ZIP download URL; sends ZIP when `recipientEmail` is present |
 
 ### 5.6 Notifications
 | Method | Path | Process ID | Roles | Notes |

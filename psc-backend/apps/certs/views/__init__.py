@@ -43,6 +43,7 @@ from .reconciliation_views import (
 from .print_views import (
     PrintArtifactCreateView,
     PrintArtifactDetailView,
+    PrintArtifactDownloadView,
     PrintArtifactListView,
     PrintShareBundleView,
 )
@@ -109,6 +110,7 @@ __all__ = [
     "OnboardingSessionListCreateView",
     "PrintArtifactCreateView",
     "PrintArtifactDetailView",
+    "PrintArtifactDownloadView",
     "PrintArtifactListView",
     "PrintShareBundleView",
     "ReconciliationFlagMarkReviewedView",

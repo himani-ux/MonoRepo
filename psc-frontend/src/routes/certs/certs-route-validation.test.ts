@@ -86,4 +86,15 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).toContain("return vessel || section || 'Other certificates';");
     expect(certsRouteSource).toContain('const groupedOptions = groupPickerOptions(resolvedOptions);');
   });
+
+  it('test_print_and_share_results_offer_real_downloads_and_email_status', () => {
+    expect(certsRouteSource).toContain('function CertPrintArtifactDownloads');
+    expect(certsRouteSource).toContain('Download PDF');
+    expect(certsRouteSource).toContain('Download Excel');
+    expect(certsRouteSource).toContain('Download ZIP');
+    expect(certsRouteSource).toContain('certsApi.downloadPrintArtifact(artifact.printId, kind)');
+    expect(certsRouteSource).toContain('function CertPrintEmailStatus');
+    expect(certsRouteSource).toContain('Email sent to');
+    expect(certsRouteSource).not.toContain("ZIP {artifact.bundleZipBlobId ? 'ready' : 'n/a'}");
+  });
 });

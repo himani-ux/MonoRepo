@@ -14,7 +14,7 @@
 - **Daily:** Open `/certs/vessels/<your-vessel>` → review status pills + alerts → action overdue/expiring rows.
 - **On cert renewal:** Open the cert → "Upload renewed cert" → pick PDF (file or scanner) → confirm OCR-pre-filled fields → submit. System auto-detects renewal vs revision (D-CERT-170).
 - **Approving subordinate submissions:** Open notifications inbox → tap pending approval → review submitted form + PDF → Approve or Reject (with reason).
-- **Sharing certs externally:** Use `/certs/share-bundle` → multi-select certs → enter recipient name → "Generate ZIP". Recipient gets manifest PDF + cert PDFs.
+- **Sharing certs externally:** Use `/certs/share-bundle` → multi-select certs → enter recipient name → "Generate ZIP". Click Download ZIP; if recipient email was entered, the system also emails the ZIP.
 - **Magic-link email ack:** When you get an email alert, tap "Acknowledge" — single-use link, expires in 24h.
 
 **Class-status messages from office:** Open the "Messages from office" card on your vessel certificate dashboard, or go to `/certs/master-messages`, to see items office sent after checking a Class Status PDF. Add a short note and click "Mark reviewed" after checking the item onboard.
@@ -112,7 +112,7 @@
 4. For custom selection, choose certificates by certificate name/number from the grouped certificate dropdown.
 5. Enter recipient email only if you want an emailed copy; the field checks email format before submit.
 6. Generate (async; ETA shown). You'll be notified in-app + Slack when ready.
-7. Download PDF + Excel companion.
+7. Download PDF + Excel companion from the result panel or Print History. If an email was entered, check the email status line on the result panel.
 
 ### 2.5 Sharing certs with a port agent (Master)
 1. `/certs/share-bundle`.
@@ -121,7 +121,7 @@
 4. Enter recipient name (port agent) and recipient email if needed; the email field checks format before submit.
 5. "Generate ZIP".
 6. Bundle filename: `VIMS_CertBundle_<vessel>_<yyyymmdd>_<print_id>.zip`.
-7. Share via your usual channel (email, etc.); recipient sees manifest + cert PDFs.
+7. Click Download ZIP. If a recipient email was entered, the system sends the ZIP; if email is not entered or sending fails, share the downloaded ZIP through your usual channel.
 
 ### 2.6 Acknowledging a critical alert via email (Master at sea)
 1. Email arrives: "[VIMS Certs] URGENT — IOPP expires in 7 days — YC FORTITUDE".

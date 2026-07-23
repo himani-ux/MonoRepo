@@ -178,7 +178,7 @@ This is the largest table; every column matters.
 |--------|---------|-----------|--------------|-----------------|--------|-------|
 | blob_id | `id` | `PdfPreview`, `VersionHistoryTray` | `/certs/vessels/<imo>/cert/<id>` | Per RBAC | âœ… | |
 | tracked_item_id, snapshot_id | `trackedItemId`, `snapshotId` | (back-references for navigation) | several | Per RBAC | âœ… | One of these is non-null per blob |
-| blob_storage_path | (signed URL only via API) | `PdfPreview.iframe`, `DownloadButton` | several | Per RBAC | ðŸ”’ | Raw S3 path never sent to client; signed download URL minted per request |
+| blob_storage_path | (download endpoint/URL only via API) | `PdfPreview.iframe`, `DownloadButton` | several | Per RBAC | ðŸ”’ | Raw storage path never sent to client; download endpoint or URL minted per request |
 | filename | `filename` | `VersionHistoryTray.row`, `DownloadButton.label` | several | Per RBAC | âœ… | Original upload name |
 | content_sha256 | (not exposed to UI) | â€” | â€” | â€” | ðŸ”§ | Used for dedup per D-CERT-118; server-only |
 | content_size_bytes | `sizeBytes` | `VersionHistoryTray.sizeChip`, `DownloadButton.tooltip` | several | Per RBAC | âœ… | Human-formatted (KB/MB) |
@@ -347,10 +347,11 @@ This is the largest table; every column matters.
 | system_state_hash | `systemStateHash` | `PrintArtifactPdfTemplate.footer` (printed on every page) | print PDF | Visible on artifact | âœ… | (D-CERT-128) |
 | watermark_applied | `watermarkApplied` | `PrintHistoryTable.watermarkBadge`, `PrintArtifactPdfTemplate.watermarkOverlay` | several | Per RBAC | âœ… | |
 | watermark_recipient | `watermarkRecipient` | `PrintArtifactPdfTemplate.watermarkOverlay` | print PDF | On artifact | âœ… | |
-| pdf_blob_id | `pdfBlobId` â†’ signed download URL | `PrintHistoryTable.downloadPdfButton` | `/certs/print/history`, print result page | Per RBAC | âœ… | |
-| excel_blob_id | `excelBlobId` â†’ signed download URL | `PrintHistoryTable.downloadExcelButton` | several | Per RBAC | âœ… | |
-| bundle_zip_blob_id | `bundleZipBlobId` â†’ signed URL | `PrintHistoryTable.downloadBundleButton` (when scope=share_bundle) | `/certs/print/history`, share-bundle result | Master / DPA / FM | âœ… | |
-| recipient_email | `recipientEmail` | `PrintHistoryTable.recipientCol` | `/certs/print/history` | Per RBAC | âœ… | |
+| pdf_blob_id | `pdfBlobId`, `downloadUrls.pdf` | `PrintHistoryTable.downloadPdfButton`, print result download button | `/certs/print/history`, print result page | Per RBAC | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/pdf/`; raw storage path is never sent to the browser. |
+| excel_blob_id | `excelBlobId`, `downloadUrls.excel` | `PrintHistoryTable.downloadExcelButton`, print result download button | several | Per RBAC | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/excel/`; audit-log exports label this secondary file as CSV. |
+| bundle_zip_blob_id | `bundleZipBlobId`, `downloadUrls.zip` | `PrintHistoryTable.downloadBundleButton`, share-bundle result download button | `/certs/print/history`, share-bundle result | Master / DPA / FM | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/zip/`. |
+| recipient_email | `recipientEmail` | `PrintHistoryTable.recipientCol`, print/share result email status | `/certs/print/history`, print/share result page | Per RBAC | âœ… | Non-empty value triggers email delivery after generation using existing platform/Circular SMTP settings. |
+| (API-derived) | `emailDeliveryStatus`, `emailDeliveryMessage` | `PrintArtifactResult.emailStatus` | print/share result page | Actor only at generation response | âœ… | Immediate response field; send result is also stored in audit metadata for the generation action. |
 | page_count | `pageCount` | `PrintHistoryTable.col` | `/certs/print/history` | Per RBAC | âœ… | |
 | generation_status | `generationStatus` | `PrintHistoryTable.statusBadge` | `/certs/print/history` | Per RBAC | âœ… | |
 | failure_message | `failureMessage` | `PrintHistoryTable.errorBanner` (when status=failed) | `/certs/print/history` | Per RBAC | âœ… | (D-CERT-150) |
@@ -674,7 +675,7 @@ When all 11 checks pass, FIELD_MAP is GREEN and the COVERAGE audit can include "
 | `classRowExtract` | reconciliation_flag.class_row_extract_json (**persisted-derived**) | Denormalized matching row from snapshot.parsed_payload_json, written by reconciliation engine | New run only â€” immutable per run |
 | `diff` | reconciliation_flag.diff_json (**persisted-derived**) | Per-field catalog-vs-class diff computed during bucketing | New run only |
 | `changes[]` | cert_change_log rows (**API-only**) | Aggregation of field_name/old_value/new_value/source_module/version_after into per-cert history (Â§22, `CertChangeHistoryDrawer` âš  build-time) | On read; rows appended transactionally per write |
-| Signed blob download URLs | pdf_blob.blob_storage_path (**API-only**) | Raw S3 path never sent; signed URL minted per request (Â§5) | Every request |
+| Blob download endpoints/URLs | pdf_blob.blob_storage_path (**API-only**) | Raw storage path never sent; authenticated endpoint or signed URL minted per request (Â§5) | Every request |
 | Mandatory coverage % | `services/coverage.py` (**API-only**) | `compute_mandatory_coverage(vessel_id)` from `mandatory_for_all_vessels` rows vs tracked items; drives onboarding step-6 gate + `CoverageBanner` (D-CERT-119) | Read time; override stores reason on vessel_config |
 | `vessel_acked` | notification_meta ack fields (**API-only**) | Office dashboard derives yes/no from vessel-side copy ack â€” independent ack model (D-CERT-087) | Read time; flips on vessel ack |
 | `systemStateHash` | `services/system_state_hash.py` â†’ print_artifact (**persisted-derived**) | 8-char hash of vessel cert state for print identifiability (D-CERT-128); printed in footer | Once at generation; immutable |

@@ -484,11 +484,11 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - Step 2 — **Filters & options:** sections, status bands, cadence, vessel dropdowns by vessel name/code/IMO (depending on scope), and certificate dropdowns by certificate name/number for custom selection. Dropdown panels are opaque and include Select all / Clear all; certificate choices are grouped by vessel and section when available. Watermark toggle (DPA can override default scope-driven watermark per D-CERT-138 / FEAT-CERT-PRT-018); recipient email field with browser email-format validation (optional, opt-in email per D-CERT-149 / FEAT-CERT-PRT-032).
 - Step 3 — **Preview & generate:** sample first page rendering with `print_id` placeholder; "Generate" button.
 - During generation: progress bar for sync per-vessel scope ("Generating PDF (page X of Y)…", hard cap 60s per D-CERT-144 / FEAT-CERT-PRT-025); for fleet-wide async, "Submitted — you'll be notified when ready" + queue position.
-- On success: download buttons (PDF + Excel companion); confirmation that artifact is auto-archived in vessel-scoped "Archived Reports" folder; if recipient email entered, "Email sent to <addr>".
+- On success: download buttons fetch the generated PDF and Excel through the authenticated print-artifact download API; confirmation that artifact is auto-archived in vessel-scoped "Archived Reports" folder; if recipient email entered, the result shows whether email was sent or failed.
 
 **Throttling:** Soft-throttle surface at >10/hour per user → audit log entry "high-volume print activity by user X" surfaces in FM dashboard for governance review (D-CERT-143 / FEAT-CERT-PRT-024); no hard block.
 
-**Surfaces (FIELD_MAP):** `vims_certs_print_artifact.*` — print_id, scope, vessels[], sections[], system_state_hash, user_id, role, timestamp_utc, watermark_applied, page_count, pdf_blob_id, excel_blob_id, recipient_email (nullable).
+**Surfaces (FIELD_MAP):** `vims_certs_print_artifact.*` — print_id, scope, vessels[], sections[], system_state_hash, user_id, role, timestamp_utc, watermark_applied, page_count, pdf_blob_id, excel_blob_id, recipient_email (nullable), `downloadUrls`, immediate `emailDeliveryStatus`.
 
 ---
 
@@ -501,7 +501,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout:**
 - Filter bar: vessel, scope, date range, watermark, recipient, user.
-- Table: print_id, generated_at, scope, vessels, watermark, user, page count, recipient (if any), download buttons (PDF + Excel).
+- Table: print_id, generated_at, scope, vessels, watermark, user, page count, recipient (if any), download buttons for generated PDF, Excel/CSV, and ZIP files as applicable.
 - Per-row: "View audit entry" link.
 
 **Surfaces (FIELD_MAP):** `vims_certs_print_artifact.*` plus joined `vims_certs_audit_log`.
@@ -523,6 +523,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - Recipient email field uses browser email-format validation.
 - "Generate ZIP" button → `VIMS_CertBundle_<vessel_name>_<yyyymmdd>_<print_id>.zip` (D-CERT-145 / FEAT-CERT-PRT-028).
 - Inside ZIP: manifest PDF (cert title, issuer, issue date, expiry, file reference) + cert PDFs.
+- On success: Download ZIP button fetches the stored bundle through the authenticated print-artifact download API; if recipient email entered, the system sends the ZIP using the existing platform email settings and shows sent/failed status.
 
 **Surfaces (FIELD_MAP):** Same `vims_certs_print_artifact` table with `bundle_zip_blob_id` extension; `vims_certs_audit_log` entry per generation.
 

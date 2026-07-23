@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   CornerDownRight,
+  Download,
   FileCheck2,
   FileText,
   History,
@@ -151,6 +152,7 @@ import {
   type CertTrackedItemDetail,
   type CertTrackedItem,
   type CertPrintArtifact,
+  type CertPrintDownloadKind,
   type CertPrintScope,
   type CertPrintWatermark,
   type CertValidationEntry,
@@ -2311,14 +2313,87 @@ function CertPrintArtifactResult({ artifact }: { artifact?: CertPrintArtifact })
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <CertPrintArtifactSummary artifact={artifact} />
-        <div className="grid gap-2 md:grid-cols-3">
-          <Badge variant={artifact.pdfBlobId ? 'success' : 'secondary'}>PDF {artifact.pdfBlobId ? 'ready' : 'n/a'}</Badge>
-          <Badge variant={artifact.excelBlobId ? 'success' : 'secondary'}>Excel {artifact.excelBlobId ? 'ready' : 'n/a'}</Badge>
-          <Badge variant={artifact.bundleZipBlobId ? 'success' : 'secondary'}>ZIP {artifact.bundleZipBlobId ? 'ready' : 'n/a'}</Badge>
-        </div>
+        <CertPrintArtifactDownloads artifact={artifact} />
+        <CertPrintEmailStatus artifact={artifact} />
       </CardContent>
     </Card>
   );
+}
+
+function CertPrintArtifactDownloads({ artifact, compact = false }: { artifact: CertPrintArtifact; compact?: boolean }) {
+  const [downloadingKind, setDownloadingKind] = useState<CertPrintDownloadKind | null>(null);
+  const [downloadError, setDownloadError] = useState('');
+  const secondaryLabel = artifact.scope === 'audit_log_export' ? 'Download CSV' : 'Download Excel';
+  const downloadOptions: Array<{ kind: CertPrintDownloadKind; label: string; available: boolean }> = [
+    { kind: 'pdf', label: 'Download PDF', available: Boolean(artifact.pdfBlobId || artifact.downloadUrls?.pdf) },
+    { kind: 'excel', label: secondaryLabel, available: Boolean(artifact.excelBlobId || artifact.downloadUrls?.excel) },
+    { kind: 'zip', label: 'Download ZIP', available: Boolean(artifact.bundleZipBlobId || artifact.downloadUrls?.zip) },
+  ];
+  const availableOptions = downloadOptions.filter((option) => option.available);
+
+  const handleDownload = async (kind: CertPrintDownloadKind) => {
+    if (downloadingKind) {
+      return;
+    }
+    setDownloadError('');
+    setDownloadingKind(kind);
+    try {
+      saveCertDownload(await certsApi.downloadPrintArtifact(artifact.printId, kind));
+    } catch (error) {
+      setDownloadError(getErrorMessage(error));
+    } finally {
+      setDownloadingKind(null);
+    }
+  };
+
+  if (availableOptions.length === 0) {
+    return <p className="text-xs text-neutral-500">No files available.</p>;
+  }
+
+  return (
+    <div className={compact ? 'space-y-1' : 'space-y-2'}>
+      <div className="flex flex-wrap gap-2">
+        {availableOptions.map((option) => (
+          <Button
+            key={option.kind}
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleDownload(option.kind)}
+            disabled={Boolean(downloadingKind)}
+          >
+            <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+            {downloadingKind === option.kind ? 'Downloading' : option.label}
+          </Button>
+        ))}
+      </div>
+      {downloadError ? <p className="text-xs text-error-700">{downloadError}</p> : null}
+    </div>
+  );
+}
+
+function CertPrintEmailStatus({ artifact }: { artifact: CertPrintArtifact }) {
+  if (!artifact.recipientEmail) {
+    return null;
+  }
+  if (artifact.emailDeliveryStatus === 'sent') {
+    return <p className="rounded-md border border-success-200 bg-success-50 px-3 py-2 text-sm text-success-800">{artifact.emailDeliveryMessage || `Email sent to ${artifact.recipientEmail}.`}</p>;
+  }
+  if (artifact.emailDeliveryStatus === 'failed') {
+    return <p className="rounded-md border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-800">{artifact.emailDeliveryMessage || 'Email could not be sent.'}</p>;
+  }
+  return null;
+}
+
+function saveCertDownload({ blob, fileName }: { blob: Blob; fileName: string }) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
 function CertPrintHistoryPage() {
@@ -2405,11 +2480,7 @@ function CertPrintHistoryPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {artifact.pdfBlobId ? <Badge variant="success">PDF</Badge> : null}
-                            {artifact.excelBlobId ? <Badge variant="success">Excel</Badge> : null}
-                            {artifact.bundleZipBlobId ? <Badge variant="success">ZIP</Badge> : null}
-                          </div>
+                          <CertPrintArtifactDownloads artifact={artifact} compact />
                         </td>
                       </tr>
                     ))}

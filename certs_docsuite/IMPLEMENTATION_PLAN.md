@@ -314,3 +314,13 @@ See PRD ยง19. Build-time deferrals (Phase 0 picks) listed in BACKEND_STRUCTURE ย
 **Triggering discovery:** Users need better OCR accuracy for class-status snapshot and certificate document extraction, while preserving the shipped parser payloads, confidence routing, upload responses, and reconciliation contract.
 
 **Supersedes:** Amendment 2 and TECH_STACK Phase 0.7 only where they name Tesseract/pytesseract as the OCR engine. D-CERT-200 remains unchanged: class snapshots are text-extracted first, and OCR fallback runs only when the full PDF has no text layer before the same NK/KR/BV parsers and reconciliation flow run.
+
+---
+
+## Amendment 4 - 2026-07-23
+
+**What changed:** CR-108 makes generated Certs print/share artifacts directly accessible and deliverable. Print Builder exposes authenticated downloads for generated PDF and Excel artifacts and emails both files when a recipient email is provided. Share Bundle exposes an authenticated ZIP download and emails the ZIP when a recipient email is provided.
+
+**Triggering discovery:** The shipped print/share UI showed "PDF ready", "Excel ready", or "ZIP ready" after generation, but users could not access the generated file from that screen. The recipient email field was persisted on the artifact record but did not send mail, making the field misleading.
+
+**Supersedes:** Phase 5 print/export behavior only where readiness status was sufficient as the user-facing result. The current behavior is D-CERT-201: a successful print/share generation must provide direct authenticated artifact access, and a non-empty recipient email triggers delivery through the existing platform email configuration.

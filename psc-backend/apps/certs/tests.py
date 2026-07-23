@@ -43,12 +43,14 @@ from apps.certs.services.parsers.bv import BVClassParser
 from apps.certs.services.parsers.kr import KRClassParser
 from apps.certs.services.parsers.nk import NKClassParser
 from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
+from apps.certs.services.print_delivery import PrintArtifactDeliveryService
 from apps.certs.services.reconciliation import build_reconciliation_flags, dispatch_parser_anomaly_notifications
 from apps.certs.services.notification_dispatcher import CertNotificationRecipient
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.services.audit_log import record_audit_event
+from apps.certs.serializers.print import serialize_print_artifact
 from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
-from apps.certs.views import reconciliation_views, snapshot_views
+from apps.certs.views import print_views, reconciliation_views, snapshot_views
 
 
 class CertsAppRegistrationTests(SimpleTestCase):
@@ -58,6 +60,10 @@ class CertsAppRegistrationTests(SimpleTestCase):
     def test_certs_routes_are_mounted(self):
         self.assertEqual(reverse("certs:health"), "/api/certs/health/")
         self.assertEqual(resolve("/api/certs/health/").url_name, "health")
+        self.assertEqual(
+            resolve("/api/certs/print/artifacts/SQE-S633-TEST/download/zip/").url_name,
+            "print-artifact-download",
+        )
         self.assertEqual(
             reverse("certs-auditor:signup", kwargs={"token": "sample"}),
             "/api/auditor/signup/sample/",
@@ -168,6 +174,159 @@ class PdfBlobStoragePathTests(SimpleTestCase):
         with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root):
             with self.assertRaises(SuspiciousFileOperation):
                 resolve_pdf_blob_path({"blob_storage_path": "../outside.pdf"})
+
+
+class PrintArtifactSerializationTests(SimpleTestCase):
+    def test_print_artifact_serializer_exposes_download_urls(self):
+        serialized = serialize_print_artifact(
+            _print_artifact_row(
+                print_id="SQE-S633-TEST-001",
+                pdf_blob_id="pdf-1",
+                excel_blob_id="excel-1",
+                bundle_zip_blob_id="zip-1",
+            )
+        )
+
+        self.assertEqual(
+            serialized["downloadUrls"]["pdf"],
+            "/api/certs/print/artifacts/SQE-S633-TEST-001/download/pdf/",
+        )
+        self.assertEqual(
+            serialized["downloadUrls"]["excel"],
+            "/api/certs/print/artifacts/SQE-S633-TEST-001/download/excel/",
+        )
+        self.assertEqual(
+            serialized["downloadUrls"]["zip"],
+            "/api/certs/print/artifacts/SQE-S633-TEST-001/download/zip/",
+        )
+
+
+class PrintArtifactDeliveryTests(SimpleTestCase):
+    def test_print_generation_view_sends_email_when_recipient_email_is_present(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        artifact = _print_artifact_row(vessels=[vessel_id], recipient_email="agent@example.com")
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="OFFICE",
+            role="DPA",
+            form_ids=["CERT_F_004"],
+            process_ids=["CERT_P_005"],
+            has_global_vessel_access=True,
+        )
+        request = APIRequestFactory().post(
+            "/api/certs/print/",
+            data={
+                "scope": "per_vessel_full",
+                "vesselIds": [vessel_id],
+                "recipientEmail": "agent@example.com",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=user)
+        email_result = {
+            "status": "sent",
+            "message": "Email sent to agent@example.com.",
+            "recipient": "agent@example.com",
+            "attachmentKinds": ["pdf", "excel"],
+        }
+
+        with (
+            patch.object(print_views.service, "generate_print", return_value=artifact),
+            patch.object(print_views.delivery_service, "send_artifact_email", return_value=email_result) as send_email,
+            patch("apps.certs.views.print_views.record_audit_event") as audit,
+        ):
+            response = print_views.PrintArtifactCreateView.as_view()(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["emailDeliveryStatus"], "sent")
+        self.assertEqual(response.data["emailDeliveryMessage"], "Email sent to agent@example.com.")
+        send_email.assert_called_once_with(artifact)
+        self.assertEqual(audit.call_args.kwargs["metadata"]["emailDeliveryStatus"], "sent")
+
+    def test_delivery_service_attaches_pdf_and_excel_to_print_email(self):
+        with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root, DEFAULT_FROM_EMAIL="certs@example.com"):
+            _write_upload_blob(upload_root, "certs/prints/report.pdf", b"pdf-bytes")
+            _write_upload_blob(upload_root, "certs/prints/report.xlsx", b"excel-bytes")
+            connection_factory = _FakeEmailConnectionFactory()
+            service = PrintArtifactDeliveryService(
+                blob_repository=_FakePdfBlobRepository(
+                    {
+                        "pdf-1": {"blob_storage_path": "certs/prints/report.pdf", "filename": "report.pdf"},
+                        "excel-1": {"blob_storage_path": "certs/prints/report.xlsx", "filename": "report.xlsx"},
+                    }
+                ),
+                email_connection_factory=connection_factory,
+            )
+
+            result = service.send_artifact_email(
+                _print_artifact_row(pdf_blob_id="pdf-1", excel_blob_id="excel-1", recipient_email="agent@example.com")
+            )
+
+        message = connection_factory.connections[0].sent_messages[0]
+        self.assertEqual(result["status"], "sent")
+        self.assertEqual(message.to, ["agent@example.com"])
+        self.assertEqual(message.from_email, "certs@example.com")
+        self.assertEqual([attachment[0] for attachment in message.attachments], ["report.pdf", "report.xlsx"])
+
+    def test_delivery_service_attaches_zip_only_to_share_bundle_email(self):
+        with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root, DEFAULT_FROM_EMAIL="certs@example.com"):
+            _write_upload_blob(upload_root, "certs/prints/bundle.zip", b"zip-bytes")
+            connection_factory = _FakeEmailConnectionFactory()
+            service = PrintArtifactDeliveryService(
+                blob_repository=_FakePdfBlobRepository(
+                    {
+                        "zip-1": {"blob_storage_path": "certs/prints/bundle.zip", "filename": "bundle.zip"},
+                    }
+                ),
+                email_connection_factory=connection_factory,
+            )
+
+            result = service.send_artifact_email(
+                _print_artifact_row(scope="share_bundle", bundle_zip_blob_id="zip-1", recipient_email="agent@example.com")
+            )
+
+        message = connection_factory.connections[0].sent_messages[0]
+        self.assertEqual(result["status"], "sent")
+        self.assertEqual(result["attachmentKinds"], ["zip"])
+        self.assertEqual([attachment[0] for attachment in message.attachments], ["bundle.zip"])
+
+    def test_download_view_streams_requested_artifact_file(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="OFFICE",
+            role="DPA",
+            form_ids=["CERT_F_004"],
+            process_ids=[],
+            has_global_vessel_access=True,
+        )
+        request = APIRequestFactory().get("/api/certs/print/artifacts/SQE-S633-TEST/download/zip/")
+        force_authenticate(request, user=user)
+
+        with tempfile.TemporaryDirectory() as upload_root:
+            path = Path(upload_root) / "bundle.zip"
+            path.write_bytes(b"zip-bytes")
+            artifact_file = SimpleNamespace(
+                absolute_path=path,
+                filename="bundle.zip",
+                content_type="application/zip",
+            )
+            with (
+                patch.object(print_views.repository, "get_artifact", return_value=_print_artifact_row(vessels=[vessel_id])),
+                patch.object(print_views.delivery_service, "get_download_file", return_value=artifact_file) as get_download_file,
+            ):
+                response = print_views.PrintArtifactDownloadView.as_view()(
+                    request,
+                    print_id="SQE-S633-TEST",
+                    artifact_kind="zip",
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/zip")
+            self.assertIn("attachment", response["Content-Disposition"])
+            self.assertIn("bundle.zip", response["Content-Disposition"])
+            get_download_file.assert_called_once()
+            response.close()
 
 
 class ClassSnapshotUploadParsingTests(SimpleTestCase):
@@ -832,6 +991,81 @@ def _master_message_row(
         "master_reviewed_role": "VESSEL_MASTER" if master_reviewed_by else None,
         "master_review_note": master_review_note,
     }
+
+
+def _print_artifact_row(
+    *,
+    print_id: str = "SQE-S633-TEST-001",
+    scope: str = "per_vessel_full",
+    vessels: list[str] | None = None,
+    sections: list[str] | None = None,
+    custom_cert_ids: list[str] | None = None,
+    pdf_blob_id: str | None = "pdf-1",
+    excel_blob_id: str | None = "excel-1",
+    bundle_zip_blob_id: str | None = None,
+    recipient_email: str = "",
+) -> dict[str, object]:
+    return {
+        "print_id": print_id,
+        "scope": scope,
+        "vessels_json": json.dumps(vessels or ["11111111-1111-1111-1111-111111111111"]),
+        "sections_json": json.dumps(sections or []),
+        "filters_json": "{}",
+        "custom_cert_ids_json": json.dumps(custom_cert_ids or []),
+        "user_id": "Harman.S",
+        "user_role": "DPA",
+        "timestamp_utc": "2026-07-23T08:00:00Z",
+        "system_state_hash": "ABC12345",
+        "watermark_applied": "NONE",
+        "watermark_recipient": "",
+        "pdf_blob_id": pdf_blob_id,
+        "excel_blob_id": excel_blob_id,
+        "bundle_zip_blob_id": bundle_zip_blob_id,
+        "recipient_email": recipient_email,
+        "page_count": 2,
+        "generation_status": "success",
+        "failure_message": "",
+    }
+
+
+def _write_upload_blob(upload_root: str, relative_path: str, content: bytes) -> None:
+    absolute_path = Path(upload_root) / relative_path
+    absolute_path.parent.mkdir(parents=True, exist_ok=True)
+    absolute_path.write_bytes(content)
+
+
+class _FakePdfBlobRepository:
+    def __init__(self, blobs: dict[str, dict[str, object]]):
+        self.blobs = blobs
+
+    def get_blob(self, blob_id: str):
+        return self.blobs.get(blob_id)
+
+
+class _FakeEmailConnectionFactory:
+    def __init__(self):
+        self.connections = []
+
+    def __call__(self, **kwargs):
+        connection = _FakeEmailConnection(kwargs)
+        self.connections.append(connection)
+        return connection
+
+
+class _FakeEmailConnection:
+    def __init__(self, kwargs):
+        self.kwargs = kwargs
+        self.sent_messages = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def send_messages(self, messages):
+        self.sent_messages.extend(messages)
+        return len(messages)
 
 
 class _NoopClassParser(BaseClassParser):

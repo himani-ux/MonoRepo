@@ -12,6 +12,11 @@ function buildAuditorApiUrl(path: string): string {
   return `${AUDITOR_API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function extractFileName(contentDisposition: string | undefined, fallback: string): string {
+  const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
+  return match?.[1] ?? fallback;
+}
+
 export interface CertCatalogSection {
   id: number;
   sectionId: number;
@@ -1021,6 +1026,18 @@ export interface CertCatalogRowFilters {
 
 export type CertPrintScope = 'per_vessel_full' | 'per_vessel_partial' | 'per_section_fleetwide' | 'custom_selection' | 'share_bundle' | 'audit_log_export';
 export type CertPrintWatermark = 'NONE' | 'INTERNAL' | 'AUDIT_COPY' | 'MASTER_COPY' | 'DRAFT';
+export type CertPrintDownloadKind = 'pdf' | 'excel' | 'zip';
+
+export interface CertPrintDownloadUrls {
+  pdf: string | null;
+  excel: string | null;
+  zip: string | null;
+}
+
+export interface CertPrintDownloadResult {
+  blob: Blob;
+  fileName: string;
+}
 
 export interface CertPrintArtifact {
   printId: string;
@@ -1038,7 +1055,10 @@ export interface CertPrintArtifact {
   pdfBlobId: string | null;
   excelBlobId: string | null;
   bundleZipBlobId: string | null;
+  downloadUrls: CertPrintDownloadUrls;
   recipientEmail: string;
+  emailDeliveryStatus: string;
+  emailDeliveryMessage: string;
   pageCount: number | null;
   generationStatus: string;
   failureMessage: string;
@@ -1490,6 +1510,20 @@ export const certsApi = {
       buildCertsApiUrl(`/print/artifacts/${encodeURIComponent(printId)}/`)
     );
     return response.data;
+  },
+
+  async downloadPrintArtifact(printId: string, kind: CertPrintDownloadKind): Promise<CertPrintDownloadResult> {
+    const response = await apiClient.get<Blob>(
+      buildCertsApiUrl(`/print/artifacts/${encodeURIComponent(printId)}/download/${kind}/`),
+      { responseType: 'blob' }
+    );
+    return {
+      blob: response.data,
+      fileName: extractFileName(
+        response.headers['content-disposition'],
+        `certs-${printId}.${kind === 'excel' ? 'xlsx' : kind}`
+      ),
+    };
   },
 
   async generateShareBundle(payload: CertShareBundlePayload): Promise<CertPrintArtifact> {

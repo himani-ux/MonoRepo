@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import quote
 
 from rest_framework import serializers
 
@@ -59,6 +60,9 @@ class ShareBundleRequestSerializer(PrintArtifactRequestSerializer):
 
 
 def serialize_print_artifact(row: dict[str, Any]) -> dict[str, Any]:
+    pdf_blob_id = str(row["pdf_blob_id"]) if row.get("pdf_blob_id") else None
+    excel_blob_id = str(row["excel_blob_id"]) if row.get("excel_blob_id") else None
+    bundle_zip_blob_id = str(row["bundle_zip_blob_id"]) if row.get("bundle_zip_blob_id") else None
     return {
         "printId": str(row.get("print_id")),
         "scope": row.get("scope"),
@@ -72,10 +76,18 @@ def serialize_print_artifact(row: dict[str, Any]) -> dict[str, Any]:
         "systemStateHash": row.get("system_state_hash"),
         "watermarkApplied": row.get("watermark_applied"),
         "watermarkRecipient": row.get("watermark_recipient") or "",
-        "pdfBlobId": str(row["pdf_blob_id"]) if row.get("pdf_blob_id") else None,
-        "excelBlobId": str(row["excel_blob_id"]) if row.get("excel_blob_id") else None,
-        "bundleZipBlobId": str(row["bundle_zip_blob_id"]) if row.get("bundle_zip_blob_id") else None,
+        "pdfBlobId": pdf_blob_id,
+        "excelBlobId": excel_blob_id,
+        "bundleZipBlobId": bundle_zip_blob_id,
+        "downloadUrls": _download_urls(
+            print_id=str(row.get("print_id") or ""),
+            pdf_blob_id=pdf_blob_id,
+            excel_blob_id=excel_blob_id,
+            bundle_zip_blob_id=bundle_zip_blob_id,
+        ),
         "recipientEmail": row.get("recipient_email") or "",
+        "emailDeliveryStatus": row.get("email_delivery_status") or "not_requested",
+        "emailDeliveryMessage": row.get("email_delivery_message") or "",
         "pageCount": row.get("page_count"),
         "generationStatus": row.get("generation_status"),
         "failureMessage": row.get("failure_message") or "",
@@ -96,3 +108,18 @@ def _json_object(value: Any) -> Any:
         return json.loads(value)
     except (TypeError, ValueError):
         return None
+
+
+def _download_urls(
+    *,
+    print_id: str,
+    pdf_blob_id: str | None,
+    excel_blob_id: str | None,
+    bundle_zip_blob_id: str | None,
+) -> dict[str, str | None]:
+    encoded_print_id = quote(print_id, safe="")
+    return {
+        "pdf": f"/api/certs/print/artifacts/{encoded_print_id}/download/pdf/" if pdf_blob_id else None,
+        "excel": f"/api/certs/print/artifacts/{encoded_print_id}/download/excel/" if excel_blob_id else None,
+        "zip": f"/api/certs/print/artifacts/{encoded_print_id}/download/zip/" if bundle_zip_blob_id else None,
+    }
