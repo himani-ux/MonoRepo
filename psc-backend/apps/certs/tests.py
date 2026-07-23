@@ -44,6 +44,7 @@ from apps.certs.services.parsers.kr import KRClassParser
 from apps.certs.services.parsers.nk import NKClassParser
 from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
 from apps.certs.services.print_delivery import PrintArtifactDeliveryService
+from apps.certs.services.pdf_renderer import ReportLabPdfRenderer
 from apps.certs.services.reconciliation import build_reconciliation_flags, dispatch_parser_anomaly_notifications
 from apps.certs.services.notification_dispatcher import CertNotificationRecipient
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
@@ -327,6 +328,44 @@ class PrintArtifactDeliveryTests(SimpleTestCase):
             self.assertIn("bundle.zip", response["Content-Disposition"])
             get_download_file.assert_called_once()
             response.close()
+
+
+class ShareBundleManifestRendererTests(SimpleTestCase):
+    def test_manifest_removes_internal_header_footer_and_uses_printed_by_label(self):
+        result = ReportLabPdfRenderer().render_share_bundle_manifest(
+            print_id="SQE-S633-TEST-001",
+            rows=[
+                {
+                    "vessel_name": "MV Test",
+                    "vessel_imo": "1234567",
+                    "vessel_flag": "PANAMA",
+                    "class_society": "KR",
+                    "catalog_display_name": "Safety Management Certificate",
+                    "catalog_print_order": 1,
+                    "tracked_item_id": "tracked-1",
+                    "issue_date": "2026-01-01",
+                    "expiry_date": "2031-01-01",
+                    "blob_filename": "smc.pdf",
+                }
+            ],
+            payload={"scope": "share_bundle", "watermarkApplied": "MASTER_COPY"},
+            actor_id="Harman.S",
+            actor_role="DPA",
+            system_state_hash="ABC12345",
+        )
+
+        from PyPDF2 import PdfReader
+
+        text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(result.content)).pages)
+        self.assertIn("Printed by: Harman.S (DPA)", text)
+        self.assertIn("Safety Management Certificate", text)
+        self.assertNotIn("SQE S 633 - Master Share Bundle Manifest", text)
+        self.assertNotIn("Print ID:", text)
+        self.assertNotIn("Hash:", text)
+        self.assertNotIn("Validity: F=Full", text)
+        self.assertNotIn("MASTER COPY", text)
+        self.assertNotIn("Generation Footer", text)
+        self.assertNotIn("User:", text)
 
 
 class ClassSnapshotUploadParsingTests(SimpleTestCase):
