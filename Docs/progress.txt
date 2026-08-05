@@ -364,3 +364,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-08-04 | MAINTAIN | T1 | Updated present-state answers with local DB-backed vessel-user and database inventory findings | docs: Docs/Dev/DEV_TEAM_PRESENT_STATE_ANSWERS_VIMS.md | exemptions: none
 2026-08-05 | MAINTAIN | T1 | Replaced the Slack token value in the backend env example with a non-secret placeholder | docs: psc-backend/.env.example | exemptions: none
 2026-08-05 | MAINTAIN | CR-129 | Fixed Near Miss completed Office Comments view to show saved office/vessel notes and hide the vessel-review blocker | docs: safety_docsuite/APP_FLOW.md, safety_docsuite/USER_GUIDE.md, safety_docsuite/VALIDATION_RULES.md | exemptions: none
+2026-08-05 | MAINTAIN | CR-130 | Moved Near Miss vessel and office comments after the action boxes and added closure comment display | docs: safety_docsuite/APP_FLOW.md, safety_docsuite/USER_GUIDE.md | exemptions: none

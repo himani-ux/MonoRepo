@@ -642,7 +642,7 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 - LOW → PIC review → closure signature (DESIGN_SYSTEM §8.2 role-varied signature block).
 - HIGH → Master / HOD vessel-side review signature captured with typed name + device fingerprint before Office Comments / fleet-alert approval.
 **States:**
-- **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3). When available, Vessel review comments and completed Office Comments are shown as read-only review-note blocks in the summary.
+- **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3). When available, Vessel review comments, completed Office Comments, and Closure comment are shown as read-only note blocks at the end of the summary after the Immediate action and Preventive action / suggestion boxes.
 - **Loading:** Skeleton card.
 - **Empty:** n/a.
 - **Error — network / auth:** standard.

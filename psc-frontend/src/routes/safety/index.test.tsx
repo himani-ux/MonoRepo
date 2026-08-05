@@ -2227,8 +2227,12 @@ describe('safety routes', () => {
   it('shows_completed_near_miss_office_comments_without_vessel_review_blocker', async () => {
     safetyApiMocks.getNearMiss.mockResolvedValueOnce({
       id: '99',
+      closure_reason: 'Closure accepted after final onboard follow-up.',
+      closed_at: '2026-08-05T10:00:00Z',
       incident_number: 'NM-BACKEND-0099',
+      near_miss_immediate_action: 'Immediate action text for order check.',
       near_miss_priority: 'LOW',
+      near_miss_suggestion: 'Preventive suggestion text for order check.',
       office_comment: 'Office reviewed this near miss and accepted the action.',
       reporter_name: 'Test Reporter',
       state: 'OFFICE_COMMENTS_COMPLETED',
@@ -2256,6 +2260,21 @@ describe('safety routes', () => {
     expect(
       screen.getByText('Office reviewed this near miss and accepted the action.')
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('Closure accepted after final onboard follow-up.')
+    ).toBeInTheDocument();
+    const pageText = document.body.textContent ?? '';
+    expect(pageText.indexOf('Immediate action text for order check.')).toBeLessThan(
+      pageText.indexOf('Master reviewed and submitted to office.')
+    );
+    expect(pageText.indexOf('Preventive suggestion text for order check.')).toBeLessThan(
+      pageText.indexOf('Office reviewed this near miss and accepted the action.')
+    );
+    expect(
+      pageText.indexOf('Office reviewed this near miss and accepted the action.')
+    ).toBeLessThan(
+      pageText.indexOf('Closure accepted after final onboard follow-up.')
+    );
     expect(
       screen.getByText('Office comments are completed. Saved comments are shown in the summary above.')
     ).toBeInTheDocument();

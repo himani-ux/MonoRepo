@@ -511,7 +511,7 @@ Entry point: Safety sidebar → **Near Miss** → click a LOW-triage item → `/
 2. Read the reporter's identity where vessel scope and Safety permission allow.
 3. Set priority LOW or HIGH (D-GAP-R22). If HIGH, proceed to fleet alert at `/safety/near-miss/:id/fleet-alert/`.
 4. Add Office Comments and accept, or send the report back for rework with a reason.
-5. After Office Comments are completed, the saved Office Comments and Vessel review comment stay visible on the Near Miss workspace as read-only notes.
+5. After Office Comments are completed, the saved Vessel review comment, Office Comments, and Closure comment stay visible at the end of the Near Miss workspace summary, after Immediate action and Preventive action / suggestion.
 6. Fleet alert payload auto-drafts with vessel + crew names anonymised per D-GAP-M08. Review and edit the alert text and fleet-learning text.
 7. Use **Issue Circular/Alert** when you want the same alert prepared in the Circular module. The Circular page opens with only the title and body prefilled; complete recipients, category, priority, attachments, and publish there as normal (FEAT-SAF-NM-006 / D-CFG-04).
 8. Use **Issue fleet alert** in Near Miss to record and dispatch the HIGH-priority fleet-alert requirement. The system sends in-app notifications plus one selected-vessel email batch using `VesselData.Email`, with `HSSEQ@kaizenship.net` in CC. The email attaches the Near Miss PDF and keeps the body short: recipients are told that the event happened, to review the PDF, and to take preventive action. This remains separate from the Circular module publish action.

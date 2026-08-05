@@ -1281,6 +1281,7 @@ function extractNearMiss(payload: unknown): NearMissRecord | null {
 function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
   const vesselReview = nearMiss.vessel_review_summary;
   const officeComment = nearMiss.office_comment?.trim();
+  const closureComment = nearMiss.closure_reason?.trim();
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1325,23 +1326,6 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">What happened</p>
         <p className="mt-2 text-sm leading-6 text-slate-700">{nearMiss.narrative ?? "No details available."}</p>
       </div>
-      {vesselReview?.comment ? (
-        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Vessel review comment</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{vesselReview.comment}</p>
-          <p className="mt-3 text-xs font-medium text-sky-800">
-            Reviewed by {vesselReview.reviewed_by_role || "vessel reviewer"}
-            {vesselReview.typed_name ? ` (${vesselReview.typed_name})` : ""}
-            {vesselReview.reviewed_at ? ` on ${formatDisplayDateTime(vesselReview.reviewed_at)}` : ""}
-          </p>
-        </div>
-      ) : null}
-      {officeComment ? (
-        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Office comments</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{officeComment}</p>
-        </div>
-      ) : null}
       <NearMissEvidenceAttachments attachments={nearMiss.evidence_attachments} />
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1364,6 +1348,32 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
           <HighRiskDetail label="Weather / voyage details" value={nearMiss.near_miss_weather_voyage_details} />
           <HighRiskDetail label="Equipment details" value={nearMiss.near_miss_equipment_details} />
           <HighRiskDetail label="Lessons learned" value={nearMiss.near_miss_lessons_learned} />
+        </div>
+      ) : null}
+      {vesselReview?.comment ? (
+        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Vessel review comment</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{vesselReview.comment}</p>
+          <p className="mt-3 text-xs font-medium text-sky-800">
+            Reviewed by {vesselReview.reviewed_by_role || "vessel reviewer"}
+            {vesselReview.typed_name ? ` (${vesselReview.typed_name})` : ""}
+            {vesselReview.reviewed_at ? ` on ${formatDisplayDateTime(vesselReview.reviewed_at)}` : ""}
+          </p>
+        </div>
+      ) : null}
+      {officeComment ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Office comments</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{officeComment}</p>
+        </div>
+      ) : null}
+      {closureComment ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Closure comment</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{closureComment}</p>
+          {nearMiss.closed_at ? (
+            <p className="mt-3 text-xs font-medium text-slate-600">Closed on {formatDisplayDateTime(nearMiss.closed_at)}</p>
+          ) : null}
         </div>
       ) : null}
     </section>
