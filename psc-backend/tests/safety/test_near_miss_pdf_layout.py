@@ -261,3 +261,101 @@ class NearMissPdfLayoutTests(unittest.TestCase):
         self.assertNotIn("Weather / voyage details", text)
         self.assertNotIn("Equipment details", text)
         self.assertNotIn("Lessons learned", text)
+
+    def test_renderer_prints_long_review_comments_as_full_width_paginating_text(self) -> None:
+        office_comment = "\n".join(
+            [
+                (
+                    "Office review paragraph one confirms that the near miss was checked for "
+                    "mooring hazards, supervision, toolbox talk quality, and trainee controls."
+                ),
+                (
+                    "Office review paragraph two records that the Master must brief the deck team "
+                    "before each operation and confirm snap-back zones before lines are handled."
+                ),
+                (
+                    "Office review paragraph three keeps expanding the comment so it cannot fit "
+                    "comfortably inside a two-column detail table without risking bad wrapping."
+                ),
+            ]
+            * 5
+            + ["FINAL OFFICE COMMENT SENTENCE MUST REMAIN VISIBLE."]
+        )
+        vessel_comment = "\n".join(
+            [
+                "Master review confirms the crew briefing was completed before submission.",
+                "Chief Officer will monitor the next mooring operation and record the result.",
+            ]
+        )
+        near_miss = Incident.objects.create(
+            incident_number="NM/2026/044",
+            vessel_id="7",
+            record_type=Incident.RecordType.NEAR_MISS,
+            state=Incident.State.OFFICE_COMMENTS_COMPLETED,
+            current_phase=1,
+            incident_type_id=1,
+            loss_type_primary_id=1,
+            near_miss_priority="LOW",
+            near_miss_severity="LOW",
+            near_miss_place="AT_ANCHOR",
+            near_miss_shell_tag="Safety Awareness",
+            occurred_at=datetime.fromisoformat("2026-07-20T09:00:00+00:00"),
+            reported_at=datetime.fromisoformat("2026-07-21T13:08:00+00:00"),
+            narrative="Cadet slipped on a rope during mooring preparation but no injury occurred.",
+            near_miss_immediate_action="Work was stopped and the cadet was checked.",
+            near_miss_suggestion="Repeat toolbox talks before every mooring operation.",
+            reporter_id="crew-44",
+            reporter_name="Crew Reporter",
+            reporter_rank="D/Cadet",
+            created_by="crew-44",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+        IncidentPhaseLog.objects.create(
+            incident=near_miss,
+            phase_from=1,
+            phase_to=1,
+            transition_type=IncidentPhaseLog.TransitionType.FORWARD,
+            loop_back_reason=f"Office comment: {office_comment}",
+            actor_user_id="dpa-1",
+            actor_role_code="DPA",
+            schema_version=1,
+        )
+        SafetyFieldHistory.objects.create(
+            parent_table=near_miss._meta.db_table,
+            parent_id=near_miss.pk,
+            field_name="near_miss_vessel_review_signature",
+            old_value=None,
+            new_value={
+                "device_fingerprint": "device-review-44",
+                "signed_at": "2026-07-21T13:30:00+00:00",
+                "signed_by": "master-7",
+                "signed_role": "MASTER",
+                "typed_name": "Master Seven",
+            },
+            change_reason=vessel_comment,
+            actor_user_id="master-7",
+            actor_role_code="MASTER",
+            schema_version=1,
+        )
+
+        with patch(
+            "apps.safety.services.pdf_renderer.resolve_vessel_display",
+            return_value={"vessel_code": "ARY", "vessel_name": "MV Arya", "vessel_display_name": "MV Arya"},
+        ):
+            result = NearMissLightweightPdfRenderer().render_near_miss_pdf(
+                incident_id=near_miss.pk,
+                viewer_user=SimpleNamespace(role_name="DPA", id="dpa-1"),
+                persist=False,
+            )
+
+        reader = PdfReader(BytesIO(result.content))
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
+        self.assertIn("Review Comments", text)
+        self.assertIn("Vessel review comment", text)
+        self.assertIn("Office comments", text)
+        self.assertIn("Master review confirms the crew briefing", text)
+        self.assertIn("Chief Officer will monitor the next mooring operation", text)
+        self.assertIn("Office review paragraph one confirms", text)
+        self.assertIn("FINAL OFFICE COMMENT SENTENCE MUST REMAIN VISIBLE.", text)

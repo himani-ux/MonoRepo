@@ -682,6 +682,7 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 **Role gate:** `PermissionGate(SAF_F_002) + ActionGate(SAF_P_007)`.
 **Data loaded on mount:** `GET /api/safety/near-miss/:id/pdf/`.
 **Signature transition:** n/a (rendering).
+**Review comment layout:** Vessel review comment and Office comments render as full-width labelled text blocks under Review Comments, preserving line breaks and paginating normally for long comments.
 **States:** Loading spinner → Loaded inline viewer → Error "Generation failed — retry".
 **Navigation:** Download link.
 **Decisions:** D-PDF-03a, D-GAP-J1 revised 2026-06-09.

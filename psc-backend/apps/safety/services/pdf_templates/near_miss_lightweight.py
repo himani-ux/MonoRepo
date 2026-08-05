@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from html import escape
 from io import BytesIO
 
 from reportlab.lib import colors
@@ -109,6 +110,16 @@ class NearMissLightweightTemplate:
             leading=12,
             textColor=colors.HexColor("#475569"),
         )
+        self.comment_label_style = ParagraphStyle(
+            "SafetyNearMissPdfCommentLabel",
+            parent=self.body_style,
+            fontName="Helvetica-Bold",
+            fontSize=10,
+            leading=13,
+            spaceBefore=2,
+            spaceAfter=3,
+            textColor=colors.HexColor("#0F172A"),
+        )
 
     def render(self, context: NearMissLightweightPdfContext) -> bytes:
         buffer = BytesIO()
@@ -185,20 +196,14 @@ class NearMissLightweightTemplate:
                 ]
             )
 
-        review_rows = self._non_empty_detail_rows(
-            [
-                ("Vessel review comment", context.vessel_review_comment),
-                ("Office comments", context.office_comments),
-            ]
-        )
-        if review_rows:
-            story.extend(
+        story.extend(
+            self._review_comment_sections(
                 [
-                    Paragraph(self.SECTION_TITLES[5], self.section_style),
-                    self._details_table(review_rows),
-                    Spacer(1, 8),
+                    ("Vessel review comment", context.vessel_review_comment),
+                    ("Office comments", context.office_comments),
                 ]
             )
+        )
         story.extend(self._paragraph_section(self.SECTION_TITLES[6], context.fleet_learning_text))
         story.extend(self._paragraph_section(self.SECTION_TITLES[7], context.closure_reason))
         story.extend(self._build_signature_section(context.signature_rows))
@@ -291,6 +296,28 @@ class NearMissLightweightTemplate:
         if not self._non_empty_detail_rows([(title, value)]):
             return []
         return [Paragraph(title, self.section_style), Paragraph(value, self.body_style), Spacer(1, 8)]
+
+    def _review_comment_sections(self, rows: list[tuple[str, str]]) -> list[object]:
+        review_rows = self._non_empty_detail_rows(rows)
+        if not review_rows:
+            return []
+
+        blocks: list[object] = [Paragraph(self.SECTION_TITLES[5], self.section_style)]
+        for label, value in review_rows:
+            blocks.extend(
+                [
+                    Paragraph(label, self.comment_label_style),
+                    self._comment_paragraph(value),
+                    Spacer(1, 6),
+                ]
+            )
+        blocks.append(Spacer(1, 2))
+        return blocks
+
+    def _comment_paragraph(self, value: str) -> Paragraph:
+        cleaned = str(value or "").strip()
+        escaped = escape(cleaned).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br/>")
+        return Paragraph(escaped, self.body_style)
 
     @staticmethod
     def _table_style(*, header: bool = False) -> TableStyle:
