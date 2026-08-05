@@ -220,7 +220,7 @@ Anonymous near-miss reporting is removed from V1. Reporter name, rank, and user 
   near-miss/                                 # Near Miss list
     create/                                  # Create — one-screen form
     :id/                                     # Near Miss detail (authorized users see reporter identity)
-    :id/triage/                              # Office Comments: LOW/MEDIUM by PIC, HIGH by DPA
+    :id/office-comments/                     # Office Comments: LOW/MEDIUM by PIC, HIGH by DPA
     :id/fleet-alert/                         # Issue fleet alert (HIGH)
     :id/pdf/                                 # 1-2 page lightweight PDF
   scm/                                       # Safety Committee Meeting list
@@ -642,22 +642,22 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 - LOW → PIC review → closure signature (DESIGN_SYSTEM §8.2 role-varied signature block).
 - HIGH → Master / HOD vessel-side review signature captured with typed name + device fingerprint before Office Comments / fleet-alert approval.
 **States:**
-- **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3).
+- **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3). When available, Vessel review comments and completed Office Comments are shown as read-only review-note blocks in the summary.
 - **Loading:** Skeleton card.
 - **Empty:** n/a.
 - **Error — network / auth:** standard.
 **Navigation:**
-- `[Office Comments]` → `/safety/near-miss/:id/triage/` (PIC accepts LOW/MEDIUM; DPA accepts HIGH; either can send back for rework when authorized; Master can submit rework regardless of original reporter).
+- `[Office Comments]` → `/safety/near-miss/:id/office-comments/` (PIC accepts LOW/MEDIUM; DPA accepts HIGH; either can send back for rework when authorized; Master can submit rework regardless of original reporter).
 - `[Issue Fleet Alert]` → `/safety/near-miss/:id/fleet-alert/` (DPA if HIGH).
 - `[Close]` → PIC action.
 **Decisions:** D-GAP-J1 revised 2026-06-09, D-GAP-R22 (Office Comments), §4.3 SSOT (lightweight).
 
-### 5.4 Near Miss Office Comments — `/safety/near-miss/:id/triage/`
+### 5.4 Near Miss Office Comments — `/safety/near-miss/:id/office-comments/`
 
 **Role gate:** `PermissionGate(SAF_F_002)` plus office action permission. PIC/office PIC accepts LOW and MEDIUM cases; DPA accepts HIGH cases.
 **Data loaded on mount:** Existing record + suggested priority + current category tag.
-**Actions:** `Accept` saves priority, category tag, and office comment. `Send to Rework` moves the record back to vessel rework with a required reason.
-**States:** Standard loaded/loading; error if priority override or rework send-back is missing a reason.
+**Actions:** `Accept` saves priority, category tag, and office comment. `Send to Rework` moves the record back to vessel rework with a required reason. After the record reaches `OFFICE_COMMENTS_COMPLETED`, the screen remains open for review but the office action buttons are disabled and the saved comment is shown read-only in the summary.
+**States:** Standard loaded/loading; error if priority override or rework send-back is missing a reason; completed records show a simple completed notice instead of the vessel-review blocker.
 **Navigation:** Back to detail.
 **Decisions:** D-GAP-R22.
 
@@ -1155,7 +1155,7 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 | FEAT-SAF-INC-041 | R: Phase 1 position block + MSC-MEPC.3 PDF | — |
 | FEAT-SAF-NM-001 | P: `/safety/near-miss/create/` | R: list |
 | FEAT-SAF-NM-002 | P: detail (every near-miss screen) | R: PDF, list |
-| FEAT-SAF-NM-003 | P: `/safety/near-miss/:id/triage/` (Office Comments) | R: detail |
+| FEAT-SAF-NM-003 | P: `/safety/near-miss/:id/office-comments/` (Office Comments) | R: detail |
 | FEAT-SAF-NM-004 | P: `/safety/near-miss/:id/` | — |
 | FEAT-SAF-NM-005 | R: create screen minimum-detail validation | — |
 | FEAT-SAF-NM-006 | P: `/safety/near-miss/:id/fleet-alert/` | R: Circular module |

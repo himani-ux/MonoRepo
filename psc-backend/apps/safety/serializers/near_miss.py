@@ -87,6 +87,7 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
     vessel_display_name = serializers.SerializerMethodField()
     rework_summary = serializers.SerializerMethodField()
     vessel_review_summary = serializers.SerializerMethodField()
+    office_comment = serializers.SerializerMethodField()
     evidence_attachments = serializers.SerializerMethodField()
     reporter_user_id = serializers.CharField(
         source="reporter_id",
@@ -140,6 +141,7 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "created_date",
             "updated_by",
             "updated_date",
+            "office_comment",
             "rework_summary",
             "vessel_review_summary",
             "evidence_attachments",
@@ -152,6 +154,7 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "current_phase",
             "created_date",
             "updated_date",
+            "office_comment",
         )
 
     def get_rework_summary(self, obj: Incident) -> dict[str, object] | None:
@@ -205,6 +208,35 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "reviewed_by_role": payload.get("signed_role") or history_row.actor_role_code,
             "typed_name": payload.get("typed_name"),
         }
+
+    def get_office_comment(self, obj: Incident) -> str | None:
+        stored_comment = str(getattr(obj, "office_comment", "") or "").strip()
+        if stored_comment:
+            return stored_comment
+
+        if obj.state != Incident.State.OFFICE_COMMENTS_COMPLETED:
+            return None
+
+        phase_log = (
+            IncidentPhaseLog.objects.filter(
+                incident=obj,
+                transition_type=IncidentPhaseLog.TransitionType.FORWARD,
+            )
+            .order_by("-occurred_at", "-id")
+            .first()
+        )
+        if phase_log is None:
+            return None
+
+        comment = str(phase_log.loop_back_reason or "").strip()
+        if not comment:
+            return None
+
+        for part in comment.split("|"):
+            cleaned = part.strip()
+            if cleaned.lower().startswith("office comment:"):
+                return cleaned.split(":", 1)[1].strip() or None
+        return comment
 
     def get_evidence_attachments(self, obj: Incident) -> list[dict[str, object]]:
         attachments: list[dict[str, object]] = []

@@ -58,6 +58,7 @@ interface NearMissRecord {
   visibility_rule?: string;
   closure_reason?: string | null;
   closed_at?: string | null;
+  office_comment?: string | null;
   evidence_attachments?: NearMissEvidenceAttachment[];
   rework_summary?: {
     comment?: string | null;
@@ -578,7 +579,9 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
     nearMiss,
   });
   const closureDisabled = isMutating || closureBlockers.length > 0 || !closureDraft.closure_reason.trim() || !closureDraft.typed_name.trim();
-  const triageBlockedByReview = nearMiss ? normalizeCode(nearMiss.state) !== READY_FOR_OFFICE_COMMENTS_STATE : true;
+  const nearMissState = normalizeCode(nearMiss?.state);
+  const officeCommentsCompleted = nearMissState === OFFICE_COMMENTS_COMPLETED_STATE;
+  const triageBlockedByReview = nearMiss ? ![READY_FOR_OFFICE_COMMENTS_STATE, OFFICE_COMMENTS_COMPLETED_STATE].includes(nearMissState) : true;
   const officePriorityChanged = nearMiss
     ? triage.near_miss_priority !== normalizeCode(nearMiss.near_miss_priority || "LOW")
     : false;
@@ -589,7 +592,6 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
   const supersedeReasonMissing = triage.supersede_to_incident && !triage.override_reason.trim();
   const officeReasonMissing = categoryChangeReasonMissing || supersedeReasonMissing;
   const officeReworkReasonMissing = !triage.override_reason.trim() || categoryChangeReasonMissing;
-  const nearMissState = normalizeCode(nearMiss?.state);
   const reworkAvailableForState = nearMissState === "REWORK_REQUIRED" || nearMissState === REJECTED_STATE;
 
   const visibleLinks = useMemo(
@@ -1022,6 +1024,7 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
           {mode === "office-comments" ? (
             <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={submitTriage}>
               <h2 className="text-xl font-semibold text-slate-900">Office Comments</h2>
+              {officeCommentsCompleted ? <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">Office comments are completed. Saved comments are shown in the summary above.</p> : null}
               {!canSendBackOfficeComment ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Office comments are available only for the assigned PIC or DPA authority.</p> : null}
               {!canAcceptOfficeComment && canSendBackOfficeComment ? <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">This near miss must be accepted by an authorized office reviewer. You can still send this report back for rework or reject it if required.</p> : null}
               {triageBlockedByReview ? <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Vessel-side review must submit this near miss to office before office comments can be saved.</p> : null}
@@ -1109,13 +1112,13 @@ export function SafetyNearMissWorkspace({ mode }: { mode: NearMissMode }) {
                 />
               </label>
               <div className="mt-4 flex flex-wrap gap-3">
-                <button className="min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !canAcceptOfficeComment || triageBlockedByReview || officeReasonMissing} type="submit">
+                <button className="min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || officeCommentsCompleted || !canAcceptOfficeComment || triageBlockedByReview || officeReasonMissing} type="submit">
                   {isMutating ? "Saving..." : "Accept"}
                 </button>
-                <button className="min-h-11 rounded-full border border-amber-300 bg-amber-50 px-5 text-sm font-semibold text-amber-900 disabled:bg-slate-100 disabled:text-slate-400" disabled={isMutating || !canSendBackOfficeComment || triageBlockedByReview || officeReworkReasonMissing} onClick={() => void sendOfficeRework()} type="button">
+                <button className="min-h-11 rounded-full border border-amber-300 bg-amber-50 px-5 text-sm font-semibold text-amber-900 disabled:bg-slate-100 disabled:text-slate-400" disabled={isMutating || officeCommentsCompleted || !canSendBackOfficeComment || triageBlockedByReview || officeReworkReasonMissing} onClick={() => void sendOfficeRework()} type="button">
                   {isMutating ? "Sending..." : "Send to Rework"}
                 </button>
-                <button className="min-h-11 rounded-full border border-rose-300 bg-rose-50 px-5 text-sm font-semibold text-rose-900 disabled:bg-slate-100 disabled:text-slate-400" disabled={isMutating || !canRejectOfficeComment || triageBlockedByReview || !triage.override_reason.trim()} onClick={() => void rejectOfficeReview()} type="button">
+                <button className="min-h-11 rounded-full border border-rose-300 bg-rose-50 px-5 text-sm font-semibold text-rose-900 disabled:bg-slate-100 disabled:text-slate-400" disabled={isMutating || officeCommentsCompleted || !canRejectOfficeComment || triageBlockedByReview || !triage.override_reason.trim()} onClick={() => void rejectOfficeReview()} type="button">
                   {isMutating ? "Rejecting..." : "Reject"}
                 </button>
               </div>
@@ -1277,6 +1280,7 @@ function extractNearMiss(payload: unknown): NearMissRecord | null {
 
 function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
   const vesselReview = nearMiss.vessel_review_summary;
+  const officeComment = nearMiss.office_comment?.trim();
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1330,6 +1334,12 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
             {vesselReview.typed_name ? ` (${vesselReview.typed_name})` : ""}
             {vesselReview.reviewed_at ? ` on ${formatDisplayDateTime(vesselReview.reviewed_at)}` : ""}
           </p>
+        </div>
+      ) : null}
+      {officeComment ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Office comments</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{officeComment}</p>
         </div>
       ) : null}
       <NearMissEvidenceAttachments attachments={nearMiss.evidence_attachments} />

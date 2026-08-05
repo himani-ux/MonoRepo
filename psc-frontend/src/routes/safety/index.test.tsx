@@ -2224,6 +2224,49 @@ describe('safety routes', () => {
     expect(screen.queryByText('DRAFT-ABC/2026/T014')).not.toBeInTheDocument();
   });
 
+  it('shows_completed_near_miss_office_comments_without_vessel_review_blocker', async () => {
+    safetyApiMocks.getNearMiss.mockResolvedValueOnce({
+      id: '99',
+      incident_number: 'NM-BACKEND-0099',
+      near_miss_priority: 'LOW',
+      office_comment: 'Office reviewed this near miss and accepted the action.',
+      reporter_name: 'Test Reporter',
+      state: 'OFFICE_COMMENTS_COMPLETED',
+      vessel_id: 'vessel-1',
+      vessel_review_summary: {
+        comment: 'Master reviewed and submitted to office.',
+        reviewed_by_role: 'MASTER',
+        typed_name: 'Captain Test',
+      },
+    });
+
+    renderSafetyRoute('/safety/near-miss/99/office-comments', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-2',
+      isGlobal: true,
+      processIds: ['SAF_P_002'],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    expect(await screen.findByText(/NM-BACKEND-0099/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Master reviewed and submitted to office.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Office reviewed this near miss and accepted the action.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Office comments are completed. Saved comments are shown in the summary above.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Vessel-side review must submit this near miss to office before office comments can be saved.')
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send to Rework' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeDisabled();
+  });
+
   it('loads_live_near_miss_export_route_with_backend_masking_note', async () => {
     renderSafetyRoute('/safety/near-miss/99/pdf', {
       formIds: ['SAF_F_002'],

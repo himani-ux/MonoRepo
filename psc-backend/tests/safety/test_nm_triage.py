@@ -81,6 +81,7 @@ class NearMissTriageTests(unittest.TestCase):
         self.assertEqual(self.near_miss.near_miss_priority, "LOW")
         self.assertEqual(self.near_miss.state, "OFFICE_COMMENTS_COMPLETED")
         self.assertEqual(response.data["suggested_priority"], "LOW")
+        self.assertEqual(response.data["office_comment"], "PIC reviewed and accepts the report.")
 
         phase_log = IncidentPhaseLog.objects.get(incident_id=self.near_miss.pk)
         self.assertEqual(phase_log.phase_from, 1)

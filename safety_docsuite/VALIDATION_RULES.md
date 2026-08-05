@@ -249,6 +249,7 @@ Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. A
 | V-NM-014 | Factor cause option UUID is inactive, belongs to another factor/stage, or does not exist | server | "Select valid near-miss cause options." | FEAT-SAF-NM-001 |
 | V-NM-015 | Near Miss Fleet Alert issue has selected vessels without `VesselData.Email` or backend SMTP sender credentials are missing | server | "Email is not recorded in VesselData for: ..." or "Fleet Alert email sender credentials are not configured." | D-MAINT-CR083 |
 | V-NM-016 | Near Miss Fleet Alert email dispatch succeeds | server | Email is sent as one selected-vessel BCC batch with `HSSEQ@kaizenship.net` in CC, the Near Miss PDF attached, and a short prevention-focused body | D-MAINT-CR086 |
+| V-NM-017 | Office Comments save attempted after Near Miss is already `OFFICE_COMMENTS_COMPLETED` | client + server | Completed Office Comments are read-only; saved office and vessel review notes remain visible on the workspace. | D-GAP-R22 |
 
 ---
 
