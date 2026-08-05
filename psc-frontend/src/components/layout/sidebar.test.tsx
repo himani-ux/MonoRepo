@@ -133,11 +133,29 @@ describe('Sidebar', () => {
     expect(screen.getByText('7')).toBeInTheDocument();
   });
 
-  it('shows_help_entry_in_footer_for_authenticated_users', () => {
+  it('hides_help_entry_in_footer_for_authenticated_users', () => {
     render(<Sidebar isOpen />);
 
-    expect(screen.getByText('Help')).toBeInTheDocument();
-    expect(screen.getByText('User guides by module')).toBeInTheDocument();
+    expect(screen.queryByText('Help')).not.toBeInTheDocument();
+    expect(screen.queryByText('User guides by module')).not.toBeInTheDocument();
+  });
+
+  it('shows_certs_entry_when_user_has_certs_access', () => {
+    sidebarMocks.useAuth.mockReturnValue({
+      user: {
+        user_type: 'office',
+      },
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      canAccessReports: false,
+      vesselId: null,
+      hasForm: vi.fn((formId: string) => formId === 'CERT_F_001'),
+    });
+
+    render(<Sidebar isOpen />);
+
+    expect(screen.getByRole('link', { name: 'Certs' })).toHaveAttribute('href', '/certs');
   });
 
   it('keeps inspection tree collapsed on circular route until inspection is clicked', () => {
@@ -180,14 +198,60 @@ describe('Sidebar', () => {
 
     render(<Sidebar isOpen />);
 
-    expect(screen.getByRole('link', { name: /safety/i })).toHaveAttribute('href', '/safety/scm');
+    const safetyButton = screen.getByRole('button', { name: /safety/i });
+    const committeeLink = screen.getByRole('link', { name: 'Committee Meetings' });
+
+    expect(safetyButton).toHaveAttribute('aria-expanded', 'true');
+    expect(safetyButton.querySelector('svg')).toBeInTheDocument();
+    expect(committeeLink).toHaveAttribute('href', '/safety/scm');
+    expect(committeeLink.querySelector('svg')).toBeInTheDocument();
   });
 
-  it('marks_help_entry_as_active_on_help_route', () => {
+  it('hides_broad_safety_admin_link_but_keeps_auditor_export', () => {
+    sidebarMocks.useLocation.mockReturnValue({ pathname: '/safety/admin/auditor-export' });
+    sidebarMocks.useAuth.mockReturnValue({
+      user: {
+        user_type: 'office',
+      },
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      canAccessReports: false,
+      hasForm: vi.fn((formId: string) =>
+        ['SAF_F_015', 'SAF_F_018', 'SAF_F_020'].includes(formId),
+      ),
+    });
+
+    render(<Sidebar isOpen />);
+
+    expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument();
+    const auditorLink = screen.getByRole('link', { name: 'Auditor Export' });
+
+    expect(auditorLink).toHaveAttribute(
+      'href',
+      '/safety/admin/auditor-export',
+    );
+    expect(auditorLink.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('does_not_render_help_entry_on_help_route', () => {
     sidebarMocks.useLocation.mockReturnValue({ pathname: '/help' });
 
     render(<Sidebar isOpen />);
 
-    expect(screen.getByRole('link', { name: /help user guides by module/i })).toHaveAttribute('href', '/help');
+    expect(screen.queryByRole('link', { name: /help user guides by module/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps_sidebar_navigation_scrollable_in_both_directions_and_adds_psc_icon', () => {
+    render(<Sidebar isOpen />);
+
+    const sidebar = screen.getByRole('complementary');
+    const navigation = screen.getByRole('navigation', { name: /main navigation/i });
+    const pscButton = screen.getByRole('button', { name: /psc/i });
+
+    expect(sidebar).toHaveClass('w-72');
+    expect(navigation).toHaveClass('overflow-y-auto');
+    expect(navigation).toHaveClass('overflow-x-auto');
+    expect(pscButton.querySelector('svg')).toBeInTheDocument();
   });
 });

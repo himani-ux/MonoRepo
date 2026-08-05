@@ -421,9 +421,6 @@ export default function SafetyScmDetailRoute() {
       {actionError ? <SafetyFloatingFeedback tone="error">{getErrorMessage(actionError)}</SafetyFloatingFeedback> : null}
       {actionSuccess ? <SafetyFloatingFeedback tone="success">{actionSuccess}</SafetyFloatingFeedback> : null}
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_55%,#fef9c3_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / SCM
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">SCM Detail</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
           Meeting record for the locked SCM structure with attendance,
@@ -462,7 +459,7 @@ export default function SafetyScmDetailRoute() {
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Attendance + WRH snapshot</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Attendance and Rest Hours</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               {attendanceQuery.isLoading
                 ? "Loading saved attendance and WRH status..."
@@ -471,7 +468,7 @@ export default function SafetyScmDetailRoute() {
                   : attendanceRows.length === 0
                     ? "No attendees recorded yet."
                     : wrhClear
-                      ? "All saved attendance rows are WRH compliant."
+                      ? "All saved attendance records are WRH compliant."
                       : "WRH warnings are present in the saved attendance record."}
             </p>
           </div>

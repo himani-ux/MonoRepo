@@ -80,8 +80,20 @@ class CertNotificationListView(APIView):
 
         page = max(1, int(request.query_params.get("page", 1)))
         page_size = min(max(1, int(request.query_params.get("page_size", 20))), 100)
+        offset = (page - 1) * page_size
 
         with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM {_table_name("master_notification")} mn
+                JOIN {_table_name("vims_certs_notification_meta")} meta
+                  ON meta.master_notification_id = mn.id
+                WHERE {" AND ".join(where_parts)}
+                """,
+                params,
+            )
+            total_count = int(cursor.fetchone()[0] or 0)
             cursor.execute(
                 f"""
                 SELECT
@@ -109,19 +121,17 @@ class CertNotificationListView(APIView):
                   ON meta.master_notification_id = mn.id
                 WHERE {" AND ".join(where_parts)}
                 ORDER BY meta.sent_at DESC
+                OFFSET %s ROWS FETCH NEXT %s ROWS ONLY
                 """,
-                params,
+                [*params, offset, page_size],
             )
             rows = [_row_dict(cursor, row) for row in cursor.fetchall()]
 
-        total_count = len(rows)
         total_pages = max(1, math.ceil(total_count / page_size))
-        offset = (page - 1) * page_size
-        paged_rows = rows[offset : offset + page_size]
 
         return Response(
             {
-                "data": [self._serialize_row(row) for row in paged_rows],
+                "data": [self._serialize_row(row) for row in rows],
                 "pagination": {
                     "page": page,
                     "page_size": page_size,

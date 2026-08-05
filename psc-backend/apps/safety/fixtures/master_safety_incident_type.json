@@ -1,79 +1,226 @@
 [
   {
-    "type_code": "IMO_COLLISION",
+    "type_code": "INC_COLLISION",
     "type_name": "Collision",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_STRANDING_GROUNDING",
-    "type_name": "Stranding / Grounding",
+    "type_code": "INC_GROUNDING",
+    "type_name": "Grounding",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_CONTACT",
-    "type_name": "Contact (with fixed/floating object)",
+    "type_code": "INC_STRANDING",
+    "type_name": "Stranding",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_FIRE_EXPLOSION",
-    "type_name": "Fire / Explosion",
+    "type_code": "INC_TOUCHED_BOTTOM_BERTH_ANCHORAGE",
+    "type_name": "Touched bottom at berth / anchorage",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_HULL_FAILURE",
-    "type_name": "Hull failure",
+    "type_code": "INC_TOUCHED_BOTTOM_RIVERS_CANALS",
+    "type_name": "Touched bottom in rivers / canals",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_MACHINERY_DAMAGE",
-    "type_name": "Machinery damage",
+    "type_code": "INC_ALLISION_JETTY_BERTH_LOCKS",
+    "type_name": "Allision with Jetty / Berth / Locks",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_DAMAGE_TO_SHIP_EQUIPMENT",
-    "type_name": "Damage to ship / equipment",
+    "type_code": "INC_ALLISION_OTHER_VESSELS",
+    "type_name": "Allision with other Vessels",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_CAPSIZING_LISTING",
-    "type_name": "Capsizing / listing",
+    "type_code": "INC_ALLISION_ICE",
+    "type_name": "Allision with ice",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_MISSING_VESSEL",
-    "type_name": "Missing vessel",
+    "type_code": "INC_ALLISION_NAV_AIDS_BUOYS_OBJECTS",
+    "type_name": "Allision with Navigation Aids / Buoys / Other objects",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_LIFE_SAVING_APPLIANCE_ACCIDENT",
-    "type_name": "Accidents with life-saving appliances",
+    "type_code": "INC_FOUNDERING",
+    "type_name": "Foundering",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   },
   {
-    "type_code": "IMO_OTHER",
+    "type_code": "INC_CAPSIZING_LOSS_STABILITY",
+    "type_name": "Capsizing / Loss of Stability",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_FLOODING",
+    "type_name": "Flooding",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EXPLOSION",
+    "type_name": "Explosion",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_FIRE",
+    "type_name": "Fire",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_CARGO_DAMAGE",
+    "type_name": "Cargo Damage",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_HULL_STRUCTURAL_FAILURE",
+    "type_name": "Hull / Structural Failure",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_FOULING_PIPELINE_SUBMARINE_CABLE",
+    "type_name": "The fouling or damaging by a vessel of a pipeline or submarine cable",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_FOULING_AID_TO_NAVIGATION",
+    "type_name": "The fouling or damaging by a vessel of an aid to navigation other than allision",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_FOULING_PORT_TERMINAL_INSTALLATION",
+    "type_name": "The fouling or damaging by a vessel of a port/terminal installation",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EQUIPMENT_FAILURE_ELECTRICAL_POWER",
+    "type_name": "Failure of ship's equipment resulting in loss of vessel's electrical power",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EQUIPMENT_FAILURE_PROPULSION",
+    "type_name": "Failure of ship's equipment resulting in loss of propulsion",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EQUIPMENT_FAILURE_STEERING",
+    "type_name": "Failure of ship's equipment resulting in loss of steering capabilities",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EQUIPMENT_FAILURE_CARGO_DELAY",
+    "type_name": "Failure of ship's equipment resulting in a delay of cargo operation of more than 6 hours",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EQUIPMENT_FAILURE_UNSEAWORTHY",
+    "type_name": "Failure of ship's equipment rendering the vessel in any other way unseaworthy",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_EQUIPMENT_OR_HULL_CARGO_DAMAGE",
+    "type_name": "Failure of ship's equipment or hull resulting in cargo damage",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_CREW_INJURY",
+    "type_name": "Crew Injury",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_POLLUTION",
+    "type_name": "Pollution",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_LOCAL_REGULATION_BREACH",
+    "type_name": "Breach of Local Regulations",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_STOWAWAY",
+    "type_name": "Stowaway Incident",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_SECURITY",
+    "type_name": "Security Incident",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_CYBER_SECURITY_BREACH",
+    "type_name": "Breach of Cyber Security",
+    "imo_reportable": 1,
+    "description": "Current incident type from CR-031.",
+    "active": 1
+  },
+  {
+    "type_code": "INC_OTHER",
     "type_name": "Other",
     "imo_reportable": 1,
-    "description": "IMO reportable incident type from SSOT section 2B.5.",
+    "description": "Current incident type from CR-031.",
     "active": 1
   }
 ]

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import unittest
 
 from django.apps import apps as django_apps
+from django.db import connection
 
 from tests.safety.support import bootstrap_django, recreate_incident_table
 
@@ -35,6 +36,110 @@ def build_user(*, role_name: str, user_id: str, process_ids: list[str]):
         vessel_ids=["7"],
         is_global=False,
     )
+
+
+VESSEL_UUID = "11111111-1111-1111-1111-111111111111"
+MASTER_RANK_UUID = "22222222-2222-2222-2222-222222222222"
+CHIEF_ENGINEER_RANK_UUID = "33333333-3333-3333-3333-333333333333"
+
+
+def recreate_phase8_crew_reference_tables() -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("DROP TABLE IF EXISTS Crew_Onboarding_History")
+        cursor.execute("DROP TABLE IF EXISTS HRM501")
+        cursor.execute("DROP TABLE IF EXISTS master_applied_rank")
+        cursor.execute(
+            """
+            CREATE TABLE master_applied_rank (
+                id VARCHAR(36) PRIMARY KEY,
+                rank_name VARCHAR(128) NULL,
+                is_active BOOLEAN NULL DEFAULT 1,
+                is_deleted BOOLEAN NULL DEFAULT 0
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE HRM501 (
+                id VARCHAR(36) PRIMARY KEY,
+                CrewID VARCHAR(16) NOT NULL,
+                first_name VARCHAR(128) NULL,
+                surname VARCHAR(128) NULL,
+                rank_name VARCHAR(36) NULL,
+                is_active BOOLEAN NULL DEFAULT 1,
+                is_deleted BOOLEAN NULL DEFAULT 0
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE Crew_Onboarding_History (
+                id VARCHAR(36) PRIMARY KEY,
+                CrewID VARCHAR(16) NOT NULL,
+                Vessel VARCHAR(36) NULL,
+                SignOnDate DATETIME NULL,
+                SignOffDate DATETIME NULL,
+                is_active BOOLEAN NULL DEFAULT 1,
+                is_deleted BOOLEAN NULL DEFAULT 0,
+                created_date DATETIME NULL
+            )
+            """
+        )
+        cursor.executemany(
+            "INSERT INTO master_applied_rank (id, rank_name, is_active, is_deleted) VALUES (%s, %s, %s, %s)",
+            [
+                (MASTER_RANK_UUID, "MASTER", 1, 0),
+                (CHIEF_ENGINEER_RANK_UUID, "CHIEF ENGINEER", 1, 0),
+            ],
+        )
+        cursor.executemany(
+            """
+            INSERT INTO HRM501 (id, CrewID, first_name, surname, rank_name, is_active, is_deleted)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                ("44444444-4444-4444-4444-444444444444", "KSM0001", "Master", "Current", MASTER_RANK_UUID, 1, 0),
+                (
+                    "55555555-5555-5555-5555-555555555555",
+                    "KSM0002",
+                    "Chief",
+                    "Engineer",
+                    CHIEF_ENGINEER_RANK_UUID,
+                    1,
+                    0,
+                ),
+            ],
+        )
+        cursor.executemany(
+            """
+            INSERT INTO Crew_Onboarding_History (
+                id, CrewID, Vessel, SignOnDate, SignOffDate, is_active, is_deleted, created_date
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                (
+                    "66666666-6666-6666-6666-666666666666",
+                    "KSM0001",
+                    VESSEL_UUID,
+                    "2026-01-01 00:00:00",
+                    None,
+                    1,
+                    0,
+                    "2026-01-01 00:00:00",
+                ),
+                (
+                    "77777777-7777-7777-7777-777777777777",
+                    "KSM0002",
+                    VESSEL_UUID,
+                    "2026-01-02 00:00:00",
+                    None,
+                    1,
+                    0,
+                    "2026-01-02 00:00:00",
+                ),
+            ],
+        )
 
 
 class Phase8LoopbackTests(unittest.TestCase):
@@ -76,6 +181,52 @@ class Phase8LoopbackTests(unittest.TestCase):
         self.assertEqual(response.data["phase_title"], "Loss Evaluation")
         self.assertEqual(response.data["report_type"], "INCIDENT")
         self.assertFalse(response.data["has_loss_evaluation"])
+
+    def test_workspace_auto_fills_current_vessel_master_and_chief_engineer(self) -> None:
+        recreate_phase8_crew_reference_tables()
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/P8CREW1",
+            vessel_id=VESSEL_UUID,
+            state="IN_PROGRESS",
+            current_phase=7,
+            risk_band=Incident.RiskBand.YELLOW,
+            pic_user_id="pic-1",
+            created_by="master-1",
+            updated_by="master-1",
+            schema_version=1,
+        )
+
+        payload = build_phase8_workspace_payload(incident)
+
+        self.assertEqual(payload["loss_evaluation"]["name_of_master"], "Master Current")
+        self.assertEqual(payload["loss_evaluation"]["name_of_chief_engineer"], "Chief Engineer")
+
+    def test_workspace_preserves_saved_loss_evaluation_officer_names(self) -> None:
+        recreate_phase8_crew_reference_tables()
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/P8CREW2",
+            vessel_id=VESSEL_UUID,
+            state="IN_PROGRESS",
+            current_phase=7,
+            risk_band=Incident.RiskBand.YELLOW,
+            pic_user_id="pic-1",
+            created_by="master-1",
+            updated_by="master-1",
+            schema_version=1,
+        )
+        IncidentLossEvaluation.objects.create(
+            incident=incident,
+            name_of_master="Manual Master",
+            name_of_chief_engineer="Manual Chief Engineer",
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+
+        payload = build_phase8_workspace_payload(incident)
+
+        self.assertEqual(payload["loss_evaluation"]["name_of_master"], "Manual Master")
+        self.assertEqual(payload["loss_evaluation"]["name_of_chief_engineer"], "Manual Chief Engineer")
 
     def test_ship_user_can_fill_loss_evaluation_before_office_approval(self) -> None:
         incident = Incident.objects.create(
@@ -252,7 +403,7 @@ class Phase8LoopbackTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["looped_back"])
 
-    def test_pic_can_close_red_incident_after_loss_evaluation_is_saved(self) -> None:
+    def test_phase_eight_close_endpoint_rejects_closure(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/P8PIC-R",
             vessel_id="7",
@@ -287,10 +438,11 @@ class Phase8LoopbackTests(unittest.TestCase):
 
         response = self.close_view(request, id=incident.pk)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         incident.refresh_from_db()
-        self.assertEqual(incident.current_phase, 9)
-        self.assertEqual(incident.state, "CLOSED")
+        self.assertEqual(incident.current_phase, 8)
+        self.assertEqual(incident.state, "APPROVED")
+        self.assertIn("Incident close is handled in Phase 6 Office Review.", str(response.data))
 
     def test_workspace_saves_incident_loss_evaluation(self) -> None:
         incident = Incident.objects.create(

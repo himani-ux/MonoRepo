@@ -15,6 +15,7 @@ bootstrap_django()
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.safety.models import Incident
+from apps.safety.models import NearMissCauseOption
 from apps.safety.views.near_miss import NearMissListCreateView, NearMissRateLimitView
 
 
@@ -35,6 +36,21 @@ def long_narrative(seed: int) -> str:
         f"Near miss {seed} involved unsecured stores shifting during rolling weather near frame {seed}, "
         "and the crew reported the exposure before it escalated into contact, injury, or equipment damage."
     )
+
+
+def build_factor_causes_payload() -> list[dict[str, str]]:
+    rows = []
+    for factor in ("HUMAN", "VESSEL", "MANAGEMENT", "OTHER"):
+        immediate = NearMissCauseOption.objects.get(factor=factor, cause_stage=NearMissCauseOption.CauseStage.IMMEDIATE)
+        root = NearMissCauseOption.objects.get(factor=factor, cause_stage=NearMissCauseOption.CauseStage.ROOT)
+        rows.append(
+            {
+                "factor": factor,
+                "immediate_option_id": str(immediate.id),
+                "root_option_id": str(root.id),
+            }
+        )
+    return rows
 
 
 class NearMissRateLimitTests(unittest.TestCase):
@@ -115,6 +131,7 @@ class NearMissRateLimitTests(unittest.TestCase):
             "occurred_at": (occurred_at or datetime.now(dt_timezone.utc) - timedelta(minutes=10)).isoformat(),
             "near_miss_severity": "LOW",
             "near_miss_shell_tag": "Liveware",
+            "near_miss_factor_causes": build_factor_causes_payload(),
             "near_miss_immediate_action": "Crew corrected the condition immediately.",
             "near_miss_suggestion": "Repeat the loose gear check before each watch.",
             "reporter_device_fingerprint": "device-wiper-7",

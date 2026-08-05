@@ -95,6 +95,31 @@ class SCMRepository(BaseRepository):
 
         return meeting
 
+    def build_wrh_host_readiness(
+        self,
+        *,
+        vessel_id: str,
+        meeting_date: date | datetime | str,
+        attendance_rows: Iterable[Mapping[str, object]] | None = None,
+    ) -> dict[str, object]:
+        normalized_vessel_id = str(vessel_id or "").strip()
+        anchor_date = self._coerce_meeting_date(meeting_date)
+        provided_rows = list(attendance_rows or [])
+        if provided_rows:
+            crew_roster = self._crew_roster_from_attendance_rows(provided_rows)
+        else:
+            crew_roster = self._safe_list_current_vessel_crew(
+                vessel_id=normalized_vessel_id,
+                active_on=anchor_date,
+            ) if normalized_vessel_id else []
+        attendee_rows = self._build_attendee_preview_rows(
+            vessel_id=normalized_vessel_id,
+            meeting_date=anchor_date,
+            crew_roster=crew_roster,
+            include_wrh_preview=True,
+        )
+        return self._build_wrh_host_readiness_from_attendee_rows(attendee_rows)
+
     def update_meeting(
         self,
         *,
@@ -516,6 +541,10 @@ class SCMRepository(BaseRepository):
             "rows": serialized_rows,
         }
 
+
+
+
+
     def build_cadence_warning(self, *, vessel_id: str, meeting_date: date | None = None) -> dict[str, object] | None:
         # APP_FLOW/PRD anchor cadence and Closed-Since-Last on the latest
         # signed-off SCM closure regardless of SCM type. Ad-Hoc still does not
@@ -723,6 +752,117 @@ class SCMRepository(BaseRepository):
                 }
             )
         return preview_rows
+
+    @staticmethod
+    def _crew_roster_from_attendance_rows(rows: Iterable[Mapping[str, object]]) -> list[dict[str, object]]:
+        roster: list[dict[str, object]] = []
+        seen_crew_ids: set[str] = set()
+        for row in rows:
+            crew_id = str(row.get("crew_id") or "").strip()
+            if not crew_id or crew_id in seen_crew_ids:
+                continue
+            roster.append(
+                {
+                    "crew_id": crew_id,
+                    "crew_name": str(row.get("display_name") or crew_id).strip(),
+                    "department": str(row.get("department") or "").strip(),
+                    "rank": str(row.get("rank_name") or row.get("rank") or "").strip(),
+                }
+            )
+            seen_crew_ids.add(crew_id)
+        return roster
+
+    def _build_wrh_host_readiness_from_attendee_rows(
+        self,
+        attendee_rows: list[dict[str, object]],
+    ) -> dict[str, object]:
+        warnings: list[str] = []
+        blocking_crew: list[dict[str, object]] = []
+        missing_ship_time = any(
+            "missing_timezone" in {str(code) for code in row.get("warning_codes", [])}
+            for row in attendee_rows
+        )
+        if not attendee_rows:
+            warnings.append("SCM cannot be hosted until the current crew roster is available for WRH readiness.")
+        if missing_ship_time:
+            warnings.append("SCM cannot be hosted until ship time is configured for this vessel/date.")
+
+        for row in attendee_rows:
+            warning_codes = {str(code) for code in row.get("warning_codes", [])}
+            crew_warning_codes = warning_codes - {"missing_timezone"}
+            row_warnings = [
+                str(warning)
+                for warning in row.get("warnings", [])
+                if str(warning).strip()
+            ]
+            wrh_flag = str(row.get("wrh_flag") or "").strip().upper()
+            is_blocked = (
+                not bool(row.get("wrh_data_available"))
+                or bool(row.get("wrh_non_compliance_flag"))
+                or wrh_flag != "GREEN"
+                or bool(crew_warning_codes)
+            )
+            if not is_blocked:
+                continue
+
+            display_name = str(row.get("display_name") or row.get("crew_id") or "Crew").strip()
+            reason = self._wrh_host_block_reason(
+                display_name=display_name,
+                warning_codes=crew_warning_codes,
+                row_warnings=row_warnings,
+                wrh_flag=wrh_flag,
+                wrh_data_available=bool(row.get("wrh_data_available")),
+                wrh_non_compliance_flag=bool(row.get("wrh_non_compliance_flag")),
+            )
+            if reason not in warnings:
+                warnings.append(reason)
+            blocking_crew.append(
+                {
+                    "crew_id": str(row.get("crew_id") or "").strip(),
+                    "display_name": display_name,
+                    "rank_name": str(row.get("rank_name") or "").strip(),
+                    "warning_codes": sorted(crew_warning_codes),
+                    "warnings": row_warnings,
+                    "wrh_data_available": bool(row.get("wrh_data_available")),
+                    "wrh_flag": wrh_flag or "RED",
+                    "wrh_non_compliance_flag": bool(row.get("wrh_non_compliance_flag")),
+                }
+            )
+
+        return {
+            "blocking_crew": blocking_crew,
+            "checked_crew_count": len(attendee_rows),
+            "message": (
+                "WRH readiness clear. SCM meeting can be hosted."
+                if not warnings
+                else "SCM meeting cannot be hosted until all WRH warnings are cleared."
+            ),
+            "missing_ship_time": missing_ship_time,
+            "ready": not warnings,
+            "warnings": warnings,
+        }
+
+    @staticmethod
+    def _wrh_host_block_reason(
+        *,
+        display_name: str,
+        warning_codes: set[str],
+        row_warnings: list[str],
+        wrh_flag: str,
+        wrh_data_available: bool,
+        wrh_non_compliance_flag: bool,
+    ) -> str:
+        if "lookup_timeout" in warning_codes:
+            return f"WRH lookup timed out for {display_name}."
+        if "lookup_failed" in warning_codes:
+            return f"WRH lookup failed for {display_name}."
+        if "missing_data" in warning_codes or not wrh_data_available:
+            return f"WRH data is unavailable for {display_name}."
+        if wrh_non_compliance_flag or "non_compliance" in warning_codes or wrh_flag == "YELLOW":
+            return f"WRH non-compliance is present for {display_name}."
+        if row_warnings:
+            return f"WRH warning for {display_name}: {row_warnings[0]}"
+        return f"WRH status is not clear for {display_name}."
 
     def _fetch_preview_wrh_snapshots(
         self,
@@ -1124,14 +1264,15 @@ class SCMRepository(BaseRepository):
             prepared_by=prepared_by,
         )
         empty_closed_since_last = self.build_empty_closed_since_last_payload()
+        attendee_rows = self._build_attendee_preview_rows(
+            vessel_id=normalized_vessel_id,
+            meeting_date=anchor_date,
+            crew_roster=crew_roster,
+            include_wrh_preview=include_wrh_preview,
+        )
 
         return {
-            "attendee_rows": self._build_attendee_preview_rows(
-                vessel_id=normalized_vessel_id,
-                meeting_date=anchor_date,
-                crew_roster=crew_roster,
-                include_wrh_preview=include_wrh_preview,
-            ),
+            "attendee_rows": attendee_rows,
             "cadence_status": self._build_cadence_status(
                 vessel_id=normalized_vessel_id,
                 meeting_date=anchor_date,
@@ -1180,6 +1321,7 @@ class SCMRepository(BaseRepository):
                 else []
             ),
             "vessel": self._resolve_vessel_snapshot(vessel_id=normalized_vessel_id, user=user),
+            "wrh_host_readiness": self._build_wrh_host_readiness_from_attendee_rows(attendee_rows),
         }
 
     def build_agenda_payload(

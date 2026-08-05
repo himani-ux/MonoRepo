@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const headerMocks = vi.hoisted(() => ({
   navigate: vi.fn(),
+  useLocation: vi.fn(),
   useAuth: vi.fn(),
   useUnreadCount: vi.fn(),
   logout: vi.fn(),
@@ -17,8 +18,19 @@ const headerMocks = vi.hoisted(() => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => headerMocks.navigate,
-  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
-    <a href={to}>{children}</a>
+  useLocation: () => headerMocks.useLocation(),
+  Link: ({
+    to,
+    children,
+    ...rest
+  }: {
+    to: string;
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -69,18 +81,30 @@ import { Header } from './header';
 describe('Header', () => {
   beforeEach(() => {
     headerMocks.navigate.mockReset();
+    headerMocks.useLocation.mockReset();
     headerMocks.useAuth.mockReset();
     headerMocks.useUnreadCount.mockReset();
     headerMocks.logout.mockReset();
 
+    headerMocks.useLocation.mockReturnValue({ pathname: '/inspections' });
     headerMocks.logout.mockResolvedValue(undefined);
     headerMocks.useAuth.mockReturnValue({
       fullName: 'Captain Nemo',
       role: 'VESSEL_MASTER',
       logout: headerMocks.logout,
       isVessel: true,
+      hasProcess: vi.fn(() => true),
     });
     headerMocks.useUnreadCount.mockReturnValue({ data: 3 });
+  });
+
+  it('renders_polished_header_surface_and_controls', () => {
+    render(<Header />);
+
+    expect(screen.getByRole('banner')).toHaveClass('shadow-sm');
+    expect(screen.getByLabelText('VIMS Home')).toHaveClass('rounded-xl');
+    expect(screen.getByText('Vessel Inspection Management System')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /notifications/i })).toHaveClass('rounded-full');
   });
 
   it('test_feat_notif_001_notifications_button_navigates_to_notifications_page', () => {

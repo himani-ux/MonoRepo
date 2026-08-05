@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import uuid
+
+from django.db import DatabaseError, connection
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -37,6 +40,87 @@ def _resolved_report_type(incident: Incident, loss_evaluation: IncidentLossEvalu
     if loss_evaluation is not None and loss_evaluation.report_type:
         return loss_evaluation.report_type
     return _default_report_type(incident)
+
+
+def _normal_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _resolve_rank_label(raw_rank: object) -> str:
+    rank_value = _normal_text(raw_rank)
+    if not rank_value:
+        return ""
+    try:
+        uuid.UUID(rank_value)
+    except (ValueError, TypeError, AttributeError):
+        return rank_value
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT rank_name
+                FROM master_applied_rank
+                WHERE id = %s
+                    AND COALESCE(is_active, 1) <> 0
+                    AND COALESCE(is_deleted, 0) = 0
+                """,
+                [rank_value],
+            )
+            row = cursor.fetchone()
+    except DatabaseError:
+        return rank_value
+    return _normal_text(row[0] if row else None) or rank_value
+
+
+def resolve_loss_evaluation_officer_defaults(incident: Incident) -> dict[str, str | None]:
+    vessel_id = _normal_text(incident.vessel_id)
+    defaults: dict[str, str | None] = {
+        "name_of_master": None,
+        "name_of_chief_engineer": None,
+    }
+    if not vessel_id:
+        return defaults
+    try:
+        uuid.UUID(vessel_id)
+    except (ValueError, TypeError, AttributeError):
+        return defaults
+
+    sql = """
+        SELECT
+            coh.CrewID,
+            hrm.first_name,
+            hrm.surname,
+            hrm.rank_name
+        FROM Crew_Onboarding_History coh
+        LEFT JOIN HRM501 hrm
+            ON hrm.CrewID = coh.CrewID
+            AND COALESCE(hrm.is_active, 1) <> 0
+            AND COALESCE(hrm.is_deleted, 0) = 0
+        WHERE coh.Vessel = %s
+            AND COALESCE(coh.is_active, 1) <> 0
+            AND COALESCE(coh.is_deleted, 0) = 0
+            AND coh.SignOffDate IS NULL
+        ORDER BY coh.SignOnDate DESC, coh.created_date DESC, coh.id DESC
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(sql, [vessel_id])
+            rows = cursor.fetchall()
+    except DatabaseError:
+        return defaults
+
+    for crew_id, first_name, surname, rank_name in rows:
+        rank_text = _resolve_rank_label(rank_name).upper()
+        crew_name = " ".join(part for part in (_normal_text(first_name), _normal_text(surname)) if part)
+        crew_name = crew_name or _normal_text(crew_id)
+        if rank_text == "MASTER" and not defaults["name_of_master"]:
+            defaults["name_of_master"] = crew_name
+        elif rank_text == "CHIEF ENGINEER" and not defaults["name_of_chief_engineer"]:
+            defaults["name_of_chief_engineer"] = crew_name
+        if defaults["name_of_master"] and defaults["name_of_chief_engineer"]:
+            break
+
+    return defaults
 
 
 class RecommendationVerificationSerializer(serializers.ModelSerializer):
@@ -178,6 +262,16 @@ def build_phase8_workspace_payload(incident: Incident) -> dict[str, object]:
         ).order_by("display_order", "option_label")
     ]
 
+    loss_evaluation_payload = (
+        IncidentLossEvaluationSerializer(loss_evaluation).data
+        if loss_evaluation is not None
+        else empty_loss_evaluation_payload()
+    )
+    officer_defaults = resolve_loss_evaluation_officer_defaults(incident)
+    for field_name, default_value in officer_defaults.items():
+        if default_value and not _normal_text(loss_evaluation_payload.get(field_name)):
+            loss_evaluation_payload[field_name] = default_value
+
     return {
         "incident_id": incident.pk,
         "current_phase": incident.current_phase,
@@ -187,11 +281,7 @@ def build_phase8_workspace_payload(incident: Incident) -> dict[str, object]:
         "phase_title": "Loss Evaluation",
         "report_type": _resolved_report_type(incident, loss_evaluation),
         "has_loss_evaluation": loss_evaluation is not None,
-        "loss_evaluation": (
-            IncidentLossEvaluationSerializer(loss_evaluation).data
-            if loss_evaluation is not None
-            else empty_loss_evaluation_payload()
-        ),
+        "loss_evaluation": loss_evaluation_payload,
         "choices": {
             "consequence": _choice_options(IncidentLossEvaluation.Consequence.choices),
             "likelihood": _choice_options(IncidentLossEvaluation.Likelihood.choices),

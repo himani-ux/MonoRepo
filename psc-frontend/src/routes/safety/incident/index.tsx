@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useSafetyAuth } from "../../../hooks/safety/use-auth";
-import { useSafetyIncidents } from "../../../hooks/use-safety";
+import { useSafetyIncidentRegisterVessels, useSafetyIncidents } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
+import { incidentPhaseRoute, incidentPhaseStepLabel } from "../../../lib/safety/incident-phase-display";
 import { formatVesselName } from "../../../lib/safety/vessel-display";
 
 const RISK_BAND_OPTIONS = [
@@ -14,7 +15,7 @@ const RISK_BAND_OPTIONS = [
 ] as const;
 
 const STATE_OPTIONS = [
-  { label: "All states", value: "" },
+  { label: "All statuses", value: "" },
   { label: "Draft", value: "DRAFT" },
   { label: "Submitted", value: "SUBMITTED" },
   { label: "Sent Back", value: "SENT_BACK" },
@@ -39,14 +40,15 @@ function formatDateTime(value: string | null) {
 }
 
 function buildIncidentRoute(id: number | string, phase: number) {
-  const boundedPhase = Math.min(Math.max(phase || 1, 1), 9);
-  if (boundedPhase === 3) {
-    return `/safety/incidents/${id}/phase-3/people`;
-  }
-  if (boundedPhase === 9) {
-    return `/safety/incidents/${id}/phase-9`;
-  }
-  return `/safety/incidents/${id}/phase-${boundedPhase}`;
+  return incidentPhaseRoute(id, phase);
+}
+
+function buildVesselOptionLabel(vessel: {
+  id: string;
+  vessel_code?: string | null;
+  vessel_name?: string | null;
+}) {
+  return [vessel.vessel_code, vessel.vessel_name].filter(Boolean).join(" - ") || vessel.id;
 }
 
 function canCreateIncident(role: string | null, hasProcess: boolean) {
@@ -62,11 +64,26 @@ export default function SafetyIncidentIndexRoute() {
   const canCreate = canCreateIncident(auth.role, auth.hasProcess("SAF_P_001"));
   const [riskBand, setRiskBand] = useState("");
   const [state, setState] = useState("");
+  const [selectedVesselId, setSelectedVesselId] = useState("");
+  const vesselOptionsQuery = useSafetyIncidentRegisterVessels();
+  const authVesselOptions = useMemo(
+    () =>
+      auth.vesselIds.map((vesselId, index) => ({
+        id: String(vesselId),
+        vessel_code: "",
+        vessel_name: auth.vesselNames[index] ?? String(vesselId),
+      })),
+    [auth.vesselIds, auth.vesselNames]
+  );
+  const vesselOptions =
+    vesselOptionsQuery.data && vesselOptionsQuery.data.length > 0
+      ? vesselOptionsQuery.data
+      : authVesselOptions;
   const incidentsQuery = useSafetyIncidents({
     record_type: "INCIDENT",
     risk_band: riskBand || undefined,
     state: state || undefined,
-    vessel_id: auth.isGlobal ? undefined : auth.vesselIds[0],
+    vessel_id: selectedVesselId || undefined,
   });
 
   return (
@@ -74,9 +91,6 @@ export default function SafetyIncidentIndexRoute() {
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_55%,#fef3c7_100%)] p-6 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Safety / Incidents
-            </p>
             <h1 className="text-3xl font-semibold text-slate-900">
               Safety Incidents
             </h1>
@@ -98,7 +112,7 @@ export default function SafetyIncidentIndexRoute() {
         ) : null}
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-4">
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">
@@ -108,9 +122,24 @@ export default function SafetyIncidentIndexRoute() {
               {incidentsQuery.data?.length ?? 0} record(s)
             </span>
           </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
             <label className="space-y-2 text-sm text-slate-700">
-              <span className="font-medium">Risk band</span>
+              <span className="font-medium">Vessel</span>
+              <select
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                onChange={(event) => setSelectedVesselId(event.target.value)}
+                value={selectedVesselId}
+              >
+                <option value="">All vessels</option>
+                {vesselOptions.map((vessel) => (
+                  <option key={vessel.id} value={vessel.id}>
+                    {buildVesselOptionLabel(vessel)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2 text-sm text-slate-700">
+              <span className="font-medium">risk_band</span>
               <select
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
                 onChange={(event) => setRiskBand(event.target.value)}
@@ -124,7 +153,7 @@ export default function SafetyIncidentIndexRoute() {
               </select>
             </label>
             <label className="space-y-2 text-sm text-slate-700">
-              <span className="font-medium">State</span>
+              <span className="font-medium">Status</span>
               <select
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
                 onChange={(event) => setState(event.target.value)}
@@ -157,8 +186,8 @@ export default function SafetyIncidentIndexRoute() {
                     <th className="px-4 py-3 font-medium">Reference</th>
                     <th className="px-4 py-3 font-medium">Vessel</th>
                     <th className="px-4 py-3 font-medium">Occurred</th>
-                    <th className="px-4 py-3 font-medium">Band</th>
-                    <th className="px-4 py-3 font-medium">State</th>
+                    <th className="px-4 py-3 font-medium">risk_band</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -172,7 +201,7 @@ export default function SafetyIncidentIndexRoute() {
                           {incident.incident_number || incident.draft_reference || `Incident #${incident.id}`}
                         </Link>
                         <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                          Phase {incident.current_phase}
+                          {incidentPhaseStepLabel(incident.current_phase)}
                         </div>
                       </td>
                       <td className="px-4 py-4 text-slate-600">{formatVesselName(incident)}</td>
@@ -194,16 +223,6 @@ export default function SafetyIncidentIndexRoute() {
             </div>
           )}
         </div>
-
-        <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Current Scope
-          </h2>
-          <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <li>Records are shown for your current vessel scope.</li>
-            <li>Risk band and state filters are applied to the register.</li>
-          </ul>
-        </aside>
       </div>
     </section>
   );

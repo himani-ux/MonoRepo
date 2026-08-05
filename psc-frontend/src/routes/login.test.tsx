@@ -85,8 +85,12 @@ describe('LoginPage', () => {
 
     render(<LoginPage />);
 
+    expect(screen.getByText('VIMS')).toBeInTheDocument();
+    expect(screen.getByText('PSC / RS / Audit Close-out System')).toBeInTheDocument();
     expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Trigger Login Success' })).toBeInTheDocument();
+    expect(screen.queryByText('Safety records, ready when you need them.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Office and ship access')).not.toBeInTheDocument();
   });
 
   it('test_feat_auth_001_login_success_navigates_to_default_dashboard_route', () => {

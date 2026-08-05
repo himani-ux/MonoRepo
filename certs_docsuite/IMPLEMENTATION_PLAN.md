@@ -23,7 +23,7 @@
 | 0.6 | Frontend route `/certs/` stub renders "Certs module coming soon" | Renders without console errors; permission check works | 0.2 |
 | 0.7 | OCR engine pick + wrapper interface in `services/ocr_pipeline.py` (per TECH_STACK §15.1) | Mock + real engine both pass interface test | 0.4 |
 | 0.8 | HTML-to-PDF renderer pick (WeasyPrint or ReportLab) per TECH_STACK §15.2 | Renders sample HTML to PDF | 0.4 |
-| 0.9 | Slack workspace + channel naming convention confirmed with DPA | DPA sign-off note | — |
+| 0.9 | Slack workspace + channel naming convention confirmed with DPA | Confirmed production channel `vims-certs` / `C0BMCASMNKS`; invited Slack app uses `SLACK_BOT_TOKEN` | — |
 
 ### Phase 0 Traceability
 - **0.1** — PRD: — (infrastructure scaffold); APP_FLOW: —; FIELD_MAP: —; BACKEND: §1 Django App Structure; DESIGN_SYSTEM: —; FRONTEND_GUIDELINES: —; SECURITY: — (no regulated surface); OBSERVABILITY: no events — scaffold only
@@ -34,7 +34,7 @@
 - **0.6** — PRD: — (route stub); APP_FLOW: §3.1 Fleet Dashboard `/certs` (stub); FIELD_MAP: —; BACKEND: —; DESIGN_SYSTEM: uses existing tokens only; FRONTEND_GUIDELINES: §1 File Layout, §2 `Cert*` naming, §7 RBAC Gating (stub permission check); SECURITY: —; OBSERVABILITY: no events — static stub
 - **0.7** — PRD: FEAT-CERT-OCR-001 (foundation); APP_FLOW: —; FIELD_MAP: —; BACKEND: §6 `services/ocr_pipeline.py`, §7 OCR Pipeline interface; DESIGN_SYSTEM: —; FRONTEND_GUIDELINES: —; SECURITY: —; OBSERVABILITY: no events — interface + mock only (resolves BLOCKERS B-TECH-01)
 - **0.8** — PRD: FEAT-CERT-PRT-002 (foundation); APP_FLOW: —; FIELD_MAP: —; BACKEND: §6 `services/pdf_renderer.py`; DESIGN_SYSTEM: §5 Print Layout is the target spec (not implemented this step); FRONTEND_GUIDELINES: —; SECURITY: —; OBSERVABILITY: no events — renderer selection spike (resolves BLOCKERS B-TECH-02)
-- **0.9** — PRD: FEAT-CERT-NOTIF-002/020 (preparation); APP_FLOW: —; FIELD_MAP: —; BACKEND: §6 `services/slack_relay.py` (future consumer); DESIGN_SYSTEM: —; FRONTEND_GUIDELINES: —; SECURITY: —; OBSERVABILITY: no events — DPA sign-off note is the artifact
+- **0.9** — PRD: FEAT-CERT-NOTIF-002/020 (preparation); APP_FLOW: —; FIELD_MAP: —; BACKEND: §6 `services/slack_relay.py` default channel `C0BMCASMNKS`; DESIGN_SYSTEM: —; FRONTEND_GUIDELINES: —; SECURITY: `SLACK_BOT_TOKEN` remains env-only; OBSERVABILITY: no events — DPA sign-off note is the artifact
 
 **Phase 0 exit gate:** every cell above checked; no business logic yet; CI green; the 0.7/0.8 picks (OCR engine, PDF renderer) encoded back into TECH_STACK.md §2 + BACKEND_STRUCTURE.md; settings field rows transcribed into FIELD_MAP.md §18.
 
@@ -334,3 +334,83 @@ See PRD §19. Build-time deferrals (Phase 0 picks) listed in BACKEND_STRUCTURE �
 **Triggering discovery:** The shipped normal print PDF exposed internal artifact labels and footer metadata that users did not want on the operational copy. The same cleanup had already been requested for the share-bundle manifest, and the normal print PDF needed the same user-facing treatment while preserving auditability in the database and API.
 
 **Supersedes:** Phase 5.2, D-CERT-128, and D-CERT-132 only where they required visible print-PDF footer identifiers or a visible validity glossary/column. The current behavior is D-CERT-202: print artifacts remain identifiable through stored `print_id`, `system_state_hash`, audit metadata, download filenames, and Print History, while normal user-facing PDFs omit those internal labels from the visible page content.
+
+---
+
+## Amendment 6 - 2026-07-24
+
+**What changed:** CR-111 fixes the remaining Certs alignment gaps found during the SSOT/docsuite audit. D-CERT-203 adds guarded nullable Certs compatibility columns to the shared `master_notification` table when those columns are missing, allowing Certs notification dispatch and `vims_certs_notification_meta` joins to work without a destructive shared-table rebuild. D-CERT-204 names the current background-job truth: Certs jobs are exposed through Django job modules and management commands scheduled by the host/server scheduler until a separate platform Celery/beat deployment is implemented and proven.
+
+**Triggering discovery:** The live class-snapshot upload path previously failed with SQL Server errors for missing `master_notification` columns such as `module_code`, `record_id`, `recipient_ref`, `notification_kind`, `message`, `delivery_channel`, and `payload_json`. The alignment audit also found that the maintained code exposes Certs jobs through command entry points while TECH_STACK and BACKEND_STRUCTURE still claimed unproven Celery/beat wiring and older placeholder job filenames.
+
+**Supersedes:** TECH_STACK worker-queue row and BACKEND_STRUCTURE Background Jobs section only where they claimed current Certs Celery/beat wiring or named job files that are not present in this repo. It also formalizes that D-CERT-202 is the current print-output law over older original-SSOT print footer/glossary clauses.
+
+---
+
+## Amendment 7 - 2026-07-29
+
+**What changed:** CR-119 / D-CERT-206 restricts BV Conditions of class extraction to the actual BV Conditions of Class section. BV Class Memoranda and Statutory Memoranda no longer populate `conditions_of_class[]` and no longer create Conditions of class review flags.
+
+**Triggering discovery:** User review of a BV class report showed that previously reported "COC" items were Class Memoranda, not Conditions of Class.
+
+**Supersedes:** D-CERT-066-derived parser/docs behavior only where BV memoranda were treated as Conditions of Class. Actual BV Conditions of Class remain in scope for parser extraction and reconciliation review.
+
+---
+
+## Amendment 8 - 2026-07-29
+
+**What changed:** CR-120 / D-CERT-207 makes Conditions of class extraction strict for all supported class societies. NK, KR, and BV now populate `conditions_of_class[]` only from exact Condition of Class / Conditions of Class source sections.
+
+**Triggering discovery:** After the BV memoranda correction, the user clarified that the same strict COC rule applies to every class society.
+
+**Supersedes:** D-CERT-066 and D-CERT-206 wherever KR Actionable Note, KR Statutory Condition, NK Condition of Installation, NK Condition of Statutory Survey, BV Class Memoranda, or BV Statutory Memoranda were treated as Conditions of Class.
+
+---
+
+## Amendment 9 - 2026-07-29
+
+**What changed:** CR-121 / D-CERT-208 simplifies the normal `/certs/print` workflow and label. The user-facing screen is now "Print Vessel Status" and shows only the current vessel context plus a single-select "Certificate List" dropdown with a "Sections" option.
+
+**Triggering discovery:** User review found the normal print form too broad and requested removal of Buckets/Add Vessel filters and the Scope, Status, Sections, Watermark, and Recipient controls.
+
+**Supersedes:** Phase 5.1/5.2 and D-CERT-138, D-CERT-140, and D-CERT-149 only where they required those controls in the normal print UI. Stored artifact fields, Print History, Share Bundle, auditor export, and backend print/share payload compatibility remain in scope.
+
+---
+
+## Amendment 10 - 2026-07-29
+
+**What changed:** CR-122 / D-CERT-209 renames the normal `/certs/print` screen and vessel-dashboard action from "Print Vessel Status" to "Print certs status".
+
+**Triggering discovery:** User corrected the visible label after reviewing the simplified print screen wording.
+
+**Supersedes:** D-CERT-208 and Amendment 9 only for the visible label. The current-vessel single-select Certificate List workflow and backend compatibility remain unchanged.
+
+---
+
+## Amendment 11 - 2026-07-29
+
+**What changed:** CR-123 / D-CERT-210 changes normal print/share selection from individual certificates to certificate sections. `Print certs status` shows `All sections` plus section names in the single Certificate List dropdown. Share Bundle uses a section multi-select and bundles all certificates in selected sections.
+
+**Triggering discovery:** User review found individual certificate selection impractical because vessels can have more than 400 certificates.
+
+**Supersedes:** D-CERT-208, D-CERT-209, and Amendment 9 only where they allowed individual certificate choices in the normal print/share UI. Backend-compatible custom certificate ID support remains accepted for existing integrations and historical artifact payloads.
+
+---
+
+## Amendment 12 - 2026-07-29
+
+**What changed:** CR-124 / D-CERT-211 renames the Print certs status dropdown label from "Certificate List" to "Certificate sections".
+
+**Triggering discovery:** User clarified that the dropdown contains certificate sections and should be labelled accordingly.
+
+**Supersedes:** D-CERT-210 and Amendment 11 only for the visible dropdown label. Section-based selection behavior is unchanged.
+
+---
+
+## Amendment 13 - 2026-07-29
+
+**What changed:** CR-125 / D-CERT-212 removes `Print ID`, `Scope`, and `System state hash` rows from the visible Certs Excel workbook generated with the normal PDF + Excel print artifact.
+
+**Triggering discovery:** After the visible PDF/result-panel cleanup, user review found that the Excel companion still printed internal artifact identifiers that should stay out of the user-facing spreadsheet.
+
+**Supersedes:** D-CERT-128, D-CERT-141, D-CERT-147, D-CERT-202, and Amendment 5 only where they could be read as requiring `print_id`, scope, or system-state hash inside the visible Excel workbook. Stored DB/API/audit/history metadata, filenames, and artifact traceability remain unchanged.

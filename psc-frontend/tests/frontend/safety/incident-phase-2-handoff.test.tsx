@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -72,9 +72,10 @@ describe("SafetyIncidentPhase2Page handoff", () => {
       longitude: "",
       notification_channel_count: 0,
       office_notified_at: null,
+      office_notified: false,
       pic_user_id: null,
       resources_allocated: null,
-      risk_band: null,
+      risk_band: "YELLOW",
       schema_version: 1,
       state: "SUBMITTED",
     });
@@ -93,11 +94,11 @@ describe("SafetyIncidentPhase2Page handoff", () => {
       },
     ]);
 
-    expect(await screen.findByRole("heading", { name: "Awaiting resource allocation" })).toBeInTheDocument();
-    expect(screen.getByText(/Authorized Phase 2 roles/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Office communication pending" })).toBeInTheDocument();
+    expect(screen.getByText(/Users who can update/i)).toBeInTheDocument();
     expect(screen.getByText(/Notification fan-out sent: 5/i)).toBeInTheDocument();
     expect(
-      screen.queryByRole("heading", { name: "Notifications + Resource Allocation" }),
+      screen.queryByRole("heading", { name: "Tell Office" }),
     ).not.toBeInTheDocument();
   });
 
@@ -114,9 +115,10 @@ describe("SafetyIncidentPhase2Page handoff", () => {
       longitude: "",
       notification_channel_count: 0,
       office_notified_at: null,
+      office_notified: false,
       pic_user_id: null,
       resources_allocated: null,
-      risk_band: null,
+      risk_band: "YELLOW",
       schema_version: 1,
       state: "SUBMITTED",
     });
@@ -124,15 +126,11 @@ describe("SafetyIncidentPhase2Page handoff", () => {
     renderRoute(["/safety/incidents/42/phase-2"]);
 
     expect(
-      await screen.findByRole("heading", { name: "Notifications + Resource Allocation" }),
+      await screen.findByRole("heading", { name: "Tell Office" }),
     ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Internal risk band"), {
-      target: { value: "YELLOW" },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Submit to office" })).toBeEnabled();
-    });
+    expect(screen.getByLabelText("Risk level")).toBeInTheDocument();
+    expect(screen.getByLabelText("Was office informed?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument();
   });
 });

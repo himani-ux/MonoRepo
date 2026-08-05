@@ -2017,6 +2017,19 @@ class TestFEAT_CAR_009_ViewCARList(BaseCARAPITestCase):
         self.assertEqual(len(response.data["data"]), 1)
         self.assertEqual(response.data["data"][0]["id"], str(self.other_vessel_car.id))
 
+    def test_feat_car_009_regression_global_pic_list_skips_assignment_lookup(self):
+        """Regression: global PIC list should avoid the slow vessel-assignment branch."""
+        with patch("apps.car.views.has_global_office_vessel_access", return_value=True), patch(
+            "apps.car.views.get_office_user_vessel_ids"
+        ) as vessel_ids:
+            response = self._list(user=self.office_pic)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        vessel_ids.assert_not_called()
+        ids = {row["id"] for row in response.data["data"]}
+        self.assertIn(str(self.own_draft.id), ids)
+        self.assertIn(str(self.other_vessel_car.id), ids)
+
     def test_feat_car_009_happy_path_filter_by_status(self):
         """BACKEND_STRUCTURE 10.5: status query filter is supported for CAR list."""
         response = self._list(
@@ -2071,6 +2084,26 @@ class TestFEAT_CAR_009_ViewCARList(BaseCARAPITestCase):
         self.assertEqual(row["status"], CARStatus.SUBMITTED)
         self.assertIn("vessel_name", row)
         self.assertIn("target_date", row)
+
+    def test_feat_car_009_regression_list_returns_vessel_name_not_uuid(self):
+        """Regression: CAR list should display vessel name instead of vessel UUID fallback."""
+        def attach_vessel_name(rows):
+            for row in rows:
+                if row["id"] == str(self.own_submitted.id):
+                    row["vessel_name"] = "MV Example"
+                    row["vessel_code"] = "EXM"
+            return rows
+
+        with patch.object(CARListView, "_attach_vessel_metadata", side_effect=attach_vessel_name):
+            response = self._list(
+                user=self.vessel_master,
+                params={"status": CARStatus.SUBMITTED},
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(item for item in response.data["data"] if item["id"] == str(self.own_submitted.id))
+        self.assertEqual(row["vessel_name"], "MV Example")
+        self.assertNotEqual(row["vessel_name"], row["vessel_id"])
 
     def test_feat_car_009_rbac_unauthenticated_list_rejected(self):
         """RBAC BACKEND_STRUCTURE 11.1: list endpoint requires authentication."""
@@ -2590,6 +2623,15 @@ class TestFEAT_RPT_001_CARPDFExport(BaseCARAPITestCase):
                         "notes": "Rectified at port.",
                         "changed_by": "Master User",
                         "changed_at": "2026-06-03T10:25:00+00:00",
+                    },
+                    {
+                        "deficiency_code": "01113",
+                        "deficiency_description": "Fire safety issue before follow-up.",
+                        "from_action_code": "30",
+                        "to_action_code": "50",
+                        "notes": "Temporary action marked before final closure.",
+                        "changed_by": "Master User",
+                        "changed_at": "2026-06-03T09:15:00+00:00",
                     }
                 ],
                 "follow_up_reports": [
@@ -2610,9 +2652,14 @@ class TestFEAT_RPT_001_CARPDFExport(BaseCARAPITestCase):
         self.assertIn("Follow-up Details", merged)
         self.assertIn("03 Jun 2026", merged)
         self.assertIn("General follow-up notes entered by the vessel.", merged)
-        self.assertNotIn("Action Code Updates", merged)
-        self.assertNotIn("Fire safety issue.", merged)
-        self.assertNotIn("Rectified at port.", merged)
+        self.assertIn("Action Code Updates", merged)
+        self.assertIn("Action Code", merged)
+        self.assertIn("30 to 50", merged)
+        self.assertIn("50 to 10", merged)
+        self.assertLess(merged.index("30 to 50"), merged.index("50 to 10"))
+        self.assertIn("Temporary action marked before final closure.", merged)
+        self.assertIn("Fire safety issue.", merged)
+        self.assertIn("Rectified at port.", merged)
         self.assertIn("Master User", merged)
         self.assertIn("psc-follow-up-report.pdf", merged)
         self.assertIn("Follow-up report uploaded after action code change.", merged)

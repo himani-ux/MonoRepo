@@ -190,24 +190,24 @@ The `Carried Forward` pill uses a **dashed border** as its second encoding chann
 
 ## 5. Causal-Layer Visual Hierarchy
 
-Locked by **D-GAP-R01** (SSOT §6 L1539) — every cause entered on an incident must be tagged **Immediate / Intermediate / Root**, extending D-DNV-01 M-SCAT coding. Phase 5 cannot close with Immediate-only codes; ≥1 Root-level cause required.
+Locked by **D-GAP-R01** and updated for the current UI by **D-MAINT-CR033** — every current cause entered on an incident must be tagged **Immediate / Root**, extending D-DNV-01 M-SCAT-compatible coding. The current flow cannot advance unless at least one Immediate Cause and one Root Cause are recorded.
 
 ### 5.1 Layer Tokens
 
 | Token | Layer | Background (card) | Text / icon accent | Left-border accent (4px) | Indentation (left) | Font-weight | Decision |
 |-------|-------|--------------------|---------------------|---------------------------|---------------------|-------------|----------|
 | `--safety-causal-immediate` | Immediate cause (what happened) | `neutral-50` | `warning-600` | `warning-500` | `space-0` (0px) | `font-normal` (400) | D-GAP-R01 |
-| `--safety-causal-intermediate` | Intermediate / Contributing | `warning-50` | `warning-700` | `warning-600` | `space-4` (16px) | `font-medium` (500) | D-GAP-R01 |
+| `--safety-causal-intermediate` | Legacy Intermediate / Contributing (not shown as a current selectable layer) | `warning-50` | `warning-700` | `warning-600` | `space-4` (16px) | `font-medium` (500) | D-GAP-R01 historical; superseded for current UI by D-MAINT-CR033 |
 | `--safety-causal-root` | Root cause (system-level, Lack-of-Control per §2B.11 bias #5) | `error-50` | `error-700` | `error-600` | `space-8` (32px) | `font-semibold` (600) | D-GAP-R01 + D-DNV-11 |
 
 Indentation, left-border thickness, and font-weight form a **3-channel visual hierarchy** — color is never the sole channel (WCAG 2.1 §1.4.1).
 
 ### 5.2 Causal Tree Component Rules
 
-- **Layer order on screen:** Immediate at top → Intermediate (indented) → Root (double-indented). Matches the ABS scaffolding "why → why → why" cascade.
+- **Layer order on screen:** Immediate at top → Root. Legacy Intermediate rows are grouped under Root in current UI/PDF display instead of appearing as a separate selectable category.
 - **Connector lines:** 1px solid `neutral-300`, vertical between parent/child nodes (reuses inherited border color).
-- **Empty-state (no Root recorded yet):** Render a `warning-100` banner inside the Root section with Lucide icon `AlertTriangle` (`icon-sm`, `warning-600`) and the text `"At least one Root-level cause is required before closing Phase 5 (D-GAP-R01)."`
-- **Count badge per layer:** pill with inherited Reporting badge dimensions; shows `N Immediate · N Intermediate · N Root` across the top of the Analysis Workspace.
+- **Empty-state (no Root recorded yet):** Render a `warning-100` banner inside the Root section with Lucide icon `AlertTriangle` (`icon-sm`, `warning-600`) and the text `"At least one Root Cause is required."`
+- **Count badge per layer:** pill with inherited Reporting badge dimensions; shows Immediate and Root counts across the top of the Analysis Workspace.
 
 ---
 
@@ -522,7 +522,7 @@ Inherits Reporting §13 / Inspection §12 PDF base (A4, 20mm margins, Inter body
 | 1 | Cover + IMO classification + risk band | Top band 15mm, color = band text token (`error-700` RED / `warning-700` YELLOW / `success-700` GREEN); logo top-left 25×25mm; `IMO classifier` outline-pill bottom-right | D-GAP-R08, D-GAP-R09 |
 | 2 | Investigator / team credentials | Standard section; each credential row = 10pt | D-GAP-R09 |
 | 3 | Evidence collected + Chain-of-Custody cross-ref | Table with `neutral-200` grid (inherited); Chain-of-Custody ID column 12mm | D-GAP-R04, D-GAP-R09 |
-| 4 | Root-cause analysis (Immediate / Intermediate / Root labels) | Each causal-layer row indented matching §5.1 indentation (scaled to mm): Immediate 0mm, Intermediate 5mm, Root 10mm | D-GAP-R01, D-GAP-R09 |
+| 4 | Root-cause analysis (Immediate / Root labels) | Each causal-layer row uses the current two-level RCA layout; legacy Intermediate rows are grouped under Root Cause. | D-GAP-R01, D-GAP-R09, D-MAINT-CR033 |
 | 5 | 7-point causal-factor enumeration (KAIZEN §11.5.6.1) | Numbered list 1–7, 10pt body | D-GAP-R09 |
 | 6 | Corrective / Preventive / Lessons Learnt actions + timeline | Tier chip 6pt uppercase; tier color matches §6 tokens | D-GAP-R13, D-DNV-06 |
 | 7 | Lessons Learnt narrative | Italic block, `neutral-700` 10pt, 5mm left indent | D-DNV-06, D-PDF-01 |

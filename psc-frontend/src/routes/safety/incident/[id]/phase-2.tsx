@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
+import IncidentPhaseSwitcher from "../../../../components/safety/incident/incident-phase-switcher";
 import { SafetyIncidentPhase2Form } from "../../../../components/safety/incident/phase2-form";
 import { useSafetyAuth } from "../../../../hooks/safety/use-auth";
 import { useToast } from "../../../../hooks/use-toast";
@@ -25,6 +26,16 @@ function canEditPhase2(role: string | null) {
   return PHASE_2_MUTATION_ROLES.has((role ?? "").trim().toUpperCase());
 }
 
+function deriveInvestigationDepth(riskBand: SafetyIncidentPhase2Values["risk_band"]) {
+  if (riskBand === "RED") {
+    return "DEEP" as const;
+  }
+  if (riskBand === "YELLOW") {
+    return "MEDIUM" as const;
+  }
+  return "SHALLOW" as const;
+}
+
 export default function SafetyIncidentPhase2Page() {
   const { id } = useParams();
   const auth = useSafetyAuth();
@@ -42,7 +53,9 @@ export default function SafetyIncidentPhase2Page() {
       message?: string;
       notifications_emitted?: number;
     };
+    workflowMessage?: string;
   } | null)?.phase2Handoff;
+  const workflowMessage = (location.state as { workflowMessage?: string } | null)?.workflowMessage;
 
   useEffect(() => {
     if (!id) {
@@ -67,6 +80,11 @@ export default function SafetyIncidentPhase2Page() {
           latitude: phase2.latitude ?? "",
           longitude: phase2.longitude ?? "",
           loss_type_primary_id: phase2.loss_type_primary_id ?? null,
+          loss_type_secondary_id: phase2.loss_type_secondary_id ?? null,
+          loss_type_tertiary_id: phase2.loss_type_tertiary_id ?? null,
+          loss_type_other: phase2.loss_type_other ?? null,
+          office_notification_mode: phase2.office_notification_mode ?? null,
+          office_notified: phase2.office_notified ?? null,
           office_notified_at: phase2.office_notified_at,
           pic_user_id: phase2.pic_user_id ?? "",
           risk_band: phase2.risk_band,
@@ -76,9 +94,9 @@ export default function SafetyIncidentPhase2Page() {
       } catch (error) {
         if (!cancelled) {
           toast({
-            title: "Unable to load Phase 2",
+            title: "Unable to load office communication",
             description:
-              error instanceof Error ? error.message : "Incident Phase 2 could not be loaded.",
+              error instanceof Error ? error.message : "Incident office communication could not be loaded.",
             variant: "destructive",
           });
         }
@@ -102,11 +120,14 @@ export default function SafetyIncidentPhase2Page() {
 
     try {
       const payload: SafetyIncidentPhase2Payload = {
-        imo_classifier: values.imo_classifier,
-        investigation_depth: values.investigation_depth ?? null,
-        latitude: values.latitude,
-        longitude: values.longitude,
+        imo_classifier: "NOT_APPLICABLE",
+        investigation_depth: deriveInvestigationDepth(values.risk_band),
         loss_type_primary_id: values.loss_type_primary_id ?? null,
+        loss_type_secondary_id: values.loss_type_secondary_id ?? null,
+        loss_type_tertiary_id: values.loss_type_tertiary_id ?? null,
+        loss_type_other: values.loss_type_other?.trim() || null,
+        office_notification_mode: values.office_notification_mode ?? null,
+        office_notified: values.office_notified ?? null,
         risk_band: values.risk_band,
         schema_version: values.schema_version,
       };
@@ -114,16 +135,16 @@ export default function SafetyIncidentPhase2Page() {
       const submitted = await safetyApi.submitIncidentPhase2(id);
       setPhase2State(submitted.state);
       toast({
-        title: "Phase 2 submitted",
-        description: `Incident ${submitted.incident_number ?? id} is ready for Phase 3 evidence capture.`,
+        title: "Office communication submitted",
+        description: `Incident ${submitted.incident_number ?? id} is ready for root cause entry.`,
         variant: "success",
       });
-      navigate(`/safety/incidents/${id}/phase-3/people`);
+      navigate(`/safety/incidents/${id}/phase-2`);
     } catch (error) {
       toast({
-        title: "Unable to submit Phase 2",
+        title: "Unable to submit office communication",
         description:
-          error instanceof Error ? error.message : "Incident Phase 2 could not be submitted.",
+          error instanceof Error ? error.message : "Incident office communication could not be submitted.",
         variant: "destructive",
       });
     }
@@ -132,7 +153,7 @@ export default function SafetyIncidentPhase2Page() {
   if (isLoading) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-slate-600">Loading incident Phase 2...</p>
+        <p className="text-sm text-slate-600">Loading incident office communication...</p>
       </section>
     );
   }
@@ -141,21 +162,22 @@ export default function SafetyIncidentPhase2Page() {
     const authorizedRoles = handoffState?.authorized_roles?.join(", ") ?? "MASTER, CO, CE, DPA, FM";
     const message =
       handoffState?.message ??
-      "Phase 2 editing is restricted to Master, CO, CE, DPA, or FM. Awaiting resource allocation.";
+      "Office communication can be updated by Master, CO, CE, DPA, or FM.";
 
     return (
       <section className="space-y-6">
+        <IncidentPhaseSwitcher activePhase={1} />
         <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
-            Incident / Phase 2
+            Incident / Office Communication
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-amber-950">Awaiting resource allocation</h1>
+          <h1 className="mt-2 text-3xl font-semibold text-amber-950">Office communication pending</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-amber-900">{message}</p>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Phase 1 handoff status</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Phase 1 office communication</h2>
             <dl className="mt-5 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Incident</dt>
@@ -166,7 +188,7 @@ export default function SafetyIncidentPhase2Page() {
                 <dd className="mt-2 text-base font-semibold text-slate-900">{phase2State ?? "SUBMITTED"}</dd>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-                <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Authorized Phase 2 roles</dt>
+                <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Users who can update</dt>
                 <dd className="mt-2 text-sm leading-6 text-slate-700">{authorizedRoles}</dd>
               </div>
             </dl>
@@ -176,7 +198,7 @@ export default function SafetyIncidentPhase2Page() {
             <section className="rounded-3xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-900">What happens next</h2>
               <p className="mt-2 text-sm leading-6 text-slate-700">
-                Your Phase 1 intake is preserved. An authorized Phase 2 role must allocate resources and submit the office notification step before the investigation workspace opens.
+                Your Phase 1 details are saved. An authorized user confirms whether office was informed before root cause work starts.
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-700">
                 Notification fan-out sent: {handoffState?.notifications_emitted ?? 0}
@@ -197,6 +219,12 @@ export default function SafetyIncidentPhase2Page() {
 
   return (
     <section className="space-y-6">
+      <IncidentPhaseSwitcher activePhase={1} />
+      {workflowMessage ? (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {workflowMessage}
+        </section>
+      ) : null}
       <SafetyIncidentPhase2Form
         incidentId={id ?? "phase-2"}
         initialValues={initialValues}

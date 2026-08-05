@@ -18,11 +18,14 @@ import { incidentPhaseRoute } from '../../../lib/safety/incident-phase-display';
 import type { SafetyIncidentPhase7Preflight } from '../../../schemas/safety/incident-phase7';
 import {
   DEFAULT_INCIDENT_PDF_SECTION_KEYS,
-  IncidentPdfSectionSelector,
   type IncidentPdfSectionKey,
 } from './incident-pdf-section-selector';
 
 const SEND_BACK_TARGET_PHASE = 6;
+const LOSS_EVALUATION_PDF_SECTION_KEY: IncidentPdfSectionKey = 'estimated_cost';
+const REQUIRED_INCIDENT_PDF_SECTION_KEYS = DEFAULT_INCIDENT_PDF_SECTION_KEYS.filter(
+  (sectionKey) => sectionKey !== LOSS_EVALUATION_PDF_SECTION_KEY
+);
 const GREEN_PIC_ROLE_CODES = new Set([
   'PIC',
   'VESSEL SUPERINTENDENT',
@@ -80,6 +83,7 @@ function emptyPreflight(): SafetyIncidentPhase7Preflight {
       reporter: { present: false, required: true },
     },
     office_comment: '',
+    rework_summary: null,
   };
 }
 
@@ -160,9 +164,8 @@ export function SafetyIncidentPhase7() {
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
-  const [selectedPdfSections, setSelectedPdfSections] = useState<
-    IncidentPdfSectionKey[]
-  >(DEFAULT_INCIDENT_PDF_SECTION_KEYS);
+  const [includeLossEvaluationInPdf, setIncludeLossEvaluationInPdf] =
+    useState(false);
   const [fleetAlertOpen, setFleetAlertOpen] = useState(false);
   const [fleetAlertVessels, setFleetAlertVessels] = useState<
     IncidentFleetAlertVessel[]
@@ -228,7 +231,23 @@ export function SafetyIncidentPhase7() {
     hasRequiredProcess && hasBandAuthority && actionBlockers.length === 0;
   const isOfficeReviewUser =
     hasBandAuthority || CENTRAL_OFFICE_ROLE_CODES.has(currentRoleCode);
+  const allFleetAlertVesselIds = useMemo(
+    () => fleetAlertVessels.map((vessel) => vessel.vessel_id),
+    [fleetAlertVessels]
+  );
+  const allFleetAlertVesselsSelected =
+    allFleetAlertVesselIds.length > 0 &&
+    allFleetAlertVesselIds.every((vesselId) =>
+      selectedFleetAlertVesselIds.includes(vesselId)
+    );
+  const pdfControlsVisible = Boolean(
+    preflight.pdf_preview.download_path || preflight.pdf_preview.message
+  );
   const hasVisibleOfficeComment = officeComment.trim().length > 0;
+  const reworkSummaryComment = String(
+    preflight.rework_summary?.comment ?? ''
+  );
+  const hasReworkSummary = reworkSummaryComment.trim().length > 0;
   const blockerLabels = actionBlockers.map((blocker) =>
     blocker.replace(/_/g, ' ')
   );
@@ -342,27 +361,54 @@ export function SafetyIncidentPhase7() {
     }
   }
 
-  async function openPdfPreview() {
+  async function markReworkDone() {
+    if (!id) {
+      return;
+    }
+    setIsMutating(true);
+    setError(null);
+    setResultMessage(null);
+    try {
+      await safetyApi.transitionIncident(id, { target_phase: 7 });
+      setResultMessage('Rework marked done.');
+      await reload();
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setIsMutating(false);
+    }
+  }
+
+  const pdfSectionKeys = useMemo(() => {
+    if (includeLossEvaluationInPdf) {
+      return [
+        ...REQUIRED_INCIDENT_PDF_SECTION_KEYS,
+        LOSS_EVALUATION_PDF_SECTION_KEY,
+      ];
+    }
+    return REQUIRED_INCIDENT_PDF_SECTION_KEYS;
+  }, [includeLossEvaluationInPdf]);
+
+  async function downloadPdf() {
     if (!id || !preflight.pdf_preview.available) {
       return;
     }
-    const previewWindow = window.open('', '_blank');
     setIsMutating(true);
     setError(null);
     try {
-      const { blob } = await safetyApi.downloadIncidentPdf(
+      const { blob, fileName } = await safetyApi.downloadIncidentPdf(
         id,
-        selectedPdfSections
+        pdfSectionKeys
       );
-      const previewUrl = URL.createObjectURL(blob);
-      if (previewWindow) {
-        previewWindow.location.href = previewUrl;
-      } else {
-        window.open(previewUrl, '_blank');
-      }
-      window.setTimeout(() => URL.revokeObjectURL(previewUrl), 60_000);
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60_000);
     } catch (caught) {
-      previewWindow?.close();
       setError(getErrorMessage(caught));
     } finally {
       setIsMutating(false);
@@ -384,6 +430,16 @@ export function SafetyIncidentPhase7() {
     setIsFleetAlertLoading(true);
     setError(null);
     try {
+      const currentPhaseBeforeFleetAlert = Number(preflight.current_phase ?? 0);
+      if (currentPhaseBeforeFleetAlert < 7) {
+        const transition = await safetyApi.transitionIncident(id, {
+          target_phase: 7,
+        });
+        setPreflight((current) => ({
+          ...current,
+          current_phase: Number(transition?.current_phase ?? 7),
+        }));
+      }
       const response = await safetyApi.getIncidentFleetAlert(id);
       const vessels = Array.isArray(response.recipient_vessels)
         ? (response.recipient_vessels as IncidentFleetAlertVessel[])
@@ -414,8 +470,23 @@ export function SafetyIncidentPhase7() {
       const vesselCount =
         responseRecipientIds.length || selectedFleetAlertVesselIds.length;
       const emailsSent = Number(response.emails_sent ?? 0);
+      const emailFailed = Number(response.email_failed ?? 0);
+      const vesselsWithoutEmail = Number(response.vessels_without_email ?? 0);
+      const addressedVesselCount =
+        emailsSent > 1
+          ? emailsSent
+          : Math.max(0, vesselCount - emailFailed - vesselsWithoutEmail);
+      const deliveryParts = [
+        `Email batch addressed to ${addressedVesselCount} vessel(s)`,
+      ];
+      if (emailFailed > 0) {
+        deliveryParts.push(`failed: ${emailFailed}`);
+      }
+      if (vesselsWithoutEmail > 0) {
+        deliveryParts.push(`without email: ${vesselsWithoutEmail}`);
+      }
       setResultMessage(
-        `Fleet alert sent to ${vesselCount} selected ship(s). Emails sent: ${emailsSent}.`
+        `Fleet alert sent to ${vesselCount} selected ship(s). ${deliveryParts.join(', ')}.`
       );
       setSelectedFleetAlertVesselIds([]);
       setFleetAlertOpen(false);
@@ -424,6 +495,20 @@ export function SafetyIncidentPhase7() {
     } finally {
       setIsFleetAlertSending(false);
     }
+  }
+
+  function toggleFleetAlertVessel(vesselId: string) {
+    setSelectedFleetAlertVesselIds((current) =>
+      current.includes(vesselId)
+        ? current.filter((value) => value !== vesselId)
+        : [...current, vesselId]
+    );
+  }
+
+  function toggleAllFleetAlertVessels() {
+    setSelectedFleetAlertVesselIds(
+      allFleetAlertVesselsSelected ? [] : allFleetAlertVesselIds
+    );
   }
 
   const pdfPreviewReady = Boolean(
@@ -474,6 +559,29 @@ export function SafetyIncidentPhase7() {
                   Login as HOD, Chief Engineer, or Chief Officer to sign.
                 </p>
               ) : null}
+            </section>
+          ) : null}
+
+          {hasReworkSummary ? (
+            <section className="rounded-3xl border border-rose-300 bg-rose-50 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-rose-950">
+                    Rework summary
+                  </h2>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-rose-950">
+                    {reworkSummaryComment}
+                  </p>
+                </div>
+                <button
+                  className="min-h-11 rounded-full bg-rose-700 px-5 text-sm font-semibold text-white disabled:bg-rose-300"
+                  disabled={isMutating}
+                  onClick={() => void markReworkDone()}
+                  type="button"
+                >
+                  {isMutating ? 'Updating...' : 'Rework Done'}
+                </button>
+              </div>
             </section>
           ) : null}
 
@@ -546,54 +654,6 @@ export function SafetyIncidentPhase7() {
                   >
                     {isFleetAlertLoading ? 'Loading ships...' : 'Fleet Alert'}
                   </button>
-                  {fleetAlertOpen ? (
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <label className="block text-sm font-medium text-slate-700">
-                        Select ships for Fleet Alert
-                        <select
-                          className="mt-2 min-h-36 w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm"
-                          disabled={
-                            isFleetAlertLoading || isFleetAlertSending
-                          }
-                          multiple
-                          onChange={(event) => {
-                            const values = Array.from(
-                              event.currentTarget.selectedOptions
-                            ).map((option) => option.value);
-                            setSelectedFleetAlertVesselIds(values);
-                          }}
-                          value={selectedFleetAlertVesselIds}
-                        >
-                          {fleetAlertVessels.map((vessel) => (
-                            <option
-                              key={vessel.vessel_id}
-                              value={vessel.vessel_id}
-                            >
-                              {vessel.display_name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <button
-                          className="min-h-10 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-400"
-                          disabled={
-                            isFleetAlertSending ||
-                            selectedFleetAlertVesselIds.length === 0
-                          }
-                          onClick={() => void submitFleetAlert()}
-                          type="button"
-                        >
-                          {isFleetAlertSending
-                            ? 'Sending...'
-                            : 'Send Fleet Alert'}
-                        </button>
-                        <span className="text-sm text-slate-600">
-                          {selectedFleetAlertVesselIds.length} selected
-                        </span>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </form>
 
@@ -625,43 +685,150 @@ export function SafetyIncidentPhase7() {
         </>
       )}
 
-      {isOfficeReviewUser &&
-      (preflight.pdf_preview.download_path || preflight.pdf_preview.message) ? (
-        <IncidentPdfSectionSelector
-          disabled={isMutating || !pdfPreviewReady}
-          onChange={setSelectedPdfSections}
-          value={selectedPdfSections}
-        />
+      {fleetAlertOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <section
+            aria-labelledby="fleet-alert-dialog-title"
+            aria-modal="true"
+            className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl"
+            role="dialog"
+          >
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h2
+                className="text-lg font-semibold text-slate-900"
+                id="fleet-alert-dialog-title"
+              >
+                Select vessels for Fleet Alert
+              </h2>
+            </div>
+            <div className="max-h-[55vh] overflow-y-auto px-5 py-4">
+              {isFleetAlertLoading ? (
+                <p className="text-sm text-slate-600">Loading vessels...</p>
+              ) : fleetAlertVessels.length > 0 ? (
+                <div className="space-y-2">
+                  <label className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                    <input
+                      checked={allFleetAlertVesselsSelected}
+                      className="h-4 w-4 rounded border-slate-300"
+                      disabled={isFleetAlertSending}
+                      onChange={toggleAllFleetAlertVessels}
+                      type="checkbox"
+                    />
+                    <span>Select all vessels</span>
+                  </label>
+                  {fleetAlertVessels.map((vessel) => (
+                    <label
+                      className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+                      key={vessel.vessel_id}
+                    >
+                      <input
+                        checked={selectedFleetAlertVesselIds.includes(
+                          vessel.vessel_id
+                        )}
+                        className="h-4 w-4 rounded border-slate-300"
+                        disabled={isFleetAlertSending}
+                        onChange={() =>
+                          toggleFleetAlertVessel(vessel.vessel_id)
+                        }
+                        type="checkbox"
+                      />
+                      <span className="flex-1">
+                        <span className="block font-medium">
+                          {vessel.display_name}
+                        </span>
+                        {vessel.has_email === false ? (
+                          <span className="text-xs text-amber-700">
+                            Email not recorded in VesselData
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-600">
+                  No active vessels are available.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+              <span className="text-sm text-slate-600">
+                {selectedFleetAlertVesselIds.length} selected
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  className="min-h-10 rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+                  disabled={isFleetAlertSending}
+                  onClick={() => setFleetAlertOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="min-h-10 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-400"
+                  disabled={
+                    isFleetAlertLoading ||
+                    isFleetAlertSending ||
+                    selectedFleetAlertVesselIds.length === 0
+                  }
+                  onClick={() => void submitFleetAlert()}
+                  type="button"
+                >
+                  {isFleetAlertSending ? 'Sending...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
       ) : null}
 
-      {isOfficeReviewUser ? (
-        <div className="flex flex-wrap gap-3">
+      {pdfControlsVisible ? (
+        <section
+          aria-labelledby="incident-pdf-options-title"
+          className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <h2
+            className="text-lg font-semibold text-slate-900"
+            id="incident-pdf-options-title"
+          >
+            PDF Options
+          </h2>
+          <label className="mt-4 flex min-h-11 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-800">
+            <input
+              checked={includeLossEvaluationInPdf}
+              className="h-4 w-4 rounded border-slate-300"
+              disabled={isMutating || !pdfPreviewReady}
+              onChange={(event) =>
+                setIncludeLossEvaluationInPdf(event.target.checked)
+              }
+              type="checkbox"
+            />
+            Print Loss Evaluation
+          </label>
+        </section>
+      ) : null}
+
+      <div className="flex flex-wrap gap-3">
+        {isOfficeReviewUser ? (
           <Link
             className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
             to={`/safety/incidents/${id}/phase-3/preventive`}
           >
             Back to Preventive Action
           </Link>
-          {preflight.pdf_preview.download_path ||
-          preflight.pdf_preview.message ? (
-            <button
-              className="inline-flex min-h-11 items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400"
-              disabled={
-                isMutating ||
-                !pdfPreviewReady ||
-                selectedPdfSections.length === 0
-              }
-              onClick={() => void openPdfPreview()}
-              title={
-                pdfPreviewReady ? undefined : preflight.pdf_preview.message
-              }
-              type="button"
-            >
-              PDF Preview
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+        ) : null}
+        {pdfControlsVisible ? (
+          <button
+            className="inline-flex min-h-11 items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400"
+            disabled={isMutating || !pdfPreviewReady}
+            onClick={() => void downloadPdf()}
+            title={pdfPreviewReady ? undefined : preflight.pdf_preview.message}
+            type="button"
+          >
+            Download PDF
+          </button>
+        ) : null}
+      </div>
     </section>
   );
 }

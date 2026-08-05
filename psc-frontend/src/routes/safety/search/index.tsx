@@ -11,7 +11,7 @@ import { useSafetySearch } from "../../../hooks/use-safety";
 type SearchRecordTypeFilter = "ALL" | SafetySearchGroupKey;
 
 const searchTypeOptions: Array<{ description: string; value: SearchRecordTypeFilter; label: string }> = [
-  { value: "ALL", label: "All", description: "Cross-record full-text scan across every Step 8.8 source." },
+  { value: "ALL", label: "All", description: "Search all safety records." },
   { value: "INCIDENT", label: "Incident", description: "Formal incident records only." },
   { value: "NEAR_MISS", label: "Near Miss", description: "Near-miss records with reporter details for authorized users." },
   { value: "SCM", label: "SCM", description: "Safety committee meeting records." },
@@ -131,13 +131,9 @@ export default function SafetySearchRoute() {
   return (
     <section className="space-y-6">
       <header className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#dbeafe_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Search
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">Safety Search</h1>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-          Step 8.8 resolves the earlier fallback with the platform SQL Server full-text engine while keeping the
-          grouped cross-record search surface and archive opt-in unchanged for users.
+          Search incidents, near misses, SCM records, and SOI findings from one place.
         </p>
       </header>
 

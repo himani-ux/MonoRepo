@@ -237,7 +237,8 @@ Permissions are server-driven (`msc_profiles` per D-CERT-090); hook fetches once
 - Sync per-vessel: progress bar with "Generating PDF (page X of Y)..." (D-CERT-144). Hard cap 60s; on timeout, surface "Generation timed out — try a narrower scope or contact support" + auto-create support ticket via D-CERT-150 mechanism.
 - Async fleet-wide: queue, ETA, in-app notification on complete.
 - Auto-archive every print artifact (D-CERT-149) — visible in `/certs/print/history`.
-- Optional recipient email per print (D-CERT-149) — checkbox at generate time.
+- Normal Print certs status uses the current vessel context and one single-select Certificate sections dropdown. `All sections` prints the full vessel status; selecting one section prints every certificate in that section. Do not show individual certificate choices, Buckets/Add Vessel filters, Scope, Status, Sections, Watermark, or Recipient fields in the normal print screen (D-CERT-208, D-CERT-209, D-CERT-210, D-CERT-211).
+- Share Bundle remains separate: certificate-section multi-select with Select all / Clear all, recipient name, recipient email validation, ZIP download, and optional email delivery. Do not list individual certificates in the normal share screen.
 
 ---
 

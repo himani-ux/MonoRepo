@@ -80,12 +80,9 @@ export default function SafetyScmAttendanceRoute() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_55%,#eff6ff_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / SCM
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">SCM Attendance</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          WRH attendance snapshots and warning-only exceptions are now read from the live meeting payload.
+          Review attendance and rest-hour warnings for this meeting.
         </p>
       </header>
 
@@ -106,7 +103,7 @@ export default function SafetyScmAttendanceRoute() {
         </article>
         <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Contract
+            WRH rule
           </p>
           <p className="mt-2 text-lg font-semibold text-slate-900">Warn, don&apos;t block</p>
         </article>

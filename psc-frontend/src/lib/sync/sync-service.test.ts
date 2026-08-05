@@ -237,7 +237,7 @@ describe('sync-service', () => {
         attachment_upload_urls: [
           {
             client_id: 'temp_1',
-            upload_url: '/api/psc/sync/upload/token/',
+            upload_url: 'http://localhost:8000/api/psc/sync/upload/token/',
             expires_at: new Date(Date.now() + 60_000).toISOString(),
           },
         ],

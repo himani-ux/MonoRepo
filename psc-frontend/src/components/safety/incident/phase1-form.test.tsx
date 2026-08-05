@@ -210,7 +210,11 @@ describe('SafetyIncidentPhase1Form injury section', () => {
       ...EXPECTED_INCIDENT_TYPE_NAMES,
     ]);
     expect(screen.queryByRole('option', { name: 'Missing vessel' })).toBeNull();
-  });
+
+    expect(screen.queryByLabelText('Specify other incident type')).toBeNull();
+    await userEvent.selectOptions(incidentTypeSelect, String(EXPECTED_INCIDENT_TYPE_NAMES.length));
+    expect(screen.getByLabelText('Specify other incident type')).toBeTruthy();
+  }, 10000);
 
   it('shows simplified office, position, reporting, and weather fields on the incident report', async () => {
     phase1FormMocks.getIncidentWeatherOptions.mockResolvedValue([]);
@@ -247,6 +251,22 @@ describe('SafetyIncidentPhase1Form injury section', () => {
     expect(screen.queryByRole('option', { name: 'On WhatsApp' })).toBeNull();
     expect(screen.queryByLabelText('How was office told?')).toBeNull();
 
+    expect(
+      screen.getByRole('combobox', {
+        name: 'Was a Risk Assessment carried out?',
+      })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('combobox', {
+        name: 'Was Toolbox Meeting carried out?',
+      })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('combobox', { name: 'Was a Permit Issue?' })
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Type of Activity')).toBeTruthy();
+    expect(screen.getByLabelText('Describe What happened?')).toBeTruthy();
+
     const reportTimeInput = screen.getByLabelText('Report time');
     const shoreAssistanceInput = screen.getByRole('combobox', {
       name: 'Shore Assistance Required',
@@ -265,16 +285,43 @@ describe('SafetyIncidentPhase1Form injury section', () => {
     expect(longitudeInput).toBeTruthy();
     expect(coordinateRow).toContainElement(longitudeInput);
     expect(coordinateRow).not.toContainElement(shoreAssistanceInput);
-    expect(screen.getByLabelText('Location of Vessel')).toBeTruthy();
+    const vesselLocationSelect = screen.getByRole('combobox', {
+      name: 'Location of Vessel',
+    });
+    expect(vesselLocationSelect).toBeTruthy();
+    expect(
+      screen.getByRole('option', { name: 'At Sea (Open sea condition)' })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('option', { name: 'At Sea (Coastal passage)' })
+    ).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'In Port' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'At Anchorage' })).toBeTruthy();
+    expect(screen.queryByLabelText('Specify Location of Vessel')).toBeNull();
+    await userEvent.selectOptions(vesselLocationSelect, 'In Port');
+    expect(screen.getByLabelText('Specify Location of Vessel')).toBeTruthy();
     expect(screen.getByLabelText('Location on Board')).toBeTruthy();
     expect(screen.queryByLabelText('Last Port')).toBeNull();
     expect(screen.getByLabelText('Departure Date')).toBeTruthy();
+    expect(
+      screen
+        .getByLabelText('Location on Board')
+        .compareDocumentPosition(
+          screen.getByLabelText('Was a Risk Assessment carried out?')
+        ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByLabelText('Type of Activity')
+        .compareDocumentPosition(screen.getByLabelText('Departure Date')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(
       screen.getByRole('combobox', { name: 'Vessel Condition' })
     ).toBeTruthy();
     expect(screen.queryByLabelText('Ice condition on-board')).toBeNull();
     expect(screen.queryByLabelText('Ice condition at sea')).toBeNull();
-  });
+  }, 10000);
 
   it('omits hidden legacy phase 1 fields from save payloads', async () => {
     const onSaveDraft = vi.fn().mockResolvedValue(undefined);
@@ -315,6 +362,104 @@ describe('SafetyIncidentPhase1Form injury section', () => {
     expect(payload).not.toHaveProperty('weather_ice_condition_at_sea_id');
     expect(payload).not.toHaveProperty('weather_ice_condition_onboard_id');
     expect(payload.office_notification_mode).toBeNull();
+  });
+
+  it('saves changes when a legacy Phase 1 injury only has removed estimated-cost fields', async () => {
+    const onSaveDraft = vi.fn().mockResolvedValue(undefined);
+
+    phase1FormMocks.toast.mockClear();
+    phase1FormMocks.getIncidentWeatherOptions.mockResolvedValue([]);
+    phase1FormMocks.getReferenceIncidentTypes.mockResolvedValue([]);
+    phase1FormMocks.getReferenceLossTypes.mockResolvedValue([]);
+    phase1FormMocks.getVesselCrew.mockResolvedValue([]);
+    phase1FormMocks.getInjuryDropdownOptions.mockResolvedValue([]);
+
+    render(
+      <SafetyIncidentPhase1Form
+        initialValues={{
+          external_party_injury: {
+            cost_medicines_onboard: '125',
+            injured_person_type: 'NON_CREW',
+            miscellaneous_expenses_reason: 'Legacy cost note',
+          },
+          schema_version: 1,
+          vessel_id: 'vessel-1',
+        }}
+        mode="edit"
+        onSaveDraft={onSaveDraft}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(onSaveDraft).toHaveBeenCalled();
+    });
+
+    expect(onSaveDraft.mock.calls[0][0].external_party_injury).toBeNull();
+    expect(phase1FormMocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Some details are missing' })
+    );
+  });
+
+  it('saves changes when legacy Phase 1 injury optional text fields are null', async () => {
+    const onSaveDraft = vi.fn().mockResolvedValue(undefined);
+
+    phase1FormMocks.toast.mockClear();
+    phase1FormMocks.getIncidentWeatherOptions.mockResolvedValue([]);
+    phase1FormMocks.getReferenceIncidentTypes.mockResolvedValue([]);
+    phase1FormMocks.getReferenceLossTypes.mockResolvedValue([]);
+    phase1FormMocks.getVesselCrew.mockResolvedValue([]);
+    phase1FormMocks.getInjuryDropdownOptions.mockResolvedValue([]);
+
+    render(
+      <SafetyIncidentPhase1Form
+        initialValues={{
+          external_party_injury: {
+            company_name: 'Harbor Services',
+            first_aid_details: null,
+            injured_person_type: 'NON_CREW',
+            notes: null,
+            party_name: 'Alex Pilot',
+            party_type: 'PILOT',
+            severity: 'First aid',
+            what_happened_narrative: null,
+          } as never,
+          schema_version: 1,
+          vessel_id: 'vessel-1',
+        }}
+        mode="edit"
+        onSaveDraft={onSaveDraft}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      expect(onSaveDraft).toHaveBeenCalled();
+    });
+
+    const injuryPayload = onSaveDraft.mock.calls[0][0].external_party_injury;
+    expect(injuryPayload).toMatchObject({
+      company_name: 'Harbor Services',
+      party_name: 'Alex Pilot',
+      party_type: 'PILOT',
+      severity: 'First aid',
+    });
+    expect(injuryPayload).not.toHaveProperty('notes');
+    expect(injuryPayload).not.toHaveProperty('first_aid_details');
+    expect(injuryPayload).not.toHaveProperty('what_happened_narrative');
+    expect(phase1FormMocks.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Some details are missing' })
+    );
   });
 
   it('keeps the create form visible when injury is enabled and Crew is selected', async () => {

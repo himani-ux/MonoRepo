@@ -1,4 +1,4 @@
-﻿// src/components/dashboardlayout/KsmLibrary.jsx
+// src/components/dashboardlayout/KsmLibrary.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -126,13 +126,13 @@ const KsmLibrary = ({
 }) => {
   const detailsPanelRef = useRef(null);
   const navigate = useNavigate();
-  
+
   const [selectedId, setSelectedId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Crew list state
   const [showCrewList, setShowCrewList] = useState(false);
   const [crewList, setCrewList] = useState([]);
@@ -169,7 +169,7 @@ const KsmLibrary = ({
     setExpandedTitle(null);
   };
 
-  // ðŸ“¥ Fetch notifications
+  // 📥 Fetch notifications
   useEffect(() => {
     if (!canViewList || !user) {
       setLoading(false);
@@ -178,7 +178,7 @@ const KsmLibrary = ({
 
     const fetchNotifications = async () => {
     try {
-      // âœ… DETERMINE ENDPOINT BASED ON ROLE
+      // ✅ DETERMINE ENDPOINT BASED ON ROLE
       const isMaster = isCircularMasterUser(user);
       console.log('User role:', user.role, 'rank:', user.rank, 'role_name:', user.role_name, 'isMaster:', isMaster);
 
@@ -187,7 +187,7 @@ const KsmLibrary = ({
         : 'http://localhost:8000/api/circular/api/crew/notifications/';
       const crewId = user.crew_id || user.username;
       console.log('Fetching from:', endpoint);
-      console.log("âœ… Fetching notifications from:", endpoint, "with crew_id:", crewId);
+      console.log("✅ Fetching notifications from:", endpoint, "with crew_id:", crewId);
       const res = await fetch(`${endpoint}?crew_id=${encodeURIComponent(crewId)}`);
 
       if (!res.ok) {
@@ -212,7 +212,7 @@ const KsmLibrary = ({
           type: item.type || 'Alert',
           criticality: item.criticality || 'Medium',
           hashtags,
-          publishedDate: item.publishedDate ? item.publishedDate.replace("T", " ").split(".")[0] : "â€”",
+          publishedDate: item.publishedDate ? item.publishedDate.replace("T", " ").split(".")[0] : "—",
           scope: scopeLabel,
           attachment_url: item.attachment_url || null,
           isReminded,
@@ -247,7 +247,7 @@ const KsmLibrary = ({
   fetchNotifications();
 }, [user, canViewList]);
 
-  // ðŸ‘¥ Fetch crew list
+  // 👥 Fetch crew list
   useEffect(() => {
     if (!showCrewList || !canViewCrewStatus || !selectedId) return;
 
@@ -311,24 +311,24 @@ const KsmLibrary = ({
     setSendingCrewReminder(null);
   }, [selectedId]);
 
-  // ðŸ›Žï¸ Remind crew
+  // 🛎️ Remind crew
   const handleRemindIndividualCrew = async (employeeId) => {
     if (!canRemindCrew) return;
     if (sendingCrewReminder) return;
-    
+
     setSendingCrewReminder(employeeId);
 
     try {
       const res = await fetch('http://localhost:8000/api/circular/api/msc/remind-crew/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           msc_sr_no: selectedId,
           master_id: user.crew_id || user.username,
-          crew_id: employeeId, 
+          crew_id: employeeId,
         }),
       });
-      
+
       if (res.ok) {
         alert(`Reminder sent to ${employeeId}`);
         const reminderTimestamp = new Date().toISOString();
@@ -360,10 +360,10 @@ const KsmLibrary = ({
     }
   };
 
-  // âœ… Acknowledge notification
+  // ✅ Acknowledge notification
   const handleAcknowledge = async (notification) => {
     if (!canAcknowledge) return;
-    
+
     try {
       const res = await fetch('http://localhost:8000/api/circular/api/msc/read-ack/', {
         method: 'POST',
@@ -415,7 +415,7 @@ const KsmLibrary = ({
     }
   };
 
-  // ðŸ” Filter notifications - ONLY DECLARATION
+  // 🔍 Filter notifications - ONLY DECLARATION
   const filteredNotifications = notifications.filter((n) => {
     const matchesSearch =
       n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -448,7 +448,7 @@ const KsmLibrary = ({
         }
     : { total: 0, read: 0 };
 
-  // ðŸ–¼ï¸ Render helpers
+  // 🖼️ Render helpers
   const getStatusColor = (isAck) => isAck ? 'border-blue-400' : 'border-red-400';
   const getCritColor = (criticality) => {
     switch (criticality) {
@@ -507,7 +507,7 @@ const KsmLibrary = ({
           <div className="text-xs text-neutral-500">
             {loading
               ? 'Loading...'
-              : `${filteredNotifications.length} results Â· Page ${safeCurrentPage} of ${totalPages}`}
+              : `${filteredNotifications.length} results · Page ${safeCurrentPage} of ${totalPages}`}
           </div>
         </div>
 
@@ -534,7 +534,7 @@ const KsmLibrary = ({
                 <CardContent className="p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <div className="font-medium text-neutral-900">{notification.id || "â€”"}</div>
+                      <div className="font-medium text-neutral-900">{notification.id || "—"}</div>
                       {notification.isRankTargeted && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm">
                           <AlertTriangle className="h-3 w-3" />
@@ -753,7 +753,7 @@ const KsmLibrary = ({
                           {tag.startsWith("#") ? tag : `#${tag}`}
                         </Badge>
                       ))}
-                      
+
                       {selectedNotification.attachment_url && (
                         <Button
                           size="sm"
@@ -811,7 +811,7 @@ const KsmLibrary = ({
                                 <div
                                   key={crew.crew_id}
                                   className={`flex items-center justify-between p-2 rounded-md ${
-                                    crew.status === 'Acknowledged'  
+                                    crew.status === 'Acknowledged'
                                       ? 'bg-green-50 border border-green-200'
                                       : 'bg-red-50 border border-red-200'
                                   }`}

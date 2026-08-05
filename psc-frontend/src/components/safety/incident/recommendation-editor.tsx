@@ -35,7 +35,9 @@ function RecommendationCard({
   onEdit?: (recommendation: SafetyRecommendation) => void;
   recommendation: SafetyRecommendation;
 }) {
-  const linkedAction = recommendation.corrective_actions[0];
+  const dueDate = recommendation.corrective_actions?.find(
+    (action) => action.due_date
+  )?.due_date;
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -61,13 +63,10 @@ function RecommendationCard({
       <p className="mt-2 text-sm leading-6 text-slate-600">
         {recommendation.description}
       </p>
-      {linkedAction?.due_date ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-          <p>
-            <span className="font-semibold">Due date:</span>{' '}
-            {linkedAction.due_date}
-          </p>
-        </div>
+      {dueDate ? (
+        <p className="mt-2 text-sm font-medium text-slate-700">
+          Due Date: {dueDate}
+        </p>
       ) : null}
     </article>
   );
@@ -95,9 +94,6 @@ export function SafetyRecommendationEditor({
           <h2 className="mt-2 text-xl font-semibold text-slate-900">
             {heading}
           </h2>
-        </div>
-        <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-600">
-          {workspace.corrective_actions.length} linked actions
         </div>
       </header>
 

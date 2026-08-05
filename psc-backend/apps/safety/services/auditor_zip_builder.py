@@ -22,7 +22,7 @@ from .pdf_renderer import IncidentPdfRenderer, NearMissLightweightPdfRenderer, S
 @dataclass(frozen=True)
 class AuditorBundleIncludedRecord:
     record_type: str
-    record_id: int
+    record_id: str
     reference: str
     vessel_id: str
     pdf_file_name: str
@@ -163,7 +163,7 @@ class AuditorZipBuilder:
                 included_records.append(
                     AuditorBundleIncludedRecord(
                         record_type=record_type,
-                        record_id=int(record.pk),
+                        record_id=str(record.pk),
                         reference=self._record_reference(record_type, record),
                         vessel_id=str(getattr(record, "vessel_id", "")),
                         pdf_file_name=pdf_file_name,

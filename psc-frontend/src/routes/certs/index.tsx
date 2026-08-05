@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CornerDownRight,
   Download,
+  Eye,
   FileCheck2,
   FileText,
   History,
@@ -66,7 +67,6 @@ import {
   useBulkSoftDeleteCatalogRows,
   useCreateCatalogRow,
   useDeprecateCatalogRow,
-  useHardPurgeCatalogRow,
   useUpdateCatalogRow,
 } from '@/hooks/certs/use-catalog';
 import { useAuditLog, useExportAuditLog } from '@/hooks/certs/use-audit-log';
@@ -114,6 +114,7 @@ import {
   useApproveTrackedItem,
   useRemoveTrackedItemPdf,
   useRejectTrackedItem,
+  useReparseTrackedItemPdf,
   useSubmitTrackedItem,
   useTrackedItems,
   useTrackedItemDetail,
@@ -133,6 +134,7 @@ import { useCertSettings, useUpdateCertSettings } from '@/hooks/certs/use-settin
 import {
   certsApi,
   type CertCatalogAuditEntry,
+  type CertCatalogSection,
   type CertAuditLogEntry,
   type CertAuditLogFilters,
   type CertAuditorAccessGrant,
@@ -150,11 +152,10 @@ import {
   type CertReconciliationRunDetail,
   type CertTrackedItemAuditEvent,
   type CertTrackedItemDetail,
+  type CertTrackedItemFilters,
   type CertTrackedItem,
   type CertPrintArtifact,
   type CertPrintDownloadKind,
-  type CertPrintScope,
-  type CertPrintWatermark,
   type CertValidationEntry,
   type CertFleetDashboardVessel,
   type CertFleetDashboardResponse,
@@ -185,7 +186,24 @@ const SHIP_TYPE_OPTIONS = [
 const SPECIFIC_SHIP_TYPE_OPTIONS = SHIP_TYPE_OPTIONS.filter((option) => option.value !== 'all');
 const APPLICABILITY_MODE_OPTIONS = [
   { value: 'all_matching_type', label: 'All matching ship type' },
-  { value: 'specific_vessel_ids', label: 'Specific vessel IDs' },
+  { value: 'specific_vessel_ids', label: 'Specific vessels' },
+] as const;
+const CATALOG_VALIDITY_TYPE_OPTIONS = [
+  { value: 'full', label: 'Full' },
+  { value: 'conditional', label: 'Conditional' },
+  { value: 'short_term', label: 'Short term' },
+  { value: 'permanent', label: 'Permanent' },
+] as const;
+const CATALOG_ISSUING_AUTHORITY_TYPE_OPTIONS = [
+  { value: 'flag', label: 'Flag' },
+  { value: 'class', label: 'Class' },
+  { value: 'RO', label: 'Recognized organization' },
+  { value: 'manufacturer', label: 'Manufacturer' },
+  { value: 'company', label: 'Company' },
+  { value: 'ko_other', label: 'Other' },
+] as const;
+const CATALOG_SUBMISSION_SCOPE_OPTIONS = [
+  { value: 'all_ranks_with_approval', label: 'All ranks with approval' },
 ] as const;
 const CLASS_MAPPING_KIND_OPTIONS = [
   { value: 'renewal', label: 'Renewal' },
@@ -218,14 +236,15 @@ const ACTION_STATUSES = new Set([
   'pending_supersession',
 ]);
 const RECONCILIATION_BUCKET_TABS = [
-  { bucket: 'match', label: 'Already matched', countKey: 'matchesCount' },
-  { bucket: 'mismatch', label: 'Details differ', countKey: 'mismatchesCount' },
-  { bucket: 'missing_in_catalog', label: 'Needs setup in VIMS', countKey: 'missingInCatalogCount' },
-  { bucket: 'missing_in_class', label: 'Not found in class report', countKey: 'missingInClassCount' },
-  { bucket: 'conditional_stc', label: 'Short-term certificate', countKey: 'conditionalStcDetectedCount' },
-  { bucket: 'extended_postponed', label: 'Extended or postponed', countKey: 'extendedPostponedDetectedCount' },
-  { bucket: 'unmapped_low_confidence', label: 'Needs manual check', countKey: 'unmappedLowConfidenceCount' },
+  { bucket: 'match', label: 'Match', countKey: 'matchesCount' },
+  { bucket: 'mismatch', label: 'Different', countKey: 'mismatchesCount' },
+  { bucket: 'missing_in_catalog', label: 'Add to VIMS', countKey: 'missingInCatalogCount' },
+  { bucket: 'conditional_stc', label: 'Short term', countKey: 'conditionalStcDetectedCount' },
+  { bucket: 'extended_postponed', label: 'Extension or postponement', countKey: 'extendedPostponedDetectedCount' },
+  { bucket: 'conditions_of_class', label: 'Conditions of class', countKey: null },
+  { bucket: 'unmapped_low_confidence', label: 'Check report item', countKey: 'unmappedLowConfidenceCount' },
 ] as const;
+const RECONCILIATION_HIDE_WHEN_EMPTY_BUCKETS = new Set(['extended_postponed', 'unmapped_low_confidence']);
 
 type CertAuthContext = {
   role?: unknown;
@@ -410,7 +429,7 @@ function CertClassReconciliationEntryCard() {
 }
 
 function CertApprovalQueueSummaryCard() {
-  const pending = useTrackedItems({ approvalState: 'pending_master_approval' });
+  const pending = useTrackedItems({ approvalState: 'pending_master_approval', page: 1, pageSize: 1 });
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -495,7 +514,7 @@ function CertApprovalQueuePage() {
   const auth = useAuth();
   const canOpenQueue = canOpenCertApprovalQueue(auth);
   const canDecide = canDecideCertApproval(auth);
-  const pending = useTrackedItems({ approvalState: 'pending_master_approval' }, canOpenQueue);
+  const pending = useTrackedItems({ approvalState: 'pending_master_approval', page: 1, pageSize: 100 }, canOpenQueue);
 
   if (!canOpenQueue) {
     return <CertsPermissionDenied />;
@@ -1919,8 +1938,10 @@ interface CertPickerOption {
   group?: string | null;
 }
 
-function useCertPrintSelectionOptions(enabled: boolean) {
-  const trackedItems = useTrackedItems({}, enabled);
+const PRINT_ALL_SECTIONS_OPTION = 'all_sections';
+
+function useCertPrintSelectionOptions(filters: CertTrackedItemFilters, enabled: boolean) {
+  const trackedItems = useTrackedItems({ ...filters, page: 1, pageSize: 1 }, enabled);
 
   return {
     certificateItems: trackedItems.data?.results ?? [],
@@ -1928,65 +1949,17 @@ function useCertPrintSelectionOptions(enabled: boolean) {
   };
 }
 
-function buildCertCertificatePickerOptions(
-  items: CertTrackedItem[],
-  selectedVesselIds: string[]
-): CertPickerOption[] {
-  const selectedVessels = new Set(selectedVesselIds);
-  const includeVesselInGroup = selectedVessels.size !== 1;
-  return items
-    .filter((item) => Boolean(item.id))
-    .filter((item) => selectedVessels.size === 0 || Boolean(item.vesselId && selectedVessels.has(item.vesselId)))
-    .map((item) => ({
-      value: item.id,
-      label: formatCertificatePickerLabel(item),
-      description: formatCertificatePickerDescription(item),
-      group: formatCertificatePickerGroup(item, includeVesselInGroup),
+function buildCertSectionPickerOptions(sections: CertCatalogSection[]): CertPickerOption[] {
+  return sections
+    .filter((section) => section.sectionId || section.sectionCode)
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.displayName.localeCompare(right.displayName))
+    .map((section) => ({
+      value: String(section.sectionId || section.sectionCode),
+      label: section.displayName,
+      description: section.activeRowCount
+        ? `${section.activeRowCount} catalog row${section.activeRowCount === 1 ? '' : 's'}`
+        : null,
     }));
-}
-
-function formatCertificatePickerLabel(item: CertTrackedItem): string {
-  const name = String(item.displayName ?? item.catalogDisplayName ?? item.catalogShortName ?? item.catalogCode ?? '').trim();
-  const number = String(item.certificateNumber ?? '').trim();
-  const baseLabel = name || formatEntityLabel(item.id, 'Certificate');
-  return number && !baseLabel.includes(number) ? `${baseLabel} - ${number}` : baseLabel;
-}
-
-function formatCertificatePickerDescription(item: CertTrackedItem): string | null {
-  const status = String(item.status ?? '').trim();
-  const expiry = item.expiryDate ? `Expires ${formatDate(item.expiryDate)}` : '';
-  const parts = [status ? formatStatus(status) : '', expiry].filter(Boolean);
-  return parts.length ? parts.join(' | ') : null;
-}
-
-function formatCertificatePickerGroup(item: CertTrackedItem, includeVessel: boolean): string {
-  const vessel = String(item.vesselName ?? item.vesselCode ?? item.vesselImo ?? '').trim();
-  const section = String(item.sectionName ?? item.sectionCode ?? '').trim();
-  const category = formatCertificatePickerCategory(item);
-  const parts = [
-    includeVessel ? vessel : '',
-    section || 'Other section',
-    category,
-  ].filter(Boolean);
-  return parts.length ? parts.join(' - ') : 'Other certificates';
-}
-
-function formatCertificatePickerCategory(item: CertTrackedItem): string {
-  const status = String(item.status ?? '').trim().toLowerCase();
-  if (status === 'expired') return 'Expired';
-  if (status === 'overdue') return 'Overdue';
-  if (status === 'window_closing') return 'Renewal urgent';
-  if (status === 'window_open') return 'Renewal due';
-  if (status === 'pending_first_upload') return 'PDF missing';
-  if (status === 'pending_master_approval') return 'Waiting for Master review';
-  if (!item.expiryDate && item.validityType === 'permanent') return 'Permanent';
-  if (typeof item.daysToGo === 'number') {
-    if (item.daysToGo <= 0) return 'Expired';
-    if (item.daysToGo <= 30) return 'Due within 30 days';
-    if (item.daysToGo <= 90) return 'Due within 90 days';
-    return 'Current';
-  }
-  return status ? formatStatus(status) : 'Other status';
 }
 
 function resolveContextVesselId(initialVesselId: string, authVesselId: string | null | undefined): string {
@@ -2161,20 +2134,18 @@ function CertPrintBuilderPage() {
   const queryImo = queryParams.get('imo');
   const contextVesselId = resolveContextVesselId(initialVesselId, auth.vesselId);
   const vesselIds = contextVesselId ? [contextVesselId] : [];
-  const [scope, setScope] = useState<Exclude<CertPrintScope, 'share_bundle'>>('per_vessel_full');
-  const [sections, setSections] = useState('');
-  const [customCertIds, setCustomCertIds] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [watermark, setWatermark] = useState<CertPrintWatermark>('NONE');
-  const [watermarkRecipient, setWatermarkRecipient] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const printSelection = useCertPrintSelectionOptions(canPrint);
+  const [certificateListSelection, setCertificateListSelection] = useState(PRINT_ALL_SECTIONS_OPTION);
+  const sections = useCatalogSections();
   const mutation = useGeneratePrintArtifact();
-  const certificateOptions = buildCertCertificatePickerOptions(printSelection.certificateItems, vesselIds);
+  const printSelectionFilters: CertTrackedItemFilters = contextVesselId
+    ? { vesselId: contextVesselId }
+    : {};
+  const printSelectionEnabled = canPrint && Boolean(contextVesselId);
+  const printSelection = useCertPrintSelectionOptions(printSelectionFilters, printSelectionEnabled);
+  const sectionOptions = buildCertSectionPickerOptions(sections.data ?? []);
   const vesselContextLabel = contextVesselId
     ? formatContextVesselLabel(contextVesselId, queryImo, auth.user?.vessel_name, printSelection.certificateItems)
     : '';
-  const requiresVesselContext = scope !== 'per_section_fleetwide';
   const shareBundleHref = contextVesselId
     ? `${ROUTES.CERTS_SHARE_BUNDLE}?vesselId=${encodeURIComponent(contextVesselId)}${queryImo ? `&imo=${encodeURIComponent(queryImo)}` : ''}`
     : ROUTES.CERTS_SHARE_BUNDLE;
@@ -2185,24 +2156,25 @@ function CertPrintBuilderPage() {
 
   const submitPrint = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (requiresVesselContext && vesselIds.length === 0) {
+    if (vesselIds.length === 0) {
       return;
     }
+    const selectedSection = certificateListSelection === PRINT_ALL_SECTIONS_OPTION ? '' : certificateListSelection;
     mutation.mutate({
-      scope,
+      scope: selectedSection ? 'per_vessel_partial' : 'per_vessel_full',
       vesselIds,
-      sections: parseCsvValues(sections),
-      customCertIds,
-      filters: { status: statusFilter },
-      watermarkApplied: watermark,
-      watermarkRecipient,
-      recipientEmail,
+      sections: selectedSection ? [selectedSection] : [],
+      customCertIds: [],
+      filters: {},
+      watermarkApplied: 'NONE',
+      watermarkRecipient: '',
+      recipientEmail: '',
     });
   };
 
   return (
     <RootLayout>
-      <PageHeader title="Print Builder" />
+      <PageHeader title="Print certs status" />
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
@@ -2221,91 +2193,37 @@ function CertPrintBuilderPage() {
         <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
           <Card>
             <CardHeader>
-              <CardTitle>SQE S 633 export</CardTitle>
+              <CardTitle>Print certs status</CardTitle>
             </CardHeader>
             <CardContent>
               <form className="space-y-4" onSubmit={submitPrint}>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="printScope">Scope</Label>
-                    <Select value={scope} onValueChange={(value) => setScope(value as Exclude<CertPrintScope, 'share_bundle'>)}>
-                      <SelectTrigger id="printScope"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="per_vessel_full">Per-vessel full</SelectItem>
-                        <SelectItem value="per_vessel_partial">Per-vessel partial</SelectItem>
-                        <SelectItem value="per_section_fleetwide">Per-section fleet-wide</SelectItem>
-                        <SelectItem value="custom_selection">Custom selection</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="printStatus">Status</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger id="printStatus"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All statuses</SelectItem>
-                        <SelectItem value="ok">Current</SelectItem>
-                        <SelectItem value="window_open">Window open</SelectItem>
-                        <SelectItem value="window_closing">Window closing</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                        <SelectItem value="expired">Expired</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
                 {vesselContextLabel ? (
                   <div className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
                     Vessel: <span className="font-medium text-neutral-900">{vesselContextLabel}</span>
                   </div>
-                ) : requiresVesselContext ? (
+                ) : (
                   <div className="rounded-md border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900">
                     Open a vessel first to print that vessel.
                   </div>
-                ) : null}
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="printSections">Sections</Label>
-                    <Input id="printSections" value={sections} onChange={(event) => setSections(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="printWatermark">Watermark</Label>
-                    <Select value={watermark} onValueChange={(value) => setWatermark(value as CertPrintWatermark)}>
-                      <SelectTrigger id="printWatermark"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">None</SelectItem>
-                        <SelectItem value="INTERNAL">Internal</SelectItem>
-                        <SelectItem value="AUDIT_COPY">Audit copy</SelectItem>
-                        <SelectItem value="DRAFT">Draft</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                )}
                 <div className="space-y-2">
-                  <Label htmlFor="printCustomCerts">Certificates</Label>
-                  <CertMultiSelectDropdown
-                    id="printCustomCerts"
-                    value={customCertIds}
-                    options={certificateOptions}
-                    onChange={setCustomCertIds}
-                    placeholder="Choose certificates"
-                    fallbackLabel="Certificate"
-                    pluralLabel="certificates"
-                    loading={printSelection.isCertificatesLoading}
-                    noOptionsText="No certificates available."
-                  />
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="printWatermarkRecipient">Watermark recipient</Label>
-                    <Input id="printWatermarkRecipient" value={watermarkRecipient} onChange={(event) => setWatermarkRecipient(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="printRecipientEmail">Recipient email</Label>
-                    <Input id="printRecipientEmail" type="email" inputMode="email" autoComplete="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} />
-                  </div>
+                  <Label htmlFor="printCertificateList">Certificate sections</Label>
+                  <Select value={certificateListSelection} onValueChange={setCertificateListSelection} disabled={!contextVesselId || sections.isLoading}>
+                    <SelectTrigger id="printCertificateList" className="bg-white">
+                      <SelectValue placeholder={sections.isLoading ? 'Loading sections' : 'Choose section'} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-80 bg-white">
+                      <SelectItem value={PRINT_ALL_SECTIONS_OPTION}>All sections</SelectItem>
+                      {sectionOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {mutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(mutation.error)}</p> : null}
-                <Button type="submit" disabled={mutation.isPending || (requiresVesselContext && vesselIds.length === 0)}>
+                <Button type="submit" disabled={mutation.isPending || vesselIds.length === 0}>
                   <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
                   {mutation.isPending ? 'Generating' : 'Generate PDF and Excel'}
                 </Button>
@@ -2457,12 +2375,12 @@ function CertPrintHistoryPage() {
     <RootLayout>
       <PageHeader title="Print History" />
       <div className="space-y-4 p-4">
-        <Button asChild variant="outline">
-          <Link to={ROUTES.CERTS_PRINT}>
-            <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
-            Print builder
-          </Link>
-        </Button>
+            <Button asChild variant="outline">
+              <Link to={ROUTES.CERTS_PRINT}>
+                <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
+                Print certs status
+              </Link>
+            </Button>
         <Card>
           <CardContent className="p-0">
             {artifacts.data.results.length === 0 ? (
@@ -2529,12 +2447,16 @@ function CertShareBundlePage() {
   const initialVesselId = queryParams.get('vesselId') ?? '';
   const contextVesselId = resolveContextVesselId(initialVesselId, auth.vesselId);
   const vesselIds = contextVesselId ? [contextVesselId] : [];
-  const [customCertIds, setCustomCertIds] = useState<string[]>([]);
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [watermarkRecipient, setWatermarkRecipient] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
-  const bundleSelection = useCertPrintSelectionOptions(canShareBundle);
+  const sections = useCatalogSections();
   const mutation = useGenerateShareBundle();
-  const certificateOptions = buildCertCertificatePickerOptions(bundleSelection.certificateItems, vesselIds);
+  const bundleSelection = useCertPrintSelectionOptions(
+    contextVesselId ? { vesselId: contextVesselId } : {},
+    canShareBundle && Boolean(contextVesselId)
+  );
+  const sectionOptions = buildCertSectionPickerOptions(sections.data ?? []);
   const vesselContextLabel = contextVesselId
     ? formatContextVesselLabel(contextVesselId, queryParams.get('imo'), auth.user?.vessel_name, bundleSelection.certificateItems)
     : '';
@@ -2550,7 +2472,8 @@ function CertShareBundlePage() {
     }
     mutation.mutate({
       vesselIds,
-      customCertIds,
+      sections: selectedSections,
+      customCertIds: [],
       watermarkRecipient,
       recipientEmail,
     });
@@ -2583,17 +2506,17 @@ function CertShareBundlePage() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="bundleCerts">Certificates</Label>
+                  <Label htmlFor="bundleSections">Certificate sections</Label>
                   <CertMultiSelectDropdown
-                    id="bundleCerts"
-                    value={customCertIds}
-                    options={certificateOptions}
-                    onChange={setCustomCertIds}
-                    placeholder="Choose certificates"
-                    fallbackLabel="Certificate"
-                    pluralLabel="certificates"
-                    loading={bundleSelection.isCertificatesLoading}
-                    noOptionsText="No certificates available."
+                    id="bundleSections"
+                    value={selectedSections}
+                    options={sectionOptions}
+                    onChange={setSelectedSections}
+                    placeholder="Choose sections"
+                    fallbackLabel="Section"
+                    pluralLabel="sections"
+                    loading={sections.isLoading}
+                    noOptionsText="No sections available."
                   />
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -2607,7 +2530,7 @@ function CertShareBundlePage() {
                   </div>
                 </div>
                 {mutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(mutation.error)}</p> : null}
-                <Button type="submit" disabled={mutation.isPending || vesselIds.length === 0}>
+                <Button type="submit" disabled={mutation.isPending || vesselIds.length === 0 || selectedSections.length === 0}>
                   <Share2 className="mr-2 h-4 w-4" aria-hidden="true" />
                   {mutation.isPending ? 'Generating' : 'Generate ZIP bundle'}
                 </Button>
@@ -2625,28 +2548,12 @@ function CertPrintArtifactSummary({ artifact }: { artifact: CertPrintArtifact })
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
       <div>
-        <dt className="text-neutral-500">Scope</dt>
-        <dd className="font-medium text-neutral-900">{formatStatus(artifact.scope)}</dd>
-      </div>
-      <div>
         <dt className="text-neutral-500">Generated</dt>
         <dd className="font-medium text-neutral-900">{formatDateTime(artifact.timestampUtc)}</dd>
       </div>
       <div>
-        <dt className="text-neutral-500">Hash</dt>
-        <dd className="font-medium text-neutral-900">{artifact.systemStateHash}</dd>
-      </div>
-      <div>
-        <dt className="text-neutral-500">Watermark</dt>
-        <dd className="font-medium text-neutral-900">{formatStatus(artifact.watermarkApplied)}</dd>
-      </div>
-      <div>
         <dt className="text-neutral-500">Pages</dt>
         <dd className="font-medium text-neutral-900">{artifact.pageCount ?? 'n/a'}</dd>
-      </div>
-      <div>
-        <dt className="text-neutral-500">Recipient</dt>
-        <dd className="font-medium text-neutral-900">{artifact.watermarkRecipient || artifact.recipientEmail || 'Not set'}</dd>
       </div>
     </dl>
   );
@@ -3024,45 +2931,50 @@ function CertVesselHeader({
     <Card>
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div>
               <h1 className="text-2xl font-semibold text-neutral-900">{vessel.name ?? vessel.code ?? 'Vessel'}</h1>
               <p className="text-sm text-neutral-600">
                 IMO {vessel.imo ?? 'Not set'} - {vessel.flag ?? 'Flag not set'} - {vessel.classSociety ?? 'Class not set'} - {formatShipType(vessel.shipType)}
               </p>
             </div>
-            <div className="grid gap-3 text-sm sm:grid-cols-3">
-              <div>
+            <div className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
+              <div className="min-w-0">
                 <p className="text-neutral-500">Current Master</p>
-                <p className="font-medium text-neutral-900">{vessel.currentMaster ?? 'Not assigned'}</p>
+                <p className="break-words font-medium text-neutral-900">{vessel.currentMaster ?? 'Not assigned'}</p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-neutral-500">Last class snapshot</p>
-                <p className="font-medium text-neutral-900">{formatSnapshotAge(data.lastClassSnapshot)}</p>
+                <p className="font-medium text-neutral-900 lg:whitespace-nowrap">{formatSnapshotAge(data.lastClassSnapshot)}</p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-neutral-500">Mandatory coverage</p>
-                <p className="font-medium text-neutral-900">{data.mandatoryCoverage.percent}%</p>
+                <p className="font-medium text-neutral-900 lg:whitespace-nowrap">{data.mandatoryCoverage.percent}%</p>
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
+          <div className="flex flex-wrap gap-2 lg:flex-nowrap">
+            <Button asChild variant="outline" className="whitespace-nowrap">
               <Link to={ROUTES.CERTS_VESSEL_PROFILE(imo)}>
                 <Activity className="mr-2 h-4 w-4" aria-hidden="true" />
                 Vessel profile
               </Link>
             </Button>
+            {data.lastClassSnapshot?.id ? (
+              <ClassSnapshotPdfButton snapshotId={data.lastClassSnapshot.id} className="whitespace-nowrap">
+                Open class status PDF
+              </ClassSnapshotPdfButton>
+            ) : null}
             {canPrint ? (
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="whitespace-nowrap">
                 <Link to={`${ROUTES.CERTS_PRINT}?vesselId=${encodeURIComponent(vessel.id)}&imo=${encodeURIComponent(imo)}`}>
                   <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Print this vessel
+                  Print certs status
                 </Link>
               </Button>
             ) : null}
             {canShareBundle ? (
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="whitespace-nowrap">
                 <Link to={`${ROUTES.CERTS_SHARE_BUNDLE}?vesselId=${encodeURIComponent(vessel.id)}&imo=${encodeURIComponent(imo)}`}>
                   <Share2 className="mr-2 h-4 w-4" aria-hidden="true" />
                   Share bundle
@@ -3073,6 +2985,60 @@ function CertVesselHeader({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+type CertButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+type CertButtonSize = 'default' | 'sm' | 'lg' | 'icon';
+
+function ClassSnapshotPdfButton({
+  snapshotId,
+  children,
+  className,
+  size,
+  variant = 'outline',
+  showIcon = true,
+}: {
+  snapshotId: string;
+  children: ReactNode;
+  className?: string;
+  size?: CertButtonSize;
+  variant?: CertButtonVariant;
+  showIcon?: boolean;
+}) {
+  const [opening, setOpening] = useState(false);
+
+  const handleOpenPdf = async () => {
+    if (opening) {
+      return;
+    }
+
+    const pdfWindow = window.open('', '_blank');
+    if (!pdfWindow) {
+      window.alert('Allow pop-ups for this site, then try again.');
+      return;
+    }
+    pdfWindow.opener = null;
+    setOpening(true);
+
+    try {
+      const blob = await certsApi.getClassSnapshotPdfBlob(snapshotId);
+      const objectUrl = URL.createObjectURL(blob);
+      pdfWindow.location.href = objectUrl;
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {
+      pdfWindow.close();
+      window.alert('Could not open this class status PDF. Try again.');
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  return (
+    <Button type="button" size={size} variant={variant} className={className} onClick={handleOpenPdf} disabled={opening}>
+      {showIcon ? <FileText className="mr-2 h-4 w-4" aria-hidden="true" /> : null}
+      {opening ? 'Opening...' : children}
+    </Button>
   );
 }
 
@@ -3299,9 +3265,7 @@ function CertVesselTableRow({ item, imo }: { item: CertTrackedItem; imo: string 
       <td className="px-3 py-3"><CertStatusBadge status={item.status} /></td>
       <td className="px-3 py-3 text-neutral-700">{formatCertificateValidity(item)}</td>
       <td className="px-3 py-3">
-        <Button asChild size="sm" variant="outline">
-          <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id)}>{actionLabel(item)}</Link>
-        </Button>
+        <CertVesselItemActions item={item} imo={imo} />
       </td>
     </tr>
   );
@@ -3328,12 +3292,73 @@ function CertVesselItemCard({ item, imo }: { item: CertTrackedItem; imo: string 
         <div className="flex flex-wrap gap-2">
           {item.pdfMissing ? <Badge variant="destructive">Certificates missing</Badge> : null}
           {item.approvalState && item.approvalState !== 'approved' ? <Badge variant="warning">{formatStatus(item.approvalState)}</Badge> : null}
-          <Button asChild size="sm" variant="outline">
-            <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id)}>{actionLabel(item)}</Link>
-          </Button>
+          <CertVesselItemActions item={item} imo={imo} />
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function CertVesselItemActions({ item, imo }: { item: CertTrackedItem; imo: string }) {
+  const [viewLoading, setViewLoading] = useState(false);
+  const hasPdf = Boolean(item.pdfAttachmentId);
+  const detailLabel = actionLabel(item);
+  const viewLabel = hasPdf ? 'View certificate PDF' : 'No PDF uploaded';
+
+  const handleOpenPdf = async () => {
+    const blobId = item.pdfAttachmentId;
+    if (!blobId || viewLoading) {
+      return;
+    }
+
+    const pdfWindow = window.open('', '_blank');
+    if (!pdfWindow) {
+      window.alert('Allow pop-ups for this site, then try again.');
+      return;
+    }
+    pdfWindow.opener = null;
+    setViewLoading(true);
+
+    try {
+      const blob = await certsApi.getTrackedItemPdfBlob(item.id, blobId);
+      const objectUrl = URL.createObjectURL(blob);
+      pdfWindow.location.href = objectUrl;
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch {
+      pdfWindow.close();
+      window.alert('Could not open this certificate PDF. Try again.');
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Button
+        asChild
+        size="icon"
+        variant="outline"
+        className="h-8 w-8"
+        aria-label={detailLabel}
+        title={detailLabel}
+      >
+        <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(imo, item.id)}>
+          <UploadCloud className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="h-8 w-8"
+        onClick={handleOpenPdf}
+        disabled={!hasPdf || viewLoading}
+        aria-label={viewLabel}
+        title={viewLabel}
+      >
+        <Eye className="h-4 w-4" aria-hidden="true" />
+      </Button>
+    </div>
   );
 }
 
@@ -3357,15 +3382,16 @@ function CertReconciliationDashboardPage() {
   const canUpload = useCertsPermission(FORM_IDS.CERTS_RECONCILIATION, PROCESS_IDS.CERTS_CREATE);
   const auth = useAuth();
   const canOpenParserOps = PARSER_OPS_DEV_ENABLED && isParserOpsRole(normalizeAuthRole(auth));
-  const [bucketFilter, setBucketFilter] = useState('all');
+  const [filterVesselId, setFilterVesselId] = useState('all');
   const [vesselId, setVesselId] = useState('');
   const [classSociety, setClassSociety] = useState('NK');
-  const [printedOnDate, setPrintedOnDate] = useState('');
+  const [reportDateFromPdf, setReportDateFromPdf] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState('');
-  const runs = useReconciliationRuns(canRead ? { bucket: bucketFilter === 'all' ? null : bucketFilter } : {});
-  const snapshots = useClassSnapshots(canRead ? {} : { vesselId: 'permission-denied' });
-  const vesselDashboard = useFleetDashboard(canUpload);
+  const selectedFilterVesselId = filterVesselId === 'all' ? null : filterVesselId;
+  const runs = useReconciliationRuns(canRead ? { vesselId: selectedFilterVesselId } : {});
+  const snapshots = useClassSnapshots(canRead ? { vesselId: selectedFilterVesselId } : { vesselId: 'permission-denied' });
+  const vesselDashboard = useFleetDashboard(canRead);
   const uploadMutation = useUploadClassSnapshot();
 
   if (!canRead) {
@@ -3395,7 +3421,6 @@ function CertReconciliationDashboardPage() {
   }
 
   const hasRuns = runs.data.count > 0;
-  const filtersActive = bucketFilter !== 'all';
   const uploadVessels = [...(vesselDashboard.data?.onboardedVessels ?? [])].sort((left, right) =>
     formatClassSnapshotVesselOption(left).localeCompare(formatClassSnapshotVesselOption(right))
   );
@@ -3414,7 +3439,7 @@ function CertReconciliationDashboardPage() {
     uploadMutation.mutate({
       vesselId: vesselId.trim(),
       classSociety,
-      printedOnDate: printedOnDate || null,
+      printedOnDate: reportDateFromPdf || null,
       file: uploadFile,
     });
   };
@@ -3423,39 +3448,40 @@ function CertReconciliationDashboardPage() {
     <RootLayout>
       <PageHeader title="Class Reconciliation" />
       <div className="space-y-4 p-4">
+        {canOpenParserOps ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline">
+              <Link to={ROUTES.CERTS_PARSER_OPS}>
+                <History className="mr-2 h-4 w-4" aria-hidden="true" />
+                Parser ops
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+
         <Card>
-          <CardContent className="grid gap-3 p-4 md:grid-cols-4">
-            <div className="space-y-2">
-              <Label htmlFor="reconciliationBucketFilter">Bucket</Label>
-              <Select value={bucketFilter} onValueChange={setBucketFilter}>
-                <SelectTrigger id="reconciliationBucketFilter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All buckets</SelectItem>
-                  <SelectItem value="mismatch">Mismatch</SelectItem>
-                  <SelectItem value="missing_in_catalog">Missing in catalog</SelectItem>
-                  <SelectItem value="missing_in_class">Missing in class</SelectItem>
-                  <SelectItem value="conditional_stc">Conditional STC</SelectItem>
-                  <SelectItem value="extended_postponed">Extended/postponed</SelectItem>
-                  <SelectItem value="unmapped_low_confidence">Low confidence</SelectItem>
-                </SelectContent>
-              </Select>
+          <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-neutral-900">Vessel filter</p>
+              <p className="text-xs text-neutral-500">Show class reports and recent uploads for one vessel.</p>
             </div>
-            <div className="flex flex-wrap items-end gap-2 md:col-span-3">
-              {filtersActive ? (
-                <Button type="button" variant="outline" onClick={() => setBucketFilter('all')}>
-                  <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Reset filters
-                </Button>
-              ) : null}
-              {canOpenParserOps ? (
-                <Button asChild variant="outline">
-                  <Link to={ROUTES.CERTS_PARSER_OPS}>
-                    <History className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Parser ops
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
+            <Select
+              value={filterVesselId}
+              onValueChange={setFilterVesselId}
+              disabled={vesselDashboard.isLoading || uploadVessels.length === 0}
+            >
+              <SelectTrigger className="w-full sm:w-80">
+                <SelectValue placeholder={vesselDashboard.isLoading ? 'Loading vessels...' : 'All vessels'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All vessels</SelectItem>
+                {uploadVessels.map((vessel) => (
+                  <SelectItem key={vessel.id} value={vessel.id}>
+                    {formatClassSnapshotVesselOption(vessel)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
 
@@ -3467,7 +3493,7 @@ function CertReconciliationDashboardPage() {
             <CardContent>
               {!hasRuns ? (
                 <div className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-600">
-                  {filtersActive ? 'No reconciliation runs match these filters.' : 'No class snapshots have been reconciled yet.'}
+                  No class snapshots have been reconciled yet.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -3478,6 +3504,7 @@ function CertReconciliationDashboardPage() {
                         <th className="px-3 py-3">Class</th>
                         <th className="px-3 py-3">Run</th>
                         <th className="px-3 py-3">Findings</th>
+                        <th className="px-3 py-3">Printed On</th>
                         <th className="px-3 py-3">Action</th>
                       </tr>
                     </thead>
@@ -3494,6 +3521,7 @@ function CertReconciliationDashboardPage() {
                             <p className="mt-1 text-xs text-neutral-500">{formatDateTime(run.ranAt)}</p>
                           </td>
                           <td className="px-3 py-3 text-neutral-700">{formatReconciliationFindingSummary(run)}</td>
+                          <td className="px-3 py-3 text-neutral-700">{formatDate(run.printedOnDate)}</td>
                           <td className="px-3 py-3">
                             <Button asChild size="sm" variant="outline">
                               <Link to={ROUTES.CERTS_RECONCILIATION_RUN(run.id)}>Review</Link>
@@ -3549,22 +3577,28 @@ function CertReconciliationDashboardPage() {
                         <p className="text-xs text-neutral-500">No onboarded vessels are available for class snapshot upload.</p>
                       ) : null}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="classSnapshotSociety">Class</Label>
-                        <Select value={classSociety} onValueChange={setClassSociety}>
-                          <SelectTrigger id="classSnapshotSociety"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NK">NK</SelectItem>
-                            <SelectItem value="KR">KR</SelectItem>
-                            <SelectItem value="BV">BV</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="classSnapshotPrintedOn">Printed on</Label>
-                        <Input id="classSnapshotPrintedOn" type="date" value={printedOnDate} onChange={(event) => setPrintedOnDate(event.target.value)} />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="classSnapshotSociety">Class</Label>
+                      <Select value={classSociety} onValueChange={setClassSociety}>
+                        <SelectTrigger id="classSnapshotSociety"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NK">NK</SelectItem>
+                          <SelectItem value="KR">KR</SelectItem>
+                          <SelectItem value="BV">BV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="classSnapshotReportDate">Report date from PDF</Label>
+                      <Input
+                        id="classSnapshotReportDate"
+                        type="date"
+                        value={reportDateFromPdf}
+                        onChange={(event) => setReportDateFromPdf(event.target.value)}
+                      />
+                      <p className="text-xs text-neutral-500">
+                        Leave blank unless the system cannot read the date. If prompted, enter the Printed on or Generated on date shown in the PDF.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="classSnapshotPdf">Class Status PDF</Label>
@@ -3575,7 +3609,7 @@ function CertReconciliationDashboardPage() {
                         onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
                       />
                       <p className="text-xs text-neutral-500">
-                        Upload the latest official Class Status or Vessel Status PDF downloaded from the class society portal. Do not upload an individual certificate PDF here.
+                        Upload the latest official Class Status or Vessel Status PDF downloaded from the class society portal. The report date must come from the PDF, never from the upload date.
                       </p>
                     </div>
                     {uploadError ? <p className="text-sm text-error-700">{uploadError}</p> : null}
@@ -3831,13 +3865,17 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
 
   useEffect(() => {
     if (!run.data) return;
+    const visibleBucketTabs = getVisibleReconciliationBucketTabs(run.data);
     const bucketHasRows = run.data.flags.some((flag) => flag.bucket === activeBucket);
-    if (bucketHasRows) return;
-    const firstBucketWithRows = RECONCILIATION_BUCKET_TABS.find((tab) =>
+    const activeBucketIsVisible = visibleBucketTabs.some((tab) => tab.bucket === activeBucket);
+    if (bucketHasRows && activeBucketIsVisible) return;
+    const firstBucketWithRows = visibleBucketTabs.find((tab) =>
       run.data?.flags.some((flag) => flag.bucket === tab.bucket)
     );
     if (firstBucketWithRows) {
       setActiveBucket(firstBucketWithRows.bucket);
+    } else if (!activeBucketIsVisible && visibleBucketTabs[0]) {
+      setActiveBucket(visibleBucketTabs[0].bucket);
     }
   }, [activeBucket, run.data]);
 
@@ -3869,6 +3907,8 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
 
   const bucketFlags = run.data.flags.filter((flag) => flag.bucket === activeBucket);
   const selectedFlag = bucketFlags.find((flag) => flag.id === selectedFlagId) ?? bucketFlags[0] ?? null;
+  const visibleBucketTabs = getVisibleReconciliationBucketTabs(run.data);
+  const selectedIsConditionOfClass = selectedFlag?.bucket === 'conditions_of_class';
 
   return (
     <RootLayout>
@@ -3884,8 +3924,8 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
               aria-label="Review groups"
               className="grid gap-2 md:grid-cols-2 xl:grid-cols-4"
             >
-              {RECONCILIATION_BUCKET_TABS.map((tab) => {
-                const count = getReconciliationBucketCount(run.data, tab.countKey);
+              {visibleBucketTabs.map((tab) => {
+                const count = getReconciliationBucketCount(run.data, tab);
                 const selected = activeBucket === tab.bucket;
                 return (
                   <button
@@ -3918,13 +3958,13 @@ function CertReconciliationRunPage({ runId }: { runId: string }) {
                 No items in this group.
               </div>
             ) : (
-              <div className="grid gap-4 xl:grid-cols-[0.9fr_1.05fr_1.05fr]">
+              <div className={`grid gap-4 ${selectedIsConditionOfClass ? 'xl:grid-cols-[0.9fr_1.4fr]' : 'xl:grid-cols-[0.9fr_1.05fr_1.05fr]'}`}>
                 <CertReconciliationFlagList
                   flags={bucketFlags}
                   selectedFlagId={selectedFlag?.id ?? null}
                   onSelect={setSelectedFlagId}
                 />
-                <CertReconciliationCatalogPanel run={run.data} flag={selectedFlag} />
+                {!selectedIsConditionOfClass ? <CertReconciliationCatalogPanel run={run.data} flag={selectedFlag} /> : null}
                 <CertReconciliationClassPanel flag={selectedFlag} />
               </div>
             )}
@@ -3964,10 +4004,16 @@ function CertReconciliationRunHeader({ run }: { run: CertReconciliationRunDetail
           <Badge variant={getReconciliationExceptionCount(run) > 0 ? 'warning' : 'secondary'}>
             {getReconciliationExceptionCount(run)} findings
           </Badge>
-          <Button type="button" variant="outline" disabled>
-            <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
-            Open class report PDF
-          </Button>
+          {run.snapshotId ? (
+            <ClassSnapshotPdfButton snapshotId={run.snapshotId}>
+              Open class report PDF
+            </ClassSnapshotPdfButton>
+          ) : (
+            <Button type="button" variant="outline" disabled>
+              <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+              Open class report PDF
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -4135,6 +4181,7 @@ function CertReconciliationActionPanel({
   const canSubmit = canReview && reason.trim().length >= 10 && !alreadyResolved;
   const mutationError = markReviewed.error ?? notifyMaster.error;
   const diffRows = Object.entries(flag.diff ?? {});
+  const showDiffRows = flag.bucket !== 'conditions_of_class';
   const showMappingAction = canAddMapping && ['missing_in_catalog', 'unmapped_low_confidence'].includes(String(flag.bucket));
   const showMasterUploadLink = Boolean(flag.trackedItemId && run.imo);
 
@@ -4149,7 +4196,7 @@ function CertReconciliationActionPanel({
           {alreadyResolved ? <Badge variant="success">Resolved {formatDateTime(flag.resolvedAt)}</Badge> : null}
         </div>
 
-        {diffRows.length > 0 ? (
+        {showDiffRows && diffRows.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-neutral-200 text-sm">
               <thead className="bg-neutral-50 text-left text-xs font-semibold uppercase text-neutral-500">
@@ -4161,23 +4208,22 @@ function CertReconciliationActionPanel({
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {diffRows.map(([field, value]) => {
-                  const diff = normalizeRecord(value);
                   return (
                     <tr key={field}>
                       <td className="px-3 py-2 font-medium text-neutral-900">{humanizeKey(field)}</td>
-                      <td className="px-3 py-2 text-neutral-700">{formatUnknown(diff?.tracked ?? diff?.catalog ?? 'not set')}</td>
-                      <td className="px-3 py-2 text-neutral-700">{formatUnknown(diff?.class ?? diff?.snapshot ?? value)}</td>
+                      <td className="px-3 py-2 text-neutral-700">{formatReconciliationDiffValue(value, 'vims')}</td>
+                      <td className="px-3 py-2 text-neutral-700">{formatReconciliationDiffValue(value, 'class')}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : showDiffRows ? (
           <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">
             No detailed differences were recorded for this item.
           </div>
-        )}
+        ) : null}
 
         {canReview && !alreadyResolved ? (
           <div className="space-y-3">
@@ -4364,12 +4410,30 @@ function CertClassMappingDialog({ flag, run }: { flag: CertReconciliationFlag; r
 }
 
 function CertReconciliationDefinition({ label, value }: { label: string; value: unknown }) {
+  const displayValue = formatReconciliationDefinitionValue(label, value);
   return (
     <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
       <dt className="text-xs font-semibold uppercase text-neutral-500">{label}</dt>
-      <dd className="mt-1 break-words text-neutral-900">{formatUnknown(value)}</dd>
+      <dd className="mt-1 whitespace-pre-wrap break-words text-neutral-900">{displayValue}</dd>
     </div>
   );
+}
+
+function formatReconciliationDefinitionValue(label: string, value: unknown): string {
+  const displayValue = formatUnknown(value);
+  if (label !== 'Summary') {
+    return displayValue;
+  }
+  return formatClassReportSummaryText(displayValue);
+}
+
+function formatClassReportSummaryText(value: string): string {
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\s+((?:\d+\.)+\s+)/g, '\n$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function CertTrackedItemDetailLoading({ trackedItemId }: { trackedItemId: string }) {
@@ -4723,6 +4787,7 @@ function CertTrackedItemMetadataPanel({ item, imo, canEdit }: { item: CertTracke
 function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedItemDetail; imo: string; canUpload: boolean }) {
   const activePdf = item.pdfVersions.find((pdf) => pdf.isActive);
   const uploadMutation = useUploadTrackedItemPdf(item.id, imo);
+  const reparseMutation = useReparseTrackedItemPdf(item.id, imo);
   const removeMutation = useRemoveTrackedItemPdf(item.id, imo);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -4796,6 +4861,13 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
     } finally {
       setViewLoading(false);
     }
+  };
+
+  const handleReparsePdf = () => {
+    if (!activePdf || reparseMutation.isPending) {
+      return;
+    }
+    reparseMutation.mutate({ reason: 'Certificate PDF read again from detail screen.' });
   };
 
   return (
@@ -4891,6 +4963,12 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
               </DialogContent>
             </Dialog>
             {activePdf ? (
+              <Button type="button" variant="outline" onClick={handleReparsePdf} disabled={reparseMutation.isPending}>
+                <RotateCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                {reparseMutation.isPending ? 'Reading...' : 'Read PDF again'}
+              </Button>
+            ) : null}
+            {activePdf ? (
               <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
                 <DialogTrigger asChild>
                   <Button type="button" variant="outline">
@@ -4939,6 +5017,9 @@ function CertTrackedItemPdfPanel({ item, imo, canUpload }: { item: CertTrackedIt
               </Dialog>
             ) : null}
           </div>
+        ) : null}
+        {reparseMutation.error ? (
+          <p className="rounded-md border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700">{getErrorMessage(reparseMutation.error)}</p>
         ) : null}
         <div className="space-y-2">
           <h2 className="text-sm font-semibold uppercase text-neutral-500">Version history</h2>
@@ -5851,13 +5932,121 @@ function CertCatalogError({ message, onRetry }: { message: string; onRetry: () =
   );
 }
 
+type CatalogSelectOption = {
+  value: string;
+  label: string;
+};
+
+function CertCatalogTextOrSelectField({
+  id,
+  value,
+  onChange,
+  options,
+  required = false,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly CatalogSelectOption[];
+  required?: boolean;
+}) {
+  if (options.length === 0) {
+    return <Input id={id} value={value} onChange={(event) => onChange(event.target.value)} required={required} />;
+  }
+
+  const resolvedOptions = includeCurrentCatalogOption(options, value);
+  return (
+    <Select value={value || undefined} onValueChange={onChange}>
+      <SelectTrigger id={id}>
+        <SelectValue placeholder="Select" />
+      </SelectTrigger>
+      <SelectContent>
+        {resolvedOptions.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function CertCatalogVesselDropdown({
+  id,
+  value,
+  onChange,
+  vessels,
+  isLoading,
+}: {
+  id: string;
+  value: string[];
+  onChange: (value: string[]) => void;
+  vessels: CertFleetDashboardVessel[];
+  isLoading: boolean;
+}) {
+  const selected = new Set(value);
+  const sortedVessels = [...vessels].sort((left, right) => (
+    formatCatalogVesselName(left).localeCompare(formatCatalogVesselName(right))
+  ));
+  const toggleVessel = (vesselId: string, checked: boolean) => {
+    const next = new Set(selected);
+    if (checked) {
+      next.add(vesselId);
+    } else {
+      next.delete(vesselId);
+    }
+    onChange(Array.from(next));
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          className="w-full justify-between bg-white text-left font-normal"
+          disabled={isLoading || sortedVessels.length === 0}
+        >
+          <span className="truncate">{formatSelectedCatalogVessels(value, sortedVessels)}</span>
+          <span className="ml-2 text-xs text-neutral-500">{isLoading ? 'Loading' : `${value.length} selected`}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="max-h-72 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto border border-neutral-200 bg-white p-1 text-neutral-900 shadow-xl">
+        {sortedVessels.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-neutral-500">No vessels available</div>
+        ) : (
+          sortedVessels.map((vessel) => (
+            <DropdownMenuCheckboxItem
+              key={vessel.id}
+              checked={selected.has(vessel.id)}
+              onCheckedChange={(checked) => toggleVessel(vessel.id, Boolean(checked))}
+              onSelect={(event) => event.preventDefault()}
+            >
+              {formatCatalogVesselOption(vessel)}
+            </DropdownMenuCheckboxItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function CertCatalogCreateForm({
   onCancel,
   parentOptions,
+  printSectionLabelOptions,
+  vesselOptions,
+  vesselsLoading,
+  vesselsError,
   inlinePromotion,
 }: {
   onCancel: () => void;
   parentOptions: CertCatalogRow[];
+  printSectionLabelOptions: CatalogSelectOption[];
+  vesselOptions: CertFleetDashboardVessel[];
+  vesselsLoading: boolean;
+  vesselsError: string | null;
   inlinePromotion?: CertCatalogInlinePromotionContext;
 }) {
   const createMutation = useCreateCatalogRow();
@@ -5867,20 +6056,26 @@ function CertCatalogCreateForm({
   const [sectionId, setSectionId] = useState(2);
   const [printSectionLabel, setPrintSectionLabel] = useState('Statutory & Flag');
   const [validityType, setValidityType] = useState('full');
-  const [cadenceMonths, setCadenceMonths] = useState(60);
+  const [cadenceMonths, setCadenceMonths] = useState('60');
   const [issuingAuthorityType, setIssuingAuthorityType] = useState('flag');
   const [submissionScope, setSubmissionScope] = useState('all_ranks_with_approval');
   const [parentId, setParentId] = useState('none');
   const [applicableShipTypes, setApplicableShipTypes] = useState<string[]>(['all']);
   const [applicabilityMode, setApplicabilityMode] = useState('all_matching_type');
-  const [specificVesselIds, setSpecificVesselIds] = useState('');
+  const [specificVesselIds, setSpecificVesselIds] = useState<string[]>([]);
   const [isClassTracked, setIsClassTracked] = useState(false);
   const [mandatoryForAllVessels, setMandatoryForAllVessels] = useState(true);
   const [parentSupportsDynamicChildren, setParentSupportsDynamicChildren] = useState(false);
   const [reason, setReason] = useState('');
+  const [specificVesselError, setSpecificVesselError] = useState('');
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (applicabilityMode === 'specific_vessel_ids' && specificVesselIds.length === 0) {
+      setSpecificVesselError('Select at least one vessel.');
+      return;
+    }
+    setSpecificVesselError('');
     createMutation.mutate(
       {
         canonicalCode,
@@ -5889,7 +6084,7 @@ function CertCatalogCreateForm({
         sectionId,
         printSectionLabel,
         validityType,
-        cadenceMonths: validityType === 'permanent' ? null : cadenceMonths,
+        cadenceMonths: validityType === 'permanent' ? null : parseOptionalCatalogInteger(cadenceMonths),
         issuingAuthorityType,
         isClassTracked,
         submissionScope,
@@ -5897,7 +6092,7 @@ function CertCatalogCreateForm({
         applicableShipTypes,
         mandatoryForAllVessels,
         applicabilityMode,
-        specificVesselIds: applicabilityMode === 'specific_vessel_ids' ? splitCsv(specificVesselIds) : [],
+        specificVesselIds: applicabilityMode === 'specific_vessel_ids' ? specificVesselIds : [],
         reason,
         parentSupportsDynamicChildren,
         inlinePromotion,
@@ -5936,23 +6131,55 @@ function CertCatalogCreateForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="printSectionLabel">Print section label</Label>
-            <Input id="printSectionLabel" value={printSectionLabel} onChange={(event) => setPrintSectionLabel(event.target.value)} required />
+            <CertCatalogTextOrSelectField
+              id="printSectionLabel"
+              value={printSectionLabel}
+              onChange={setPrintSectionLabel}
+              options={printSectionLabelOptions}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="validityType">Validity type</Label>
-            <Input id="validityType" value={validityType} onChange={(event) => setValidityType(event.target.value)} required />
+            <CertCatalogTextOrSelectField
+              id="validityType"
+              value={validityType}
+              onChange={setValidityType}
+              options={CATALOG_VALIDITY_TYPE_OPTIONS}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cadenceMonths">Cadence months</Label>
-            <Input id="cadenceMonths" type="number" min={0} value={cadenceMonths} onChange={(event) => setCadenceMonths(Number(event.target.value))} />
+            <Input
+              id="cadenceMonths"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={cadenceMonths}
+              onChange={(event) => setCadenceMonths(cleanCatalogIntegerInput(event.target.value))}
+              disabled={validityType === 'permanent'}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="issuingAuthorityType">Issuing authority type</Label>
-            <Input id="issuingAuthorityType" value={issuingAuthorityType} onChange={(event) => setIssuingAuthorityType(event.target.value)} required />
+            <CertCatalogTextOrSelectField
+              id="issuingAuthorityType"
+              value={issuingAuthorityType}
+              onChange={setIssuingAuthorityType}
+              options={CATALOG_ISSUING_AUTHORITY_TYPE_OPTIONS}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="submissionScope">Submission scope</Label>
-            <Input id="submissionScope" value={submissionScope} onChange={(event) => setSubmissionScope(event.target.value)} required />
+            <CertCatalogTextOrSelectField
+              id="submissionScope"
+              value={submissionScope}
+              onChange={setSubmissionScope}
+              options={CATALOG_SUBMISSION_SCOPE_OPTIONS}
+              required
+            />
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="createParentId">Parent row</Label>
@@ -5991,13 +6218,17 @@ function CertCatalogCreateForm({
           </div>
           {applicabilityMode === 'specific_vessel_ids' ? (
             <div className="space-y-2">
-              <Label htmlFor="createSpecificVesselIds">Specific vessel IDs</Label>
-              <Input
-                id="createSpecificVesselIds"
+              <Label htmlFor="createSpecificVessels">Specific vessels</Label>
+              <CertCatalogVesselDropdown
+                id="createSpecificVessels"
                 value={specificVesselIds}
-                onChange={(event) => setSpecificVesselIds(event.target.value)}
-                required
+                onChange={setSpecificVesselIds}
+                vessels={vesselOptions}
+                isLoading={vesselsLoading}
               />
+              <p className="text-xs text-neutral-500">Choose vessel names. The system will use the correct vessel IDs automatically.</p>
+              {vesselsError ? <p className="text-xs text-error-700">{vesselsError}</p> : null}
+              {specificVesselError ? <p className="text-sm text-error-700">{specificVesselError}</p> : null}
             </div>
           ) : null}
           <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
@@ -6038,49 +6269,55 @@ function CertCatalogCreateForm({
 function CertCatalogDetail({
   rowId,
   catalogRows,
+  printSectionLabelOptions,
+  vesselOptions,
+  vesselsLoading,
+  vesselsError,
 }: {
   rowId: string;
   catalogRows: CertCatalogRow[];
+  printSectionLabelOptions: CatalogSelectOption[];
+  vesselOptions: CertFleetDashboardVessel[];
+  vesselsLoading: boolean;
+  vesselsError: string | null;
 }) {
   const canWrite = useCanWriteCatalog();
-  const canBulkAction = useCanBulkActionCatalog();
-  const navigate = useNavigate();
   const { data: row, isLoading, isError, error, refetch } = useCatalogRow(rowId);
   const auditHistory = useCatalogRowAuditHistory(rowId);
   const updateMutation = useUpdateCatalogRow(rowId);
   const deprecateMutation = useDeprecateCatalogRow(rowId);
-  const hardPurgeMutation = useHardPurgeCatalogRow(rowId);
   const parentOptions = getParentOptions(catalogRows, rowId);
   const parentRow = row?.parentId ? catalogRows.find((candidate) => candidate.id === row.parentId) : undefined;
   const [displayName, setDisplayName] = useState('');
   const [printSectionLabel, setPrintSectionLabel] = useState('');
   const [validityType, setValidityType] = useState('');
-  const [cadenceMonths, setCadenceMonths] = useState<number | ''>('');
+  const [cadenceMonths, setCadenceMonths] = useState('');
   const [issuingAuthorityType, setIssuingAuthorityType] = useState('');
   const [submissionScope, setSubmissionScope] = useState('');
   const [parentId, setParentId] = useState('none');
   const [applicableShipTypes, setApplicableShipTypes] = useState<string[]>(['all']);
   const [applicabilityMode, setApplicabilityMode] = useState('all_matching_type');
-  const [specificVesselIds, setSpecificVesselIds] = useState('');
+  const [specificVesselIds, setSpecificVesselIds] = useState<string[]>([]);
   const [isClassTracked, setIsClassTracked] = useState(false);
   const [mandatoryForAllVessels, setMandatoryForAllVessels] = useState(true);
   const [parentSupportsDynamicChildren, setParentSupportsDynamicChildren] = useState(false);
   const [linkedPmsComponentId, setLinkedPmsComponentId] = useState('');
   const [reason, setReason] = useState('');
   const [reasonError, setReasonError] = useState('');
+  const [specificVesselError, setSpecificVesselError] = useState('');
 
   useEffect(() => {
     if (row) {
       setDisplayName(row.displayName);
       setPrintSectionLabel(row.printSectionLabel);
       setValidityType(row.validityType);
-      setCadenceMonths(row.cadenceMonths ?? '');
+      setCadenceMonths(row.cadenceMonths == null ? '' : String(row.cadenceMonths));
       setIssuingAuthorityType(row.issuingAuthorityType);
-      setSubmissionScope(row.submissionScope);
+      setSubmissionScope(row.submissionScope === 'master_only' ? 'all_ranks_with_approval' : row.submissionScope);
       setParentId(row.parentId ?? 'none');
       setApplicableShipTypes(row.applicableShipTypes.length ? row.applicableShipTypes : ['all']);
       setApplicabilityMode(row.applicabilityMode || 'all_matching_type');
-      setSpecificVesselIds(row.specificVesselIds.join(', '));
+      setSpecificVesselIds(row.specificVesselIds);
       setIsClassTracked(row.isClassTracked);
       setMandatoryForAllVessels(row.mandatoryForAllVessels);
       setParentSupportsDynamicChildren(row.parentSupportsDynamicChildren);
@@ -6103,11 +6340,16 @@ function CertCatalogDetail({
   const save = (event: FormEvent) => {
     event.preventDefault();
     setReasonError('');
+    if (applicabilityMode === 'specific_vessel_ids' && specificVesselIds.length === 0) {
+      setSpecificVesselError('Select at least one vessel.');
+      return;
+    }
+    setSpecificVesselError('');
     updateMutation.mutate({
       displayName,
       printSectionLabel,
       validityType,
-      cadenceMonths: cadenceMonths === '' || validityType === 'permanent' ? null : Number(cadenceMonths),
+      cadenceMonths: validityType === 'permanent' ? null : parseOptionalCatalogInteger(cadenceMonths),
       issuingAuthorityType,
       isClassTracked,
       submissionScope,
@@ -6117,7 +6359,7 @@ function CertCatalogDetail({
       parentSupportsDynamicChildren,
       linkedPmsComponentId: linkedPmsComponentId || null,
       applicabilityMode,
-      specificVesselIds: applicabilityMode === 'specific_vessel_ids' ? splitCsv(specificVesselIds) : [],
+      specificVesselIds: applicabilityMode === 'specific_vessel_ids' ? specificVesselIds : [],
       reason,
     });
   };
@@ -6130,19 +6372,6 @@ function CertCatalogDetail({
     }
     setReasonError('');
     deprecateMutation.mutate({ reason: trimmedReason });
-  };
-
-  const hardPurge = () => {
-    const trimmedReason = reason.trim();
-    if (trimmedReason.length < 10) {
-      setReasonError('Hard purge reason must be at least 10 characters.');
-      return;
-    }
-    setReasonError('');
-    hardPurgeMutation.mutate(
-      { reason: trimmedReason },
-      { onSuccess: () => navigate(ROUTES.CERTS_CATALOG) }
-    );
   };
 
   return (
@@ -6188,23 +6417,51 @@ function CertCatalogDetail({
             </div>
             <div className="space-y-2">
               <Label htmlFor="detailPrintSectionLabel">Print section label</Label>
-              <Input id="detailPrintSectionLabel" value={printSectionLabel} onChange={(event) => setPrintSectionLabel(event.target.value)} />
+              <CertCatalogTextOrSelectField
+                id="detailPrintSectionLabel"
+                value={printSectionLabel}
+                onChange={setPrintSectionLabel}
+                options={printSectionLabelOptions}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="detailValidityType">Validity type</Label>
-              <Input id="detailValidityType" value={validityType} onChange={(event) => setValidityType(event.target.value)} />
+              <CertCatalogTextOrSelectField
+                id="detailValidityType"
+                value={validityType}
+                onChange={setValidityType}
+                options={CATALOG_VALIDITY_TYPE_OPTIONS}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="detailCadenceMonths">Cadence months</Label>
-              <Input id="detailCadenceMonths" type="number" min={0} value={cadenceMonths} onChange={(event) => setCadenceMonths(event.target.value === '' ? '' : Number(event.target.value))} />
+              <Input
+                id="detailCadenceMonths"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={cadenceMonths}
+                onChange={(event) => setCadenceMonths(cleanCatalogIntegerInput(event.target.value))}
+                disabled={validityType === 'permanent'}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="detailIssuingAuthorityType">Issuing authority type</Label>
-              <Input id="detailIssuingAuthorityType" value={issuingAuthorityType} onChange={(event) => setIssuingAuthorityType(event.target.value)} />
+              <CertCatalogTextOrSelectField
+                id="detailIssuingAuthorityType"
+                value={issuingAuthorityType}
+                onChange={setIssuingAuthorityType}
+                options={CATALOG_ISSUING_AUTHORITY_TYPE_OPTIONS}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="detailSubmissionScope">Submission scope</Label>
-              <Input id="detailSubmissionScope" value={submissionScope} onChange={(event) => setSubmissionScope(event.target.value)} />
+              <CertCatalogTextOrSelectField
+                id="detailSubmissionScope"
+                value={submissionScope}
+                onChange={setSubmissionScope}
+                options={CATALOG_SUBMISSION_SCOPE_OPTIONS}
+              />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="detailParentId">Parent row</Label>
@@ -6243,13 +6500,17 @@ function CertCatalogDetail({
             </div>
             {applicabilityMode === 'specific_vessel_ids' ? (
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="detailSpecificVesselIds">Specific vessel IDs</Label>
-                <Input
-                  id="detailSpecificVesselIds"
+                <Label htmlFor="detailSpecificVessels">Specific vessels</Label>
+                <CertCatalogVesselDropdown
+                  id="detailSpecificVessels"
                   value={specificVesselIds}
-                  onChange={(event) => setSpecificVesselIds(event.target.value)}
-                  required
+                  onChange={setSpecificVesselIds}
+                  vessels={vesselOptions}
+                  isLoading={vesselsLoading}
                 />
+                <p className="text-xs text-neutral-500">Choose vessel names. The system will use the correct vessel IDs automatically.</p>
+                {vesselsError ? <p className="text-xs text-error-700">{vesselsError}</p> : null}
+                {specificVesselError ? <p className="text-sm text-error-700">{specificVesselError}</p> : null}
               </div>
             ) : null}
             <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
@@ -6287,7 +6548,6 @@ function CertCatalogDetail({
             </div>
             {updateMutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(updateMutation.error)}</p> : null}
             {deprecateMutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(deprecateMutation.error)}</p> : null}
-            {hardPurgeMutation.isError ? <p className="text-sm text-error-700">{getErrorMessage(hardPurgeMutation.error)}</p> : null}
             <div className="flex flex-wrap gap-2">
               <Button type="submit" className="w-fit" disabled={updateMutation.isPending}>
                 <Save className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -6314,32 +6574,6 @@ function CertCatalogDetail({
                       </DialogClose>
                       <Button type="button" variant="destructive" onClick={deprecate} disabled={deprecateMutation.isPending}>
                         Deprecate row
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              ) : null}
-              {canBulkAction ? (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button type="button" variant="destructive" disabled={hardPurgeMutation.isPending}>
-                      <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                      Hard purge
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Hard purge catalog row?</DialogTitle>
-                      <DialogDescription>
-                        This permanently deletes the catalog row. Retained TrackedItem data blocks the purge through database references.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">Cancel</Button>
-                      </DialogClose>
-                      <Button type="button" variant="destructive" onClick={hardPurge} disabled={hardPurgeMutation.isPending}>
-                        Confirm hard purge
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -6482,6 +6716,7 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
     q: filter,
     applicableShipType: applicableShipTypeFilter || null,
   }, 50);
+  const vesselDashboard = useFleetDashboard(canReadCatalog);
   const bulkSoftDeleteMutation = useBulkSoftDeleteCatalogRows();
   const {
     dataUpdatedAt: catalogRowsDataUpdatedAt,
@@ -6492,6 +6727,11 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
   } = rows;
   const loadedCatalogRows = rows.data?.pages.flatMap((page) => page.results) ?? [];
   const catalogTotalCount = rows.data?.pages[0]?.count ?? 0;
+  const catalogVesselOptions = vesselDashboard.data?.onboardedVessels ?? [];
+  const catalogVesselsError = vesselDashboard.isError
+    ? `Could not load vessels. ${getErrorMessage(vesselDashboard.error)}`
+    : null;
+  const printSectionLabelOptions = getCatalogPrintSectionLabelOptions(loadedCatalogRows, sections.data ?? []);
 
   useEffect(() => {
     if (!hasNextCatalogRowsPage || isFetchingNextCatalogRowsPage || isCatalogRowsLoading) {
@@ -6666,10 +6906,23 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
               <CertCatalogCreateForm
                 onCancel={() => setIsCreating(false)}
                 parentOptions={getParentOptions(loadedCatalogRows)}
+                printSectionLabelOptions={printSectionLabelOptions}
+                vesselOptions={catalogVesselOptions}
+                vesselsLoading={vesselDashboard.isLoading}
+                vesselsError={catalogVesselsError}
                 inlinePromotion={inlinePromotion}
               />
             ) : null}
-            {rowId ? <CertCatalogDetail rowId={rowId} catalogRows={loadedCatalogRows} /> : null}
+            {rowId ? (
+              <CertCatalogDetail
+                rowId={rowId}
+                catalogRows={loadedCatalogRows}
+                printSectionLabelOptions={printSectionLabelOptions}
+                vesselOptions={catalogVesselOptions}
+                vesselsLoading={vesselDashboard.isLoading}
+                vesselsError={catalogVesselsError}
+              />
+            ) : null}
             {loadedCatalogRows.length > 0 ? (
               <div className="space-y-2">
                 <CertCatalogTable
@@ -6709,6 +6962,10 @@ function CertCatalogAdminPage({ rowId }: { rowId?: string }) {
 }
 
 function getReconciliationExceptionCount(run: CertReconciliationRun): number {
+  const flags = (run as Partial<CertReconciliationRunDetail>).flags;
+  const conditionCount = Array.isArray(flags)
+    ? flags.filter((flag) => flag.bucket === 'conditions_of_class').length
+    : 0;
   return (
     (run.mismatchesCount ?? 0)
     + (run.missingInCatalogCount ?? 0)
@@ -6716,14 +6973,27 @@ function getReconciliationExceptionCount(run: CertReconciliationRun): number {
     + (run.conditionalStcDetectedCount ?? 0)
     + (run.extendedPostponedDetectedCount ?? 0)
     + (run.unmappedLowConfidenceCount ?? 0)
+    + conditionCount
   );
 }
 
+function getVisibleReconciliationBucketTabs(run: CertReconciliationRunDetail): typeof RECONCILIATION_BUCKET_TABS {
+  return RECONCILIATION_BUCKET_TABS.filter((tab) => {
+    if (!RECONCILIATION_HIDE_WHEN_EMPTY_BUCKETS.has(tab.bucket)) {
+      return true;
+    }
+    return getReconciliationBucketCount(run, tab) > 0;
+  }) as typeof RECONCILIATION_BUCKET_TABS;
+}
+
 function getReconciliationBucketCount(
-  run: CertReconciliationRun,
-  countKey: (typeof RECONCILIATION_BUCKET_TABS)[number]['countKey']
+  run: CertReconciliationRunDetail,
+  tab: (typeof RECONCILIATION_BUCKET_TABS)[number]
 ): number {
-  return Number(run[countKey] ?? 0);
+  if (tab.countKey) {
+    return Number(run[tab.countKey] ?? 0);
+  }
+  return run.flags.filter((flag) => flag.bucket === tab.bucket).length;
 }
 
 function formatReconciliationFindingSummary(run: CertReconciliationRun): string {
@@ -6745,6 +7015,36 @@ function normalizeRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function formatReconciliationDiffValue(value: unknown, side: 'vims' | 'class'): string {
+  const diff = normalizeRecord(value);
+  if (!diff) {
+    return formatReadableReviewValue(value);
+  }
+  const keys = side === 'vims'
+    ? ['tracked', 'catalog', 'vims', 'record']
+    : ['class', 'snapshot', 'report'];
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(diff, key)) {
+      return formatReadableReviewValue(diff[key]);
+    }
+  }
+  return formatReadableReviewValue(diff);
+}
+
+function formatReadableReviewValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.length ? value.map((item) => formatReadableReviewValue(item)).join(', ') : 'not set';
+  }
+  const record = normalizeRecord(value);
+  if (record) {
+    const parts = Object.entries(record)
+      .filter(([, entryValue]) => hasDisplayValue(entryValue))
+      .map(([key, entryValue]) => `${humanizeKey(key)}: ${formatReadableReviewValue(entryValue)}`);
+    return parts.length ? parts.join('; ') : 'not set';
+  }
+  return formatUnknown(value);
+}
+
 function formatReconciliationBucketLabel(bucket: string | null | undefined): string {
   return RECONCILIATION_BUCKET_TABS.find((tab) => tab.bucket === bucket)?.label ?? formatStatus(bucket);
 }
@@ -6753,6 +7053,7 @@ function formatClassReportItemTitle(flag: CertReconciliationFlag): string {
   const extract = normalizeRecord(flag.classRowExtract);
   const displayName = cleanDisplayValue(extract?.display_name ?? extract?.displayName ?? extract?.name);
   const code = cleanDisplayValue(extract?.class_code_or_name ?? extract?.classCodeOrName ?? extract?.class_code);
+  if (flag.bucket === 'conditions_of_class') return displayName || 'Condition of class';
   if (displayName && code && !displayName.includes(code)) return `${displayName} (${code})`;
   return displayName || code || flag.catalogDisplayName || 'Class report item';
 }
@@ -6760,19 +7061,9 @@ function formatClassReportItemTitle(flag: CertReconciliationFlag): string {
 function getClassReportReviewFields(flag: CertReconciliationFlag): Array<{ label: string; value: unknown }> {
   const extract = normalizeRecord(flag.classRowExtract);
   if (!extract) return [];
-  const displayName = cleanDisplayValue(extract.display_name ?? extract.displayName ?? extract.name);
-  const code = cleanDisplayValue(extract.class_code_or_name ?? extract.classCodeOrName ?? extract.class_code);
   return [
-    { label: 'Class', value: extract.class_society ?? extract.classSociety },
-    { label: 'Item', value: displayName && code && !displayName.includes(code) ? `${displayName} (${code})` : displayName || code },
-    { label: 'Section in class report', value: extract.source_section ?? extract.sourceSection },
-    { label: 'Item type', value: extract.row_type ? formatStatus(String(extract.row_type)) : extract.rowType ? formatStatus(String(extract.rowType)) : null },
-    { label: 'Issue date', value: extract.issue_date ?? extract.issueDate },
-    { label: 'Expiry date', value: extract.expiry_date ?? extract.expiryDate },
-    { label: 'Last done', value: extract.last_done_date ?? extract.lastDoneDate },
-    { label: 'Next due', value: extract.next_due_date ?? extract.nextDueDate },
-    { label: 'Postponed until', value: extract.postponed_until ?? extract.postponedUntil },
-    { label: 'Text found in class report', value: extract.raw_text ?? extract.rawText },
+    { label: 'Summary', value: extract.raw_text ?? extract.rawText },
+    { label: 'Due date', value: extract.due_date ?? extract.dueDate },
   ].filter((field) => hasDisplayValue(field.value));
 }
 
@@ -6780,6 +7071,7 @@ function formatMasterMessageTitle(message: CertMasterReconciliationMessage): str
   const extract = normalizeRecord(message.classRowExtract);
   const displayName = cleanDisplayValue(extract?.display_name ?? extract?.displayName ?? extract?.name);
   const code = cleanDisplayValue(extract?.class_code_or_name ?? extract?.classCodeOrName ?? extract?.class_code);
+  if (message.bucket === 'conditions_of_class') return displayName || 'Condition of class';
   if (displayName && code && !displayName.includes(code)) return `${displayName} (${code})`;
   return displayName || code || message.catalogDisplayName || 'Class status item';
 }
@@ -6787,19 +7079,9 @@ function formatMasterMessageTitle(message: CertMasterReconciliationMessage): str
 function getMasterMessageClassFields(message: CertMasterReconciliationMessage): Array<{ label: string; value: unknown }> {
   const extract = normalizeRecord(message.classRowExtract);
   if (!extract) return [];
-  const displayName = cleanDisplayValue(extract.display_name ?? extract.displayName ?? extract.name);
-  const code = cleanDisplayValue(extract.class_code_or_name ?? extract.classCodeOrName ?? extract.class_code);
   return [
-    { label: 'Vessel', value: message.vesselName ?? message.imo },
-    { label: 'Class', value: message.classSociety ?? extract.class_society ?? extract.classSociety },
-    { label: 'Item', value: displayName && code && !displayName.includes(code) ? `${displayName} (${code})` : displayName || code },
-    { label: 'Section in class report', value: extract.source_section ?? extract.sourceSection },
-    { label: 'Issue date', value: extract.issue_date ?? extract.issueDate },
-    { label: 'Expiry date', value: extract.expiry_date ?? extract.expiryDate },
-    { label: 'Last done', value: extract.last_done_date ?? extract.lastDoneDate },
-    { label: 'Next due', value: extract.next_due_date ?? extract.nextDueDate },
-    { label: 'Postponed until', value: extract.postponed_until ?? extract.postponedUntil },
-    { label: 'Text found in class report', value: extract.raw_text ?? extract.rawText },
+    { label: 'Summary', value: extract.raw_text ?? extract.rawText },
+    { label: 'Due date', value: extract.due_date ?? extract.dueDate },
   ].filter((field) => hasDisplayValue(field.value));
 }
 
@@ -6962,10 +7244,11 @@ function formatShipType(value: string | null | undefined): string {
 
 function formatSnapshotAge(snapshot: CertVesselDashboardResponse['lastClassSnapshot']): string {
   if (!snapshot) return 'No class snapshot uploaded';
-  if (snapshot.daysAgo === 0) return 'Uploaded today';
-  if (snapshot.daysAgo === 1) return 'Uploaded 1 day ago';
-  if (typeof snapshot.daysAgo === 'number') return `Uploaded ${snapshot.daysAgo} days ago`;
-  return `Uploaded ${formatDate(snapshot.uploadedAt)}`;
+  if (snapshot.daysAgo === 0) return 'Report dated today';
+  if (snapshot.daysAgo === 1) return 'Report dated 1 day ago';
+  if (typeof snapshot.daysAgo === 'number') return `Report dated ${snapshot.daysAgo} days ago`;
+  if (snapshot.printedOnDate) return `Report dated ${formatDate(snapshot.printedOnDate)}`;
+  return 'Report date not set';
 }
 
 function formatClassSnapshotUploadResult(snapshot: CertClassSnapshot): string {
@@ -6985,6 +7268,9 @@ function formatClassSnapshotParseFailure(snapshot: CertClassSnapshot): string {
   const failureReason = getClassSnapshotParseFailureReason(snapshot);
   if (failureReason?.includes('OCR fallback read no text')) {
     return 'Snapshot uploaded, but neither text extraction nor OCR could read usable class-status data from this PDF. Upload the official Class Status PDF exported from NK, KR, or BV, then retry.';
+  }
+  if (failureReason?.includes('printed/generated date')) {
+    return 'Snapshot uploaded, but the report date could not be read. Enter the Printed on or Generated on date shown in the PDF, then upload again.';
   }
   return 'Snapshot uploaded, but the parser could not read this PDF. Check the snapshot row and try Reparse after correcting the file.';
 }
@@ -7356,6 +7642,75 @@ function formatParentOption(row: CertCatalogRow): string {
   return `${row.canonicalCode} - ${row.displayName}`;
 }
 
+function getCatalogPrintSectionLabelOptions(
+  rows: CertCatalogRow[],
+  sections: CertCatalogSection[]
+): CatalogSelectOption[] {
+  const labels = new Map<string, string>();
+  sections.forEach((section) => {
+    const label = String(section.displayName ?? '').trim();
+    if (label) {
+      labels.set(label.toLowerCase(), label);
+    }
+  });
+  rows.forEach((row) => {
+    const label = String(row.printSectionLabel ?? '').trim();
+    if (label) {
+      labels.set(label.toLowerCase(), label);
+    }
+  });
+  return Array.from(labels.values())
+    .sort((left, right) => left.localeCompare(right))
+    .map((label) => ({ value: label, label }));
+}
+
+function includeCurrentCatalogOption(
+  options: readonly CatalogSelectOption[],
+  currentValue: string
+): CatalogSelectOption[] {
+  const value = currentValue.trim();
+  if (!value || options.some((option) => option.value === value)) {
+    return [...options];
+  }
+  return [{ value, label: formatStatus(value) }, ...options];
+}
+
+function cleanCatalogIntegerInput(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function parseOptionalCatalogInteger(value: string): number | null {
+  const cleaned = cleanCatalogIntegerInput(value);
+  return cleaned ? Number(cleaned) : null;
+}
+
+function formatCatalogVesselName(vessel: CertFleetDashboardVessel): string {
+  return String(vessel.name || vessel.code || vessel.imo || vessel.id).trim();
+}
+
+function formatCatalogVesselOption(vessel: CertFleetDashboardVessel): string {
+  const name = formatCatalogVesselName(vessel);
+  const details = [
+    vessel.code ? String(vessel.code).trim() : null,
+    vessel.imo ? `IMO ${String(vessel.imo).trim()}` : null,
+  ].filter(Boolean);
+  return details.length ? `${name} - ${details.join(' - ')}` : name;
+}
+
+function formatSelectedCatalogVessels(
+  selectedIds: string[],
+  vessels: CertFleetDashboardVessel[]
+): string {
+  if (selectedIds.length === 0) {
+    return 'Select vessels';
+  }
+  if (selectedIds.length === 1) {
+    const selectedVessel = vessels.find((vessel) => vessel.id === selectedIds[0]);
+    return selectedVessel ? formatCatalogVesselName(selectedVessel) : '1 vessel selected';
+  }
+  return `${selectedIds.length} vessels selected`;
+}
+
 function normalizedCatalogText(value: string | null | undefined): string {
   return String(value ?? '').trim().toUpperCase().replace(/[_\s]+/g, '-');
 }
@@ -7367,18 +7722,6 @@ function isRollupCatalogRow(row: CertCatalogRow): boolean {
     normalizedCatalogText(row.shortName),
   ].join(' ');
   return ROLLUP_ROW_TOKENS.some((token) => haystack.includes(token));
-}
-
-function splitCsv(value: string): string[] {
-  const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
-  return parts.length > 0 ? parts : ['all'];
-}
-
-function parseCsvValues(value: string): string[] {
-  return value
-    .split(/[\n,]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
 }
 
 function getInlinePromotionContext(search: string): CertCatalogInlinePromotionContext | undefined {
@@ -7725,11 +8068,18 @@ function CertMasterMessageCard({
               Sent {formatDateTime(message.officeNotifiedAt)} by {formatPrincipalLabel(undefined, message.officeNotifiedBy, undefined, 'office')}
             </p>
           </div>
-          {message.trackedItemId && message.imo ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(message.imo, message.trackedItemId)}>Open certificate</Link>
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {message.snapshotId ? (
+              <ClassSnapshotPdfButton snapshotId={message.snapshotId} size="sm" showIcon={false}>
+                Open class status PDF
+              </ClassSnapshotPdfButton>
+            ) : null}
+            {message.trackedItemId && message.imo ? (
+              <Button asChild size="sm" variant="outline">
+                <Link to={ROUTES.CERTS_TRACKED_ITEM_DETAIL(message.imo, message.trackedItemId)}>Open certificate</Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <section className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
@@ -7749,12 +8099,11 @@ function CertMasterMessageCard({
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {diffRows.map(([field, value]) => {
-                  const diff = normalizeRecord(value);
                   return (
                     <tr key={field}>
                       <td className="px-3 py-2 font-medium text-neutral-900">{humanizeKey(field)}</td>
-                      <td className="px-3 py-2 text-neutral-700">{formatUnknown(diff?.tracked ?? diff?.catalog ?? 'not set')}</td>
-                      <td className="px-3 py-2 text-neutral-700">{formatUnknown(diff?.class ?? diff?.snapshot ?? value)}</td>
+                      <td className="px-3 py-2 text-neutral-700">{formatReconciliationDiffValue(value, 'vims')}</td>
+                      <td className="px-3 py-2 text-neutral-700">{formatReconciliationDiffValue(value, 'class')}</td>
                     </tr>
                   );
                 })}

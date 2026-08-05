@@ -1,4 +1,4 @@
-﻿// src/components/CrewDashboard.jsx
+// src/components/CrewDashboard.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { buildItemRows, groupEntriesByLogicalORBEntry, toRecordJSON } from "../../utils/orb/orbUtils";
@@ -57,7 +57,7 @@ export default function CrewDashboard({ isChiefMode = false, onSubmit }) {
   const [pendingFEntry, setPendingFEntry] = useState(null);
   const [editingEntryId, setEditingEntryId] = useState(null);
 
-  const {user} = useAuth();       
+  const {user} = useAuth();
   const vesselId = user?.vessel_id;
 
   const officer = user ? `${user.username} (${user.rank})` : "Unknown User";
@@ -142,7 +142,7 @@ export default function CrewDashboard({ isChiefMode = false, onSubmit }) {
       return "Dead Sea";
     }
 
-    // Antarctic Area (IMO: south of 60Â°S)
+    // Antarctic Area (IMO: south of 60°S)
     if (lat <= -60) {
       return "Antarctic Area";
     }
@@ -185,7 +185,7 @@ export default function CrewDashboard({ isChiefMode = false, onSubmit }) {
         const grouped = groupEntriesByLogicalORBEntry(ops);
         setEntries(grouped);
 
-        //     // âœ… Only process if ops is valid
+        //     // ✅ Only process if ops is valid
         // if (Array.isArray(ops)) {
         //   const summary = calculateSludgeSummary(ops);
         //   setSludgeSummary(summary);
@@ -235,7 +235,7 @@ useEffect(() => {
   // Fetch available tanks dynamically
   useEffect(() => {
     if (!currentVessel || !formData.code) {
-      console.log("Skipping fetch â€” missing vessel_id or code", currentVessel, formData.code);
+      console.log("Skipping fetch — missing vessel_id or code", currentVessel, formData.code);
       return;
     }
 
@@ -301,7 +301,7 @@ useEffect(() => {
 
 
   const refreshEntries = async () => {
-    
+
     if (!vesselId) return;
 
     try {
@@ -354,7 +354,7 @@ useEffect(() => {
   const calculateSludgeSummary = (entries) => {
     const summary = {};
 
-    console.log("Processing entries for sludge summary:", entries); // âœ… Debug
+    console.log("Processing entries for sludge summary:", entries); // ✅ Debug
 
     const codeCEntries = entries.filter(e => {
       if (e.code !== 'C') return false;
@@ -366,15 +366,15 @@ useEffect(() => {
       return true;
     });
 
-    console.log("Filtered Code C entries:", codeCEntries); // âœ… Check if any match
+    console.log("Filtered Code C entries:", codeCEntries); // ✅ Check if any match
 
     for (const entry of codeCEntries) {
       const { details } = entry;
 
-      // âœ… Safely check operation_mode
+      // ✅ Safely check operation_mode
       if (!details.operation_mode) continue;
 
-      // Weekly Update â†’ Set current retained level
+      // Weekly Update → Set current retained level
       if (details.operation_mode === 'weekly' && details.sludge_tank_id && details.sludge_before != null) {
         const tank = details.sludge_tank_id.trim();
         if (!tank) continue;
@@ -388,7 +388,7 @@ useEffect(() => {
 
         const retained = parseFloat(details.sludge_before);
         if (!isNaN(retained)) {
-          summary[tank].current = retained; // âœ… Override with latest weekly value
+          summary[tank].current = retained; // ✅ Override with latest weekly value
         }
 
         if (details.sludge_tank_capacity) {
@@ -398,10 +398,10 @@ useEffect(() => {
           }
         }
 
-        console.log(`[Weekly] Updated ${tank}: ${retained} mÂ³`);
+        console.log(`[Weekly] Updated ${tank}: ${retained} m³`);
       }
 
-      // Manual Collection â†’ Add to source tank
+      // Manual Collection → Add to source tank
       if (details.operation_mode === 'manual' && details.collection_source && details.manual_collection_m3) {
         const tank = details.collection_source.trim();
         if (!tank) continue;
@@ -411,11 +411,11 @@ useEffect(() => {
         const collected = parseFloat(details.manual_collection_m3);
         if (!isNaN(collected) && collected > 0) {
           summary[tank].current += collected;
-          console.log(`[Manual] Added ${collected} mÂ³ to ${tank}`);
+          console.log(`[Manual] Added ${collected} m³ to ${tank}`);
         }
       }
 
-      // Disposal Methods â†’ Subtract from source
+      // Disposal Methods → Subtract from source
       if (['reception', 'transfer', 'incineration'].includes(details.disposal_method)) {
         let sourceTank = '';
         let qty = 0;
@@ -434,7 +434,7 @@ useEffect(() => {
         if (sourceTank && !isNaN(qty) && qty > 0) {
           if (!summary[sourceTank]) summary[sourceTank] = { current: 0, capacity: 0 };
           summary[sourceTank].current = Math.max(0, summary[sourceTank].current - qty);
-          console.log(`[Disposal] Removed ${qty} mÂ³ from ${sourceTank}`);
+          console.log(`[Disposal] Removed ${qty} m³ from ${sourceTank}`);
         }
       }
     }
@@ -446,7 +446,7 @@ useEffect(() => {
       percent: data.capacity > 0 ? ((data.current / data.capacity) * 100).toFixed(1) : 0
     }));
 
-    console.log("Final Sludge Summary:", result); // âœ… Final output
+    console.log("Final Sludge Summary:", result); // ✅ Final output
     return result;
   };
 
@@ -571,7 +571,7 @@ useEffect(() => {
 
       const tank = availableTanks?.find(t => t.tank_name === details.tank_identity);
       if (tank && details.ballast_qty > tank.capacity) {
-        return `Ballast quantity (${details.ballast_qty} mÂ³) exceeds tank capacity (${tank.capacity} mÂ³). Please check tank limits.`;
+        return `Ballast quantity (${details.ballast_qty} m³) exceeds tank capacity (${tank.capacity} m³). Please check tank limits.`;
       }
     }
 
@@ -591,7 +591,7 @@ useEffect(() => {
         const availableCapacity = capacity - currentContent;
 
         if (details.transfer_qty > availableCapacity) {
-          return `Quantity exceeds available capacity (${availableCapacity.toFixed(2)} mÂ³) of ${details.transfer_tank}.`;
+          return `Quantity exceeds available capacity (${availableCapacity.toFixed(2)} m³) of ${details.transfer_tank}.`;
         }
       }
 
@@ -713,7 +713,7 @@ useEffect(() => {
 
     //   . 10. Quantity Discharged
     if (!details.quantity_discharged_m3 || details.quantity_discharged_m3 <= 0) {
-      return "Quantity Discharged (Item 10) must be > 0 MÂ³.";
+      return "Quantity Discharged (Item 10) must be > 0 M³.";
     }
 
     //   . Extract ballast quantity from Code A
@@ -721,7 +721,7 @@ useEffect(() => {
     const ballastedQty = qtyMatch ? parseFloat(qtyMatch[1]) : 0;
 
     // if (details.quantity_discharged_m3 > ballastedQty) {
-    //   return `Discharge quantity (${details.quantity_discharged_m3} MÂ³) cannot exceed ballasted quantity (${ballastedQty} MÂ³).`;
+    //   return `Discharge quantity (${details.quantity_discharged_m3} M³) cannot exceed ballasted quantity (${ballastedQty} M³).`;
     // }
 
     //   . Get tank capacity
@@ -730,7 +730,7 @@ useEffect(() => {
     )?.capacity || 0;
 
     if (details.quantity_discharged_m3 > tankCapacity) {
-      return `Discharge quantity (${details.quantity_discharged_m3} MÂ³) exceeds tank capacity (${tankCapacity} MÂ³).`;
+      return `Discharge quantity (${details.quantity_discharged_m3} M³) exceeds tank capacity (${tankCapacity} M³).`;
     }
 
 
@@ -866,13 +866,13 @@ useEffect(() => {
 
       const tankObj = findTankByIdentifier(details.sludge_tank_id);
       // if (tankObj && Number.isFinite(toNumber(tankObj.capacity)) && tankCapacity > toNumber(tankObj.capacity)) {
-      //   return `Capacity (${tankCapacity} mÂ³) cannot exceed tank's design capacity (${tankObj.capacity} mÂ³)`;
+      //   return `Capacity (${tankCapacity} m³) cannot exceed tank's design capacity (${tankObj.capacity} m³)`;
       // }
 
       const sludgeBefore = toNumber(details.sludge_before);
       if (Number.isFinite(sludgeBefore)) {
         if (sludgeBefore < 0) return "Retained quantity cannot be negative";
-        if (sludgeBefore > tankCapacity) return `Retained quantity cannot exceed tank capacity (${tankCapacity} MÂ³)`;
+        if (sludgeBefore > tankCapacity) return `Retained quantity cannot exceed tank capacity (${tankCapacity} M³)`;
       }
     }
 
@@ -887,7 +887,7 @@ useEffect(() => {
       }
       //  Check: manual collection cannot exceed retained qty entered for that tank
       if (details.manual_collection_m3 > details.retained_quantity) {
-        return `Manual Collection (${details.manual_collection_m3} MÂ³) cannot exceed Retained Quantity (${details.retained_quantity} MÂ³) for the selected tank.`;
+        return `Manual Collection (${details.manual_collection_m3} M³) cannot exceed Retained Quantity (${details.retained_quantity} M³) for the selected tank.`;
       }
 
       // // Source and collection tanks must NOT be the same
@@ -909,7 +909,7 @@ useEffect(() => {
 
         //  Check: manual collection cannot exceed tank capacity
         if (manualQty > tankCapacity) {
-          return `Manual Collection (${manualQty} mÂ³) cannot exceed Source Tank capacity (${tankCapacity} mÂ³).`;
+          return `Manual Collection (${manualQty} m³) cannot exceed Source Tank capacity (${tankCapacity} m³).`;
         }
 
         //  Check: manual collection cannot be negative
@@ -1017,7 +1017,7 @@ useEffect(() => {
 
 
         if (disposalQuantity > retainedInLatestWeekly) {
-          return `Disposal quantity  exceeds available sludge (${retainedInLatestWeekly} mÂ³) in ${sourceTankIdentifier} as per last weekly update.`;
+          return `Disposal quantity  exceeds available sludge (${retainedInLatestWeekly} m³) in ${sourceTankIdentifier} as per last weekly update.`;
         }
       }
 
@@ -1029,7 +1029,7 @@ useEffect(() => {
         if (!Number.isFinite(toNumber(details.retained_quantity))) return "Retained quantity is required.";
         const tank = findTankByIdentifier(details.source_tank);
         if (tank && toNumber(details.retained_quantity) > toNumber(tank.capacity)) {
-          return `Retained quantity (${details.retained_quantity} mÂ³) cannot exceed the capacity of ${tank.tank_name} (${tank.capacity} mÂ³).`;
+          return `Retained quantity (${details.retained_quantity} m³) cannot exceed the capacity of ${tank.tank_name} (${tank.capacity} m³).`;
         }
         if (!details.reception_vessel?.trim()) return "Reception vessel name is required.";
         if (!details.reception_port?.trim()) return "Reception port name is required.";
@@ -1050,11 +1050,11 @@ useEffect(() => {
             return "Retained Quantity (12.2) must be >= 0 if provided.";
           }
           if (sourceTank && toNumber(details.retained_quantity) > toNumber(sourceTank.capacity)) {
-            return `Retained Quantity cannot exceed source tank capacity (${sourceTank.capacity} mÂ³).`;
+            return `Retained Quantity cannot exceed source tank capacity (${sourceTank.capacity} m³).`;
           }
         }
         if (destTank && Number.isFinite(toNumber(destTank.capacity)) && q > toNumber(destTank.capacity)) {
-          return `Transferred quantity (${q} mÂ³) cannot exceed destination tank capacity (${destTank.capacity} mÂ³).`;
+          return `Transferred quantity (${q} m³) cannot exceed destination tank capacity (${destTank.capacity} m³).`;
         }
       }
 
@@ -1069,10 +1069,10 @@ useEffect(() => {
         const retained = toNumber(details.retained_quantity);
         if (sourceTank && Number.isFinite(toNumber(sourceTank.capacity))) {
           const cap = toNumber(sourceTank.capacity);
-          if (q > cap) return `Incinerated quantity (${q} mÂ³) cannot exceed source tank capacity (${cap} mÂ³).`;
-          if (Number.isFinite(retained) && retained > cap) return `Retained quantity (${retained} mÂ³) cannot exceed source tank capacity (${cap} mÂ³).`;
+          if (q > cap) return `Incinerated quantity (${q} m³) cannot exceed source tank capacity (${cap} m³).`;
+          if (Number.isFinite(retained) && retained > cap) return `Retained quantity (${retained} m³) cannot exceed source tank capacity (${cap} m³).`;
           if (Number.isFinite(retained) && (q + retained) > cap) {
-            return `Incinerated (${q} mÂ³) + Retained (${retained} mÂ³) cannot exceed source tank capacity (${cap} mÂ³).`;
+            return `Incinerated (${q} m³) + Retained (${retained} m³) cannot exceed source tank capacity (${cap} m³).`;
           }
         }
       }
@@ -1090,13 +1090,13 @@ useEffect(() => {
   // Main validation handler common for all the codes, but not in use anymore as individual handlers are being created per code
   const handleValidate = async () => {
     try {
-      
+
       if (!vesselId) {
         alert("Vessel not selected");
         return false;
       }
 
-      // ðŸ”¹ 1. Fetch raw entries
+      // 🔹 1. Fetch raw entries
       const res = await fetch(`http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`);
       const data = await res.json();
 
@@ -1108,7 +1108,7 @@ useEffect(() => {
       }
       console.log("Fetched raw entries:", allRawEntries);
 
-      // ðŸ”¹ 2. Extract previous Code A entries
+      // 🔹 2. Extract previous Code A entries
       const previousCodeAEntries = allRawEntries
         .filter(entry => entry.code === "A")
       console.log("Previous Code A Entries:", previousCodeAEntries);
@@ -1183,18 +1183,18 @@ useEffect(() => {
       const srcCap = toNumber(srcTank.capacity);
 
       if (dischargeQty > srcCap) {
-        return `Discharge quantity (${dischargeQty} mÂ³) cannot exceed source tank capacity (${srcCap} mÂ³)`;
+        return `Discharge quantity (${dischargeQty} m³) cannot exceed source tank capacity (${srcCap} m³)`;
       }
 
       if (Number.isFinite(retainedQty) && retainedQty > srcCap) {
-        return `Retained quantity (${retainedQty} mÂ³) cannot exceed source tank capacity (${srcCap} mÂ³)`;
+        return `Retained quantity (${retainedQty} m³) cannot exceed source tank capacity (${srcCap} m³)`;
       }
 
       // Combined check: discharge + retained must not exceed source capacity.
       // If retained not provided (NaN) we assume UI auto-fills it; but still check using 0 if missing.
       const retainedForCheck = Number.isFinite(retainedQty) ? retainedQty : 0;
       if ((dischargeQty + retainedForCheck) > srcCap) {
-        return `Total (Discharge + Retained = ${dischargeQty + retainedForCheck} mÂ³) cannot exceed source tank capacity (${srcCap} mÂ³)`;
+        return `Total (Discharge + Retained = ${dischargeQty + retainedForCheck} m³) cannot exceed source tank capacity (${srcCap} m³)`;
       }
     }
 
@@ -1269,7 +1269,7 @@ useEffect(() => {
       }
 
       if (destTank && Number.isFinite(toNumber(destTank.capacity)) && destRetained > toNumber(destTank.capacity)) {
-        return `Retained quantity (${destRetained} mÂ³) cannot exceed destination tank capacity (${destTank.capacity} mÂ³).`;
+        return `Retained quantity (${destRetained} m³) cannot exceed destination tank capacity (${destTank.capacity} m³).`;
       }
 
       // ensure discharge > 0 (already checked) and does not exceed source capacity (already checked above).
@@ -1303,8 +1303,8 @@ useEffect(() => {
   const validateCodeG = (details) => {
     if (!details.occurrence_time) return "Time of occurrence is required";
     // if (!details.position) return "Position is required";
-    // if (!/^\d{1,2}Â°\d{1,2}'[NS]\s*\d{1,3}Â°\d{1,2}'[EW]$/.test(details.position)) {
-    //   return "Position must be in Lat/Long format (e.g., 10Â°10'N 078Â°20'E)";
+    // if (!/^\d{1,2}°\d{1,2}'[NS]\s*\d{1,3}°\d{1,2}'[EW]$/.test(details.position)) {
+    //   return "Position must be in Lat/Long format (e.g., 10°10'N 078°20'E)";
     // }
 
     if (details.quantity_m3 < 0 || details.quantity_m3 == null) return "Quantity must be >= 0";
@@ -1343,7 +1343,7 @@ useEffect(() => {
       return;
     }
 
-    
+
     if (!vesselId) {
       alert("Vessel not selected");
       return;
@@ -1402,7 +1402,7 @@ useEffect(() => {
       alert("Tank data not loaded. Please wait or refresh.");
       return;
     }
-   
+
     const officerName = user?.UserName || "OFFICER-IN-CHARGE";
 
     // --- Get officer details from the user object ---
@@ -1437,7 +1437,7 @@ useEffect(() => {
 
     try {
       //  Fetch ALL raw entries for validation
-      
+
       const allRawEntriesResponse = await fetch(
         `http://localhost:8000/api/orb/api/operations/?vessel_id=${vesselId}&is_deleted=false`
       );
@@ -1574,7 +1574,7 @@ useEffect(() => {
 
 
 
-    //   . Handle Code F â†’ Code I Mandatory Flow
+    //   . Handle Code F → Code I Mandatory Flow
     if (formData.code === 'F') {
       //   . Store F temporarily
       setPendingFEntry({
@@ -1708,7 +1708,7 @@ useEffect(() => {
     }
 
     const lines = recordText.split('\n').map(l => l.trim()).filter(l => l !== '');
-    // main entry code switch cases 
+    // main entry code switch cases
     switch (code) {
       case 'A':
         let detailsA = {};
@@ -1718,11 +1718,11 @@ useEffect(() => {
             const match = line.match(/TANK\(S\) BALLASTED:\s*(.+)/i);
             if (match) detailsA.tank_identity = match[1].trim();
           }
-          // 2. TANK CLEANED SINCE LAST OIL / NOT CLEANED â€“ PREVIOUS OIL
+          // 2. TANK CLEANED SINCE LAST OIL / NOT CLEANED – PREVIOUS OIL
           else if (line.startsWith('2.')) {
-            if (line.includes('NOT CLEANED â€“ PREVIOUS OIL')) {
+            if (line.includes('NOT CLEANED – PREVIOUS OIL')) {
               detailsA.cleaned_since_last = 'no';
-              const prevOilMatch = line.match(/NOT CLEANED â€“ PREVIOUS OIL:?\s*(.+)/i);
+              const prevOilMatch = line.match(/NOT CLEANED – PREVIOUS OIL:?\s*(.+)/i);
               if (prevOilMatch) detailsA.previous_oil = prevOilMatch[1].trim();
             } else if (line.includes('TANK CLEANED SINCE')) {
               detailsA.cleaned_since_last = 'yes';
@@ -1731,7 +1731,7 @@ useEffect(() => {
           // 3.1 START/STOP Cleaning
           else if (line.startsWith('3.1')) {
             // Parsing positions is complex, might require more specific regex if needed
-            // Example: "3.1 START POSITION (Lat/Long) (When cleaning started): 45Â° 30' N, 012Â° 45' E"
+            // Example: "3.1 START POSITION (Lat/Long) (When cleaning started): 45° 30' N, 012° 45' E"
             const startMatch = line.match(/START POSITION \(Lat\/Long\) \(When cleaning started\):\s*(.+)/i);
             if (startMatch) {
               // Parsing lat/long is complex, store raw string or implement detailed parsing
@@ -1766,7 +1766,7 @@ useEffect(() => {
           }
           // 4.2 BALLAST QUANTITY
           else if (line.startsWith('4.2')) {
-            const match = line.match(/BALLAST QUANTITY:\s*([\d.]+)\s*MÂ³/i);
+            const match = line.match(/BALLAST QUANTITY:\s*([\d.]+)\s*M³/i);
             if (match) detailsA.ballast_quantity = parseFloat(match[1]);
           }
         }
@@ -1801,7 +1801,7 @@ useEffect(() => {
           }
           // 10. QUANTITY DISCHARGED
           else if (line.startsWith('10.')) {
-            const match = line.match(/QUANTITY DISCHARGED:\s*([\d.]+)\s*MÂ³/i);
+            const match = line.match(/QUANTITY DISCHARGED:\s*([\d.]+)\s*M³/i);
             if (match) detailsB.quantity_discharged_m3 = parseFloat(match[1]);
           }
         }
@@ -1818,12 +1818,12 @@ useEffect(() => {
           // 11.2, 11.3, 11.4 - Quantities and capacities
           else if (line.startsWith('11.2')) {
             // This is often the "Before" quantity for weekly updates
-            const match = line.match(/BEFORE:\s*([\d.]+)\s*MÂ³/i);
+            const match = line.match(/BEFORE:\s*([\d.]+)\s*M³/i);
             if (match) detailsC.sludge_before = parseFloat(match[1]);
           }
           else if (line.startsWith('11.3')) {
             // This could be "Manual Collection" quantity
-            const match = line.match(/MANUAL COLLECTION:\s*([\d.]+)\s*MÂ³/i);
+            const match = line.match(/MANUAL COLLECTION:\s*([\d.]+)\s*M³/i);
             if (match) detailsC.manual_collection_m3 = parseFloat(match[1]);
           }
           else if (line.startsWith('11.4')) {
@@ -1885,7 +1885,7 @@ useEffect(() => {
           else if (line.startsWith('15.3')) {
             detailsD.method = 'holding';
             // Parse destination tank and retained quantity
-            const tankMatch = line.match(/TRANSFERRED TO\s+(.+?)\s+OR\s+RETAINED IN TANK\s+(.+?)\s+QUANTITY\s+([\d.]+)\s+mÂ³/i);
+            const tankMatch = line.match(/TRANSFERRED TO\s+(.+?)\s+OR\s+RETAINED IN TANK\s+(.+?)\s+QUANTITY\s+([\d.]+)\s+m³/i);
             if (tankMatch) {
               detailsD.holding_tank_ids = tankMatch[1].trim() || tankMatch[2].trim(); // Pick first non-empty
               detailsD.holding_tank_retained_m3 = parseFloat(tankMatch[3]);
@@ -1893,7 +1893,7 @@ useEffect(() => {
           }
           // Quantity discharged (often item 10 in B, but context might vary)
           else if (line.includes('QUANTITY DISCHARGED')) {
-            const match = line.match(/QUANTITY DISCHARGED:\s*([\d.]+)\s*MÂ³/i);
+            const match = line.match(/QUANTITY DISCHARGED:\s*([\d.]+)\s*M³/i);
             if (match) detailsD.quantity_discharged_m3 = parseFloat(match[1]);
           }
         }
@@ -2233,7 +2233,7 @@ function ORBEntryForm(
                     const onlyNumbersAndDot = e.target.value.replace(/[^0-9.]/g, ""); // allow digits + dot
                     handleChange("oil_density", onlyNumbersAndDot);
                   }}
-                  placeholder="e.g., 0.985 g/cmÂ³"
+                  placeholder="e.g., 0.985 g/cm³"
                 />
               </div>
             )}
@@ -2258,7 +2258,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(91)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2278,7 +2278,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2312,7 +2312,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(181)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2332,7 +2332,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2372,7 +2372,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(91)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2392,7 +2392,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2426,7 +2426,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(181)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2446,7 +2446,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>{i}</option>
                         ))}
@@ -2542,7 +2542,7 @@ function ORBEntryForm(
                       )}
                     </div>
                     <div>
-                      <label>3.2 Chemicals Used (mÂ³) *</label>
+                      <label>3.2 Chemicals Used (m³) *</label>
                       <input
                         type="number"
                         step="0.01"
@@ -2591,7 +2591,7 @@ function ORBEntryForm(
             {/* 3.3 Quantity of Cleaning Water */}
             {(details.operation_type === "cleaning" || details.operation_type === "both") && (
               <div>
-                <label>3.3 Quantity of Cleaning Water (mÂ³) *</label>
+                <label>3.3 Quantity of Cleaning Water (m³) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2668,7 +2668,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(91)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2690,7 +2690,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2726,7 +2726,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(181)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2748,7 +2748,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2798,7 +2798,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(91)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2820,7 +2820,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2856,7 +2856,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">Â°</option>
+                        <option value="">°</option>
                         {[...Array(181)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2878,7 +2878,7 @@ function ORBEntryForm(
                         }
                         style={{ width: "70px" }}
                       >
-                        <option value="">â€²</option>
+                        <option value="">′</option>
                         {[...Array(60)].map((_, i) => (
                           <option key={i} value={i}>
                             {i}
@@ -2909,7 +2909,7 @@ function ORBEntryForm(
             {/* 4.2 Ballast Quantity */}
             {(details.operation_type === "ballasting" || details.operation_type === "both") && (
               <div>
-                <label>4.2 Ballast Quantity (mÂ³) *</label>
+                <label>4.2 Ballast Quantity (m³) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -2984,7 +2984,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">Â°</option>
+                    <option value="">°</option>
                     {[...Array(91)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3006,7 +3006,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">â€²</option>
+                    <option value="">′</option>
                     {[...Array(60)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3042,7 +3042,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">Â°</option>
+                    <option value="">°</option>
                     {[...Array(181)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3064,7 +3064,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">â€²</option>
+                    <option value="">′</option>
                     {[...Array(60)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3119,7 +3119,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">Â°</option>
+                    <option value="">°</option>
                     {[...Array(91)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3141,7 +3141,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">â€²</option>
+                    <option value="">′</option>
                     {[...Array(60)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3177,7 +3177,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">Â°</option>
+                    <option value="">°</option>
                     {[...Array(181)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3199,7 +3199,7 @@ function ORBEntryForm(
                     }
                     style={{ width: "70px" }}
                   >
-                    <option value="">â€²</option>
+                    <option value="">′</option>
                     {[...Array(60)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -3268,7 +3268,7 @@ function ORBEntryForm(
                 onChange={() => handleChange('method', details.method === 'reception' ? '' : 'reception')}
                 style={{ width: "200px" }}
               />
-              
+
                 <input
                   type="text"
                   value={details.reception_port || ''}
@@ -3276,7 +3276,7 @@ function ORBEntryForm(
                   placeholder="e.g., ROTTERDAM"
 
                 />
-              
+
               {errors.reception_port && (
                 <span style={{ color: 'red', fontSize: '12px', display: 'block' }}>
                   {errors.reception_port}
@@ -3303,7 +3303,7 @@ function ORBEntryForm(
                 value={details.reception_port || ""}
                 onChange={(e) => {
                   handleChange("reception_port", e.target.value);
-                  handleChange("method", "reception"); // âœ… always set method
+                  handleChange("method", "reception"); // ✅ always set method
                 }}
                 placeholder="Enter Port Name"
                 style={{ width: '200px', marginTop: '7px', borderColor: errors.reception_port ? "red" : "#ccc" }}
@@ -3319,9 +3319,9 @@ function ORBEntryForm(
             )}
 
 
-            {/* 10. Quantity Discharged (mÂ³) */}
+            {/* 10. Quantity Discharged (m³) */}
             <div>
-              <label>10. Quantity Discharged (mÂ³)</label>
+              <label>10. Quantity Discharged (m³)</label>
               <input
                 type="number"
                 step="0.01"
@@ -3434,7 +3434,7 @@ function ORBEntryForm(
 
                 {/* 11.2 Total Capacity */}
                 <div>
-                  <label>11.2 Total Capacity (mÂ³) *</label>
+                  <label>11.2 Total Capacity (m³) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -3453,7 +3453,7 @@ function ORBEntryForm(
 
                 {/* 11.3 Sludge Before Collection */}
                 <div>
-                  <label>11.3 total quantity of retention (mÂ³) *</label>
+                  <label>11.3 total quantity of retention (m³) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -3473,7 +3473,7 @@ function ORBEntryForm(
 
             {details.operation_mode === 'manual' && (
               <>
-                {/* 11.1 â€“ 11.3 (Same as Weekly) */}
+                {/* 11.1 – 11.3 (Same as Weekly) */}
                 <div>
                   <label>11.1 Identity of tank(s)*</label>
                   <select
@@ -3507,7 +3507,7 @@ function ORBEntryForm(
                 </div>
 
                 <div>
-                  <label>11.2 Total Capacity (mÂ³) *</label>
+                  <label>11.2 Total Capacity (m³) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -3525,7 +3525,7 @@ function ORBEntryForm(
                 </div>
 
                 <div>
-                  <label>11.3 Total quantity of retention (mÂ³) *</label>
+                  <label>11.3 Total quantity of retention (m³) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -3543,7 +3543,7 @@ function ORBEntryForm(
 
                 {/* 11.4 Manual Collection */}
                 <div>
-                  <label>11.4 Manual Collection (mÂ³) *</label>
+                  <label>11.4 Manual Collection (m³) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -3717,7 +3717,7 @@ function ORBEntryForm(
 
                   {details.disposal_method === 'transfer' && (
                     <>
-                      <label>Quantity Transferred (mÂ³) *</label>
+                      <label>Quantity Transferred (m³) *</label>
                       <input
                         type="number"
                         step="0.01"
@@ -3760,7 +3760,7 @@ function ORBEntryForm(
                         </span>
                       )}
 
-                      <label>Retained Quantity (mÂ³)</label>
+                      <label>Retained Quantity (m³)</label>
                       <input
                         type="number"
                         step="0.01"
@@ -3922,7 +3922,7 @@ function ORBEntryForm(
                 {availableTanks
                   .map(tank => (
                     <option key={tank.id} value={tank.id}>
-                      {tank.tank_name} (FR:{tank.frame_from}-{tank.frame_to}, {tank.capacity} mÂ³)
+                      {tank.tank_name} (FR:{tank.frame_from}-{tank.frame_to}, {tank.capacity} m³)
                     </option>
                   ))
                 }
@@ -3936,7 +3936,7 @@ function ORBEntryForm(
 
             {/* 13.2 Retained Quantity */}
             <div>
-              <label>13. Retained in Source Tank (mÂ³) *</label>
+              <label>13. Retained in Source Tank (m³) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -4036,7 +4036,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_start_lat_deg', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">Â°</option>
+                          <option value="">°</option>
                           {[...Array(91)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4051,7 +4051,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_start_lat_min', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">â€²</option>
+                          <option value="">′</option>
                           {[...Array(60)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4080,7 +4080,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_start_lon_deg', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">Â°</option>
+                          <option value="">°</option>
                           {[...Array(181)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4095,7 +4095,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_start_lon_min', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">â€²</option>
+                          <option value="">′</option>
                           {[...Array(60)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4137,7 +4137,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_end_lat_deg', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">Â°</option>
+                          <option value="">°</option>
                           {[...Array(91)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4152,7 +4152,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_end_lat_min', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">â€²</option>
+                          <option value="">′</option>
                           {[...Array(60)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4181,7 +4181,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_end_lon_deg', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">Â°</option>
+                          <option value="">°</option>
                           {[...Array(181)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4196,7 +4196,7 @@ function ORBEntryForm(
                           onChange={(e) => handleChange('ppm_end_lon_min', parseInt(e.target.value))}
                           style={{ width: '70px' }}
                         >
-                          <option value="">â€²</option>
+                          <option value="">′</option>
                           {[...Array(60)].map((_, i) => (
                             <option key={i} value={i}>{i}</option>
                           ))}
@@ -4219,7 +4219,7 @@ function ORBEntryForm(
                     </div>
                   </div>
 
-                  {/* âœ… NEW: Start & Stop Time with UTC */}
+                  {/* ✅ NEW: Start & Stop Time with UTC */}
                   <div style={{ marginLeft: '24px', marginTop: '16px', display: 'grid', gap: '12px' }}>
 
                     {/* Start Time */}
@@ -4257,11 +4257,11 @@ function ORBEntryForm(
                     </div>
                   </div>
 
-                  {/* âœ… Validation Message */}
+                  {/* ✅ Validation Message */}
                   {details.ppm_start_time && details.ppm_stop_time && (
                     new Date(`2000-01-01T${details.ppm_stop_time}`) < new Date(`2000-01-01T${details.ppm_start_time}`) && (
                       <span style={{ color: 'red', fontSize: '12px', marginLeft: '24px', display: 'block' }}>
-                        âŒ Stop time cannot be before start time.
+                        ❌ Stop time cannot be before start time.
                       </span>
                     )
                   )}
@@ -4338,7 +4338,7 @@ function ORBEntryForm(
 
                   {/* Retained Quantity */}
                   <div>
-                    <label>Retained Quantity (mÂ³) *</label>
+                    <label>Retained Quantity (m³) *</label>
                     <input
                       type="number"
                       step="0.01"
@@ -4637,7 +4637,7 @@ function ORBEntryForm(
                     style={{ width: "70px", borderColor: errors.position ? "red" : "#ccc" }}
                     required
                   >
-                    <option value="">Â°</option>
+                    <option value="">°</option>
                     {[...Array(91)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -4660,7 +4660,7 @@ function ORBEntryForm(
                     style={{ width: "70px", borderColor: errors.position ? "red" : "#ccc" }}
                     required
                   >
-                    <option value="">â€²</option>
+                    <option value="">′</option>
                     {[...Array(60)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -4698,7 +4698,7 @@ function ORBEntryForm(
                     style={{ width: "70px", borderColor: errors.position ? "red" : "#ccc" }}
                     required
                   >
-                    <option value="">Â°</option>
+                    <option value="">°</option>
                     {[...Array(181)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -4721,7 +4721,7 @@ function ORBEntryForm(
                     style={{ width: "70px", borderColor: errors.position ? "red" : "#ccc" }}
                     required
                   >
-                    <option value="">â€²</option>
+                    <option value="">′</option>
                     {[...Array(60)].map((_, i) => (
                       <option key={i} value={i}>
                         {i}
@@ -5143,7 +5143,7 @@ function ORBEntryForm(
                         )
                         .map(tank => (
                           <option key={tank.id} value={tank.id}>
-                            {tank.tank_name} ({tank.capacity} mÂ³)
+                            {tank.tank_name} ({tank.capacity} m³)
                           </option>
                         ))}
                     </select>
@@ -5186,7 +5186,7 @@ function ORBEntryForm(
                       }}
                       style={{ background: '#917ee4ff', color: 'white', border: 'none', padding: '4px 8px' }}
                     >
-                      âœ–
+                      ✖
                     </button>
                   </div>
                 ))}
@@ -5256,7 +5256,7 @@ function ORBEntryForm(
                         )
                         .map(tank => (
                           <option key={tank.id} value={tank.id}>
-                            {tank.tank_name} ({tank.capacity} mÂ³)
+                            {tank.tank_name} ({tank.capacity} m³)
                           </option>
                         ))}
                     </select>
@@ -5300,7 +5300,7 @@ function ORBEntryForm(
                       }}
                       style={{ background: '#917ee4ff', color: 'white', border: 'none', padding: '4px 8px' }}
                     >
-                      âœ–
+                      ✖
                     </button>
                   </div>
 
@@ -5360,7 +5360,7 @@ function ORBEntryForm(
                 rows="6"
                 value={details.remarks || ""}
                 onChange={(e) => handleChange('remarks', e.target.value)}
-                // placeholder={`e.g., Drained 15 litres of water from No.1 F.O. settling tank (P) to bilge well.\n\nOR\n\nTransferred 200 litres of MDO from storage tank to service tank for generator testing.\n\nOR\n\nWeekly check of sludge tank levels: WASTE OIL TANK (FR:24-27) - 38 mÂ³`}
+                // placeholder={`e.g., Drained 15 litres of water from No.1 F.O. settling tank (P) to bilge well.\n\nOR\n\nTransferred 200 litres of MDO from storage tank to service tank for generator testing.\n\nOR\n\nWeekly check of sludge tank levels: WASTE OIL TANK (FR:24-27) - 38 m³`}
                 style={{
                   width: '100%',
                   borderColor: errors.remarks ? 'red' : '#ccc',
@@ -5390,7 +5390,7 @@ function ORBEntryForm(
 
   const codeOptions = (codes || []).map((c) => (
     <option key={c.id} value={c.code}>
-      {c.code} â€“ {c.description}
+      {c.code} – {c.description}
     </option>
   ));
 
@@ -5513,7 +5513,7 @@ function ORBTable({ entries, onEdit, onDelete }) {
                           if (line.startsWith('TANK(S) BALLASTED')) itemNo = '1';
 
                           // 2. Cleaned Since Last Oil
-                          else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) itemNo = '2';
+                          else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) itemNo = '2';
 
 
                           // 4.1 Ballast Start/End
@@ -5547,7 +5547,7 @@ function ORBTable({ entries, onEdit, onDelete }) {
                             }
                           }
                           //   . Quantity is always 10, regardless of index
-                          else if (line.includes('MÂ³')) {
+                          else if (line.includes('M³')) {
                             itemNo = '10';
                           }
                           break;
@@ -5557,9 +5557,9 @@ function ORBTable({ entries, onEdit, onDelete }) {
                             itemNo = entry.item_no || '';
                           } case 'C':
                           // 11.1 handled on first line
-                          if (line.includes('MÂ³') && !line.includes('COLLECTED') && !line.includes('RETAINED')) {
+                          if (line.includes('M³') && !line.includes('COLLECTED') && !line.includes('RETAINED')) {
                             itemNo = '11.2';;
-                          } if ((idx === 2) && line.includes('MÂ³')) {
+                          } if ((idx === 2) && line.includes('M³')) {
                             itemNo = '11.3';
                           } if (idx === 3) {
                             itemNo = '11.4';
@@ -5625,7 +5625,7 @@ function ORBTable({ entries, onEdit, onDelete }) {
                           if (line.startsWith('START:')) itemNo = '26.2';
                           else if (line.includes('BUNKERED IN TANKS')) itemNo = line.includes('FUEL') ? '26.3' : '26.4';
                           else if (line.includes('TANK(S) BALLASTED')) itemNo = '1';
-                          else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) itemNo = '2';
+                          else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) itemNo = '2';
                           else if (line.includes('START BALLAST')) itemNo = '4.1';
                           else if (line.includes('START') && !line.includes('BALLAST')) itemNo = '3.1';
                           else if (line.startsWith('METHOD USED')) itemNo = '3.2';
@@ -5633,7 +5633,7 @@ function ORBTable({ entries, onEdit, onDelete }) {
                           else if (line.includes('BALLAST QUANTITY')) itemNo = '4.2';
                           else if (line.includes('THROUGH 15 PPM EQUIPMENT')) itemNo = '9.1';
                           else if (line.includes('RECEPTION')) itemNo = '9.2';
-                          else if (line.includes('mÂ³') || line.includes('MÂ³')) itemNo = '10';
+                          else if (line.includes('m³') || line.includes('M³')) itemNo = '10';
                           break;
                       }
 

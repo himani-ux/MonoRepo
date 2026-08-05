@@ -19,6 +19,13 @@ class NearMissPdfSignatureRow:
 
 
 @dataclass(frozen=True)
+class NearMissCauseFactorPdfRow:
+    factor: str
+    immediate_cause: str
+    root_cause: str
+
+
+@dataclass(frozen=True)
 class NearMissLightweightPdfContext:
     incident_id: int
     incident_number: str
@@ -30,7 +37,7 @@ class NearMissLightweightPdfContext:
     categories: str
     near_miss_types: str
     possible_loss_type: str
-    immediate_causes: str
+    cause_factor_rows: list[NearMissCauseFactorPdfRow]
     occurred_at: str | None
     reported_at: str | None
     reporter_name: str
@@ -43,12 +50,10 @@ class NearMissLightweightPdfContext:
     weather_voyage_details: str
     equipment_details: str
     lessons_learned: str
+    vessel_review_comment: str
     office_comments: str
-    rework_summary: str
     closure_reason: str
-    fleet_alert_due_by: str | None
     fleet_alert_issued_at: str | None
-    fleet_alert_status: str
     fleet_learning_text: str
     generated_at: str
     visibility_note: str
@@ -57,12 +62,12 @@ class NearMissLightweightPdfContext:
 
 class NearMissLightweightTemplate:
     SECTION_TITLES = [
-        "SSOT Summary",
+        "Summary",
         "What Happened",
         "Preventive Measures",
         "Immediate Action",
         "High-risk and Learning Details",
-        "Office Comments and Rework",
+        "Review Comments",
         "Fleet Learning",
         "Closure",
         "Signatures",
@@ -118,24 +123,26 @@ class NearMissLightweightTemplate:
             author="Safety Module",
         )
 
-        summary_table = Table(
+        summary_rows = self._non_empty_detail_rows(
             [
-                ["Near miss ref", context.incident_number],
-                ["Vessel", context.vessel_id],
-                ["State", context.state],
-                ["Priority", context.priority],
-                ["Severity", context.severity],
-                ["Place", context.place],
-                ["Category", context.categories],
-                ["Immediate cause", context.immediate_causes],
-                ["Occurred at", context.occurred_at or "Not recorded"],
-                ["Reported at", context.reported_at or "Not recorded"],
-                ["Reported by", context.reporter_name],
-                ["Reporter's rank", context.reporter_rank],
-                ["Fleet alert due", context.fleet_alert_due_by or "Not applicable"],
-                ["Fleet alert issued", context.fleet_alert_issued_at or "Not issued"],
-                ["Generated at", context.generated_at],
-            ],
+                ("Near miss ref", context.incident_number),
+                ("Vessel", context.vessel_id),
+                ("State", context.state),
+                ("Priority", context.priority),
+                ("Severity", context.severity),
+                ("Place", context.place),
+                ("Category", context.categories),
+                ("Near-miss type", context.near_miss_types),
+                ("Possible loss type", context.possible_loss_type),
+                ("Occurred at", context.occurred_at),
+                ("Reported at", context.reported_at),
+                ("Reported by", context.reporter_name),
+                ("Reporter's rank", context.reporter_rank),
+                ("Fleet alert issued", context.fleet_alert_issued_at),
+            ]
+        )
+        summary_table = Table(
+            summary_rows,
             colWidths=[42 * mm, 128 * mm],
             hAlign="LEFT",
         )
@@ -148,16 +155,18 @@ class NearMissLightweightTemplate:
             summary_table,
             Spacer(1, 6),
             *self._visibility_note_block(context.visibility_note),
-            Paragraph(self.SECTION_TITLES[1], self.section_style),
-            Paragraph(context.what_happened, self.body_style),
-            Spacer(1, 8),
-            Paragraph(self.SECTION_TITLES[2], self.section_style),
-            Paragraph(context.suggestion_text, self.body_style),
-            Spacer(1, 8),
-            Paragraph(self.SECTION_TITLES[3], self.section_style),
-            Paragraph(context.immediate_action_text, self.body_style),
-            Spacer(1, 8),
         ]
+        if context.cause_factor_rows:
+            story.extend(
+                [
+                    Paragraph("Cause Factors", self.section_style),
+                    self._cause_factors_table(context),
+                    Spacer(1, 8),
+                ]
+            )
+        story.extend(self._paragraph_section(self.SECTION_TITLES[1], context.what_happened))
+        story.extend(self._paragraph_section(self.SECTION_TITLES[2], context.suggestion_text))
+        story.extend(self._paragraph_section(self.SECTION_TITLES[3], context.immediate_action_text))
         high_risk_rows = self._non_empty_detail_rows(
             [
                 ("Root cause detail", context.root_cause_detail),
@@ -176,30 +185,30 @@ class NearMissLightweightTemplate:
                 ]
             )
 
-        story.extend(
+        review_rows = self._non_empty_detail_rows(
             [
-                Paragraph(self.SECTION_TITLES[5], self.section_style),
-                self._details_table(
-                    [
-                        ("Office comments", context.office_comments),
-                        ("Rework summary", context.rework_summary),
-                    ]
-                ),
-                Spacer(1, 8),
-                Paragraph(self.SECTION_TITLES[6], self.section_style),
-                Paragraph(context.fleet_learning_text, self.body_style),
-                Spacer(1, 8),
-                Paragraph(self.SECTION_TITLES[7], self.section_style),
-                Paragraph(context.closure_reason, self.body_style),
-                Spacer(1, 8),
+                ("Vessel review comment", context.vessel_review_comment),
+                ("Office comments", context.office_comments),
             ]
         )
+        if review_rows:
+            story.extend(
+                [
+                    Paragraph(self.SECTION_TITLES[5], self.section_style),
+                    self._details_table(review_rows),
+                    Spacer(1, 8),
+                ]
+            )
+        story.extend(self._paragraph_section(self.SECTION_TITLES[6], context.fleet_learning_text))
+        story.extend(self._paragraph_section(self.SECTION_TITLES[7], context.closure_reason))
         story.extend(self._build_signature_section(context.signature_rows))
 
         document.build(story)
         return buffer.getvalue()
 
     def _build_signature_section(self, rows: list[NearMissPdfSignatureRow]) -> list[object]:
+        if not rows:
+            return []
         signature_rows = [
             (
                 row.label,
@@ -217,6 +226,31 @@ class NearMissLightweightTemplate:
         table.setStyle(self._table_style(header=True))
         return [Paragraph(self.SECTION_TITLES[8], self.section_style), table, Spacer(1, 10)]
 
+    def _cause_factors_table(self, context: NearMissLightweightPdfContext) -> Table:
+        if context.cause_factor_rows:
+            rows = [
+                [
+                    Paragraph(row.factor, self.body_style),
+                    Paragraph(row.immediate_cause or "Not selected", self.body_style),
+                    Paragraph(row.root_cause or "Not selected", self.body_style),
+                ]
+                for row in context.cause_factor_rows
+            ]
+        else:
+            rows = [[Paragraph("Not selected", self.body_style), Paragraph("", self.body_style), Paragraph("", self.body_style)]]
+
+        table = Table(
+            [
+                ["Factor", "Immediate Cause", "Root Cause"],
+                *rows,
+            ],
+            colWidths=[34 * mm, 68 * mm, 68 * mm],
+            repeatRows=1,
+            hAlign="LEFT",
+        )
+        table.setStyle(self._table_style(header=True))
+        return table
+
     def _visibility_note_block(self, visibility_note: str) -> list[object]:
         if not visibility_note.strip():
             return [Spacer(1, 12)]
@@ -224,7 +258,7 @@ class NearMissLightweightTemplate:
 
     def _details_table(self, rows: list[tuple[str, str]]) -> Table:
         table = Table(
-            [[label, value or "Not recorded"] for label, value in rows],
+            [[label, value] for label, value in rows],
             colWidths=[46 * mm, 124 * mm],
             hAlign="LEFT",
         )
@@ -233,12 +267,30 @@ class NearMissLightweightTemplate:
 
     @staticmethod
     def _non_empty_detail_rows(rows: list[tuple[str, str]]) -> list[tuple[str, str]]:
-        empty_values = {"", "not recorded", "not recorded."}
+        empty_values = {
+            "",
+            "not applicable",
+            "not issued",
+            "not recorded",
+            "not recorded.",
+            "not required",
+            "not selected",
+            "unset",
+            "closure reason is not recorded.",
+            "fleet learning / lessons are not recorded.",
+            "narrative not recorded.",
+            "no immediate action is recorded.",
+        }
         return [
             (label, value)
             for label, value in rows
             if str(value or "").strip().lower() not in empty_values
         ]
+
+    def _paragraph_section(self, title: str, value: str) -> list[object]:
+        if not self._non_empty_detail_rows([(title, value)]):
+            return []
+        return [Paragraph(title, self.section_style), Paragraph(value, self.body_style), Spacer(1, 8)]
 
     @staticmethod
     def _table_style(*, header: bool = False) -> TableStyle:

@@ -6,7 +6,7 @@
  * 1. Confirm Context (read-only inspection info)
  * 2. Open Deficiencies (show non-rectified, user selects)
  * 3. Update ActionCodes (reinspection date, bulk/per-row action code)
- * 4. Upload Follow-up Report (optional PDF)
+ * 4. Upload Follow-up Reports (optional PDFs)
  * 5. Confirm & Submit
  */
 
@@ -52,6 +52,9 @@ const STEPS: StepConfig[] = [
   { label: 'Upload Report', shortLabel: 'Report' },
   { label: 'Confirm & Submit', shortLabel: 'Submit' },
 ];
+
+const MAX_FOLLOW_UP_REPORT_FILES = 3;
+const MAX_FOLLOW_UP_REPORT_FILE_SIZE = 5 * 1024 * 1024;
 
 // ============================================================================
 // Helper: Format date
@@ -150,8 +153,8 @@ export const FollowUpWizard: FC<FollowUpWizardProps> = ({
   });
   const [defNotes, setDefNotes] = useState<Record<string, string>>({});
 
-  // Step 4 state: optional report
-  const [reportFile, setReportFile] = useState<File | null>(null);
+  // Step 4 state: optional reports
+  const [reportFiles, setReportFiles] = useState<File[]>([]);
   const [reportDescription, setReportDescription] = useState('');
 
   // Step 3 validation errors
@@ -183,15 +186,15 @@ export const FollowUpWizard: FC<FollowUpWizardProps> = ({
         return true;
       }
       case 3:
-        // Report is optional; if file provided, description required
-        if (reportFile && !reportDescription.trim()) return false;
+        // Reports are optional; if files are provided, description is required.
+        if (reportFiles.length > 0 && !reportDescription.trim()) return false;
         return true;
       case 4:
         return true;
       default:
         return false;
     }
-  }, [step, selectedDefIds, reinspectionDate, inspection.inspection_date, reportFile, reportDescription]);
+  }, [step, selectedDefIds, reinspectionDate, inspection.inspection_date, reportFiles, reportDescription]);
 
   const handleNext = useCallback(() => {
     if (step === 2) {
@@ -230,12 +233,12 @@ export const FollowUpWizard: FC<FollowUpWizardProps> = ({
       reinspection_date: reinspectionDate,
       notes: '',
       deficiency_updates: updates,
-      report_file: reportFile,
+      report_files: reportFiles,
       report_description: reportDescription,
     };
 
     await onSubmit(data);
-  }, [selectedDefs, defActions, defNotes, reinspectionDate, reportFile, reportDescription, onSubmit]);
+  }, [selectedDefs, defActions, defNotes, reinspectionDate, reportFiles, reportDescription, onSubmit]);
 
   // ---- Toggle deficiency selection ----
 
@@ -311,9 +314,9 @@ export const FollowUpWizard: FC<FollowUpWizardProps> = ({
       case 3:
         return (
           <Step4Report
-            file={reportFile}
+            files={reportFiles}
             description={reportDescription}
-            onFileChange={setReportFile}
+            onFilesChange={setReportFiles}
             onDescriptionChange={setReportDescription}
           />
         );
@@ -325,7 +328,7 @@ export const FollowUpWizard: FC<FollowUpWizardProps> = ({
             defActions={defActions}
             actionCodes={actionCodes}
             reinspectionDate={reinspectionDate}
-            reportFile={reportFile}
+            reportFiles={reportFiles}
           />
         );
       default:
@@ -583,77 +586,139 @@ const Step3ActionCodes: FC<Step3Props> = ({
 // ============================================================================
 
 interface Step4Props {
-  file: File | null;
+  files: File[];
   description: string;
-  onFileChange: (file: File | null) => void;
+  onFilesChange: (files: File[]) => void;
   onDescriptionChange: (desc: string) => void;
 }
 
-const Step4Report: FC<Step4Props> = ({ file, description, onFileChange, onDescriptionChange }) => (
-  <div className="space-y-4">
-    <h3 className="text-base font-semibold text-gray-900">Upload Follow-up Report</h3>
-    <p className="text-sm text-gray-500">
-      Optionally attach a follow-up inspection report (PDF only, max 5MB).
-      You can skip this step if no report is available.
-    </p>
+const Step4Report: FC<Step4Props> = ({
+  files,
+  description,
+  onFilesChange,
+  onDescriptionChange,
+}) => {
+  const [fileError, setFileError] = useState('');
+  const canAddMore = files.length < MAX_FOLLOW_UP_REPORT_FILES;
 
-    {/* File input */}
-    <div className="space-y-1">
-      <Label>Report File (PDF)</Label>
-      {file ? (
-        <div className="flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 p-3">
-          <Upload className="h-5 w-5 text-primary-500" />
-          <span className="flex-1 truncate text-sm font-medium text-primary-700">
-            {file.name}
+  const handleSelectedFiles = (selectedFiles: FileList | null) => {
+    setFileError('');
+    const incomingFiles = Array.from(selectedFiles || []);
+    if (!incomingFiles.length) return;
+
+    if (files.length + incomingFiles.length > MAX_FOLLOW_UP_REPORT_FILES) {
+      setFileError(`You can attach up to ${MAX_FOLLOW_UP_REPORT_FILES} PDFs.`);
+      return;
+    }
+
+    const invalidType = incomingFiles.find(
+      (selectedFile) =>
+        selectedFile.type !== 'application/pdf' &&
+        !selectedFile.name.toLowerCase().endsWith('.pdf'),
+    );
+    if (invalidType) {
+      setFileError('Only PDF files can be attached.');
+      return;
+    }
+
+    const oversizedFile = incomingFiles.find(
+      (selectedFile) => selectedFile.size > MAX_FOLLOW_UP_REPORT_FILE_SIZE,
+    );
+    if (oversizedFile) {
+      setFileError('Each PDF must be 5MB or smaller.');
+      return;
+    }
+
+    onFilesChange([...files, ...incomingFiles]);
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    setFileError('');
+    onFilesChange(files.filter((_, index) => index !== indexToRemove));
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-base font-semibold text-gray-900">Upload Follow-up Reports</h3>
+      <p className="text-sm text-gray-500">
+        Optionally attach up to {MAX_FOLLOW_UP_REPORT_FILES} follow-up PDFs. Each PDF must be 5MB or smaller.
+      </p>
+
+      {/* File input */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Report PDFs</Label>
+          <span className="text-xs font-medium text-gray-500">
+            {files.length}/{MAX_FOLLOW_UP_REPORT_FILES} selected
           </span>
-          <span className="text-xs text-gray-500">
-            {(file.size / 1024 / 1024).toFixed(2)} MB
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => onFileChange(null)}>
-            <X className="h-4 w-4" />
-          </Button>
         </div>
-      ) : (
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-primary-400 hover:bg-primary-50">
-          <Upload className="h-6 w-6 text-gray-400" />
-          <span className="text-sm text-gray-500">Click to select PDF file</span>
-          <input
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0] ?? null;
-              if (f && f.size > 5 * 1024 * 1024) {
-                alert('File exceeds 5MB limit');
-                return;
-              }
-              onFileChange(f);
-            }}
+
+        {files.length > 0 && (
+          <div className="space-y-2">
+            {files.map((file, index) => (
+              <div
+                key={`${file.name}-${file.size}-${index}`}
+                className="flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 p-3"
+              >
+                <Upload className="h-5 w-5 text-primary-500" />
+                <span className="flex-1 truncate text-sm font-medium text-primary-700">
+                  {file.name}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canAddMore ? (
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 p-6 transition-colors hover:border-primary-400 hover:bg-primary-50">
+            <Upload className="h-6 w-6 text-gray-400" />
+            <span className="text-sm text-gray-500">Click to select PDF files</span>
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                handleSelectedFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        ) : (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+            Maximum {MAX_FOLLOW_UP_REPORT_FILES} PDFs selected.
+          </div>
+        )}
+        {fileError && <p className="text-sm text-error-500">{fileError}</p>}
+      </div>
+
+      {/* Description (required if files are present) */}
+      {files.length > 0 && (
+        <div className="space-y-1">
+          <Label htmlFor="report-desc">
+            Description <span className="text-error-500">*</span>
+          </Label>
+          <Textarea
+            id="report-desc"
+            placeholder="Describe the follow-up reports..."
+            value={description}
+            onChange={(e) => onDescriptionChange(e.target.value)}
+            rows={3}
           />
-        </label>
+          {!description.trim() && (
+            <p className="text-sm text-error-500">Description is required when uploading reports</p>
+          )}
+        </div>
       )}
     </div>
-
-    {/* Description (required if file present) */}
-    {file && (
-      <div className="space-y-1">
-        <Label htmlFor="report-desc">
-          Description <span className="text-error-500">*</span>
-        </Label>
-        <Textarea
-          id="report-desc"
-          placeholder="Describe the follow-up report..."
-          value={description}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-          rows={3}
-        />
-        {!description.trim() && (
-          <p className="text-sm text-error-500">Description is required when uploading a report</p>
-        )}
-      </div>
-    )}
-  </div>
-);
+  );
+};
 
 // ============================================================================
 // Step 5 — Summary & Confirm
@@ -665,7 +730,7 @@ interface Step5Props {
   defActions: Record<string, number>;
   actionCodes: PSCActionCode[];
   reinspectionDate: string;
-  reportFile: File | null;
+  reportFiles: File[];
 }
 
 const Step5Summary: FC<Step5Props> = ({
@@ -674,7 +739,7 @@ const Step5Summary: FC<Step5Props> = ({
   defActions,
   actionCodes,
   reinspectionDate,
-  reportFile,
+  reportFiles,
 }) => {
   const actionCodeMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -694,7 +759,10 @@ const Step5Summary: FC<Step5Props> = ({
           <InfoRow label="Inspection" value={`${inspection.port || ''} — ${formatDate(inspection.inspection_date)}`} />
           <InfoRow label="Reinspection Date" value={formatDate(reinspectionDate)} />
           <InfoRow label="Deficiencies Updated" value={String(selectedDefs.length)} />
-          <InfoRow label="Report Attached" value={reportFile ? 'Yes' : 'No'} />
+          <InfoRow
+            label="Reports Attached"
+            value={reportFiles.length ? `${reportFiles.length} PDF(s)` : 'No'}
+          />
         </CardContent>
       </Card>
 

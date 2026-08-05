@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
-import { useAuth } from "../../../hooks/use-auth";
 import { getErrorMessage } from "../../../lib/api/client";
 import { safetyApi } from "../../../lib/api/safety";
 import type {
@@ -13,14 +12,135 @@ import type {
 
 type LossEvaluationDraft = Omit<SafetyIncidentLossEvaluation, "id" | "updated_date">;
 
-const PIC_ROLES = new Set([
-  "PIC",
-  "VESSEL SUPERINTENDENT",
-  "OFFICE_PIC",
-  "OFFICE_SSQE",
-  "OFFICE_SUPT",
-]);
-const OFFICE_DECISION_ROLES = new Set(["DPA", ...PIC_ROLES]);
+const lossEvaluationChoiceDefaults = {
+  consequence: [
+    { label: "Minor", value: "MINOR" },
+    { label: "Appreciable", value: "APPRECIABLE" },
+    { label: "Major", value: "MAJOR" },
+    { label: "Severe", value: "SEVERE" },
+    { label: "Catastrophic", value: "CATASTROPHIC" },
+  ],
+  likelihood: [
+    { label: "Remote", value: "REMOTE" },
+    { label: "Unlikely", value: "UNLIKELY" },
+    { label: "Possible", value: "POSSIBLE" },
+    { label: "Likely", value: "LIKELY" },
+    { label: "Almost certain", value: "ALMOST_CERTAIN" },
+  ],
+  repair_type: [
+    { label: "Temporary", value: "TEMPORARY" },
+    { label: "Permanent", value: "PERMANENT" },
+  ],
+  report_type: [
+    { label: "Incident Report", value: "INCIDENT" as const },
+    { label: "Injury Report", value: "INJURY" as const },
+  ],
+  risk_level: [
+    { label: "Very low", value: "VERY_LOW" },
+    { label: "Low", value: "LOW" },
+    { label: "Medium", value: "MEDIUM" },
+    { label: "High", value: "HIGH" },
+    { label: "Very high", value: "VERY_HIGH" },
+  ],
+  safe_working_practice: [
+    "Health and hygiene",
+    "Good housekeeping",
+    "Fitness, health and hygiene",
+    "Smoking",
+    "Avoiding the effects of fatigue (tiredness)",
+    "Working in hot or sunny climates and hot environments",
+    "Working in cold climates and environments",
+    "Risk from sharps",
+    "Head protection",
+    "Hearing protection",
+    "Face and eye protection",
+    "Respiratory protective equipment",
+    "Hand and foot protection",
+    "Protection from falls",
+    "Body protection",
+    "Protection against drowning",
+    "Gas cylinders",
+    "Pipelines",
+    "Portable fire extinguishers",
+    "Good manual-handling techniques",
+    "Drainage",
+    "Lighting",
+    "Guarding of openings",
+    "Watertight doors",
+    "Stairways, ladders and portable ladders",
+    "Shipboard vehicles",
+    "Working on deck while ship is at sea",
+    "Adverse weather",
+    "General advice to seafarers",
+    "Assessing exposure to noise",
+    "Mitigation: hand-arm vibration",
+    "Mitigation: whole-body vibration",
+    "Permit to work systems",
+    "Enclosed Space Entry",
+    "Portable ladders",
+    "Cradles and stages",
+    "Bosun's chair",
+    "Working from punts",
+    "Scaffolding",
+    "Hand tools",
+    "Electrical equipment",
+    "High or very low temperatures",
+    "Controls",
+    "Markings",
+    "Warnings",
+    "Portable power-operated tools and equipment",
+    "Workshop and bench machines (fixed installations)",
+    "Abrasive wheels",
+    "Hydraulic/pneumatic/high-pressure jetting equipment",
+    "Hydraulic jacks",
+    "Use of mobile work equipment",
+    "Carrying of seafarers on mobile work equipment",
+    "Overturning of fork-lift trucks",
+    "Self-propelled work equipment",
+    "Remote-controlled self-propelled work equipment",
+    "Drive units and power take-off shafts",
+    "Ropes and wires",
+    "Laundry equipment",
+    "Lifting Plant",
+    "Thorough examination of lifting equipment",
+    "Reports, records and marking of lifting equipment",
+    "Lifting operations",
+    "Use of winches and cranes",
+    "Use of derricks",
+    "Use of derricks in union purchase",
+    "Use of stoppers",
+    "Overhaul of cargo gear",
+    "Trucks and other vehicles/appliances",
+    "Personnel-lifting equipment, lifts",
+    "Maintenance and testing of lifts",
+    "Work in machinery spaces",
+    "Unmanned machinery spaces",
+    "Maintenance of machinery",
+    "Hydraulic and pneumatic equipment",
+    "Storage batteries: general",
+    "Storage batteries: lead acid",
+    "Storage batteries: alkaline",
+    "Carcinogens and mutagens",
+    "Safety nets",
+    "Use of Equipment",
+    "Access for pilots",
+    "Safe rigging of pilot ladder",
+    "Safe access to small craft",
+    "Slips, falls and tripping hazards",
+    "Galley stoves, steam boilers and deep fat fryers",
+    "Liquid petroleum gas appliances",
+    "Deep fat frying",
+    "Microwave ovens",
+    "Catering equipment",
+    "Knives, meat saws, choppers, etc.",
+    "Refrigerated rooms and store rooms",
+    "Painting",
+  ].map((label) => ({ label, value: label })),
+  yes_no: [
+    { label: "Yes", value: true },
+    { label: "No", value: false },
+  ],
+};
 
 const commonEmptyDraft: LossEvaluationDraft = {
   report_type: null,
@@ -99,19 +219,13 @@ function emptyWorkspace(): SafetyPhase8WorkspacePayload {
     ],
     blockers: ["loss_evaluation_not_saved"],
     choices: {
-      consequence: [],
-      likelihood: [],
-      repair_type: [],
-      report_type: [
-        { label: "Incident Report", value: "INCIDENT" },
-        { label: "Injury Report", value: "INJURY" },
-      ],
-      risk_level: [],
-      safe_working_practice: [],
-      yes_no: [
-        { label: "Yes", value: true },
-        { label: "No", value: false },
-      ],
+      consequence: lossEvaluationChoiceDefaults.consequence,
+      likelihood: lossEvaluationChoiceDefaults.likelihood,
+      repair_type: lossEvaluationChoiceDefaults.repair_type,
+      report_type: lossEvaluationChoiceDefaults.report_type,
+      risk_level: lossEvaluationChoiceDefaults.risk_level,
+      safe_working_practice: lossEvaluationChoiceDefaults.safe_working_practice,
+      yes_no: lossEvaluationChoiceDefaults.yes_no,
     },
     current_phase: 8,
     has_loss_evaluation: false,
@@ -130,16 +244,16 @@ function emptyWorkspace(): SafetyPhase8WorkspacePayload {
   };
 }
 
-function normalizeCode(value: unknown) {
-  return String(value ?? "").trim().toUpperCase();
-}
-
-function roleCanAct(role: string) {
-  return OFFICE_DECISION_ROLES.has(role);
-}
-
 function displayText(value: string | null | undefined) {
-  return String(value ?? "").trim();
+  return String(value ?? "");
+}
+
+function normalizeLossEvaluationError(caught: unknown) {
+  const message = getErrorMessage(caught);
+  if (/phase\s*6\s+action\s+check\s+is\s+available\s+after\s+phase\s*5\s+office\s+approval/i.test(message)) {
+    return null;
+  }
+  return message;
 }
 
 function decimalInputValue(value: string | null | undefined) {
@@ -149,6 +263,10 @@ function decimalInputValue(value: string | null | undefined) {
 function toOptionalString(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function toTextInputValue(value: string) {
+  return value === "" ? null : value;
 }
 
 function sumDecimalFields(draft: LossEvaluationDraft, fields: Array<keyof LossEvaluationDraft>) {
@@ -168,10 +286,52 @@ function mergeDraft(payload: SafetyIncidentLossEvaluation): LossEvaluationDraft 
   return merged;
 }
 
+function withFallbackOptions<T extends string | boolean>(
+  options: Array<SafetyLossEvaluationOption<T>> | undefined,
+  fallback: Array<SafetyLossEvaluationOption<T>>
+) {
+  return Array.isArray(options) && options.length > 0 ? options : fallback;
+}
+
+function normalizeWorkspacePayload(payload: SafetyPhase8WorkspacePayload): SafetyPhase8WorkspacePayload {
+  const fallback = emptyWorkspace();
+  const choices = payload.choices ?? fallback.choices;
+  return {
+    ...fallback,
+    ...payload,
+    blocker_details: payload.blocker_details ?? [],
+    blockers: payload.blockers ?? [],
+    choices: {
+      consequence: withFallbackOptions(choices.consequence, fallback.choices.consequence),
+      likelihood: withFallbackOptions(choices.likelihood, fallback.choices.likelihood),
+      repair_type: withFallbackOptions(choices.repair_type, fallback.choices.repair_type),
+      report_type: withFallbackOptions(choices.report_type, fallback.choices.report_type),
+      risk_level: withFallbackOptions(choices.risk_level, fallback.choices.risk_level),
+      safe_working_practice: withFallbackOptions(
+        choices.safe_working_practice,
+        fallback.choices.safe_working_practice
+      ),
+      yes_no: withFallbackOptions(choices.yes_no, fallback.choices.yes_no),
+    },
+    loss_evaluation: {
+      ...fallback.loss_evaluation,
+      ...(payload.loss_evaluation ?? {}),
+    },
+  };
+}
+
+function cleanDraftValue(value: unknown) {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
 function cleanPayload(draft: LossEvaluationDraft, reportType: SafetyLossEvaluationReportType) {
   const payload: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(draft)) {
-    payload[key] = value === "" ? null : value;
+    payload[key] = cleanDraftValue(value);
   }
   if (reportType === "INJURY") {
     payload.injury_total_estimated_cost = sumDecimalFields(draft, injuryCostFields);
@@ -202,13 +362,13 @@ function TextField({
       {multiline ? (
         <textarea
           className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-          onChange={(event) => onChange(toOptionalString(event.target.value))}
+          onChange={(event) => onChange(toTextInputValue(event.target.value))}
           value={displayText(value)}
         />
       ) : (
         <input
           className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-          onChange={(event) => onChange(toOptionalString(event.target.value))}
+          onChange={(event) => onChange(toTextInputValue(event.target.value))}
           value={displayText(value)}
         />
       )}
@@ -308,12 +468,9 @@ function Card({
 
 export function SafetyIncidentPhase8() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { role, user } = useAuth();
   const noticeRef = useRef<HTMLDivElement | null>(null);
   const [workspace, setWorkspace] = useState<SafetyPhase8WorkspacePayload>(emptyWorkspace());
   const [draft, setDraft] = useState<LossEvaluationDraft>(commonEmptyDraft);
-  const [closureReason, setClosureReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -329,20 +486,7 @@ export function SafetyIncidentPhase8() {
     setIsLoading(true);
     try {
       const payload = (await safetyApi.getIncidentPhase8Workspace(id)) as unknown as SafetyPhase8WorkspacePayload;
-      const normalizedPayload = {
-        ...emptyWorkspace(),
-        ...payload,
-        blocker_details: payload.blocker_details ?? [],
-        blockers: payload.blockers ?? [],
-        choices: {
-          ...emptyWorkspace().choices,
-          ...(payload.choices ?? {}),
-        },
-        loss_evaluation: {
-          ...emptyWorkspace().loss_evaluation,
-          ...(payload.loss_evaluation ?? {}),
-        },
-      };
+      const normalizedPayload = normalizeWorkspacePayload(payload);
       setWorkspace(normalizedPayload);
       const nextDraft = mergeDraft(normalizedPayload.loss_evaluation);
       if (normalizedPayload.has_loss_evaluation && !nextDraft.report_type) {
@@ -350,7 +494,7 @@ export function SafetyIncidentPhase8() {
       }
       setDraft(nextDraft);
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(normalizeLossEvaluationError(caught));
     } finally {
       setIsLoading(false);
     }
@@ -360,7 +504,6 @@ export function SafetyIncidentPhase8() {
     void reload();
   }, [reload]);
 
-  const currentRole = normalizeCode(user?.role || role || user?.safety_role_name || user?.role_name);
   const selectedReportType = draft.report_type;
   const reportTypeSelected = selectedReportType !== null;
   const isInjuryReport = selectedReportType === "INJURY";
@@ -369,7 +512,6 @@ export function SafetyIncidentPhase8() {
       ? "Injury Report"
       : "Incident Report"
     : "Choose report type";
-  const canClose = roleCanAct(currentRole);
   const incidentTotal = useMemo(() => sumDecimalFields(draft, incidentCostFields), [draft]);
   const injuryTotal = useMemo(() => sumDecimalFields(draft, injuryCostFields), [draft]);
   const safeWorkingPracticeOptions = useMemo(() => {
@@ -404,46 +546,17 @@ export function SafetyIncidentPhase8() {
         id,
         payload,
       )) as unknown as SafetyPhase8WorkspacePayload;
-      setWorkspace({
-        ...emptyWorkspace(),
-        ...response,
-        choices: {
-          ...emptyWorkspace().choices,
-          ...(response.choices ?? {}),
-        },
-        loss_evaluation: {
-          ...emptyWorkspace().loss_evaluation,
-          ...(response.loss_evaluation ?? {}),
-        },
-      });
-      const nextDraft = mergeDraft(response.loss_evaluation);
+      const normalizedResponse = normalizeWorkspacePayload(response);
+      setWorkspace(normalizedResponse);
+      const nextDraft = mergeDraft(normalizedResponse.loss_evaluation);
       if (!nextDraft.report_type) {
-        nextDraft.report_type = response.report_type;
+        nextDraft.report_type = normalizedResponse.report_type;
       }
       setDraft(nextDraft);
       setResultMessage("Loss Evaluation saved.");
       window.setTimeout(() => noticeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch (caught) {
-      setError(getErrorMessage(caught));
-      window.setTimeout(() => noticeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-    } finally {
-      setIsMutating(false);
-    }
-  }
-
-  async function closeIncident(event: FormEvent) {
-    event.preventDefault();
-    if (!id) {
-      return;
-    }
-    setIsMutating(true);
-    setError(null);
-    setResultMessage(null);
-    try {
-      await safetyApi.closeIncidentPhase8(id, { closure_reason: closureReason });
-      navigate("/safety/incidents");
-    } catch (caught) {
-      setError(getErrorMessage(caught));
+      setError(normalizeLossEvaluationError(caught));
       window.setTimeout(() => noticeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } finally {
       setIsMutating(false);
@@ -470,19 +583,6 @@ export function SafetyIncidentPhase8() {
         </section>
       ) : null}
 
-      <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Phase 7</p>
-        <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-950">Loss Evaluation</h1>
-            <p className="mt-3 text-sm text-slate-600">{reportLabel}</p>
-          </div>
-          <span className="w-fit rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
-            {workspace.has_loss_evaluation ? "Saved" : "Not saved"}
-          </span>
-        </div>
-      </header>
-
       <form className="space-y-6" onSubmit={saveLossEvaluation}>
         <Card eyebrow="Report Type" title="What are you recording?">
           <FieldGrid>
@@ -494,9 +594,6 @@ export function SafetyIncidentPhase8() {
               value={draft.report_type}
             />
           </FieldGrid>
-          <p className="mt-3 text-sm text-slate-600">
-            Select Incident Report or Injury Report first. The form below will change based on this choice.
-          </p>
         </Card>
 
         {reportTypeSelected ? (
@@ -812,35 +909,6 @@ export function SafetyIncidentPhase8() {
           type="submit"
         >
           {isMutating ? "Saving..." : "Save Loss Evaluation"}
-        </button>
-      </form>
-
-      <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={closeIncident}>
-        <h2 className="text-xl font-semibold text-slate-950">Close Incident</h2>
-        {!canClose ? (
-          <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Office role is required to close the incident.
-          </p>
-        ) : null}
-        {!workspace.ready_for_close ? (
-          <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Save Loss Evaluation before closing.
-          </p>
-        ) : null}
-        <label className="mt-4 block text-sm font-medium text-slate-700">
-          Closing note
-          <textarea
-            className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 p-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-            onChange={(event) => setClosureReason(event.target.value)}
-            value={closureReason}
-          />
-        </label>
-        <button
-          className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400"
-          disabled={isMutating || !canClose || !workspace.ready_for_close || !closureReason.trim()}
-          type="submit"
-        >
-          {isMutating ? "Closing..." : "Close Incident"}
         </button>
       </form>
 

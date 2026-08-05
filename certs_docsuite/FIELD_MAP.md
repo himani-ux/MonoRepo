@@ -1,4 +1,4 @@
-﻿# VIMS Certificates Module â€” Field Map (DB â†’ API â†’ UI Trace)
+# VIMS Certificates Module â€” Field Map (DB â†’ API â†’ UI Trace)
 
 > **Version:** 1.2
 > **Last Updated:** 2026-06-24 (v1.2a â€” Phase 0.4 transcribed `vims_certs_settings` field rows after migration implementation. v1.2 â€” B-FM-01..05 RESOLVED: NEWSEQUENTIALID per D-AUDRS-271, ORM auto_now\*/request.user write path, `vims_jobs` retention role, 5y-rolling blanket retention, settings = structured single-row. v1.1 â€” KLOSS Step 2 realignment: naming rule; Â§22 renumber; new Â§23â€“Â§26; 11-check audit. v1.0: 2026-05-13)
@@ -65,7 +65,7 @@ Each `vims_certs_*` table gets one section. Each row in the section is one DB co
 |--------|---------|-----------|--------------|-----------------|--------|-------|
 | section_id | `id` | `CatalogSidebar` | `/certs/catalog` | All Cert roles | âœ… | URL parameter |
 | section_code | `code` | `CatalogSidebar`, `CertVesselDashboard.SectionAccordion` | `/certs/catalog`, `/certs/vessels/<imo>` | All Cert roles | âœ… | Used as accordion key |
-| display_name | `displayName` | `CatalogSidebar`, `CertVesselDashboard.SectionAccordion`, `PrintBuilder.ScopeFilters` | `/certs/catalog`, `/certs/vessels/<imo>`, `/certs/print` | All Cert roles | âœ… | Sidebar label, accordion header |
+| display_name | `displayName` | `CatalogSidebar`, `CertVesselDashboard.SectionAccordion`, `PrintCertsStatus.CertificateList`, `ShareBundle.SectionList` | `/certs/catalog`, `/certs/vessels/<imo>`, `/certs/print`, `/certs/share-bundle` | All Cert roles | âœ… | Sidebar label, accordion header, print/share section choice |
 | sort_order | `sortOrder` | (sort param only) | â€” | â€” | ðŸ”§ | Server-side sort key; not displayed |
 | created_at, created_by | â€” | â€” | â€” | â€” | ðŸ”§ | Audit trail; reachable via `/certs/audit-log` filtered query, not directly rendered on this entity |
 
@@ -78,21 +78,21 @@ Each `vims_certs_*` table gets one section. Each row in the section is one DB co
 | catalog_id | `id` | `CatalogTable.row`, `CatalogRowDetail` | `/certs/catalog`, `/certs/catalog/<id>` | All Cert read; DPA write | âœ… | URL param |
 | canonical_code | `canonicalCode` | `CatalogTable.col`, `CatalogRowDetail.header`, `CertCard.codeChip` | `/certs/catalog`, `/certs/catalog/<id>`, `/certs/vessels/<imo>/cert/<id>` | All Cert | âœ… | Immutable post-creation |
 | section_id | `sectionId` | `CatalogTable.col` (joined to section name), sidebar grouping | `/certs/catalog` | All Cert | âœ… | Joined to `section.display_name` |
-| display_name | `displayName` | `CatalogTable.col`, `CatalogRowDetail`, `CertCard.title`, `GapFillForm.certTypeDropdown`, `PrintBuilder` | most screens | All Cert | âœ… | Primary human label |
-| short_name | `shortName` | `CertCard.acronymChip`, `PrintBuilder.compactView` | `/certs/vessels/<imo>`, `/certs/print` | All Cert | âœ… | Optional; hidden if null |
-| print_section_label | `printSectionLabel` | `PrintArtifactPdfTemplate` (server-side renderer) | print PDF output | DPA edit | âœ… | Renders into print artifact, not interactive UI |
+| display_name | `displayName` | `CatalogTable.col`, `CatalogRowDetail`, `CertCard.title`, `GapFillForm.certTypeDropdown`, `PrintCertsStatus.CertificateList` | most screens | All Cert | âœ… | Primary human label |
+| short_name | `shortName` | `CertCard.acronymChip`, `PrintCertsStatus.compactView` | `/certs/vessels/<imo>`, `/certs/print` | All Cert | âœ… | Optional; hidden if null |
+| print_section_label | `printSectionLabel` | `CatalogRowDetail`, `PrintArtifactPdfTemplate` (server-side renderer) | `/certs/catalog/<id>`, print PDF output | DPA edit | âœ… | Catalog editor shows existing section/label dropdown choices when available and falls back to text entry otherwise |
 | validity_type | `validityType` | `CatalogRowDetail.metadata`, `TrackedItemDetail.metadataPanel` | several | All Cert | âœ… | Enum dropdown in editor; not printed inside normal visible PDFs per D-CERT-202 |
-| cadence_months | `cadenceMonths` | `CatalogRowDetail`, `TrackedItemDetail.metadataPanel` | `/certs/catalog/<id>`, `/certs/vessels/<imo>/cert/<id>` | All Cert | âœ… | Numeric input |
+| cadence_months | `cadenceMonths` | `CatalogRowDetail`, `TrackedItemDetail.metadataPanel` | `/certs/catalog/<id>`, `/certs/vessels/<imo>/cert/<id>` | All Cert | âœ… | Catalog editor uses clean numeric entry and disables it for permanent rows |
 | cadence_custom_days | `cadenceCustomDays` | `CatalogRowDetail` (conditional render when type = custom_days) | `/certs/catalog/<id>` | DPA edit | âœ… | |
 | issuing_authority_type | `issuingAuthorityType` | `CatalogRowDetail`, `GapFillForm` | several | DPA edit | âœ… | Enum dropdown |
 | is_class_tracked | `isClassTracked` | `CatalogRowDetail`, `CertVesselDashboard.filterChip`, `CertCard.classTrackedBadge`, `ReconciliationEngine` (server logic) | several | All Cert | âœ… | Boolean toggle |
-| submission_scope | `submissionScope` | `CatalogRowDetail`, `TrackedItemDetail.workflowPanel` (gates buttons) | `/certs/catalog/<id>`, `/certs/vessels/<imo>/cert/<id>` | All Cert | âœ… | Drives RBAC for submit/approve buttons |
+| submission_scope | `submissionScope` | `CatalogRowDetail`, `TrackedItemDetail.workflowPanel` (gates buttons) | `/certs/catalog/<id>`, `/certs/vessels/<imo>/cert/<id>` | All Cert | âœ… | Dropdown in catalog editor; drives RBAC for submit/approve buttons |
 | parent_id | `parentId` | `CatalogTable` (indented child row), `CatalogRowDetail.parentBreadcrumb`, `CertCard.parentBreadcrumb`, `PrintArtifactPdfTemplate.subnumbering` | several | All Cert | âœ… | UI 2-level cap per D-CERT-010 |
 | relationship_type_default | `relationshipTypeDefault` | `CatalogRowDetail.metadata` | `/certs/catalog/<id>` | DPA edit | âœ… | |
 | applicable_ship_types | `applicableShipTypes` | `CatalogRowDetail.shipTypeMultiselect`, `OnboardingWizard.step2.preview` (count of pre-pop rows) | `/certs/catalog/<id>`, `/certs/onboarding/<imo>` | DPA edit | âœ… | JSON array â†’ multi-select chips |
 | mandatory_for_all_vessels | `mandatoryForAllVessels` | `CatalogRowDetail`, `CoverageBanner` (drives D-CERT-119 calculation) | `/certs/catalog/<id>`, `/certs/vessels/<imo>` | All Cert | âœ… | |
 | applicability_mode | `applicabilityMode` | `CatalogRowDetail` (toggles specific_vessel_ids picker) | `/certs/catalog/<id>` | DPA edit | âœ… | |
-| specific_vessel_ids | `specificVesselIds` | `CatalogRowDetail.vesselPicker` (conditional) | `/certs/catalog/<id>` | DPA edit | âœ… | |
+| specific_vessel_ids | `specificVesselIds` | `CatalogRowDetail.vesselPicker` (conditional) | `/certs/catalog/<id>` | DPA edit | âœ… | User selects vessel names; API stores UUID list |
 | parent_supports_dynamic_children | `parentSupportsDynamicChildren` | `CatalogRowDetail.flagBadge`, `OnboardingWizard.gapFill.addInstanceButton`, `CertVesselDashboard.addInstanceButton` | several | All Cert | âœ… | Drives "Add another instance" UX |
 | age_gate_max_years | `ageGateMaxYears` | `CatalogRowDetail`, nightly recompute job | `/certs/catalog/<id>` | DPA edit | âœ… | E.g. 15 for IWS |
 | retain_all_versions | `retainAllVersions` | `CatalogRowDetail`, retention sweeper | `/certs/catalog/<id>` | DPA edit | âœ… | CSR override flag |
@@ -204,8 +204,8 @@ This is the largest table; every column matters.
 | snapshot_id | `id` | `SnapshotListTable.row`, `ReconciliationRunCard` | `/certs/reconciliation` | Per RBAC | âœ… | |
 | vessel_id | `vesselId` | joined to vessel name in `SnapshotListTable.col` | `/certs/reconciliation` | Per RBAC | âœ… | |
 | class_society | `classSociety` | `SnapshotListTable.col`, `ReconciliationRunCard.chip` | several | Per RBAC | âœ… | |
-| pdf_blob_id | `pdfBlobId` | `SnapshotDetailScreen.openOriginalButton` (per D-CERT-148) | snapshot detail, `/certs/reconciliation/<run_id>` | Per RBAC | âœ… | Always retained per D-CERT-020 |
-| printed_on_date | `printedOnDate` | `SnapshotListTable.col` (default sort), `ReconciliationRunCard.dateChip` | several | Per RBAC | âœ… | |
+| pdf_blob_id | `pdfBlobId` | `SnapshotDetailScreen.openOriginalButton`, `VesselDashboard.openClassStatusPdf`, `ReconciliationReviewHeader.openClassReportButton`, `MasterMessageCard.openClassStatusPdf` (per D-CERT-148) | snapshot detail, `/certs/vessels/<imo>`, `/certs/reconciliation/<run_id>`, `/certs/master-messages` | Per RBAC | âœ… | Always retained per D-CERT-020; streamed via `/api/certs/class-snapshots/<id>/pdf/view/` |
+| printed_on_date | `printedOnDate` | `SnapshotListTable.col` (default sort), `ReconciliationRunCard.dateChip`, vessel dashboard class-report age, upload fallback field | several | Per RBAC | âœ… | Parser-derived from the PDF's printed/generated date, or manually entered from the PDF when parser date extraction fails; upload-time fallback is never allowed |
 | uploaded_by, uploaded_at | `uploadedBy`, `uploadedAt` | `SnapshotListTable.col` | `/certs/reconciliation` | Per RBAC | âœ… | |
 | parser_version | `parserVersion` | `SnapshotDetailScreen.metadata`, `ReconciliationRunCard.parserVersionBadge`, ParserOpsPage | several; ParserOps = Tech Sup'tt only | Per RBAC; Tech Sup'tt | âœ… | |
 | parse_status | `parseStatus` | `SnapshotListTable.statusBadge`, `SnapshotDetailScreen.statusBanner` | `/certs/reconciliation` | Per RBAC | âœ… | enum: success / partial / failed / pending |
@@ -225,7 +225,7 @@ This is the largest table; every column matters.
 | Column | API key | Component | Screen route | Role visibility | Status | Notes |
 |--------|---------|-----------|--------------|-----------------|--------|-------|
 | run_id | `id` | `ReconciliationDashboard.row`, `ReconciliationReviewScreen` | `/certs/reconciliation`, `/certs/reconciliation/<run_id>` | Per RBAC | âœ… | |
-| snapshot_id | `snapshotId` | `ReconciliationRunCard.snapshotLink` | several | Per RBAC | âœ… | |
+| snapshot_id | `snapshotId` | `ReconciliationRunCard.snapshotLink`, class report PDF link | several | Per RBAC | âœ… | Drives office and vessel-side uploaded Class Status PDF view links |
 | ran_at | `ranAt` | `ReconciliationDashboard.col` | `/certs/reconciliation` | Per RBAC | âœ… | |
 | matches_count, mismatches_count, missing_in_catalog_count, missing_in_class_count, conditional_stc_detected_count, extended_postponed_detected_count, unmapped_low_confidence_count | `matchesCount`, `mismatchesCount`, etc. | `ReconciliationDashboard.bucketCounts`, `ReconciliationReviewScreen.tabBadges`, `DashboardKpiCards.mismatchKpi` | several | Per RBAC | âœ… | |
 | flags_json | (loaded as separate `vims_certs_reconciliation_flag` rows) | â€” | â€” | â€” | ðŸ”§ | Aggregated for dashboard; per-flag detail via separate endpoint |
@@ -241,11 +241,11 @@ This is the largest table; every column matters.
 |--------|---------|-----------|--------------|-----------------|--------|-------|
 | flag_id | `id` | `ReconciliationReviewScreen.tabRow` | `/certs/reconciliation/<run_id>` | Per RBAC | âœ… | |
 | run_id | `runId` | (URL context) | same | Per RBAC | âœ… | |
-| bucket | `bucket` | `ReconciliationReviewScreen.tabRoute` | same | Per RBAC | âœ… | Drives which tab the flag appears in |
+| bucket | `bucket` | `ReconciliationReviewScreen.tabRoute` | same | Per RBAC | âœ… | Drives which tab the flag appears in; includes `conditions_of_class` only for parser-normalized rows from exact Condition of Class / Conditions of Class sections |
 | catalog_id | `catalogId` | `ReconciliationReviewPanel.diffPanel.catalogSide` | same | Per RBAC | âœ… | Joined to catalog.display_name |
 | tracked_item_id | `trackedItemId` | `ReconciliationReviewPanel.diffPanel.trackedItemSide` | same | Per RBAC | âœ… | Click â†’ cert detail |
-| class_row_extract_json | `classRowExtract` | `ReconciliationReviewPanel.diffPanel.classSide` | same | Per RBAC | âœ… | |
-| diff_json | `diff` | `ReconciliationReviewPanel.diffPanel.diffHighlight` | same | Per RBAC | âœ… | |
+| class_row_extract_json | `classRowExtract` | `ReconciliationReviewPanel.diffPanel.classSide` | same | Per RBAC | âœ… | Condition flags include condition ID, section, due/issued date when present, and source text |
+| diff_json | `diff` | `ReconciliationReviewPanel.diffPanel.diffHighlight`, `MasterMessageCard.diffTable` | same and `/certs/master-messages` | Per RBAC | âœ… | Display unwraps VIMS-side and class-side values into readable text instead of raw JSON |
 | reviewed_by, reviewed_at | `reviewedBy`, `reviewedAt` | `ReconciliationReviewPanel.row.reviewerChip` | same | Per RBAC | âœ… | |
 | resolution_action | `resolutionAction` | `ReconciliationReviewPanel.row.actionBadge` | same | Per RBAC | âœ… | enum |
 | resolved_at | `resolvedAt` | `ReconciliationReviewPanel.row` | same | Per RBAC | âœ… | |
@@ -314,7 +314,7 @@ This is the largest table; every column matters.
 | Column | API key | Component | Screen route | Role visibility | Status | Notes |
 |--------|---------|-----------|--------------|-----------------|--------|-------|
 | notification_id | `id` | `NotificationInbox.row`, `TrackedItemDetail.notificationsDrawer` | `/notifications`, `/certs/vessels/<imo>/cert/<id>` | Self / Per RBAC | âœ… | |
-| master_notification_id | `masterNotificationId` | (joined for body content) | `/notifications` | Self | âœ… | Cross-table join |
+| master_notification_id | `masterNotificationId` | (joined for body content) | `/notifications` | Self | âœ… | Cross-table join to `master_notification.id`; CR-111 / D-CERT-203 adds missing nullable Certs columns to that shared table instead of changing this metadata link |
 | trigger_event | `triggerEvent` | `NotificationInbox.row.eventChip`, `TrackedItemDetail.notificationsDrawer` | several | Self | âœ… | |
 | cert_row_id | `certRowId` | `NotificationInbox.row.deepLink` | `/notifications` | Self | âœ… | Click â†’ cert detail |
 | vessel_id | `vesselId` | `NotificationInbox.row.vesselChip` | `/notifications` | Self | âœ… | |
@@ -336,21 +336,21 @@ This is the largest table; every column matters.
 
 | Column | API key | Component | Screen route | Role visibility | Status | Notes |
 |--------|---------|-----------|--------------|-----------------|--------|-------|
-| print_id | `id` | `PrintHistoryTable.row`, share/email subject, download filename | `/certs/print/history`, email, downloads | Per RBAC | âœ… | (D-CERT-128, D-CERT-202) single-vessel format `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel format `SQE-S633-FLEET-<yyyymmdd>-<seq>`; not printed inside normal visible PDFs |
-| scope | `scope` | `PrintHistoryTable.col`, `PrintBuilder.scopeChip` | several | Per RBAC | âœ… | |
+| print_id | `id` | `PrintHistoryTable.row`, share/email subject, download filename | `/certs/print/history`, email, downloads | Per RBAC | âœ… | (D-CERT-128, D-CERT-202, D-CERT-212) single-vessel format `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel format `SQE-S633-FLEET-<yyyymmdd>-<seq>`; not printed inside normal visible PDFs or Excel workbooks |
+| scope | `scope` | `PrintHistoryTable.col`, `PrintHistoryTable.scopeChip` | several | Per RBAC | âœ… | Stored for artifact history/API; not printed as a row inside normal visible Excel workbooks per D-CERT-212. |
 | vessels_json | `vessels` | `PrintHistoryTable.col`, contextual vessel scope from vessel dashboard or ship-side login | several | Per RBAC | âœ… | Vessel-scoped print/share actions do not show a vessel dropdown; the selected/logged-in vessel is submitted internally. |
-| sections_json | `sections` | `PrintHistoryTable.col` | `/certs/print/history` | Per RBAC | âœ… | |
-| filters_json | `filters` | `PrintHistoryTable.row.filterDrawer` | `/certs/print/history` | Per RBAC | âœ… | |
-| custom_cert_ids_json | `customCertIds` | `PrintHistoryTable.row.detailsDrawer` | `/certs/print/history` | Per RBAC | âœ… | |
+| sections_json | `sections` | `PrintHistoryTable.col` | `/certs/print/history` | Per RBAC | ✅ | Normal Print certs status stores one selected section or empty for All sections; Share Bundle stores selected certificate sections. |
+| filters_json | `filters` | `PrintHistoryTable.row.filterDrawer` | `/certs/print/history` | Per RBAC | ✅ | Normal Print certs status submits `{}`; older/backend-compatible artifact requests may still store filters. |
+| custom_cert_ids_json | `customCertIds` | `PrintHistoryTable.row.detailsDrawer` | `/certs/print/history` | Per RBAC | ✅ | Backend-compatible custom certificate IDs remain accepted, but normal Print certs status and Share Bundle UI submit an empty list because users select sections. |
 | user_id, user_role | `userId`, `userRole` | `PrintHistoryTable.col`, `PrintArtifactPdfTemplate.printedByLine` | several | Per RBAC; FM dashboard for high-volume surfacing | âœ… | (D-CERT-128, D-CERT-143, D-CERT-202); visible normal PDF label is `Printed by` |
 | timestamp_utc | `timestampUtc` | `PrintHistoryTable.col` | several | Per RBAC | âœ… | Stored for history/audit; not printed inside normal visible PDFs per D-CERT-202 |
-| system_state_hash | `systemStateHash` | `PrintHistoryTable.row`, audit metadata | `/certs/print/history`, audit log | Per RBAC | âœ… | (D-CERT-128, D-CERT-202) stored for artifact identity; not printed inside normal visible PDFs |
-| watermark_applied | `watermarkApplied` | `PrintHistoryTable.watermarkBadge`, `PrintArtifactPdfTemplate.bottomRightWatermark` | several | Per RBAC | âœ… | When selected for normal print PDF, prints the watermark label at the bottom-right of each page |
-| watermark_recipient | `watermarkRecipient` | `PrintBuilder.watermarkRecipient`, share/email metadata | print/share generation | Per RBAC | âœ… | Stored for request metadata where supplied; not printed inside normal visible PDFs per D-CERT-202 |
+| system_state_hash | `systemStateHash` | `PrintHistoryTable.row`, audit metadata | `/certs/print/history`, audit log | Per RBAC | âœ… | (D-CERT-128, D-CERT-202, D-CERT-212) stored for artifact identity; not printed inside normal visible PDFs or Excel workbooks |
+| watermark_applied | `watermarkApplied` | `PrintHistoryTable.watermarkBadge`, `PrintArtifactPdfTemplate.bottomRightWatermark` | several | Per RBAC | ✅ | Normal Print certs status submits `NONE`; Share Bundle, auditor export, and backend-compatible paths may still set artifact watermark metadata. |
+| watermark_recipient | `watermarkRecipient` | share/email metadata | print/share generation | Per RBAC | ✅ | No normal print input; stored for request metadata where supplied and not printed inside normal visible PDFs per D-CERT-202. |
 | pdf_blob_id | `pdfBlobId`, `downloadUrls.pdf` | `PrintHistoryTable.downloadPdfButton`, print result download button | `/certs/print/history`, print result page | Per RBAC | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/pdf/`; raw storage path is never sent to the browser. |
 | excel_blob_id | `excelBlobId`, `downloadUrls.excel` | `PrintHistoryTable.downloadExcelButton`, print result download button | several | Per RBAC | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/excel/`; audit-log exports label this secondary file as CSV. |
 | bundle_zip_blob_id | `bundleZipBlobId`, `downloadUrls.zip` | `PrintHistoryTable.downloadBundleButton`, share-bundle result download button | `/certs/print/history`, share-bundle result | Master / DPA / FM | âœ… | Download goes through `/api/certs/print/artifacts/<print_id>/download/zip/`. |
-| recipient_email | `recipientEmail` | `PrintHistoryTable.recipientCol`, print/share result email status | `/certs/print/history`, print/share result page | Per RBAC | âœ… | Non-empty value triggers email delivery after generation using existing platform/Circular SMTP settings. |
+| recipient_email | `recipientEmail` | `PrintHistoryTable.recipientCol`, print/share result email status | `/certs/print/history`, print/share result page | Per RBAC | ✅ | No normal Print certs status input; non-empty share/backend-compatible requests trigger email delivery after generation using existing platform/Circular SMTP settings. |
 | (API-derived) | `emailDeliveryStatus`, `emailDeliveryMessage` | `PrintArtifactResult.emailStatus` | print/share result page | Actor only at generation response | âœ… | Immediate response field; send result is also stored in audit metadata for the generation action. |
 | page_count | `pageCount` | `PrintHistoryTable.col` | `/certs/print/history` | Per RBAC | âœ… | |
 | generation_status | `generationStatus` | `PrintHistoryTable.statusBadge` | `/certs/print/history` | Per RBAC | âœ… | |
@@ -673,12 +673,13 @@ When all 11 checks pass, FIELD_MAP is GREEN and the COVERAGE audit can include "
 | `nextDueDate` | Same tuple (**persisted-derived**) | Third element of `(window_open, window_close, next_due_date)` | Same + nightly status-flip cron |
 | `status` | tracked_item.status (**hybrid**) | Read-time computed EXCEPT sticky stored states: `superseded`, `expired_at_onboarding`, `pending_first_upload`, `invalid_due_to_reflag`, `pending_supersession` (Â§4). Inputs: window/expiry/next_due/postponed vs today | Read time; hourly + nightly crons |
 | `classRowExtract` | reconciliation_flag.class_row_extract_json (**persisted-derived**) | Denormalized matching row from snapshot.parsed_payload_json, written by reconciliation engine | New run only â€” immutable per run |
-| `diff` | reconciliation_flag.diff_json (**persisted-derived**) | Per-field catalog-vs-class diff computed during bucketing | New run only |
+| `conditions_of_class[]` | class_status_snapshot.parsed_payload_json (**persisted-derived**) then reconciliation_flag.class_row_extract_json | Parser-normalized rows from exact Condition of Class / Conditions of Class sections in NK/KR/BV reports; KR Actionable Note / Statutory Condition, NK installation/statutory survey conditions, and BV memoranda are not included | New parser run only |
+| `diff` | reconciliation_flag.diff_json (**persisted-derived**) | Per-field catalog-vs-class diff computed during bucketing; UI unwraps nested tracked/catalog/class values into plain text | New run only |
 | `changes[]` | cert_change_log rows (**API-only**) | Aggregation of field_name/old_value/new_value/source_module/version_after into per-cert history (Â§22, `CertChangeHistoryDrawer` âš  build-time) | On read; rows appended transactionally per write |
 | Blob download endpoints/URLs | pdf_blob.blob_storage_path (**API-only**) | Raw storage path never sent; authenticated endpoint or signed URL minted per request (Â§5) | Every request |
 | Mandatory coverage % | `services/coverage.py` (**API-only**) | `compute_mandatory_coverage(vessel_id)` from `mandatory_for_all_vessels` rows vs tracked items; drives onboarding step-6 gate + `CoverageBanner` (D-CERT-119) | Read time; override stores reason on vessel_config |
 | `vessel_acked` | notification_meta ack fields (**API-only**) | Office dashboard derives yes/no from vessel-side copy ack â€” independent ack model (D-CERT-087) | Read time; flips on vessel ack |
-| `systemStateHash` | `services/system_state_hash.py` â†’ print_artifact (**persisted-derived**) | 8-char hash of vessel cert state for print identifiability (D-CERT-128); stored in artifact/audit/history, not printed inside normal visible PDFs per D-CERT-202 | Once at generation; immutable |
+| `systemStateHash` | `services/system_state_hash.py` â†’ print_artifact (**persisted-derived**) | 8-char hash of vessel cert state for print identifiability (D-CERT-128); stored in artifact/audit/history, not printed inside normal visible PDFs or Excel workbooks per D-CERT-202/D-CERT-212 | Once at generation; immutable |
 | `print_id` | print_artifact PK (**persisted-derived**) | Single-vessel: `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel: `SQE-S633-FLEET-<yyyymmdd>-<seq>` (D-CERT-128; B-PRT-01 resolved 2026-06-29) | Once at generation |
 | `scheduledDeleteAt` | pdf_blob (**persisted-derived**) | From retention_policy + supersession (Â§3.5) | Supersession; DPA retention override (D-CERT-021) |
 | `idempotency_key` | notification_meta (**persisted-derived**) | `(cert_row_id, cadence, sent_date)` at dispatch (D-CERT-174) | Once per dispatch attempt |

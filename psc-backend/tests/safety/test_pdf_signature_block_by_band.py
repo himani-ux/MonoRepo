@@ -19,26 +19,14 @@ class IncidentPdfSignatureBandTests(unittest.TestCase):
     def setUp(self) -> None:
         recreate_incident_table()
 
-    def test_signature_rows_follow_risk_band_contract(self) -> None:
+    def test_signature_rows_are_not_risk_band_specific(self) -> None:
         cases = [
-            (
-                Incident.RiskBand.GREEN,
-                ["Reporter signature", "Master signature", "HOD signature", "PIC closer signature"],
-                ["DPA signature", "FM signature"],
-            ),
-            (
-                Incident.RiskBand.YELLOW,
-                ["Reporter signature", "Master signature", "HOD signature", "DPA signature"],
-                ["PIC closer signature", "FM signature"],
-            ),
-            (
-                Incident.RiskBand.RED,
-                ["Reporter signature", "Master signature", "HOD signature", "DPA signature", "FM signature"],
-                ["PIC closer signature"],
-            ),
+            Incident.RiskBand.GREEN,
+            Incident.RiskBand.YELLOW,
+            Incident.RiskBand.RED,
         ]
 
-        for index, (band, expected_rows, unexpected_rows) in enumerate(cases, start=1):
+        for index, band in enumerate(cases, start=1):
             with self.subTest(risk_band=band):
                 incident = Incident.objects.create(
                     incident_number=f"KSM-INC-2026-00{index}",
@@ -55,23 +43,12 @@ class IncidentPdfSignatureBandTests(unittest.TestCase):
                     updated_by="rep-7",
                     schema_version=1,
                 )
-                if band == Incident.RiskBand.GREEN:
-                    incident.dpa_accepted_by = "pic-7"
-                    incident.dpa_accepted_at = datetime.fromisoformat("2026-04-28T08:00:00+00:00")
-                elif band == Incident.RiskBand.YELLOW:
-                    incident.dpa_accepted_by = "dpa-7"
-                    incident.dpa_accepted_at = datetime.fromisoformat("2026-04-28T08:00:00+00:00")
-                else:
-                    incident.dpa_accepted_by = "dpa-7"
-                    incident.dpa_accepted_at = datetime.fromisoformat("2026-04-28T08:00:00+00:00")
-                    incident.fm_approved_by = "fm-7"
-                    incident.fm_approved_at = datetime.fromisoformat("2026-04-28T09:00:00+00:00")
+                incident.dpa_accepted_by = "pic-or-dpa-7"
+                incident.dpa_accepted_at = datetime.fromisoformat("2026-04-28T08:00:00+00:00")
                 incident.save(
                     update_fields=[
                         "dpa_accepted_by",
                         "dpa_accepted_at",
-                        "fm_approved_by",
-                        "fm_approved_at",
                     ]
                 )
 
@@ -82,7 +59,10 @@ class IncidentPdfSignatureBandTests(unittest.TestCase):
                 )
                 text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(result.content)).pages)
 
-                for label in expected_rows:
+                for label in [
+                    "Reporter signature",
+                    "PIC / DPA office",
+                ]:
                     self.assertIn(label, text)
-                for label in unexpected_rows:
+                for label in ["Master signature", "HOD signature", "PIC closer signature", "FM signature"]:
                     self.assertNotIn(label, text)

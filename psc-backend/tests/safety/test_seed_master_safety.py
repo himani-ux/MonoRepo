@@ -36,7 +36,10 @@ TABLE_DDL = (
         category_name TEXT NOT NULL,
         subcode_id TEXT NOT NULL,
         subcode_description TEXT NOT NULL,
-        cause_type TEXT NOT NULL
+        cause_type TEXT NOT NULL,
+        active INTEGER NOT NULL,
+        seeded_version TEXT NOT NULL,
+        schema_version INTEGER NOT NULL
     )
     """,
     """
@@ -47,7 +50,10 @@ TABLE_DDL = (
         category_name TEXT NOT NULL,
         subcode_id TEXT NOT NULL,
         subcode_description TEXT NOT NULL,
-        cause_type TEXT NOT NULL
+        cause_type TEXT NOT NULL,
+        active INTEGER NOT NULL,
+        seeded_version TEXT NOT NULL,
+        schema_version INTEGER NOT NULL
     )
     """,
     """
@@ -56,7 +62,9 @@ TABLE_DDL = (
         legacy_int_id INTEGER UNIQUE,
         loss_type_id INTEGER NOT NULL,
         loss_type_name TEXT NOT NULL,
-        description TEXT NOT NULL
+        description TEXT NOT NULL,
+        active INTEGER NOT NULL,
+        seeded_version TEXT NOT NULL
     )
     """,
     """
@@ -166,7 +174,7 @@ class SafetySeedMasterCommandTests(unittest.TestCase):
         self.assertEqual(self._count_rows("master_soi_area"), 13)
         self.assertEqual(self._count_rows("master_soi_area_item"), 329)
         self.assertEqual(self._count_rows("master_soi_checklist_version"), 1)
-        self.assertEqual(self._count_rows("master_safety_incident_type"), 11)
+        self.assertEqual(self._count_rows("master_safety_incident_type"), 32)
         self.assertEqual(self._count_rows("master_safety_bias_guard"), 8)
 
     def test_seed_master_safety_is_idempotent_on_rerun(self) -> None:
@@ -179,5 +187,5 @@ class SafetySeedMasterCommandTests(unittest.TestCase):
         self.assertEqual(self._count_rows("master_soi_area"), 13)
         self.assertEqual(self._count_rows("master_soi_area_item"), 329)
         self.assertEqual(self._count_rows("master_soi_checklist_version"), 1)
-        self.assertEqual(self._count_rows("master_safety_incident_type"), 11)
+        self.assertEqual(self._count_rows("master_safety_incident_type"), 32)
         self.assertEqual(self._count_rows("master_safety_bias_guard"), 8)

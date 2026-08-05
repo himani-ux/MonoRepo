@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from django.core.exceptions import SuspiciousFileOperation
 from django.db import transaction
+from django.http import FileResponse
+from django.utils.text import get_valid_filename
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.certs.permissions import (
     RECONCILIATION_FORM_ID,
     RECONCILIATION_UPLOAD_PROCESS_ID,
+    TRACKED_ITEM_FORM_ID,
     HasReconciliationReadPermission,
     has_request_certs_perm,
     is_reconciliation_uploader,
@@ -22,13 +26,20 @@ from apps.certs.serializers.snapshot import (
 )
 from apps.certs.services.audit_log import record_audit_event, resolve_actor_id
 from apps.certs.services.pdf_blob_repository import PdfBlobRepository
-from apps.certs.services.pdf_blob_storage import save_uploaded_class_snapshot_pdf
+from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path, save_uploaded_class_snapshot_pdf
 from apps.certs.services.snapshot_repository import ClassSnapshotRepository
 
 
 repository = ClassSnapshotRepository()
 pdf_repository = PdfBlobRepository()
 MAX_CLASS_SNAPSHOT_UPLOAD_BYTES = 50 * 1024 * 1024
+
+
+class HasClassSnapshotPdfReadPermission(BasePermission):
+    message = "You do not have access to this class status PDF."
+
+    def has_permission(self, request, view) -> bool:
+        return has_request_certs_perm(request, RECONCILIATION_FORM_ID) or has_request_certs_perm(request, TRACKED_ITEM_FORM_ID)
 
 
 class ClassSnapshotListCreateView(generics.GenericAPIView):
@@ -116,6 +127,34 @@ class ClassSnapshotDetailView(generics.GenericAPIView):
         if not user_can_access_vessel(request.user, str(snapshot.get("vessel_id"))):
             return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
         return Response(serialize_class_snapshot(snapshot))
+
+
+class ClassSnapshotPdfInlineView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, HasClassSnapshotPdfReadPermission]
+
+    def get(self, request, snapshot_id: str, *args, **kwargs):
+        snapshot = repository.get_snapshot(str(snapshot_id))
+        if snapshot is None:
+            return Response({"detail": "Class snapshot not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not user_can_access_vessel(request.user, str(snapshot.get("vessel_id"))):
+            return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
+
+        blob_id = str(snapshot.get("pdf_blob_id") or "")
+        blob = pdf_repository.get_blob(blob_id)
+        if blob is None:
+            return Response({"detail": "Class status PDF not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            absolute_path = resolve_pdf_blob_path(blob)
+        except SuspiciousFileOperation:
+            return Response({"detail": "Class status PDF path is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+        if not absolute_path.is_file():
+            return Response({"detail": "Class status PDF file is missing from storage."}, status=status.HTTP_404_NOT_FOUND)
+
+        filename = get_valid_filename(str(blob.get("filename") or snapshot.get("filename") or absolute_path.name or "class-status.pdf")) or "class-status.pdf"
+        response = FileResponse(absolute_path.open("rb"), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        return response
 
 
 class ClassSnapshotReparseView(generics.GenericAPIView):

@@ -655,8 +655,8 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 ### 5.4 Near Miss Office Comments — `/safety/near-miss/:id/triage/`
 
 **Role gate:** `PermissionGate(SAF_F_002)` plus office action permission. PIC/office PIC accepts LOW and MEDIUM cases; DPA accepts HIGH cases.
-**Data loaded on mount:** Existing record + suggested priority + current category tag and factor causes.
-**Actions:** `Accept` saves priority, category tag, factor causes, and office comment. `Send to Rework` moves the record back to vessel rework with a required reason.
+**Data loaded on mount:** Existing record + suggested priority + current category tag.
+**Actions:** `Accept` saves priority, category tag, and office comment. `Send to Rework` moves the record back to vessel rework with a required reason.
 **States:** Standard loaded/loading; error if priority override or rework send-back is missing a reason.
 **Navigation:** Back to detail.
 **Decisions:** D-GAP-R22.
@@ -757,6 +757,7 @@ Same form as Regular except `meeting_type='AD_HOC'` and mandatory trigger reason
 **Role gate:** `PermissionGate(SAF_F_003)` for read. Attendance write/edit is restricted to Master or Chief Officer while the meeting is not closed.
 **Data loaded on mount:**
 - `GET /api/safety/scm/:id/attendance/` — attendee list from `vims_safety_scm_attendance`; office users can read this WRH snapshot.
+- New SCM host-readiness rosters are generated from CMS crew rows whose `Crew_Onboarding_History.CrewStatus` master value is `On Board`; sign-on/sign-off dates are not the live attendance eligibility check.
 - Live join: `GET /api/wrh/rest-hours/?crew_id={id}&window=prior-96h&timezone=via-wrh-ship-time-config` — per attendee (D-GAP-M11, D-GAP-M26).
 **Signature transition:** None.
 **States:**
@@ -1044,7 +1045,7 @@ All cross-module joins use **same-DB live queries** — no ETL, no sync stalenes
 | **Incident → Reporting Daily Report (MSC-MEPC.3 PDF export)** | `/safety/incidents/:id/pdf/mscmepc3/` generator | `vims_reporting_daily_report` live join | Internal — user doesn't navigate; PDF pre-fills App 4 directly | **D-GAP-M09** · **D-DNV-12** · FEAT-SAF-PDF-002 |
 | **Incident → CMS crew roster (crew assignment / witness picker)** | `/safety/incidents/:id/phase-4/people/` | `Crew_Onboarding_History` + `Final_crew_list` live join | In-line picker dropdown returns crew; click opens CMS crew card in slide-over | **D-GAP-I2** · FEAT-SAF-XMOD-003 |
 | **Incident → CMS (qualifications snapshot at event time)** | Phase-3 People tab record display | Same live join, historical filter `active_on={incidentDate}` | Snapshot captured at Phase 1 submit; read-only thereafter | **D-GAP-I2** |
-| **SCM → WRH host readiness and attendance** | `/safety/scm/create-*` readiness card and `/safety/scm/:id/attendance/` table badges | `vims_wrh_rest_hours` + `wrh_ship_time_config` live join | SCM hosting is blocked until ship time and all roster crew WRH readiness are clear; after creation, per-row badges remain visible and do not block PDF export or Office Comment closure | **D-MAINT-CR014** · **D-GAP-M11** · **D-GAP-M26** · FEAT-SAF-XMOD-002 |
+| **SCM → CMS roster + WRH host readiness and attendance** | `/safety/scm/create-*` readiness card and `/safety/scm/:id/attendance/` table badges | `Crew_Onboarding_History.CrewStatus` → `CrewStatus.CrewStatusName = On Board`, then `vims_wrh_rest_hours` + `wrh_ship_time_config` live join | SCM hosting is blocked until ship time and all On Board roster crew WRH readiness are clear; after creation, per-row badges remain visible and do not block PDF export or Office Comment closure | **D-MAINT-CR128** · **D-MAINT-CR014** · **D-GAP-M11** · **D-GAP-M26** · FEAT-SAF-XMOD-002 |
 | **Corrective Action → Purchase Requisition (hard FK)** | Corrective Action row from `/safety/incidents/:id/phase-3/` | `/purchase/requisitions/create?linked_safety_ca={caId}` or `/purchase/requisitions/:reqId` | Hard FK = Purchase Req cannot be archived while open CA linked; CA detail shows live Req status | **D-GAP-M12** · FEAT-SAF-XMOD-004 |
 | **SOI assistant picker → CMS** | `/safety/soi/create/` | `Crew_Onboarding_History` live join with cross-department filter | Picker enforces cross-dept (SSQE §4.5.2); no manual override | **D-GAP-I2** · **D-GAP-M18** · FEAT-SAF-XMOD-003 |
 | **Near Miss fleet alert → Circular module + email** | `/safety/near-miss/:id/fleet-alert/` `[Issue Circular/Alert]` and `[Issue fleet alert]` | `/circular/office?safety_prefill=near_miss_fleet_alert`, `VesselData.Email`, SMTP sender, Near Miss PDF | Opens existing Circular create flow with title/body prefilled from the anonymised Near Miss alert; DPA completes all remaining Circular fields and publishes there. Safety does not direct-create the circular. The Safety issue action separately records completion, emits in-app notifications, and sends one selected-vessel email batch with `HSSEQ@kaizenship.net` in CC, the Near Miss PDF attached, and a short prevention-focused body. | **D-CFG-04** · **D-GAP-M08** · **D-MAINT-CR083** · **D-MAINT-CR086** · FEAT-SAF-NM-006 |

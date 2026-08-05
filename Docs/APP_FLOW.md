@@ -68,7 +68,7 @@ These changes were made later on after the original v1.0 screen inventory:
 **Data Required:** None
 **User Roles:** All (unauthenticated)
 
-**Layout:**
+**Layout:** Centered login screen with the VIMS ship mark and title above a single sign-in card. The form remains username/password based and keeps the existing validation, error messages, password visibility control, and redirect behavior.
 ```
 ┌─────────────────────────────────────┐
 │           [Company Logo]            │
@@ -388,7 +388,7 @@ These changes were made later on after the original v1.0 screen inventory:
 │                                                             │
 │ FOLLOW-UP REPORT                                            │
 │ ┌─────────────────────────────────────────────────────────┐│
-│ │ [+ Upload Follow-up Report PDF]                         ││
+│ │ [+ Upload Follow-up Report PDFs, max 3]                  ││
 │ └─────────────────────────────────────────────────────────┘│
 │                                                             │
 │ DEFICIENCY STATUS UPDATES                                   │

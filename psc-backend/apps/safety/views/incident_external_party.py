@@ -39,17 +39,16 @@ class IncidentExternalPartyInjuryView(IncidentViewMixin, generics.GenericAPIView
 
     def _enforce_external_party_role(self) -> None:
         if _normalized_role(self.request.user) not in ALLOWED_EXTERNAL_PARTY_MUTATION_ROLES:
-            raise PermissionDenied("Only incident investigators may edit external-party injury records.")
+            raise PermissionDenied("Only incident investigators may edit injury records.")
 
     def _require_open_phase(self, incident: Incident) -> None:
-        if incident.current_phase > 6:
-            raise ValidationError("External-party injury capture is limited to open incident phases 1 to 6.")
+        self._enforce_editable_until_office_approval(incident)
 
     def get(self, request, *args, **kwargs):
         incident = self.get_object()
         record = getattr(incident, "external_party_injury", None)
         if record is None:
-            raise ValidationError("No external-party injury record exists for this incident.")
+            raise ValidationError("No injury record exists for this incident.")
         return Response(self.get_serializer(record).data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
@@ -91,7 +90,7 @@ class IncidentExternalPartyInjuryView(IncidentViewMixin, generics.GenericAPIView
 
         record = getattr(incident, "external_party_injury", None)
         if record is None:
-            raise ValidationError("No external-party injury record exists for this incident.")
+            raise ValidationError("No injury record exists for this incident.")
 
         serializer = self.get_serializer(record, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)

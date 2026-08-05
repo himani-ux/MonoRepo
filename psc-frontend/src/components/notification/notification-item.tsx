@@ -56,6 +56,16 @@ const NOTIFICATION_STYLES: Record<NotificationType, NotificationStyle> = {
   CIRCULAR_PENDING_APPROVAL: { icon: Hourglass, iconColor: 'text-warning-500' },
   CIRCULAR_APPROVED: { icon: CheckCircle2, iconColor: 'text-success-500' },
   CIRCULAR_REJECTED: { icon: AlertTriangle, iconColor: 'text-danger-500' },
+  NEAR_MISS_SUBMITTED: { icon: Shield, iconColor: 'text-primary-500' },
+  NEAR_MISS_HOD_REVIEW_COMPLETE: { icon: ClipboardCheck, iconColor: 'text-primary-500' },
+  NEAR_MISS_REWORK_REQUIRED: { icon: RefreshCw, iconColor: 'text-warning-500' },
+  NEAR_MISS_READY_FOR_OFFICE_COMMENTS: { icon: Send, iconColor: 'text-primary-500' },
+  NEAR_MISS_FLEET_ALERT: { icon: AlertTriangle, iconColor: 'text-danger-500' },
+  NEAR_MISS_FLEET_ALERT_NUDGE_DAY_5: { icon: Clock, iconColor: 'text-warning-500' },
+  NEAR_MISS_FLEET_ALERT_NUDGE_DAY_6: { icon: Clock, iconColor: 'text-warning-500' },
+  NEAR_MISS_FLEET_ALERT_ESCALATION_DAY_8: { icon: AlertTriangle, iconColor: 'text-danger-500' },
+  INCIDENT_PHASE_2_HANDOFF_REQUIRED: { icon: Hourglass, iconColor: 'text-warning-500' },
+  INCIDENT_PHASE_2_SUBMITTED: { icon: Send, iconColor: 'text-primary-500' },
 };
 
 // ============================================================================
@@ -111,6 +121,10 @@ export const NotificationItem: FC<NotificationItemProps> = memo(function Notific
         navigate(ROUTES.INSPECTION_DETAIL(notification.entity_id));
       } else if (notification.entity_type === 'DEFICIENCY') {
         navigate(ROUTES.DEFICIENCIES);
+      } else if (notification.entity_type === 'SAFETY_NEAR_MISS') {
+        navigate(`/safety/near-miss/${notification.entity_id}`);
+      } else if (notification.entity_type === 'SAFETY_INCIDENT') {
+        navigate(`/safety/incident/${notification.entity_id}`);
       }
     }
   };

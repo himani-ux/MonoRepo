@@ -29,6 +29,7 @@ from apps.safety.models import (
     SCMMeeting,
     SOIFinding,
     SOIInspection,
+    WitnessInterview,
 )
 from apps.safety.repositories.scm_repo import SCMRepository
 from apps.safety.repositories.soi_repo import SOIRepository
@@ -91,12 +92,12 @@ INCIDENT_PDF_SECTION_LABELS = {
     "summary": "Summary",
     "reporter_details": "Reporter Details",
     "injury_details": "Injury Details",
-    "estimated_cost": "Estimated Cost",
-    "root_cause": "Root Cause",
+    "root_cause": "Root Cause Analysis",
+    "corrective_preventive_actions": "Corrective and Preventive Actions",
     "evidence_documents": "Evidence (Documents)",
-    "corrective_preventive_actions": "Corrective / Preventive Actions",
     "lessons_learned": "Lessons Learned",
     "signature": "Signature",
+    "estimated_cost": "Estimated Cost",
 }
 DEFAULT_INCIDENT_PDF_SECTION_KEYS = tuple(INCIDENT_PDF_SECTION_LABELS)
 ATTACHMENT_FILE_SUFFIXES = {".csv", ".doc", ".docx", ".gif", ".jpeg", ".jpg", ".pdf", ".png", ".txt", ".xls", ".xlsx"}
@@ -276,21 +277,27 @@ class IncidentPdfRenderer:
         selected_loss_values = [value for value in loss_values if value != "Not recorded"]
         if incident.loss_type_other:
             selected_loss_values.append(f"Other - {incident.loss_type_other}")
+        incident_type_name = self._incident_type_name(incident.incident_type_id)
+        if incident.incident_type_other:
+            incident_type_name = f"{incident_type_name} - {incident.incident_type_other}"
         return [
             ("Incident number", self._display(incident.incident_number)),
             ("Vessel", self._display(vessel_name)),
             ("Status", self._display(incident.state)),
             ("Risk band", self._display(incident.risk_band)),
-            ("Incident type", self._incident_type_name(incident.incident_type_id)),
+            ("Incident type", incident_type_name),
             ("Type of loss", ", ".join(selected_loss_values) if selected_loss_values else "Not recorded"),
+            ("Was a Risk Assessment carried out?", self._choice_label(incident.risk_assessment_carried_out)),
+            ("Was Toolbox Meeting carried out?", self._choice_label(incident.toolbox_meeting_carried_out)),
+            ("Was a Permit Issue?", self._choice_label(incident.permit_issued)),
+            ("Type of Activity", self._display(incident.activity_type)),
             ("Occurred at", self._format_pdf_datetime(incident.occurred_at) or "Not recorded"),
             ("Reported at", self._format_pdf_datetime(incident.reported_at) or "Not recorded"),
             ("Latitude", self._display(incident.latitude)),
             ("Longitude", self._display(incident.longitude)),
             ("Shore assistance required", self._yes_no(incident.shore_assistance_required)),
-            ("Vessel location", self._display(incident.vessel_location)),
-            ("Onboard location", self._display(incident.onboard_location)),
-            ("Last port", self._display(incident.last_port)),
+            ("Vessel location", self._display(self._vessel_location_text(incident))),
+            ("Location on Board", self._display(incident.onboard_location)),
             ("Departure date", self._display(incident.departure_date)),
             ("Vessel condition", self._choice_label(incident.vessel_condition)),
             ("Office informed?", self._yes_no(incident.office_notified)),
@@ -301,22 +308,13 @@ class IncidentPdfRenderer:
     def _build_closure_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
         blocks = []
         office_block = self._detail_block(
-            "Office Review",
+            "Office comments/ lesson learnt",
             [
-                ("Office comments", self._display(incident.office_comment)),
+                ("", self._display(incident.office_comment)),
             ],
         )
         if office_block.rows:
             blocks.append(office_block)
-
-        closure_block = self._detail_block(
-            "Closure reason",
-            [
-                ("Reason", self._display(incident.closure_reason)),
-            ],
-        )
-        if closure_block.rows:
-            blocks.append(closure_block)
         return blocks
 
     def _build_investigator_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
@@ -395,12 +393,10 @@ class IncidentPdfRenderer:
                             else injury.shore_assistance_required
                         ),
                     ),
-                    ("Vessel location", self._display(incident.vessel_location or injury.vessel_location)),
-                    ("Onboard location", self._display(incident.onboard_location or injury.onboard_location)),
-                    ("Last port", self._display(incident.last_port or injury.last_port)),
+                    ("Vessel location", self._display(self._vessel_location_text(incident) or injury.vessel_location)),
+                    ("Location on Board", self._display(incident.onboard_location or injury.onboard_location)),
                     ("Departure date", self._display(incident.departure_date or injury.departure_date)),
                     ("Vessel condition", self._choice_label(incident.vessel_condition or injury.vessel_condition)),
-                    ("What happened", self._display(injury.what_happened_narrative)),
                     ("Nature of injury", self._display(injury.nature_of_injury)),
                     ("Source of injury", self._display(injury.source_of_injury)),
                     ("Affected body areas", self._display(injury.affected_body_areas)),
@@ -464,7 +460,7 @@ class IncidentPdfRenderer:
         )
         blocks = [
             self._detail_block(
-                "Loss Evaluation - Risk Assessment",
+                "Risk Assessment",
                 [
                     ("Consequence", self._choice_label(loss.consequence)),
                     ("Likelihood", self._choice_label(loss.likelihood)),
@@ -472,7 +468,7 @@ class IncidentPdfRenderer:
                 ],
             ),
             self._detail_block(
-                "Loss Evaluation - Other Details",
+                "Details",
                 [
                     ("Name of master", self._display(loss.name_of_master)),
                     ("Name of Chief Engineer", self._display(loss.name_of_chief_engineer)),
@@ -502,7 +498,7 @@ class IncidentPdfRenderer:
                 ],
             ),
             self._detail_block(
-                "Loss Evaluation - Cost Evaluation",
+                "Cost Evaluation",
                 [
                     ("Delays to Vessel (if any)", self._display(loss.delay_to_vessel)),
                     *(
@@ -529,7 +525,7 @@ class IncidentPdfRenderer:
                 ],
             ),
             self._detail_block(
-                "Loss Evaluation - Estimated Costs",
+                "Estimated Costs",
                 (
                     [
                         ("Cost for Medicines Given Onboard", self._display(loss.cost_medicines_onboard)),
@@ -587,23 +583,26 @@ class IncidentPdfRenderer:
         return blocks
 
     def _build_witness_note_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
-        rows: list[tuple[str, str]] = []
+        blocks: list[IncidentPdfDetailBlock] = []
         interviews = list(incident.witness_interviews.all().order_by("created_date", "id"))
-        multiple_notes = len(interviews) > 1
-        for index, interview in enumerate(interviews, start=1):
-            witness_name_label = f"Witness {index} name" if multiple_notes else "Witness name"
-            witness_statement_label = f"What witness {index} said" if multiple_notes else "What the witness said"
-            remark_label = f"Remark {index}" if multiple_notes else "Remark"
-            rows.extend(
+        for interview in interviews:
+            heading = "Witness Statement"
+            witness_name = self._clean_text(interview.witness_name)
+            if witness_name:
+                heading = f"Witness Statement - {witness_name}"
+            block = self._detail_block(
+                heading,
                 [
-                    (witness_name_label, self._display(interview.witness_name)),
-                    (witness_statement_label, self._display(interview.meeting_notes)),
-                    (remark_label, self._display(interview.conclusion_notes)),
-                ]
+                    (
+                        "Witness statement attachment",
+                        self._witness_statement_attachment_link(incident, interview),
+                    ),
+                    ("Remark", self._display(interview.conclusion_notes)),
+                ],
             )
-
-        block = self._detail_block("Witness Statement", rows)
-        return [block] if block.rows else []
+            if block.rows:
+                blocks.append(block)
+        return blocks
 
     def _build_evidence_document_blocks(self, incident: Incident) -> list[IncidentPdfDetailBlock]:
         blocks: list[IncidentPdfDetailBlock] = []
@@ -635,15 +634,19 @@ class IncidentPdfRenderer:
 
         blocks: list[IncidentPdfDetailBlock] = []
         for layer_key in sorted(grouped_causes, key=lambda key: layer_order.get(key, 99)):
-            causes = grouped_causes[layer_key]
-            rows: list[tuple[str, str]] = []
-            for index, cause in enumerate(causes, start=1):
-                cause_lines = [
-                    f"Cause factor: {self._cause_factor_label(cause.cause_factor)}",
-                    f"Cause: {self._display(cause.cause_option_text)}",
-                    f"Reason: {self._display(cause.rationale)}",
-                ]
-                rows.append((f"Cause {index}", "\n".join(cause_lines)))
+            rows = []
+            for cause in grouped_causes[layer_key]:
+                rows.append(
+                    (
+                        f"Cause factor: {self._cause_factor_label(cause.cause_factor)}",
+                        "\n".join(
+                            [
+                                f"Cause: {self._display(cause.cause_option_text)}",
+                                f"Reason: {self._display(cause.rationale)}",
+                            ]
+                        ),
+                    )
+                )
             block = self._detail_block(self._causal_layer_heading(layer_key), rows)
             if block.rows:
                 blocks.append(block)
@@ -664,33 +667,32 @@ class IncidentPdfRenderer:
         return blocks
 
     def _build_action_blocks_detail(self, recommendations: Iterable[Recommendation]) -> list[IncidentPdfDetailBlock]:
-        blocks: list[IncidentPdfDetailBlock] = []
+        grouped_rows: dict[str, list[tuple[str, str]]] = {
+            Recommendation.Tier.CORRECTIVE: [],
+            Recommendation.Tier.PREVENTIVE: [],
+        }
         for recommendation in recommendations:
-            for action in recommendation.corrective_actions.all():
-                block = self._detail_block(
-                        "Corrective action",
-                        [
-                            ("Description", self._display(action.description)),
-                            ("Due date", self._display(action.due_date)),
-                            ("Status", self._display(action.status)),
-                            ("Physical verification note", self._display(action.physical_verification_note)),
-                            ("Closed at", self._format_pdf_datetime(action.closed_at) or "Not closed"),
-                        ],
-                    )
-                if block.rows:
-                    blocks.append(block)
-            for verification in recommendation.verifications.all():
-                block = self._detail_block(
-                        "Verification",
-                        [
-                            ("Effective", self._yes_no(verification.is_effective)),
-                            ("Residual risk", self._display(verification.residual_risk)),
-                            ("Verified at", self._format_pdf_datetime(verification.verified_at) or "Not recorded"),
-                            ("Notes", self._display(verification.notes)),
-                        ],
-                    )
-                if block.rows:
-                    blocks.append(block)
+            if recommendation.tier not in grouped_rows:
+                continue
+            actions = list(recommendation.corrective_actions.all())
+            if actions:
+                for action in actions:
+                    description = self._display(action.description)
+                    due_date = self._display(action.due_date)
+                    if due_date != "Not recorded":
+                        description = f"{description}\nDue Date: {due_date}"
+                    grouped_rows[recommendation.tier].append(("", description))
+                continue
+            grouped_rows[recommendation.tier].append(("", self._display(recommendation.description)))
+
+        blocks: list[IncidentPdfDetailBlock] = []
+        for tier, heading in (
+            (Recommendation.Tier.CORRECTIVE, "Corrective Actions"),
+            (Recommendation.Tier.PREVENTIVE, "Preventive Actions"),
+        ):
+            block = self._detail_block(heading, grouped_rows[tier])
+            if block.rows:
+                blocks.append(block)
         return blocks
 
     def _build_lesson_blocks(self, recommendations: Iterable[Recommendation]) -> list[IncidentPdfDetailBlock]:
@@ -790,7 +792,7 @@ class IncidentPdfRenderer:
         safeguards = list(incident.safeguard_failures.all())
         evidence_titles = ", ".join(item.title for item in incident.evidence_items.all()[:3]) or "No evidence titles recorded."
         return [
-            self._prefixed_point("What happened", incident.narrative or "Narrative not recorded."),
+            self._prefixed_point("Describe What happened?", incident.narrative or "Narrative not recorded."),
             self._prefixed_point("People", getattr(assessment, "people_contribution_text", "") or "People contribution not recorded."),
             self._prefixed_point("Process", getattr(assessment, "process_gap_text", "") or "Process gap not recorded."),
             self._prefixed_point("Plant", getattr(assessment, "plant_failure_text", "") or "Plant failure not recorded."),
@@ -857,8 +859,6 @@ class IncidentPdfRenderer:
         }
         rows = [
             self._reporter_signature_row(incident),
-            self._signature_row("Master signature", row=self._role_phase_log(incident, "MASTER")),
-            self._signature_row("HOD signature", row=self._role_phase_log(incident, "HOD")),
         ]
         office_signature = history_rows.get("phase7_signature_dpa") or history_rows.get("phase7_signature_pic")
         rows.append(self._signature_row("PIC / DPA office signature", row=office_signature))
@@ -958,6 +958,13 @@ class IncidentPdfRenderer:
         if isinstance(value, datetime):
             return IncidentPdfRenderer._format_pdf_datetime(value) or default
         return str(value)
+
+    def _vessel_location_text(self, incident: Incident) -> str:
+        location = self._display(incident.vessel_location, default="")
+        detail = self._display(incident.vessel_location_detail, default="")
+        if location and detail:
+            return f"{location} - {detail}"
+        return location
 
     @staticmethod
     def _yes_no(value) -> str:
@@ -1083,6 +1090,17 @@ class IncidentPdfRenderer:
 
     def _attachment_links_for_item(self, incident: Incident, item) -> str:
         return self._attachment_links_from_metadata(incident, item.metadata_json)
+
+    def _witness_statement_attachment_link(self, incident: Incident, interview: WitnessInterview) -> str:
+        if not self._witness_statement_attachment_is_downloadable(interview.witness_signature):
+            return "Not recorded"
+        href = f"/api/safety/incidents/{incident.id}/phase-4/interviews/{interview.id}/statement-attachment/"
+        return f"PDF_LINK::{href}::Witness statement attachment"
+
+    @staticmethod
+    def _witness_statement_attachment_is_downloadable(value) -> bool:
+        text = str(value or "").strip()
+        return text.startswith("data:") and ";base64," in text
 
     def _attachment_label(self, metadata: dict, path: str) -> str:
         direct_label = str(metadata.get("original_name") or metadata.get("file_name") or "").strip()
@@ -1278,7 +1296,7 @@ class IncidentPdfRenderer:
             value_text = _row_value(value)
             if value_text in skip_values:
                 continue
-            cleaned_rows.append((str(label or "Field"), value_text))
+            cleaned_rows.append(("", value_text) if str(label).strip() == "" else (str(label), value_text))
         return IncidentPdfDetailBlock(
             heading=str(heading or "Detail"),
             rows=cleaned_rows,

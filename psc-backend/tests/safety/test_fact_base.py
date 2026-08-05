@@ -223,7 +223,7 @@ class IncidentFactBaseTests(unittest.TestCase):
         self.assertEqual(create_response.data["source_evidence_id"], str(tab.pk))
         self.assertIn("PEOPLE", create_response.data["evidence_summary"])
 
-    def test_phase_four_gate_reports_missing_evidence_tabs_before_transition(self) -> None:
+    def test_phase_four_gate_requires_at_least_one_evidence_source_before_transition(self) -> None:
         request = self.factory.get(f"/api/safety/incidents/{self.incident.pk}/facts/gate/")
         force_authenticate(request, user=build_user())
         response = self.gate_view(request, id=self.incident.pk)
@@ -231,7 +231,7 @@ class IncidentFactBaseTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["can_continue"])
         self.assertIn("POSITION", response.data["missing_tabs"])
-        self.assertIn("Complete or mark N/A", response.data["blockers"][0])
+        self.assertIn("Add at least one evidence", response.data["blockers"][0])
 
     def test_fact_requires_linked_evidence_reference(self) -> None:
         request = self.factory.post(

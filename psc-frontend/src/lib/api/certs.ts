@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api/client';
 import { API_BASE_URL } from '@/lib/utils/constants';
 
+const CERT_PDF_OCR_REQUEST_TIMEOUT_MS = 120000;
 const CERTS_API_BASE_URL = `${API_BASE_URL}/api/certs`;
 const AUDITOR_API_BASE_URL = `${API_BASE_URL}/api/auditor`;
 
@@ -228,6 +229,8 @@ export interface CertTrackedItem {
 
 export interface CertTrackedItemsResponse {
   count: number;
+  page?: number | null;
+  pageSize?: number | null;
   results: CertTrackedItem[];
 }
 
@@ -236,6 +239,8 @@ export interface CertTrackedItemFilters {
   catalogId?: string;
   status?: string;
   approvalState?: string;
+  page?: number | null;
+  pageSize?: number | null;
 }
 
 export interface CertPdfVersion {
@@ -289,6 +294,11 @@ export interface CertOcrPayload {
 
 export interface CertTrackedItemUploadPdfPayload {
   file: File;
+  context?: CertOcrContext;
+  reason?: string;
+}
+
+export interface CertTrackedItemReparsePdfPayload {
   context?: CertOcrContext;
   reason?: string;
 }
@@ -533,6 +543,7 @@ export interface CertVesselDashboardResponse {
     id: string;
     classSociety: string | null;
     uploadedAt: string | null;
+    printedOnDate: string | null;
     daysAgo: number | null;
     parseStatus: string | null;
     reconciliationRunId: string | null;
@@ -1081,7 +1092,8 @@ export interface CertPrintPayload {
 
 export interface CertShareBundlePayload {
   vesselIds: string[];
-  customCertIds: string[];
+  sections?: string[];
+  customCertIds?: string[];
   watermarkRecipient?: string;
   recipientEmail?: string;
 }
@@ -1402,6 +1414,18 @@ export const certsApi = {
     return response.data;
   },
 
+  getClassSnapshotPdfViewUrl(id: string): string {
+    return buildCertsApiUrl(`/class-snapshots/${encodeURIComponent(id)}/pdf/view/`);
+  },
+
+  async getClassSnapshotPdfBlob(id: string): Promise<Blob> {
+    const response = await apiClient.get<Blob>(
+      buildCertsApiUrl(`/class-snapshots/${encodeURIComponent(id)}/pdf/view/`),
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
   async uploadClassSnapshot(payload: CertClassSnapshotUploadPayload): Promise<CertClassSnapshot> {
     const formData = new FormData();
     formData.append('vesselId', payload.vesselId);
@@ -1547,6 +1571,8 @@ export const certsApi = {
     if (filters.catalogId) params.set('catalogId', filters.catalogId);
     if (filters.status) params.set('status', filters.status);
     if (filters.approvalState) params.set('approvalState', filters.approvalState);
+    appendIfPresent(params, 'page', filters.page);
+    appendIfPresent(params, 'pageSize', filters.pageSize);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await apiClient.get<CertTrackedItemsResponse>(
       buildCertsApiUrl(`/tracked-items/${suffix}`)
@@ -1606,7 +1632,19 @@ export const certsApi = {
     const response = await apiClient.post<CertTrackedItemUploadPdfResponse>(
       buildCertsApiUrl(`/tracked-items/${id}/upload-pdf/`),
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: CERT_PDF_OCR_REQUEST_TIMEOUT_MS,
+      }
+    );
+    return response.data;
+  },
+
+  async reparseTrackedItemPdf(id: string, payload: CertTrackedItemReparsePdfPayload = {}): Promise<CertTrackedItemUploadPdfResponse> {
+    const response = await apiClient.post<CertTrackedItemUploadPdfResponse>(
+      buildCertsApiUrl(`/tracked-items/${id}/reparse-pdf/`),
+      payload,
+      { timeout: CERT_PDF_OCR_REQUEST_TIMEOUT_MS }
     );
     return response.data;
   },

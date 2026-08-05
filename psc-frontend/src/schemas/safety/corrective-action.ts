@@ -15,7 +15,10 @@ export const safetyPurchaseRequestSummarySchema = z.object({
 });
 
 export const safetyCorrectiveActionSchema = z.object({
-  id: z.coerce.number().int().positive(),
+  id: z.string().min(1),
+  recommendation_id: z.string().nullable().optional(),
+  recommendation_title: z.string().nullable().optional(),
+  recommendation_tier: z.string().nullable().optional(),
   title: z.string().min(1),
   description: z.string().min(1),
   assigned_crew_id: z.string().nullable().optional(),

@@ -5,7 +5,7 @@ export function formatScmState(state: string | null | undefined) {
     case "SUBMITTED":
       return "Submitted to Office";
     case "SIGNED_OFF":
-      return "Signed Off";
+      return "Closed";
     case "REOPENED":
       return "Reopened";
     case "CLOSED":

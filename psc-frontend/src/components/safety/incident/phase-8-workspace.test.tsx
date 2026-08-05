@@ -1,9 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const phase8Mocks = vi.hoisted(() => ({
-  closeIncidentPhase8: vi.fn(),
   getIncidentPhase8Workspace: vi.fn(),
   navigate: vi.fn(),
   saveIncidentPhase8LossEvaluation: vi.fn(),
@@ -27,7 +26,6 @@ vi.mock('../../../hooks/use-auth', () => ({
 
 vi.mock('../../../lib/api/safety', () => ({
   safetyApi: {
-    closeIncidentPhase8: phase8Mocks.closeIncidentPhase8,
     getIncidentPhase8Workspace: phase8Mocks.getIncidentPhase8Workspace,
     saveIncidentPhase8LossEvaluation: phase8Mocks.saveIncidentPhase8LossEvaluation,
   },
@@ -148,11 +146,29 @@ describe('SafetyIncidentPhase8', () => {
 
     render(<SafetyIncidentPhase8 />);
 
-    expect(await screen.findByRole('heading', { name: 'Loss Evaluation' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'What are you recording?' })).toBeInTheDocument();
+    expect(screen.queryByText('Phase 7')).toBeNull();
+    expect(screen.queryByText('Not saved')).toBeNull();
+    expect(
+      screen.queryByText('Select Incident Report or Injury Report first. The form below will change based on this choice.')
+    ).toBeNull();
     expect(screen.queryByText('Office approval required')).toBeNull();
     expect(screen.getByLabelText('Loss Evaluation type')).toBeInTheDocument();
     expect(screen.queryByLabelText('Consequence')).toBeNull();
     expect(phase8Mocks.getIncidentPhase8Workspace).toHaveBeenCalledWith('incident-1');
+  });
+
+  it('does not render stale Phase 6 action-check approval wording on Phase 7', async () => {
+    phase8Mocks.getIncidentPhase8Workspace.mockRejectedValue(
+      new Error('Phase 6 action check is available after Phase 5 office approval.')
+    );
+
+    render(<SafetyIncidentPhase8 />);
+
+    expect(await screen.findByRole('heading', { name: 'What are you recording?' })).toBeInTheDocument();
+    expect(
+      screen.queryByText('Phase 6 action check is available after Phase 5 office approval.')
+    ).toBeNull();
   });
 
   it('loads incident report fields after the user chooses Incident Report', async () => {
@@ -163,13 +179,99 @@ describe('SafetyIncidentPhase8', () => {
     await waitFor(() => {
       expect(phase8Mocks.getIncidentPhase8Workspace).toHaveBeenCalledWith('incident-1');
     });
-    expect(await screen.findByRole('heading', { name: 'Loss Evaluation' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'What are you recording?' })).toBeInTheDocument();
     const reportTypeSelect = screen.getByLabelText('Loss Evaluation type');
     fireEvent.change(reportTypeSelect, { target: { value: 'INCIDENT' } });
 
     expect(reportTypeSelect).toHaveValue('INCIDENT');
     expect(screen.getByLabelText('Type of Repairs')).toBeInTheDocument();
     expect(screen.getByLabelText('Estimated Cost for Off Hire')).toBeInTheDocument();
+  });
+
+  it('shows auto-filled vessel officer names in Other Details', async () => {
+    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace({
+      loss_evaluation: {
+        ...buildWorkspace().loss_evaluation,
+        name_of_master: 'Master Current',
+        name_of_chief_engineer: 'Chief Engineer Current',
+      },
+    }));
+
+    render(<SafetyIncidentPhase8 />);
+
+    fireEvent.change(await screen.findByLabelText('Loss Evaluation type'), { target: { value: 'INCIDENT' } });
+
+    expect(screen.getByLabelText('Name of master')).toHaveValue('Master Current');
+    expect(screen.getByLabelText('Name of Chief Engineer')).toHaveValue('Chief Engineer Current');
+  });
+
+  it('preserves spaces while typing Cost Evaluation reasons', async () => {
+    const firstWorkspace = buildWorkspace();
+    const savedWorkspace = buildWorkspace({
+      has_loss_evaluation: true,
+      ready_for_close: true,
+      blockers: [],
+      blocker_details: [],
+    });
+    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(firstWorkspace);
+    phase8Mocks.saveIncidentPhase8LossEvaluation.mockResolvedValue(savedWorkspace);
+
+    render(<SafetyIncidentPhase8 />);
+
+    fireEvent.change(await screen.findByLabelText('Loss Evaluation type'), { target: { value: 'INCIDENT' } });
+    fireEvent.change(screen.getByLabelText('Consequence'), { target: { value: 'MAJOR' } });
+    fireEvent.change(screen.getByLabelText('Likelihood'), { target: { value: 'POSSIBLE' } });
+    fireEvent.change(screen.getByLabelText('Risk level'), { target: { value: 'HIGH' } });
+    const reasonsField = screen.getByLabelText('Reasons');
+
+    fireEvent.change(reasonsField, { target: { value: 'Parts were ' } });
+
+    expect(reasonsField).toHaveValue('Parts were ');
+
+    fireEvent.change(reasonsField, { target: { value: 'Parts were reused' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Loss Evaluation' }));
+
+    await waitFor(() => {
+      expect(phase8Mocks.saveIncidentPhase8LossEvaluation).toHaveBeenCalledWith(
+        'incident-1',
+        expect.objectContaining({
+          materials_reason: 'Parts were reused',
+        }),
+      );
+    });
+  });
+
+  it('keeps Phase 7 dropdown options populated when the workspace returns empty choice arrays', async () => {
+    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace({
+      choices: {
+        consequence: [],
+        likelihood: [],
+        repair_type: [],
+        report_type: [],
+        risk_level: [],
+        safe_working_practice: [],
+        yes_no: [],
+      },
+    }));
+
+    render(<SafetyIncidentPhase8 />);
+
+    const reportTypeSelect = await screen.findByLabelText('Loss Evaluation type');
+    expect(within(reportTypeSelect).getByRole('option', { name: 'Incident Report' })).toBeInTheDocument();
+    fireEvent.change(reportTypeSelect, { target: { value: 'INCIDENT' } });
+
+    expect(within(screen.getByLabelText('Consequence')).getByRole('option', { name: 'Major' })).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Likelihood')).getByRole('option', { name: 'Possible' })).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Risk level')).getByRole('option', { name: 'High' })).toBeInTheDocument();
+    expect(within(screen.getByLabelText('Type of Repairs')).getByRole('option', { name: 'Temporary' })).toBeInTheDocument();
+
+    fireEvent.change(reportTypeSelect, { target: { value: 'INJURY' } });
+
+    const safeWorkingPracticeSelect = screen.getByLabelText('Code of Safe Working Practices to which the Incident relates');
+    expect(safeWorkingPracticeSelect).toBeEnabled();
+    expect(
+      within(safeWorkingPracticeSelect).getByRole('option', { name: 'Health and hygiene' })
+    ).toBeInTheDocument();
   });
 
   it('loads injury report fields after the user chooses Injury Report', async () => {
@@ -220,5 +322,21 @@ describe('SafetyIncidentPhase8', () => {
       );
     });
     expect(await screen.findByText('Loss Evaluation saved.')).toBeInTheDocument();
+  });
+
+  it('does not show incident closing controls in Loss Evaluation', async () => {
+    phase8Mocks.getIncidentPhase8Workspace.mockResolvedValue(buildWorkspace({
+      has_loss_evaluation: true,
+      ready_for_close: true,
+      blockers: [],
+      blocker_details: [],
+    }));
+
+    render(<SafetyIncidentPhase8 />);
+
+    expect(await screen.findByLabelText('Loss Evaluation type')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Close Incident' })).toBeNull();
+    expect(screen.queryByLabelText('Closing note')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close Incident' })).toBeNull();
   });
 });

@@ -25,6 +25,7 @@ from apps.certs.permissions import (
     has_request_certs_perm,
     is_master_user,
     is_vessel_sub_officer,
+    normalized_role,
     user_can_access_vessel,
 )
 from apps.certs.serializers.tracked_item import (
@@ -64,6 +65,47 @@ AUTO_ACCEPTED_OCR_FIELDS = {
     "expiry_date": "expiryDate",
 }
 OCR_DATE_FIELDS = {"issue_date", "expiry_date"}
+TRACKED_ITEM_FULL_FLEET_ROLES = {"DPA", "FM", "FLEET MANAGER", "SEQ MANAGER", "SUPER ADMIN", "SYSTEM ADMIN"}
+
+
+def _parse_positive_int(value: object, *, default: int, maximum: int) -> int:
+    try:
+        parsed = int(str(value))
+    except (TypeError, ValueError):
+        return default
+    return min(max(parsed, 1), maximum)
+
+
+def _tracked_item_vessel_scope(user) -> list[str] | None:
+    if (getattr(user, "user_type", "") or "").upper() == "VESSEL":
+        vessel_id = str(getattr(user, "vessel_id", "") or "").strip()
+        return [vessel_id] if vessel_id else []
+    if getattr(user, "has_global_vessel_access", None) is True:
+        return None
+    if normalized_role(user) in TRACKED_ITEM_FULL_FLEET_ROLES:
+        return None
+    return _normalize_scope_ids(getattr(user, "vessel_ids", None))
+
+
+def _normalize_scope_ids(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        if stripped.startswith("[") and stripped.endswith("]"):
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                parsed = None
+            if parsed is not None:
+                return _normalize_scope_ids(parsed)
+        return [part.strip() for part in stripped.split(",") if part.strip()]
+    if isinstance(value, (list, tuple, set)):
+        return [str(item).strip() for item in value if str(item or "").strip()]
+    text = str(value).strip()
+    return [text] if text else []
 
 
 class TrackedItemPermissionMixin:
@@ -78,11 +120,16 @@ class TrackedItemListCreateView(TrackedItemPermissionMixin, generics.GenericAPIV
         requested_vessel_id = request.query_params.get("vesselId") or None
         if requested_vessel_id and not user_can_access_vessel(request.user, requested_vessel_id):
             return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
+        page_number = _parse_positive_int(request.query_params.get("page"), default=1, maximum=10_000)
+        page_size = _parse_positive_int(request.query_params.get("pageSize"), default=100, maximum=100)
         page = repository.list_items(
             vessel_id=requested_vessel_id,
+            vessel_ids=None if requested_vessel_id else _tracked_item_vessel_scope(request.user),
             catalog_id=request.query_params.get("catalogId") or None,
             status_value=request.query_params.get("status") or None,
             approval_state=request.query_params.get("approvalState") or None,
+            page=page_number,
+            page_size=page_size,
         )
         rows = [
             row
@@ -91,8 +138,10 @@ class TrackedItemListCreateView(TrackedItemPermissionMixin, generics.GenericAPIV
         ]
         return Response(
             {
-                "count": len(rows),
-                "results": [serialize_tracked_item(row) for row in rows],
+                "count": page.count,
+                "page": page.page,
+                "pageSize": page.page_size,
+                "results": [serialize_tracked_item(row, include_display_names=False) for row in rows],
             }
         )
 
@@ -431,6 +480,133 @@ class TrackedItemUploadPdfView(generics.GenericAPIView):
                 "ocrConfidencePerField": confidence_map,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class TrackedItemReparsePdfView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, HasTrackedItemReadPermission]
+
+    def post(self, request, tracked_item_id: str, *args, **kwargs):
+        if not has_request_certs_perm(request, TRACKED_ITEM_FORM_ID, TRACKED_ITEM_WRITE_PROCESS_ID):
+            return Response({"detail": "You do not have access to re-read Certs PDFs."}, status=status.HTTP_403_FORBIDDEN)
+
+        current = repository.get_item(str(tracked_item_id))
+        if current is None:
+            return Response({"detail": "Tracked item not found."}, status=status.HTTP_404_NOT_FOUND)
+        vessel_id = str(current.get("vessel_id") or "")
+        if not user_can_access_vessel(request.user, vessel_id):
+            return Response({"detail": "You do not have access to this vessel."}, status=status.HTTP_403_FORBIDDEN)
+
+        workflow_values, workflow_error = _upload_workflow_values(request.user, current)
+        if workflow_error:
+            return workflow_error
+
+        context, context_error = _upload_ocr_context(request)
+        if context_error:
+            return context_error
+
+        blob_id = str(current.get("pdf_attachment_id") or "").strip()
+        if not blob_id:
+            return Response({"detail": "No active certificate PDF is attached to this certificate."}, status=status.HTTP_400_BAD_REQUEST)
+
+        blob = pdf_repository.get_blob(blob_id)
+        if not blob or str(blob.get("tracked_item_id") or "").lower() != str(tracked_item_id).lower():
+            return Response({"detail": "Active certificate PDF was not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            pdf_path = resolve_pdf_blob_path(blob)
+        except SuspiciousFileOperation:
+            return Response({"detail": "Stored certificate PDF path is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+        if not pdf_path.is_file():
+            return Response({"detail": "Stored certificate PDF file was not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        reason = str(request.data.get("reason") or "").strip() or "Certificate PDF read again."
+        actor_id = resolve_actor_id(request.user)
+
+        with transaction.atomic():
+            try:
+                ocr_payload = process_cert_pdf(str(pdf_path), context=context)
+            except OcrPipelineError as exc:
+                ocr_payload = manual_entry_payload(
+                    context=context,
+                    engine_name=DEFAULT_OCR_ENGINE_NAME,
+                    reason=str(exc),
+                )
+            processed_blob = pdf_repository.update_ocr_result(blob_id, ocr_payload)
+            update_values = {
+                "pdfAttachmentId": blob_id,
+                "pdfMissing": False,
+                **_auto_accepted_tracked_item_values(ocr_payload),
+                **workflow_values,
+            }
+            if str(current.get("status") or "") == "pending_first_upload":
+                update_values["status"] = "ok"
+            before, after = repository.update_item(str(tracked_item_id), update_values, actor_id=actor_id)
+            if after is None:
+                return Response({"detail": "Tracked item not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            serialized_before = serialize_tracked_item(before) if before else None
+            serialized_after = serialize_tracked_item(after)
+            serialized_blob_before = serialize_pdf_blob(blob)
+            serialized_blob = serialize_pdf_blob(processed_blob or blob)
+            confidence_map = ocr_confidence_map(ocr_payload)
+            record_audit_event(
+                actor=request.user,
+                action="reparse_pdf",
+                entity_type="pdf_blob",
+                entity_id=blob_id,
+                vessel_id=vessel_id,
+                before=serialized_blob_before,
+                after=serialized_blob,
+                reason=reason,
+                metadata={
+                    "source": "api.certs.tracked_items.reparse_pdf",
+                    "tracked_item_id": str(tracked_item_id),
+                    "auto_applied_fields": sorted(set(update_values) - {"pdfAttachmentId", "pdfMissing", "status"}),
+                },
+            )
+            record_audit_event(
+                actor=request.user,
+                action="ocr_processed",
+                entity_type="pdf_blob",
+                entity_id=blob_id,
+                vessel_id=vessel_id,
+                before=None,
+                after=ocr_payload,
+                reason="OCR confidence routing completed.",
+                metadata={
+                    "source": "api.certs.tracked_items.reparse_pdf",
+                    "tracked_item_id": str(tracked_item_id),
+                    "context": context,
+                    "status": ocr_payload.get("status"),
+                    "confidence_per_field": confidence_map,
+                },
+            )
+            record_cert_change_log(
+                tracked_item_id=serialized_after["id"],
+                before=before,
+                after=after,
+                version_after=int(after.get("version") or 1),
+                actor=request.user,
+                source_ref="api.certs.tracked_items.reparse_pdf",
+            )
+            if workflow_values.get("approvalState") == "pending_master_approval":
+                record_approval_event(
+                    tracked_item_id=serialized_after["id"],
+                    from_state=serialized_before.get("approvalState") if serialized_before else str(current.get("approval_state") or ""),
+                    to_state="pending_master_approval",
+                    actor=request.user,
+                    reason=reason,
+                )
+
+        return Response(
+            {
+                "trackedItem": serialized_after,
+                "pdfBlob": serialized_blob,
+                "ocrPayload": ocr_payload,
+                "ocrConfidencePerField": confidence_map,
+            },
+            status=status.HTTP_200_OK,
         )
 
 

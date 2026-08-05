@@ -50,7 +50,7 @@ async function defaultFetcher({
   signal?: AbortSignal;
   vesselId: string;
 }): Promise<SafetyMscmepc3PositionPayload> {
-  const url = new URL("/api/safety/incidents/position-prefill/", window.location.origin);
+  const url = new URL("http://localhost:8000/api/safety/incidents/position-prefill/", window.location.origin);
   url.searchParams.set("vessel_id", vesselId);
   url.searchParams.set("timestamp", occurredAt);
 
@@ -134,4 +134,3 @@ export function useMscmepc3Position({
     status,
   };
 }
-

@@ -1,4 +1,4 @@
-﻿// src/components/PDFArchive.jsx
+// src/components/PDFArchive.jsx
 import React, { useState, useEffect } from 'react';
 import { Card, Button as OrbUIButton } from '../../components/orb/OrbUI';
 import { useAuth } from '../../hooks/auth/useAuth';

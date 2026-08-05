@@ -127,7 +127,7 @@ class ChainOfCustodyCreateSerializer(serializers.Serializer):
 
 
 class ChainOfCustodyTransferSerializer(serializers.Serializer):
-    chain_of_custody_id = serializers.IntegerField()
+    chain_of_custody_id = serializers.UUIDField()
     handover_timestamp = serializers.DateTimeField()
     handover_from = serializers.CharField()
     handover_to = serializers.CharField()

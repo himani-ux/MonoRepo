@@ -33,9 +33,10 @@ from django.db.models.expressions import RawSQL
 
 
 REPORT_FILE_NAME_MAX_LENGTH = 255
-REPORT_DESCRIPTION_MAX_LENGTH = 500
 REPORT_MIME_TYPE_MAX_LENGTH = 100
 REPORT_EXTENSION_MAX_LENGTH = 20
+MAX_FOLLOW_UP_REPORT_FILES = 3
+MAX_FOLLOW_UP_REPORT_SIZE = 5 * 1024 * 1024
 AUDIT_USER_ID_MAX_LENGTH = 100
 AUDIT_USER_NAME_MAX_LENGTH = 200
 ACTION_CHANGE_REASON_MAX_LENGTH = 500
@@ -62,12 +63,29 @@ def _truncate_file_name(file_name, max_length=REPORT_FILE_NAME_MAX_LENGTH):
 def _append_deficiency_marker(description, deficiencies):
     deficiency_ids = ','.join(str(deficiency.id).replace('-', '') for deficiency in deficiencies)
     marker = f" {FOLLOW_UP_DEFICIENCY_MARKER_PREFIX}{deficiency_ids}]"
-    if len(marker) >= REPORT_DESCRIPTION_MAX_LENGTH:
-        return _truncate_text(description, REPORT_DESCRIPTION_MAX_LENGTH)
-
     visible_description = description or 'Follow-up report'
-    visible_max_length = REPORT_DESCRIPTION_MAX_LENGTH - len(marker)
-    return f"{_truncate_text(visible_description, visible_max_length)}{marker}"
+    return f"{visible_description}{marker}"
+
+
+def _get_report_files(request):
+    report_files = []
+    if hasattr(request.FILES, 'getlist'):
+        report_files.extend(request.FILES.getlist('report_files'))
+    legacy_file = request.FILES.get('report_file')
+    if legacy_file:
+        report_files.append(legacy_file)
+    return report_files
+
+
+def _validate_report_files(report_files):
+    if len(report_files) > MAX_FOLLOW_UP_REPORT_FILES:
+        return 'Up to 3 follow-up report PDFs can be attached.'
+    for report_file in report_files:
+        if report_file.content_type not in ('application/pdf',):
+            return 'Each follow-up report must be a PDF file.'
+        if report_file.size > MAX_FOLLOW_UP_REPORT_SIZE:
+            return 'Each follow-up report file must be 5MB or smaller.'
+    return ''
 
 
 class FollowUpView(APIView):
@@ -76,15 +94,16 @@ class FollowUpView(APIView):
 
     Same-inspection follow-up wizard:
     1. Batch-update deficiency action codes
-    2. Optionally upload a follow-up report (PDF, max 5MB)
+    2. Optionally upload up to 3 follow-up reports (PDF, max 5MB each)
     3. Record activity history event with reinspection_date
 
     Accepts multipart/form-data:
     - deficiency_updates: JSON string (array of {deficiency_id, action_code_id, notes})
     - reinspection_date: date string (YYYY-MM-DD)
     - notes: optional string
-    - report_file: optional PDF file
-    - report_description: optional when report_file is present
+    - report_files: optional repeated PDF file field, maximum 3 files
+    - report_file: optional legacy single PDF file field
+    - report_description: optional when report files are present
 
     Roles: VESSEL_MASTER only
     """
@@ -146,26 +165,16 @@ class FollowUpView(APIView):
         action_changed_by = _truncate_text(user_name, AUDIT_USER_ID_MAX_LENGTH)
 
         # Optional report file validation
-        report_file = request.FILES.get('report_file')
+        report_files = _get_report_files(request)
         report_description = str(request.data.get('report_description', '') or '').strip()
-        if report_file:
-            # Validate PDF type
-            if report_file.content_type not in ('application/pdf',):
-                return Response(
-                    {'error': 'VALIDATION_ERROR', 'message': 'Report must be a PDF file.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            # Validate max 5MB
-            max_size = 5 * 1024 * 1024
-            if report_file.size > max_size:
-                return Response(
-                    {'error': 'VALIDATION_ERROR', 'message': 'Report file exceeds 5MB limit.'},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            report_description = _truncate_text(
-                report_description or 'Follow-up report',
-                REPORT_DESCRIPTION_MAX_LENGTH,
+        report_file_error = _validate_report_files(report_files)
+        if report_file_error:
+            return Response(
+                {'error': 'VALIDATION_ERROR', 'message': report_file_error},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+        if report_files:
+            report_description = report_description or 'Follow-up report'
 
         with transaction.atomic():
             # 1. Update deficiency action codes
@@ -204,8 +213,8 @@ class FollowUpView(APIView):
                     'action_code_id', 'action_code', 'updated_by', 'updated_date',
                 ])
 
-            # 2. Optionally save follow-up report
-            if report_file:
+            # 2. Optionally save follow-up reports
+            for report_file in report_files:
                 safe_original_name = _truncate_file_name(report_file.name)
                 file_ext = os.path.splitext(safe_original_name)[1][:REPORT_EXTENSION_MAX_LENGTH]
                 unique_filename = f"{uuid_lib.uuid4()}{file_ext}"

@@ -61,7 +61,7 @@ class ClassSnapshotRepository:
             cursor.execute(f"SELECT COUNT(*) FROM dbo.vims_certs_class_status_snapshot s {where_sql}", params)
             count = int(cursor.fetchone()[0] or 0)
             cursor.execute(
-                _snapshot_select_sql(where_sql)
+                _snapshot_select_sql(where_sql, include_payload=False)
                 + f" ORDER BY s.printed_on_date DESC, s.uploaded_at DESC OFFSET {offset} ROWS FETCH NEXT {safe_page_size} ROWS ONLY",
                 params,
             )
@@ -153,6 +153,7 @@ class ClassSnapshotRepository:
                 SET parse_status = %s,
                     parse_completed_at = SYSUTCDATETIME(),
                     parser_version = %s,
+                    printed_on_date = %s,
                     parsed_payload_json = %s,
                     parsed_payload_schema_version = %s
                 WHERE snapshot_id = %s
@@ -160,6 +161,7 @@ class ClassSnapshotRepository:
                 [
                     parsed.parse_status,
                     parsed.parser_version,
+                    parsed.payload.get("printed_on_date"),
                     json.dumps(parsed.payload, default=str),
                     int(parsed.payload.get("schema_version") or 1),
                     snapshot_id,
@@ -182,10 +184,15 @@ class ClassSnapshotRepository:
             pdf_path.relative_to(upload_base)
         except ValueError as exc:
             raise SuspiciousFileOperation("Invalid class snapshot PDF storage path.") from exc
-        return parse_class_snapshot_pdf(pdf_path, str(snapshot.get("class_society") or ""))
+        return parse_class_snapshot_pdf(
+            pdf_path,
+            str(snapshot.get("class_society") or ""),
+            printed_on_date=snapshot.get("printed_on_date"),
+        )
 
 
-def _snapshot_select_sql(where_sql: str) -> str:
+def _snapshot_select_sql(where_sql: str, *, include_payload: bool = True) -> str:
+    payload_column = "s.parsed_payload_json" if include_payload else "CAST(NULL AS NVARCHAR(MAX)) AS parsed_payload_json"
     return f"""
         SELECT
             s.snapshot_id, s.vessel_id, v.vesselName AS vessel_name,
@@ -193,7 +200,7 @@ def _snapshot_select_sql(where_sql: str) -> str:
             p.filename, p.content_size_bytes, s.printed_on_date, s.uploaded_by,
             s.uploaded_at, s.parser_version, s.parse_status, s.parse_started_at,
             s.parse_completed_at, s.parser_timeout, s.retry_count,
-            s.parsed_payload_json, s.parsed_payload_schema_version,
+            {payload_column}, s.parsed_payload_schema_version,
             s.reconciliation_run_id, s.upload_sha256, s.superseded_user_error
         FROM dbo.vims_certs_class_status_snapshot s
         LEFT JOIN dbo.VesselData v ON v.id = s.vessel_id

@@ -324,7 +324,7 @@ Types use SQL Server compatible expressions; Django field types in parens.
 | vessel_id | UNIQUEIDENTIFIER | NN, FK â†’ master_vessel.vessel_id | |
 | class_society | NVARCHAR(8) | NN | enum: `NK \| KR \| BV` |
 | pdf_blob_id | UNIQUEIDENTIFIER | NN, FK â†’ vims_certs_pdf_blob.blob_id | Original (retained indefinitely per D-CERT-020) |
-| printed_on_date | DATE | NULL | Extracted from PDF cover |
+| printed_on_date | DATE | NULL | Extracted from the PDF cover/header/footer, or manually entered from the PDF only when parser date extraction fails. Upload time is never used for this field. |
 | uploaded_by | UNIQUEIDENTIFIER | NN, FK â†’ master_user.id | |
 | uploaded_at | DATETIME2 | NN | |
 | parser_version | NVARCHAR(32) | NN | |
@@ -433,7 +433,7 @@ Types use SQL Server compatible expressions; Django field types in parens.
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | notification_id | UNIQUEIDENTIFIER | PK | |
-| master_notification_id | UNIQUEIDENTIFIER | NN, FK â†’ master_notification.id | |
+| master_notification_id | BIGINT | NN, FK -> master_notification.id | Numeric shared notification identity used by the Certs dispatcher and compatibility migration |
 | trigger_event | NVARCHAR(64) | NN | E.g. `cert_expiring_30d`, `reconciliation_mismatch` |
 | cert_row_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_tracked_item.tracked_item_id | |
 | vessel_id | UNIQUEIDENTIFIER | NULL, FK â†’ master_vessel.vessel_id | |
@@ -455,22 +455,22 @@ Types use SQL Server compatible expressions; Django field types in parens.
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
-| print_id | NVARCHAR(64) | PK | Human-readable. Single-vessel: `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel: `SQE-S633-FLEET-<yyyymmdd>-<seq>` (B-PRT-01 resolved 2026-06-29) |
-| scope | NVARCHAR(32) | NN | enum: `per_vessel_full \| per_vessel_partial \| per_section_fleetwide \| custom_selection \| share_bundle` |
+| print_id | NVARCHAR(64) | PK | Human-readable. Single-vessel: `SQE-S633-<imo>-<yyyymmdd>-<seq>`; fleet/multi-vessel: `SQE-S633-FLEET-<yyyymmdd>-<seq>` (B-PRT-01 resolved 2026-06-29). Stored in DB/API/history/download filenames; not printed inside normal visible Excel workbooks per D-CERT-212. |
+| scope | NVARCHAR(32) | NN | enum: `per_vessel_full \| per_vessel_partial \| per_section_fleetwide \| custom_selection \| share_bundle`; normal Print certs status submits `per_vessel_full` for All sections or `per_vessel_partial` for one selected section; stored for history/API and not printed as a normal Excel row |
 | vessels_json | NVARCHAR(MAX) | NN | Array of vessel_ids in scope |
-| sections_json | NVARCHAR(MAX) | NULL | Array of section_codes when applicable |
-| filters_json | NVARCHAR(MAX) | NULL | Per-vessel partial filter set |
-| custom_cert_ids_json | NVARCHAR(MAX) | NULL | For custom_selection / share_bundle |
+| sections_json | NVARCHAR(MAX) | NULL | Array of section_codes when applicable; normal Print certs status stores one selected section or empty for All sections; Share Bundle stores selected certificate sections |
+| filters_json | NVARCHAR(MAX) | NULL | Per-vessel partial filter set; normal Print certs status submits `{}` |
+| custom_cert_ids_json | NVARCHAR(MAX) | NULL | For backend-compatible custom_selection / share_bundle requests; normal Print certs status and normal Share Bundle UI submit an empty array because users select sections |
 | user_id | UNIQUEIDENTIFIER | NN, FK â†’ master_user.id | |
 | user_role | NVARCHAR(32) | NN | |
 | timestamp_utc | DATETIME2 | NN | |
-| system_state_hash | CHAR(8) | NN | (D-CERT-128, D-CERT-202) Stored for artifact identity/audit/history; not printed inside normal visible PDFs. |
-| watermark_applied | NVARCHAR(32) | NN | enum: `none \| INTERNAL \| AUDIT_COPY \| MASTER_COPY \| DRAFT` |
-| watermark_recipient | NVARCHAR(128) | NULL | Stored for request metadata when supplied; not printed inside normal visible PDFs per D-CERT-202. |
+| system_state_hash | CHAR(8) | NN | (D-CERT-128, D-CERT-202, D-CERT-212) Stored for artifact identity/audit/history; not printed inside normal visible PDFs or Excel workbooks. |
+| watermark_applied | NVARCHAR(32) | NN | enum: `none \| INTERNAL \| AUDIT_COPY \| MASTER_COPY \| DRAFT`; normal Print certs status submits `NONE` |
+| watermark_recipient | NVARCHAR(128) | NULL | Stored for request metadata when supplied; normal Print certs status has no recipient input and this value is not printed inside normal visible PDFs per D-CERT-202. |
 | pdf_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | |
 | excel_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | |
 | bundle_zip_blob_id | UNIQUEIDENTIFIER | NULL, FK â†’ vims_certs_pdf_blob.blob_id | For share-bundle |
-| recipient_email | NVARCHAR(256) | NULL | Opt-in email (D-CERT-149). When present on print/share generation, `print_delivery.py` sends the generated files through the same Django SMTP settings used by Circular/platform email. Send result is returned immediately and captured in audit metadata; no schema column is added for delivery status. |
+| recipient_email | NVARCHAR(256) | NULL | Opt-in email (D-CERT-149). Normal Print certs status has no recipient input; when present on share/backend-compatible generation, `print_delivery.py` sends the generated files through the same Django SMTP settings used by Circular/platform email. Send result is returned immediately and captured in audit metadata; no schema column is added for delivery status. |
 | page_count | INT | NULL | |
 | generation_status | NVARCHAR(16) | NN, default 'success' | enum: `success \| failed` |
 | failure_message | NVARCHAR(MAX) | NULL | (D-CERT-150) |
@@ -621,7 +621,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | POST | `/api/certs/catalog/rows/` | CERT_P_001 + CERT_P_008 | DPA + System Admin | Create row; rejects `submission_scope = master_only` per D-CERT-199 |
 | PATCH | `/api/certs/catalog/rows/<catalog_id>/` | CERT_P_008 | DPA + System Admin | Update; rejects `submission_scope = master_only` per D-CERT-199 |
 | POST | `/api/certs/catalog/rows/<catalog_id>/deprecate/` | CERT_P_008 | DPA | Soft-delete (is_active=false) |
-| DELETE | `/api/certs/catalog/rows/<catalog_id>/` | CERT_P_008 + CERT_P_009 | DPA | Hard purge with cascade |
+| DELETE | `/api/certs/catalog/rows/<catalog_id>/` | CERT_P_008 + CERT_P_009 | DPA | Compatibility hard-purge endpoint with cascade; no catalog screen control is rendered |
 | POST | `/api/certs/catalog/rows/bulk-soft-delete/` | CERT_P_009 | DPA | Cap 50, reason required |
 | POST | `/api/certs/catalog/push-to-fleet/<catalog_id>/` | CERT_P_009 | DPA | Auto-create pending_first_upload rows |
 | POST | `/api/certs/catalog/anniversary-recompute/` | CERT_P_009 | DPA + FM 2nd approver | Bulk recompute with preview gate |
@@ -630,14 +630,15 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### 5.2 TrackedItems
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
-| GET | `/api/certs/tracked-items/?vessel_id=<imo>` | (read-vessel) | Per RBAC scope | List per vessel |
-| GET | `/api/certs/tracked-items/<id>/` | (read-vessel) | Per RBAC scope | Detail |
+| GET | `/api/certs/tracked-items/?vesselId=<uuid>` | (read-vessel) | Per RBAC scope | Paginated lightweight list; supports `vesselId`, `catalogId`, `status`, `approvalState`, `page`, `pageSize`; `pageSize` is capped at 100 and implemented with SQL `OFFSET/FETCH`; list rows keep raw actor IDs but skip per-row principal display-name lookup |
+| GET | `/api/certs/tracked-items/<id>/` | (read-vessel) | Per RBAC scope | Detail with principal display names |
 | POST | `/api/certs/tracked-items/` | CERT_P_001 / CERT_P_002 | Per submission_scope rule | Create (direct or draft) |
 | PATCH | `/api/certs/tracked-items/<id>/` | CERT_P_001 / CERT_P_002 | Per role + state | Edit |
 | POST | `/api/certs/tracked-items/<id>/submit/` | CERT_P_002 | C/O / C/E / 2/E (own vessel) | draft â†’ pending_master_approval |
 | POST | `/api/certs/tracked-items/<id>/approve/` | CERT_P_003 | Master (own vessel), DPA, PIC | pending_master_approval â†’ approved |
 | POST | `/api/certs/tracked-items/<id>/reject/` | CERT_P_004 | Master (own vessel), DPA, PIC | pending_master_approval â†’ rejected; reason required |
 | POST | `/api/certs/tracked-items/<id>/upload-pdf/` | CERT_P_001 | Master direct / DPA / FM / Sup'tts | Renewal vs revision auto-detect |
+| POST | `/api/certs/tracked-items/<id>/reparse-pdf/` | CERT_P_001 | Same as upload | Re-run OCR on the stored active PDF, refresh OCR payload, and apply auto-accepted fields without creating a new PDF version |
 | GET | `/api/certs/tracked-items/<id>/pdfs/<blob_id>/view/` | (read-vessel) | Per RBAC scope | Authenticated PDF view stream |
 | GET | `/api/certs/tracked-items/<id>/pdfs/` | (read-vessel) | Per RBAC | Active + superseded + pending-delete |
 | POST | `/api/certs/tracked-items/<id>/anniversary/` | CERT_P_008 | DPA | Rare; confirmation flow |
@@ -648,11 +649,12 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
 | POST | `/api/certs/class-snapshots/` | CERT_P_001 | DPA / FM / Sup'tts | Upload + invoke parser/reconciliation worker path immediately |
-| GET | `/api/certs/class-snapshots/` | (read-vessel) | Per RBAC | Filter list |
-| GET | `/api/certs/class-snapshots/<id>/` | (read-vessel) | Per RBAC | Detail |
+| GET | `/api/certs/class-snapshots/` | (read-vessel) | Per RBAC | Lightweight filter list; excludes full `parsed_payload_json` |
+| GET | `/api/certs/class-snapshots/<id>/` | (read-vessel) | Per RBAC | Detail including `parsedPayload` |
+| GET | `/api/certs/class-snapshots/<id>/pdf/view/` | (read-vessel) | Per RBAC | Inline view of the uploaded class status PDF; vessel dashboard, office review, and vessel messages use this link |
 | POST | `/api/certs/class-snapshots/<id>/reparse/` | CERT_P_001 | DPA + Tech Sup'tt | Manual re-parse trigger |
 | POST | `/api/certs/class-snapshots/<id>/rollback/` | CERT_P_010 | Marine Sup'tt + DPA | Wrong-vessel rollback (D-CERT-058) |
-| GET | `/api/certs/reconciliation/runs/` | (read-vessel) | Per RBAC | List runs |
+| GET | `/api/certs/reconciliation/runs/` | (read-vessel) | Per RBAC | Lightweight run list; excludes full `flags_json` |
 | GET | `/api/certs/reconciliation/runs/<run_id>/` | (read-vessel) | Per RBAC | Detail + flags |
 | POST | `/api/certs/reconciliation/flags/<flag_id>/notify-master/` | CERT_P_002 | Marine Sup'tt + DPA | Mark the flag as sent to Master and audit the office note |
 | POST | `/api/certs/reconciliation/flags/<flag_id>/mark-reviewed/` | CERT_P_002 | Marine Sup'tt + DPA | Resolve |
@@ -678,17 +680,17 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### 5.5 Print / Export
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
-| POST | `/api/certs/print/` | CERT_P_005 | Per scope RBAC | Generate PDF + Excel; returns `downloadUrls`; sends both files when `recipientEmail` is present |
+| POST | `/api/certs/print/` | CERT_P_005 | Per scope RBAC | Generate PDF + Excel; normal Print certs status UI sends current vessel with All sections or one selected section; returns `downloadUrls`; sends both files only when a backend-compatible request supplies `recipientEmail` |
 | GET | `/api/certs/print/jobs/<job_id>/` | (read) | Per scope | Async status |
 | GET | `/api/certs/print/artifacts/` | (read) | Per scope | History |
 | GET | `/api/certs/print/artifacts/<print_id>/` | (read) | Per scope | Detail + download links |
 | GET | `/api/certs/print/artifacts/<print_id>/download/<pdf\|excel\|zip>/` | (read) | Per scope | Streams the stored artifact as an authenticated attachment |
-| POST | `/api/certs/print/share-bundle/` | CERT_P_006 | Master / DPA / FM | ZIP bundle; returns ZIP download URL; sends ZIP when `recipientEmail` is present |
+| POST | `/api/certs/print/share-bundle/` | CERT_P_006 | Master / DPA / FM | ZIP bundle; normal UI sends selected certificate sections; backend-compatible custom certificate IDs remain accepted. Returns ZIP download URL; sends ZIP when `recipientEmail` is present |
 
 ### 5.6 Notifications
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
-| GET | `/api/certs/notifications/?module=certs` | (own inbox) | Self | Filter shared bell |
+| GET | `/api/certs/notifications/?module=certs` | (own inbox) | Self | Filter shared bell; SQL-paginated with `page` and `page_size` |
 | POST | `/api/certs/notifications/<id>/ack/` | (self) | Self | In-app ack |
 | GET | `/api/certs/notifications/ack/<token>/` | (token-bound) | Anyone with valid token | Magic-link landing |
 | GET | `/api/certs/alerts/config/` | CERT_F_006 read | DPA | Settings |
@@ -710,8 +712,8 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 ### 5.8 Audit Log
 | Method | Path | Process ID | Roles | Notes |
 |--------|------|------------|-------|-------|
-| GET | `/api/certs/audit-log/` | CERT_F_008 read | DPA + FM (full) / Sup'tts (own-vessel slice) | Filterable |
-| GET | `/api/certs/audit-log/<id>/` | CERT_F_008 read | Per scope | Detail |
+| GET | `/api/certs/audit-log/` | CERT_F_008 read | DPA + FM (full) / Sup'tts (own-vessel slice) | Filterable lightweight list; excludes full `before_json`, `after_json`, and `event_metadata` |
+| GET | `/api/certs/audit-log/<id>/` | CERT_F_008 read | Per scope | Detail including full before/after/metadata JSON |
 | POST | `/api/certs/audit-log/export/` | CERT_F_008 + CERT_P_005 | DPA only | Watermarked PDF + CSV |
 
 ### 5.9 Dashboard / Vessel Profile
@@ -745,10 +747,12 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 - One concrete parser per class society (NK / KR / BV) per D-CERT-005.
 - Output normalized to common intermediate schema â†’ reconciliation engine.
 - Class snapshot PDFs are text-extracted first per D-CERT-048. If the full PDF exposes no text layer, D-CERT-200 allows PaddleOCR fallback. The fallback reads embedded page images first, reconstructs PaddleOCR text boxes into row-like lines, and uses the KR parser's supported data-page selector before falling back to rendered page images for the same NK/KR/BV parser modules.
+- A parsed class snapshot must contain the report's own printed/generated date. KR reads `Printed on` from the first page (OCR fallback includes page 1 for image-only KR PDFs), NK reads `Printed on`, and BV reads `Generated on`. If the date is not readable, parsing fails instead of falling back to upload time.
+- Conditions are normalized as condition rows for reconciliation review only when they come from exact Condition of Class / Conditions of Class sections: KR keeps class-condition rows and ignores Actionable Note / Statutory Condition rows; NK keeps only Condition of Class blocks and ignores Condition of Installation / Condition of Statutory Survey blocks; BV keeps only non-empty Conditions of Class rows and ignores Class Memoranda / Statutory Memoranda.
 - Test fixtures = 6 reference PDFs (D-CERT-057); CI runs full corpus on every parser PR.
 
 ### `services/reconciliation.py`
-- `reconcile(snapshot_id) â†’ ReconciliationRun` â€” applies ClassCodeMapping (versioned per D-CERT-061), buckets into Match / Mismatch / Missing-in-catalog / Missing-in-class / Conditional-STC / Extended-Postponed / Unmapped-low-conf.
+- `reconcile(snapshot_id) â†’ ReconciliationRun` â€” applies ClassCodeMapping (versioned per D-CERT-061), buckets into Match / Mismatch / Missing-in-catalog / Missing-in-class / Conditional-STC / Extended-Postponed / Conditions-of-class / Unmapped-low-conf.
 - Anomaly detection per D-CERT-073; raises critical events when thresholds breached.
 - `review_flag(..., action='notified_master')` is the office-side source for Master messages. Vessel-side message APIs read flags with `resolution_action='notified_master'` and audit-log reason text, then record Master acknowledgement as an audit event with `resolution_action='master_reviewed'`. This acknowledgement does not write tracked-item validity fields.
 
@@ -765,7 +769,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 - Writes to `master_notification` (in-app) + emits to `email_dispatcher` + Slack relay; logs to `vims_certs_notification_meta`.
 
 ### `services/slack_relay.py`
-- Wrapper around `slack-sdk`; per-vessel + fleet-wide channel routing (D-CERT-160).
+- Wrapper around `slack-sdk`; per-vessel + fleet-wide channel routing (D-CERT-160). Default production office channel is `vims-certs` (`C0BMCASMNKS`); role-specific env overrides may route DPA/Technical/Marine elsewhere.
 
 ### `services/magic_link.py`
 - `mint(notification_id, action='ack', ttl_h=24)` â†’ signed token URL.
@@ -773,6 +777,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 
 ### `services/pdf_renderer.py` / `services/excel_renderer.py` / `services/zip_bundler.py`
 - Per FEAT-CERT-PRT-* features. Free-design layout; preserves SQE S 633 form code (D-CERT-125).
+- `excel_renderer.py` generates the data-only Excel companion and omits visible `Print ID`, `Scope`, and `System state hash` rows per D-CERT-212. Those values remain on the stored artifact and download/history/audit surfaces.
 - Phase 0.8 renderer pick: `services/pdf_renderer.py` uses the ReportLab 4.2.0 fallback. WeasyPrint 68.1 was attempted with MSYS2/Pango runtime remediation on Windows, but failed real render verification; do not depend on WeasyPrint for V1 unless a later runtime smoke test passes.
 
 ### `services/system_state_hash.py`
@@ -850,7 +855,7 @@ Class snapshot uploaded â†’ ClassStatusSnapshot inserted
         â”‚  - For Conditional-STC: pre-fill STC TrackedItem (relationship_type=short_term_for)
         â”‚  - For Extended: pre-fill child extension_of TrackedItem
         â”‚  - For Postponed: pre-fill parent's postponed_until
-        â”‚  - For Conditions of Class section: write to vessel.conditions_of_class[] (D-CERT-066)
+        â”‚  - For strict parser-normalized Conditions of Class rows: create Conditions of class review flags; non-COC note/statutory/memoranda sections are excluded by D-CERT-207
         â”‚  - Anomaly thresholds checked (D-CERT-073)
         â–¼
    ReconciliationRun + ReconciliationFlag rows inserted
@@ -867,6 +872,7 @@ Class snapshot uploaded â†’ ClassStatusSnapshot inserted
 
 **Format-change FAIL SOFT:** Unparseable rows â†’ `unmapped_rows[]` in parsed_payload; reconciliation continues for mapped rows; DPA notified; >25% unmapped â†’ critical escalation (D-CERT-031).
 **Whole-PDF text failure:** if `pdfplumber` extracts no text from the snapshot, PaddleOCR fallback runs against rendered page images. If OCR also reads no usable text, the snapshot remains stored with `parse_status=failed`, no reconciliation run is created, and the UI reports that the parser could not read the PDF.
+**Missing report date fallback:** if the parser cannot read the PDF's printed/generated date and no manual report date was supplied, the snapshot remains stored but no reconciliation run is created. The UI asks the uploader to enter the Printed on / Generated on date shown in the PDF and upload again. If a manual report date is supplied, the parser uses it only when its own date extraction is empty; upload time is never used as a freshness or validity substitute.
 
 **No fuzzy fallback:** Per D-CERT-031, parser does NOT attempt fuzzy mapping when class format changes. Workshop expansion of ClassCodeMapping is the human-in-loop path.
 
@@ -898,7 +904,7 @@ Trigger (cron / state change / mismatch / etc.)
    Hierarchical close on full resolution: cert renewed â†’ both vessel + office copies dismissed (D-CERT-085, D-CERT-087)
 ```
 
-**Parser-anomaly notification resilience:** reconciliation run creation is authoritative. Parser-anomaly notification dispatch is best-effort when the shared `master_notification` table does not expose the Certs notification columns; schema errors are logged and must not roll back snapshot parsing or reconciliation run creation.
+**Parser-anomaly notification resilience:** reconciliation run creation is authoritative. CR-111 / D-CERT-203 adds guarded nullable Certs compatibility columns to the shared `master_notification` table when those columns are absent, so dispatch can write the metadata link without forcing a destructive shared-table rebuild. If a deployment still has a broken notification schema, schema errors are logged and must not roll back snapshot parsing or reconciliation run creation.
 
 **Independent ack model (D-CERT-087):** Office and vessel each ack their own copy. Office dashboard surfaces `vessel_acked: yes/no` as a status flag.
 
@@ -928,21 +934,19 @@ Recompute triggered:
 
 ## 11. Background Jobs
 
-| Job | Schedule | Module | Notes |
-|-----|----------|--------|-------|
-| OCR worker | event-driven (queue) | `jobs/ocr_worker.py` | Per-PDF |
-| Parser worker | event-driven | `jobs/parser_worker.py` | Per-snapshot, 5min timeout + 2x retry |
-| Notification worker | event-driven | `jobs/notification_worker.py` | Drains dispatch queue |
-| Retention sweeper | daily 02:00 UTC | `jobs/retention_sweeper.py` | PdfBlob purge per D-CERT-021 |
-| Monthly digest | 1st of month 08:00 ICT | `jobs/digest_monthly.py` | DPA + Marine Sup'tt only (D-CERT-158) |
-| Draft expirer | daily 03:00 UTC | `jobs/draft_expirer.py` | 7d auto-expire (D-CERT-076) |
-| Audit archiver | nightly 04:00 UTC | `jobs/audit_archiver.py` | Hot â†’ cold tiering at 2y boundary (D-CERT-183) |
-| Cadence cron | hourly | `jobs/cadence_cron.py` | Computes next_due / window flips; fires per-cadence alerts (90/60/30/14/7/1d + post-expiry) |
-| Snapshot stale alert | daily | `jobs/snapshot_stale.py` | Per D-CERT-006 / D-CERT-007 |
-| Auditor expirer | hourly | `jobs/auditor_expirer.py` | Auto-expire grants past expiry_at |
-| Retention purge â€” audit log | nightly 05:00 UTC | `jobs/audit_purge.py` | Soft-delete past 5y; itself audited (D-CERT-091) |
-| Bouncing-email metric | hourly | `jobs/bouncing_email_metric.py` | Updates DPA dashboard surface |
-| Re-auth warning emitter | every 5 min | `jobs/reauth_warning.py` | 15-min + 5-min toast warnings per D-CERT-082 |
+| Job | Current entry point | Schedule owner | Notes |
+|-----|---------------------|----------------|-------|
+| Class snapshot parser | `jobs/parser_worker.py`; called by upload/reparse API | synchronous API trigger today | Per-snapshot parse + reconciliation path |
+| Daily expiry/cadence alerts | `management/commands/dispatch_certs_daily_alerts.py` -> `jobs/daily_alerts.py` | host/server scheduler | Stamps cadence heartbeat after scan |
+| Cadence heartbeat stamp | `management/commands/stamp_cadence_heartbeat.py` -> `jobs/cadence_heartbeat.py` | host/server scheduler or post-alert command | Writes `vims_certs_settings.last_heartbeat_at` |
+| Cadence dead-man check | `management/commands/check_cadence_deadman.py` -> `jobs/cadence_heartbeat.py` | host/server scheduler | Sends office Slack alert when heartbeat is stale |
+| Monthly digest | `management/commands/send_monthly_digest.py` -> `jobs/digest_monthly.py` | host/server scheduler | DPA + Marine Sup'tt only (D-CERT-158) |
+| Blob retention sweeper | `management/commands/sweep_cert_blobs.py` -> `jobs/blob_retention_sweeper.py` | host/server scheduler | PdfBlob purge per D-CERT-021 |
+| Audit archiver | `management/commands/archive_audit_log.py` -> `jobs/audit_archiver.py` | host/server scheduler | Hot -> cold tiering / purge summary |
+| IWS age-gate recompute | `management/commands/recompute_iws_age_gate.py` | host/server scheduler/manual | Updates IWS disabled state for older vessels |
+| Seed/support commands | `seed_*` and `clear_vessel_cert_pdfs.py` commands | manual/admin | Setup and controlled support actions |
+
+Per D-CERT-204, Celery/beat is not claimed as wired for Certs in the current deployment. A future platform scheduler change must add its own CR, deployment proof, and doc cascade.
 
 ---
 

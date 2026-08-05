@@ -2,7 +2,7 @@
  * Register PSC Follow-up page — 5-step wizard
  *
  * Allows Vessel Master to record a follow-up on the SAME inspection.
- * Updates deficiency action codes and optionally uploads a follow-up report.
+ * Updates deficiency action codes and optionally uploads follow-up reports.
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
@@ -75,8 +75,15 @@ export default function RegisterFollowUpPage() {
     if (data.notes) {
       formData.append('notes', data.notes);
     }
-    if (data.report_file) {
-      formData.append('report_file', data.report_file);
+    const reportFiles = data.report_files?.length
+      ? data.report_files
+      : data.report_file
+        ? [data.report_file]
+        : [];
+    reportFiles.forEach((reportFile) => {
+      formData.append('report_files', reportFile);
+    });
+    if (reportFiles.length > 0) {
       formData.append('report_description', data.report_description || '');
     }
 

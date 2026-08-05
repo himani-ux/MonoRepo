@@ -301,7 +301,7 @@ export default function SafetySoiFindingDetailRoute() {
                   <dd className="mt-1 text-sm text-slate-900">{selectedFinding.pending_closure_signature.signed_at}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Device</dt>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Signature record</dt>
                   <dd className="mt-1 text-sm text-slate-900">{selectedFinding.pending_closure_signature.device_fingerprint_last8}</dd>
                 </div>
               </dl>

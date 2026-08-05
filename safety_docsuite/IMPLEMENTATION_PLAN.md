@@ -2621,7 +2621,7 @@ Supersedes:
 
 Implementation impact:
 - Preventive Action now shows Description, Due date, and How much will this reduce risk? only. It sends risk reduction and a linked due-date action; theme/effort/rationale remain nullable legacy compatibility storage.
-- Witness Statement now shows Witness name, Other typed name when selected, Remark, and Upload witness statement. The old text statement field is not current UI.
+- Witness Statement now shows Witness name, Other typed name when selected, Upload witness statement, and Remark below the upload. The old text statement field is not current UI.
 - Office Review removes root/action counters, pre-approval summary cards, approval-role wording, and the send-back target picker. Office-side users see Accept / Close and Send for rework cards; ship-side users see Office Comments/lesson learnt only when a comment exists.
 - Send for rework submits the comment with the fixed action-rework target phase through the existing endpoint. No database migration or new endpoint is required.
 
@@ -2639,6 +2639,187 @@ Implementation impact:
 - Ship-side Office Review always shows the Office Comments/lesson learnt card. If no office note exists, it shows "Office comment is not added yet."
 - Office-side Office Review does not render the old Phase 7 acceptance-only PDF warning line.
 - `PdfPreviewGenerator`, `IncidentPdfRenderer`, and `MscMepc3Circ4PdfRenderer` no longer block incident PDF export solely because `current_phase < 7` or the incident is not approved/closed. Record-type and regulatory applicability checks remain.
+
+## Amendment 26 - 2026-07-07
+
+Phase 1 injury estimated-cost entry is removed under CR-055, and Witness Statement field order is clarified. Current Phase 1 Incident Report does not show or submit injury estimated-cost fields because cost entry belongs to the dedicated Phase 7 Loss Evaluation screen. Current Witness Statement order is witness selection, Upload witness statement, then Remark below the upload.
+
+Triggering discovery: post-shipment UI review found duplicate estimated-cost ownership between Phase 1 injury capture and Phase 7 Loss Evaluation, and the witness upload needed to appear above the remark field.
+
+Supersedes:
+- D-EDGE-02 and D-MAINT-CR025 only where they made Phase 1 estimated-cost entry a current visible UI behavior.
+- Amendment 24 only where it listed Witness Statement fields in the old Remark-before-upload order.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says Phase 1 currently asks whether to add estimated costs or shows Phase 1 estimated-cost inputs.
+
+Implementation impact:
+- Phase 1 injury capture keeps Crew and Non-crew injury details, investigation narrative, dropdowns, and OCIMF flags.
+- The frontend strips legacy injury estimated-cost keys from Phase 1 create/update payloads.
+- Legacy `vims_safety_external_party_injury` estimated-cost columns remain nullable compatibility/fallback storage for old records and exports.
+- Phase 7 Loss Evaluation remains the current estimated-cost entry surface for Incident Report and Injury Report records.
+- Witness Statement renders Upload witness statement above Remark.
+
+## Amendment 27 - 2026-07-07
+
+Incident closure ownership is corrected under CR-056. Current incident close happens from Phase 6 Office Review Accept / Close. Phase 7 Loss Evaluation remains an additional save-only data-entry phase for risk, loss, repair/injury, and cost details.
+
+Triggering discovery: post-shipment UI review found users expected incident closing at Phase 6 and reported that Phase 7 should be only an addition with no closing aspect. The same review found fixed Corrective and Preventive action screens could disable Save when an action already existed.
+
+Supersedes:
+- Amendment 22 only where it made Phase 7 Loss Evaluation the current close owner and required a saved Loss Evaluation row before closure.
+- D-MAINT-CR047 and D-MAINT-CR052 only where they described `/phase-6/close/` as the active close path.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says Phase 7 Loss Evaluation owns closure controls, closure readiness, closing note, or Close Incident.
+
+Implementation impact:
+- Phase 6 Office Review Accept / Close moves the incident to terminal closed state through the state machine.
+- Phase 7 Loss Evaluation shows report type, risk assessment, other details, cost evaluation, and estimated costs only; it does not show a closing note or Close Incident button.
+- `POST /api/safety/incidents/{id}/phase-6/close/` remains registered as a compatibility endpoint but rejects closure with guidance to use Phase 6 Office Review.
+- Fixed Corrective and Preventive action screens allow saving additional visible action rows when Description, Due date, and any visible preventive risk-reduction requirement are complete.
+
+## Amendment 28 - 2026-07-07
+
+Incident action cardinality is corrected under CR-057. Current Corrective and Preventive action entry allows multiple active recommendation rows for the same incident and tier. The old interim one-row-per-tier lock is removed because users can have more than one corrective action and more than one preventive action on the same incident.
+
+Triggering discovery: post-shipment action entry showed "Only one active recommendation row is allowed per tier for an incident." when users tried to add another Corrective or Preventive row. The user explicitly rejected the one-row cap for both action categories.
+
+Supersedes:
+- Step 1.8 only where it says `vims_safety_recommendation` uses an interim Option A one-row-per-tier cardinality lock.
+- Step 8.6 only where it says the backend lead locks one-row-per-tier as the final recommendation cardinality.
+- Amendment 27 only where "additional visible action rows" still depended on a backend/API uniqueness guard.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says an incident can have only one active Corrective or Preventive recommendation row per tier.
+
+Implementation impact:
+- `vims_safety_recommendation` remains one row per saved action, but the same incident and tier can have multiple active rows.
+- Migration `0057_remove_recommendation_tier_cardinality` removes the old active incident/tier uniqueness constraint.
+- The Phase 6 recommendation API no longer rejects an otherwise valid duplicate-tier Corrective or Preventive payload.
+- Frontend action entry keeps Corrective and Preventive type choices available after an existing row is saved; Save creates another row, while Edit updates the selected existing row.
+
+## Amendment 29 - 2026-07-07
+
+Incident PDF final-report grouping is corrected under CR-059. Current Incident PDFs group witness statements by witness, separate Corrective Actions and Preventive Actions, print only Office comments/ lesson learnt in the closure area, and remove Master/HOD signature rows from the current PDF signature table.
+
+Triggering discovery: post-shipment PDF review found the generated report printed witness labels as "Witness 1 name" / "Remark 1", mixed Corrective and Preventive action rows, repeated Office Review and Closure reason content, and showed Master/HOD signature rows the user no longer wants in the final PDF.
+
+Supersedes:
+- D-PDF-01 and D-GAP-R09 only where they require current Incident PDFs to print Master/HOD/FM-style signature-row composition.
+- Amendment 20 and any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says current Incident PDFs print both Office Review comments and stored closure reason.
+- CR-027 only where it made stored closure reason a current printable Closure block.
+- Any current PDF wording that keeps Corrective and Preventive actions combined without separate category blocks or prints numbered witness field labels.
+
+Implementation impact:
+- `IncidentPdfRenderer._build_witness_note_blocks` returns one Witness Statement detail block per witness, using unnumbered Witness name, What the witness said, and Remark row labels.
+- `IncidentPdfRenderer._build_action_blocks_detail` groups linked action rows into Corrective Actions and Preventive Actions blocks based on `vims_safety_recommendation.tier`.
+- `IncidentPdfRenderer._build_closure_blocks` prints only `office_comment` under **Office comments/ lesson learnt**; `closure_reason` remains stored but is not printed in the current Incident PDF.
+- `IncidentPdfRenderer._build_signature_rows` prints Reporter signature and PIC / DPA office signature only.
+
+## Amendment 30 - 2026-07-08
+
+Incident PDF action and witness row output is simplified under CR-060. Current Incident PDFs keep Corrective and Preventive actions separated, but each action prints only the Description and Due date. Witness Statement blocks carry the witness display in the block heading and do not repeat a Witness name row inside the block.
+
+Triggering discovery: post-shipment PDF review found the generated report still printed action lifecycle/verification fields that are not part of the current simplified action workflow, and repeated witness identity inside the Witness Statement block after already showing it in the block heading.
+
+Supersedes:
+- Amendment 29 only where it says current Witness Statement PDF blocks include a separate Witness name row.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says current Incident PDF action blocks print status, physical verification note, closed-at, or recommendation verification rows.
+
+Implementation impact:
+- `IncidentPdfRenderer._build_witness_note_blocks` uses `Witness Statement - <witness display>` headings when a witness display exists and emits only What the witness said and Remark rows.
+- `IncidentPdfRenderer._build_action_blocks_detail` emits only Description and Due date lines for linked Corrective and Preventive actions.
+- Recommendation verification rows and action lifecycle/physical-verification fields remain stored for compatibility but are not printed in current Incident PDFs.
+
+## Amendment 31 - 2026-07-08
+
+Incident Phase 1 reporting context, Phase 6 PDF/Fleet Alert controls, and Incident PDF sequencing are updated under CR-064. Phase 1 now stores risk-assessment/toolbox/permit yes-no-NA answers, Type of Activity, incident-type Other specify text, and vessel-location detail text for In Port / At Anchorage. Phase 6 exposes PDF download to ship-side users where vessel scope permits, Fleet Alert recipient selection has a select-all option for office users, and Incident Fleet Alert email CC includes HSSEQ. Incident PDFs now follow visible phase order, print Loss Evaluation after Phase 6 on a fresh page when selected, rename Onboard location to Location on Board, and use unnumbered boxed rows for causes and corrective/preventive actions.
+
+Triggering discovery: post-shipment PDF and workflow review found Phase 1 needed additional operational context fields, ship-side users needed the same download affordance, Fleet Alert needed fleet-wide recipient selection plus HSSEQ copy, and generated Incident PDFs needed to match the visible phase order and professional report styling.
+
+Supersedes:
+- Step 1.3 only where the Phase 1 intake field list omitted the new operational context fields and conditional Other/location specify text.
+- Step 1.9 and Amendment 25 only where PDF download availability was described as office-only or visually absent for ship-side Office Review users.
+- Step 6.1 only where the Incident PDF order followed the older 10-section template order instead of current visible phase order.
+- Amendments 29 and 30 only where current PDF root-cause/action blocks still used numbered Cause/Action labels.
+
+Current behavior after CR-064:
+- Phase 1 creates/updates the new incident-level fields and prints them in the Incident PDF intake section.
+- Incident type Other requires/specifies `incident_type_other`; vessel locations In Port / At Anchorage expose and save `vessel_location_detail`.
+- Phase 6 Office Review keeps PDF download visible for authorized ship-side users and office-side users.
+- Fleet Alert recipient popup includes Select all vessels and sends email with `HSSEQ@kaizenship.net` in CC.
+- Incident PDF renders Phase 1 through Phase 6 in order, then Phase 7 Loss Evaluation on a new page only when Print Loss Evaluation is selected.
+
+## Amendment 32 - 2026-07-13
+
+Safety dashboard presentation is simplified under CR-077. The current `/safety/dashboard/` default view shows the plain Safety Dashboard heading, simplified Safety score wording, repeat issues, top repeat causes, corrective-action age, current view dates, and export controls. Advanced analytics cards such as Heinrich Ratio and SOI Compliance % remain available but are hidden by default behind **Show more dashboard cards**.
+
+Triggering discovery: post-shipment office-user review found the Safety dashboard too chaotic and data-heavy. Users asked for cards such as Heinrich Ratio and SOI Compliance % to be displayed only when requested, and for dashboard wording to use simpler language.
+
+Supersedes:
+- Step 7.2 and D-GAP-M27 only where Heinrich Ratio was required to be immediately visible with no hiding.
+- Step 7.5 only where SOI Compliance % was required to be immediately visible on the main dashboard grid.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, or SSOT statement that says every Safety dashboard analytics panel is visible by default.
+
+Current behavior after CR-077:
+- The dashboard route keeps loading the existing dashboard endpoints and preserves the literal **SOI Compliance %** label when the metric is shown.
+- Heinrich Ratio is shown as **Reporting trend** inside the optional extra-cards section.
+- SOI Compliance % is shown as **SOI check status** inside the optional extra-cards section.
+- Default visible language favors plain operational wording: Safety Dashboard, Safety score, Time period, Choose vessel, Current view, Repeat issues, Repeat events, and Oldest open action.
+
+## Amendment 33 - 2026-07-13
+
+Incident injury narrative presentation is corrected under CR-078. The current Phase 1 injury **Investigation - Narrative** card no longer shows a separate **Describe What Happened** field, and current Incident PDFs no longer print legacy injury-row `what_happened_narrative`. The incident-level **Describe What happened?** field remains the single current narrative for both Incident Report and Injury Report output.
+
+Triggering discovery: post-shipment Phase 1 review found the injury subsection still displayed a duplicate narrative prompt after the incident-level narrative had already been made the authoritative current field.
+
+Supersedes:
+- Amendment 1 / CR-002 and any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement only where it says current Phase 1 injury capture shows or current Incident PDFs print a separate injury investigation narrative.
+
+Current behavior after CR-078:
+- `SafetyExternalPartyInjuryForm` keeps legacy `what_happened_narrative` type compatibility but does not render it in `investigationTextFields`.
+- `IncidentPdfRenderer` omits `injury.what_happened_narrative` from the current Injury Details block.
+- `vims_safety_external_party_injury.what_happened_narrative` remains nullable legacy storage/API compatibility and is not migrated or deleted.
+
+## Amendment 34 - 2026-07-13
+
+Incident Office Review send-back validation is corrected under CR-079. PIC/DPA send-back can create the `SENT_BACK` rework state from the visible Office Review screen even when the incident has not yet been internally advanced to `current_phase = 7`. The user still enters one rework comment, the frontend keeps the fixed action-rework target, and Rework Done remains the path back to Office Review/`UNDER_REVIEW`.
+
+Triggering discovery: post-shipment Office Review use found that clicking **Send for rework** could return `Office review actions require current_phase = 7.` for incidents still at earlier internal phases, even though the current UI exposes the send-back textbox to let office request exactly those corrections.
+
+Supersedes:
+- Amendment 24 / CR-044 and any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement only where it implies send-back requires internal `current_phase = 7` before the rework state can be created.
+
+Current behavior after CR-079:
+- `IncidentPhase7SendBackView` keeps PIC/DPA and process-permission checks but no longer calls the internal phase-7-only guard.
+- The rework phase log records the actual source phase in `phase_from` and the fixed action-rework target in `phase_to`.
+- Accept / Close still uses the Office Review phase and signature checks; only send-back validation is relaxed for the rework request path.
+
+## Amendment 35 - 2026-07-13
+
+Near Miss Fleet Alert delivery is extended under CR-083. Current HIGH-priority Near Miss Fleet Alert issue sends both in-app `NEAR_MISS_FLEET_ALERT` notifications and a batched SMTP email to selected vessel `VesselData.Email` recipients, with `HSSEQ@kaizenship.net` in CC. The existing Circular module handoff remains separate and is not replaced by Safety-owned Circular creation.
+
+Triggering discovery: post-shipment use showed that Near Miss Fleet Alert only sent in-app notifications, while users expected the same in-app plus email delivery pattern already implemented for Incident Fleet Alert.
+
+Supersedes:
+- Step 2.5 only where it describes Near Miss Fleet Alert issue as notification/workflow completion without email dispatch.
+- Any APP_FLOW, USER_GUIDE, VALIDATION_RULES, BACKEND_STRUCTURE, or SSOT statement that says Near Miss Fleet Alert issue only records the Safety step or only emits in-app notification.
+
+Current behavior after CR-083:
+- `/api/safety/near-miss/{id}/fleet-alert/` POST validates selected recipient scope, the 7-day SLA/extension rule, selected-vessel email presence, and configured SMTP credentials before writing fleet-alert completion history.
+- The issue action writes in-app notifications, publishes the existing Circular handoff seam metadata, sends one BCC email batch to selected vessel email addresses, and returns `notifications_emitted`, `emails_sent`, `email_failed`, and `vessels_without_email`.
+- Missing `VesselData.Email` or missing SMTP credentials fails clearly before notification/history completion is recorded.
+
+## Amendment 36 - 2026-07-13
+
+Safety dashboard presentation is simplified further under CR-084, and Auditor Bundle Export vessel filtering is changed to a dropdown. Current `/safety/dashboard/` default view shows Safety score, Current view, period/vessel controls, and export controls first. Repeat issues, top repeat causes, corrective-action age, Heinrich Ratio, and SOI Compliance % remain available only inside **Show dashboard details**. Current `/safety/admin/auditor-export/` loads the existing active-vessel options and uses them for the Vessel filter dropdown.
+
+Triggering discovery: post-shipment office-user review found the dashboard was still too data-heavy, and the auditor export Vessel filter needed actual vessel dropdown options instead of a free-text field.
+
+Supersedes:
+- Amendment 32 / CR-077 only where repeat issues, top repeat causes, and corrective-action age were still default-visible.
+- Amendment 32 / CR-077 only where the optional details control was named **Show more dashboard cards**.
+- Any APP_FLOW, PRD, USER_GUIDE, VALIDATION_RULES, or SSOT statement that says the current Auditor Bundle Export vessel filter is free text.
+
+Current behavior after CR-084:
+- The dashboard route keeps the existing dashboard endpoints and preserves **SOI Compliance %** wherever the metric is shown.
+- Detailed dashboard cards are hidden by default and open from **Show dashboard details**.
+- Auditor Bundle Export sends the same `vessel_id` payload as before, but the frontend value comes from the active-vessel dropdown.
 
 ## Amendment 37 - 2026-07-14
 

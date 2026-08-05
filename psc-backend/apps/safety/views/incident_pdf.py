@@ -23,12 +23,22 @@ class IncidentPDFDownloadView(IncidentViewMixin, generics.GenericAPIView):
     def get_pdf_renderer(self) -> IncidentPdfRenderer:
         return self.pdf_renderer_class()
 
+    def get_selected_sections(self) -> list[str] | None:
+        raw_values = self.request.query_params.getlist("sections")
+        if not raw_values:
+            return None
+        sections: list[str] = []
+        for raw_value in raw_values:
+            sections.extend(value.strip() for value in str(raw_value).split(",") if value.strip())
+        return sections or None
+
     def get(self, request, *args, **kwargs):
         incident = self.get_object()
         result = self.get_pdf_renderer().render_incident_pdf(
             incident_id=incident.pk,
             viewer_user=request.user,
             persist=True,
+            included_sections=self.get_selected_sections(),
         )
 
         response = HttpResponse(result.content, content_type=result.content_type)

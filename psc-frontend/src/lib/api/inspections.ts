@@ -259,10 +259,10 @@ export interface DeficiencyActionUpdate {
 
 /**
  * Submit a follow-up on the SAME inspection (wizard workflow).
- * Sends multipart/form-data with JSON deficiency_updates + optional file.
+ * Sends multipart/form-data with JSON deficiency_updates + optional PDF files.
  *
  * @param inspectionId - Inspection ID
- * @param data - FormData containing deficiency_updates (JSON), reinspection_date, optional report_file
+ * @param data - FormData containing deficiency_updates (JSON), reinspection_date, optional report_files
  */
 export async function submitFollowUp(
   inspectionId: string,

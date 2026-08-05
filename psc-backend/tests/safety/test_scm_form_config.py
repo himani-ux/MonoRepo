@@ -53,9 +53,20 @@ class FakeCMSRepository:
 
 
 class FakeWRHSnapshotFetcher:
+    def fetch_many_24h_and_7d(self, *, crew_ids, meeting_date, vessel_id: str):
+        return {
+            str(crew_id): self.fetch_24h_and_7d(
+                crew_id=str(crew_id),
+                meeting_date=meeting_date,
+                vessel_id=vessel_id,
+            )
+            for crew_id in crew_ids
+        }
+
     def fetch_24h_and_7d(self, *, crew_id: str, meeting_date, vessel_id: str):
         if crew_id == "master-7":
             return {
+                "timezone_offset_minutes": 330,
                 "warning_codes": ["non_compliance"],
                 "warnings": ["WRH non-compliance for review."],
                 "wrh_data_available": True,
@@ -65,6 +76,7 @@ class FakeWRHSnapshotFetcher:
                 "wrh_rest_hours_7d": 75.0,
             }
         return {
+            "timezone_offset_minutes": 330,
             "warning_codes": [],
             "warnings": [],
             "wrh_data_available": True,
@@ -185,6 +197,8 @@ class SCMFormConfigTests(unittest.TestCase):
         self.assertEqual(payload["chair"]["crew_id"], "master-7")
         self.assertEqual(len(payload["attendee_rows"]), 2)
         self.assertEqual(payload["attendee_rows"][0]["wrh_flag"], "YELLOW")
+        self.assertFalse(payload["wrh_host_readiness"]["ready"])
+        self.assertIn("WRH non-compliance is present for Master Seven.", payload["wrh_host_readiness"]["warnings"])
         self.assertEqual(payload["closed_since_last"]["summary"]["total_count"], 4)
         self.assertEqual(payload["overdue_soi_areas"][0]["area_id"], 8)
         self.assertEqual(payload["unresolved_previous_actions"][0]["source_scm_number"], "ARYA-01-Apr-2026")

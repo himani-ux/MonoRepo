@@ -18,7 +18,7 @@ bootstrap_django()
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.safety.models import Incident, IncidentCauseTag, IncidentFact, MasterMscatTaxonomy
+from apps.safety.models import Incident, IncidentCauseTag, IncidentFact, MasterMscatTaxonomy, NearMissCauseOption
 from apps.safety.views.incident_phase5 import IncidentMscatSearchView, IncidentPhase5CauseListCreateView, IncidentPhase5WorkspaceView
 
 
@@ -108,4 +108,60 @@ class Phase5AnalysisApiTests(unittest.TestCase):
 
         self.assertEqual(workspace_response.status_code, 200)
         self.assertEqual(len(workspace_response.data["causes"]), 1)
-        self.assertEqual(len(workspace_response.data["bias_guards"]), 8)
+        self.assertIn("bias_guards", workspace_response.data)
+
+    def test_cause_create_accepts_near_miss_cause_factor_option(self) -> None:
+        cause_option = NearMissCauseOption.objects.create(
+            factor=NearMissCauseOption.Factor.HUMAN,
+            cause_stage=NearMissCauseOption.CauseStage.ROOT,
+            option_code="HUMAN_ROOT_TEST",
+            option_text="Poor supervision",
+            display_order=1,
+        )
+        create_request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/analysis/causes/",
+            {
+                "source_fact_id": self.fact.pk,
+                "cause_option_id": str(cause_option.pk),
+                "causal_layer": IncidentCauseTag.CausalLayer.ROOT,
+                "analysis_tool": IncidentCauseTag.AnalysisTool.STEP,
+                "rationale": "Supervision gap was supported by the fact note.",
+            },
+            format="json",
+        )
+        force_authenticate(create_request, user=build_user())
+        create_response = self.cause_view(create_request, id=self.incident.pk)
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(create_response.data["cause_factor"], NearMissCauseOption.Factor.HUMAN)
+        self.assertEqual(create_response.data["cause_factor_label"], "Human Factors")
+        self.assertEqual(create_response.data["cause_option_text"], "Poor supervision")
+        self.assertEqual(create_response.data["mscat_subcode_id"], "OTHER")
+
+        workspace_request = self.factory.get(
+            f"/api/safety/incidents/{self.incident.pk}/analysis/",
+        )
+        force_authenticate(workspace_request, user=build_user())
+        workspace_response = self.workspace_view(workspace_request, id=self.incident.pk)
+
+        self.assertEqual(workspace_response.status_code, 200)
+        self.assertEqual(workspace_response.data["causes"][0]["cause_factor_label"], "Human Factors")
+        self.assertEqual(workspace_response.data["causes"][0]["cause_option_text"], "Poor supervision")
+
+    def test_cause_create_rejects_intermediate_layer(self) -> None:
+        create_request = self.factory.post(
+            f"/api/safety/incidents/{self.incident.pk}/analysis/causes/",
+            {
+                "source_fact_id": self.fact.pk,
+                "mscat_subcode_id": self.subcode.subcode_id,
+                "causal_layer": IncidentCauseTag.CausalLayer.INTERMEDIATE,
+                "analysis_tool": IncidentCauseTag.AnalysisTool.STEP,
+                "rationale": "Intermediate cause should not be accepted in the current RCA flow.",
+            },
+            format="json",
+        )
+        force_authenticate(create_request, user=build_user())
+        response = self.cause_view(create_request, id=self.incident.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("causal_layer", response.data)

@@ -38,6 +38,31 @@ class NotificationType(models.TextChoices):
     CIRCULAR_PENDING_APPROVAL = 'CIRCULAR_PENDING_APPROVAL', 'Circular Pending Approval'
     CIRCULAR_APPROVED = 'CIRCULAR_APPROVED', 'Circular Approved'
     CIRCULAR_REJECTED = 'CIRCULAR_REJECTED', 'Circular Rejected'
+    NEAR_MISS_SUBMITTED = 'NEAR_MISS_SUBMITTED', 'Near Miss Submitted'
+    NEAR_MISS_HOD_REVIEW_COMPLETE = 'NEAR_MISS_HOD_REVIEW_COMPLETE', 'Near Miss HOD Review Complete'
+    NEAR_MISS_REWORK_REQUIRED = 'NEAR_MISS_REWORK_REQUIRED', 'Near Miss Rework Required'
+    NEAR_MISS_READY_FOR_OFFICE_COMMENTS = (
+        'NEAR_MISS_READY_FOR_OFFICE_COMMENTS',
+        'Near Miss Ready for Office Comments',
+    )
+    NEAR_MISS_FLEET_ALERT = 'NEAR_MISS_FLEET_ALERT', 'Near Miss Fleet Alert'
+    NEAR_MISS_FLEET_ALERT_NUDGE_DAY_5 = (
+        'NEAR_MISS_FLEET_ALERT_NUDGE_DAY_5',
+        'Near Miss Fleet Alert Nudge Day 5',
+    )
+    NEAR_MISS_FLEET_ALERT_NUDGE_DAY_6 = (
+        'NEAR_MISS_FLEET_ALERT_NUDGE_DAY_6',
+        'Near Miss Fleet Alert Nudge Day 6',
+    )
+    NEAR_MISS_FLEET_ALERT_ESCALATION_DAY_8 = (
+        'NEAR_MISS_FLEET_ALERT_ESCALATION_DAY_8',
+        'Near Miss Fleet Alert Escalation Day 8',
+    )
+    INCIDENT_PHASE_2_HANDOFF_REQUIRED = (
+        'INCIDENT_PHASE_2_HANDOFF_REQUIRED',
+        'Incident Phase 2 Handoff Required',
+    )
+    INCIDENT_PHASE_2_SUBMITTED = 'INCIDENT_PHASE_2_SUBMITTED', 'Incident Phase 2 Submitted'
 
 
 class Notification(models.Model):

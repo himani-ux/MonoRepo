@@ -67,7 +67,7 @@ class AlarpGateTests(unittest.TestCase):
             )
         )
 
-    def test_yellow_preventive_row_rejects_missing_risk_reduction_and_due_date(self) -> None:
+    def test_yellow_preventive_row_saves_without_risk_reduction_or_due_date(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/ALARP1",
             vessel_id="7",
@@ -83,7 +83,7 @@ class AlarpGateTests(unittest.TestCase):
             {
                 "tier": Recommendation.Tier.PREVENTIVE,
                 "title": "Revise fleet crane maintenance standard",
-                "description": "System action without risk reduction should be blocked on YELLOW.",
+                "description": "System action is recorded as a description-only preventive action.",
             },
             format="json",
         )
@@ -91,9 +91,9 @@ class AlarpGateTests(unittest.TestCase):
 
         response = self.view(request, id=incident.pk)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("estimated_likelihood_reduction", response.data)
-        self.assertIn("corrective_action", response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["estimated_likelihood_reduction"], None)
+        self.assertEqual(response.data["corrective_actions"], [])
 
     def test_green_preventive_row_can_save_without_theme_effort_or_residual_fields(self) -> None:
         incident = Incident.objects.create(

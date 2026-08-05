@@ -35,9 +35,6 @@ export function SafetyNearMissTriageModal({
     <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Safety / Near Miss / Office
-          </p>
           <h1 className="text-3xl font-semibold text-slate-900">Near Miss Office Comments</h1>
           <p className="max-w-3xl text-sm leading-6 text-slate-600">
             Office reviewer confirms the LOW vs HIGH path, logs any override reason, and can

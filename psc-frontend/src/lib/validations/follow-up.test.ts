@@ -4,7 +4,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  MAX_FOLLOW_UP_REPORT_FILE_SIZE,
   followUpFormSchema,
+  followUpStep4Schema,
   deficiencyUpdateSchema,
 } from './follow-up';
 
@@ -141,6 +143,52 @@ describe('deficiencyUpdateSchema', () => {
       deficiency_id: '123',
       action_code_id: 'not-a-number',
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('followUpStep4Schema — report PDF attachments', () => {
+  const pdfFile = (name: string, size = 10) =>
+    new File([new Uint8Array(size)], name, { type: 'application/pdf' });
+
+  it('test_feat_def_002_happy_path_allows_up_to_three_follow_up_pdfs', () => {
+    const result = followUpStep4Schema.safeParse({
+      report_files: [pdfFile('one.pdf'), pdfFile('two.pdf'), pdfFile('three.pdf')],
+      report_description: 'Follow-up reports',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('test_feat_def_002_validation_rejects_more_than_three_follow_up_pdfs', () => {
+    const result = followUpStep4Schema.safeParse({
+      report_files: [
+        pdfFile('one.pdf'),
+        pdfFile('two.pdf'),
+        pdfFile('three.pdf'),
+        pdfFile('four.pdf'),
+      ],
+      report_description: 'Follow-up reports',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('test_feat_def_002_validation_rejects_non_pdf_follow_up_attachment', () => {
+    const result = followUpStep4Schema.safeParse({
+      report_files: [new File(['image'], 'photo.png', { type: 'image/png' })],
+      report_description: 'Follow-up reports',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('test_feat_def_002_validation_rejects_follow_up_pdf_over_5mb', () => {
+    const result = followUpStep4Schema.safeParse({
+      report_files: [pdfFile('large.pdf', MAX_FOLLOW_UP_REPORT_FILE_SIZE + 1)],
+      report_description: 'Follow-up reports',
+    });
+
     expect(result.success).toBe(false);
   });
 });

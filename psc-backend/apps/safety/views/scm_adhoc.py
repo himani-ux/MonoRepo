@@ -20,6 +20,7 @@ class SCMCreateAdHocView(SCMViewMixin, generics.GenericAPIView):
         payload = self.get_scm_repository().build_form_config(
             vessel_id=str(vessel_id),
             meeting_type=SCMMeeting.MeetingType.AD_HOC,
+            meeting_date=request.query_params.get("meeting_date"),
             actor_id=_resolve_actor_id(request.user),
             user=request.user,
             include_feeds=True,

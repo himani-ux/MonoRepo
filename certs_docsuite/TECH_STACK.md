@@ -2,9 +2,9 @@
 
 > **Platform: WEB** — responsive browser app (office desktop + vessel bridge tablet, same codebase). No native/mobile target, no offline mode (D-CERT-156). Other docs re-read this field before applying platform-conditional rules (CLAUDE.md → Platform Adherence).
 >
-> **Version:** 1.4
-> **Last Updated:** 2026-07-22 (v1.4 — Certs OCR engine changed to PaddleOCR via CR-103. v1.3 — Phase 0.8 PDF renderer pick resolved: ReportLab 4.2.0 fallback after WeasyPrint 68.1 + MSYS2/Pango runtime verification failed on Windows. v1.2 — closure session: worker queue NAMED (Celery 5.4.0 + Redis 5.0.8 + django-celery-beat 2.6.0 per Safety lock); B-TECH-01/02 reclassified as scheduled Phase-0 picks (steps 0.7/0.8). v1.1 — Platform field added; TBD→BLOCKED. v1.0: 2026-05-13)
-> **Status:** 🟢 Locked — Ready for Build (Phase-0 picks resolved through CR-103: PaddleOCR for Certs OCR, ReportLab PDF renderer at 0.8; Slack channel naming remains Step 0.9)
+> **Version:** 1.5
+> **Last Updated:** 2026-07-29 (v1.5 — Certs production Slack channel confirmed as `vims-certs` / `C0BMCASMNKS`. v1.4 — Certs OCR engine changed to PaddleOCR via CR-103. v1.3 — Phase 0.8 PDF renderer pick resolved: ReportLab 4.2.0 fallback after WeasyPrint 68.1 + MSYS2/Pango runtime verification failed on Windows. v1.2 — closure session: worker queue NAMED (Celery 5.4.0 + Redis 5.0.8 + django-celery-beat 2.6.0 per Safety lock); B-TECH-01/02 reclassified as scheduled Phase-0 picks (steps 0.7/0.8). v1.1 — Platform field added; TBD→BLOCKED. v1.0: 2026-05-13)
+> **Status:** 🟢 Locked — Ready for Build (Phase-0 picks resolved through CR-103: PaddleOCR for Certs OCR, ReportLab PDF renderer at 0.8; Slack production channel confirmed)
 > **Source:** `../VIMS-CERTIFICATES-MODULE-SSOT.md` §14 (D-CERT-022) + sibling lock files (`VIMS-Reporting-Module/TECH_STACK.md`, `VIMS-Safety-Module/TECH_STACK.md`).
 > **Inheritance rule:** Certs inherits the entire Reporting + Safety stack (Django, DRF, React, TypeScript, SQL Server, JWT, S3-compatible blob, `master_notification`). Certs adds parser + OCR + Slack libs only. **Never bump a shared dep without coordinating across all VIMS modules.**
 
@@ -33,10 +33,10 @@
 | Date / time | date-fns | (per Reporting lock) | + timezone helpers from `wrh_ship_time_config` consumer pattern |
 | HTTP client | fetch (native) wrapped in TanStack Query | — | No axios; consistent with Safety/Reporting |
 | PDF generation | ReportLab | 4.2.0 | Matches Reporting + Safety; used for print export |
-| Notifications (in-app) | `master_notification` table (shared) | — | Single bell-icon inbox across VIMS modules |
+| Notifications (in-app) | `master_notification` table (shared) with Certs compatibility columns | — | Single bell-icon inbox across VIMS modules; CR-111/D-CERT-203 adds nullable Certs columns when an existing shared table is missing them |
 | Notifications (email) | `email_dispatcher` service (shared) | — | HTML+plain-text multipart per D-CERT-152 |
 | Blob storage | S3-compatible (per existing platform lock) | — | AES-256 at-rest, TLS 1.3 in-transit per D-CERT-019, D-CERT-189 |
-| Worker queue | **Celery + Redis + django-celery-beat** | Celery 5.4.0 / Redis 5.0.8 / django-celery-beat 2.6.0 (per Safety lock) | Named 2026-06-12 (B-OBS-08 resolution; was "per existing platform job runner"). 4-worker concurrency, platform setting. Async OCR per D-CERT-123, scheduled crons per D-CERT-021, heartbeat dead-man pair per OBS-CERT-11 |
+| Scheduled jobs | Django management commands + host/server scheduler in the current deployment | Python/Django command entry points | D-CERT-204: this repo exposes Certs jobs through command entry points until a separate platform Celery/beat deployment is wired and proven. Async OCR/Celery remains a future platform hardening path, not the current shipped Certs claim. |
 
 **Source-of-truth lock files for shared deps:**
 - `../VIMS-Reporting-Module/TECH_STACK.md` (canonical Django/DRF/React versions)
@@ -58,7 +58,7 @@ If a sibling module bumps a shared dep, Certs adopts the same version in the sam
 | Print PDF renderer | ReportLab | 4.2.0 | Phase 0.8 pick: WeasyPrint 68.1 preferred path was attempted, but Windows native runtime verification failed even after MSYS2/Pango remediation; use the already-pinned ReportLab fallback for SQE S 633 print export per D-CERT-125 and D-CERT-144. | D-CERT-125, D-CERT-144 |
 | Excel renderer (data-only) | `openpyxl` | latest stable | Data-only Excel companion to print PDF (no live formulas) per D-CERT-141 | D-CERT-141 |
 | ZIP bundle | `zipfile` (Python stdlib) | with Python 3.x | Manifest PDF + cert PDFs bundle per D-CERT-145 | D-CERT-145 |
-| Slack SDK | `slack-sdk` (Python) | latest stable | Per-vessel + fleet-wide Slack channel routing per D-CERT-151, D-CERT-160, D-CERT-161 | D-CERT-151, D-CERT-161 |
+| Slack SDK | `slack-sdk` (Python) | latest stable | Per-vessel + fleet-wide Slack channel routing per D-CERT-151, D-CERT-160, D-CERT-161. Default production channel: `vims-certs` (`C0BMCASMNKS`) unless overridden in vessel config/env. | D-CERT-151, D-CERT-161 |
 | File hashing | `hashlib` (Python stdlib) | with Python 3.x | SHA-256 for PDF dedup per D-CERT-051, D-CERT-118 | D-CERT-051, D-CERT-118 |
 | Magic-link signing | `itsdangerous` or `django.core.signing` | with Django | Signed 24h-expiring single-use URLs per D-CERT-154 | D-CERT-154 |
 | Survey-window computation | KSM-internal Python module (`apps/certs/services/survey_window.py`) | own | Compute `window_open` / `window_close` from anniversary + cadence + IMO rules per D-CERT-063, D-CERT-064 | D-CERT-063, D-CERT-064 |

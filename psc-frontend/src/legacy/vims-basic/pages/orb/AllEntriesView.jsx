@@ -1,7 +1,7 @@
-﻿// src/components/AllEntriesView.jsx
+// src/components/AllEntriesView.jsx
 import React, { useState, useEffect } from 'react';
 import { Button, Card } from "../../components/orb/OrbUI";
-import { formatDate } from '../../utils/orb/orbUtils'; 
+import { formatDate } from '../../utils/orb/orbUtils';
 import { useAuth } from '../../hooks/auth/useAuth';
 
 
@@ -10,7 +10,7 @@ import { useAuth } from '../../hooks/auth/useAuth';
 const AllEntriesView = () => {
 
   const {user} = useAuth();
-  
+
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -80,7 +80,7 @@ const AllEntriesView = () => {
 
   // Render the table with entries using the specific format
   return (
-   
+
     <div className="all-entries-view orb-theme orb-page">
       <Card title="All Non-Deleted ORB Entries">
         <div className="orb-toolbar">
@@ -135,7 +135,7 @@ const AllEntriesView = () => {
                             if (line.startsWith('TANK(S) BALLASTED')) itemNo = '1';
 
                             // 2. Cleaned Since Last Oil
-                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) itemNo = '2';
+                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) itemNo = '2';
 
                             // 4.1 Ballast Start/End
                             if (line.startsWith('START BALLAST')) itemNo = '4.1';
@@ -169,7 +169,7 @@ const AllEntriesView = () => {
                               }
                             }
                             // Quantity is always 10, regardless of index
-                            else if (line.includes('MÂ³')) {
+                            else if (line.includes('M³')) {
                               itemNo = '10';
                             }
                             break;
@@ -179,10 +179,10 @@ const AllEntriesView = () => {
                               itemNo = entry.item_no || '';
                             }
                             // 11.1 handled on first line
-                            if (line.includes('MÂ³') && !line.includes('COLLECTED') && !line.includes('RETAINED')) {
+                            if (line.includes('M³') && !line.includes('COLLECTED') && !line.includes('RETAINED')) {
                               itemNo = '11.2';
                             }
-                            if ((idx === 2) && line.includes('MÂ³')) {
+                            if ((idx === 2) && line.includes('M³')) {
                               itemNo = '11.3';
                             }
                             if (idx === 3) {
@@ -249,7 +249,7 @@ const AllEntriesView = () => {
                             if (line.startsWith('START:')) itemNo = '26.2';
                             else if (line.includes('BUNKERED IN TANKS')) itemNo = line.includes('FUEL') ? '26.3' : '26.4';
                             else if (line.includes('TANK(S) BALLASTED')) itemNo = '1';
-                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED â€“ PREVIOUS OIL')) itemNo = '2';
+                            else if (line.includes('TANK CLEANED SINCE') || line.includes('NOT CLEANED – PREVIOUS OIL')) itemNo = '2';
                             else if (line.includes('START BALLAST')) itemNo = '4.1';
                             else if (line.includes('START') && !line.includes('BALLAST')) itemNo = '3.1';
                             else if (line.startsWith('METHOD USED')) itemNo = '3.2';
@@ -257,7 +257,7 @@ const AllEntriesView = () => {
                             else if (line.includes('BALLAST QUANTITY')) itemNo = '4.2';
                             else if (line.includes('THROUGH 15 PPM EQUIPMENT')) itemNo = '9.1';
                             else if (line.includes('RECEPTION')) itemNo = '9.2';
-                            else if (line.includes('mÂ³') || line.includes('MÂ³')) itemNo = '10';
+                            else if (line.includes('m³') || line.includes('M³')) itemNo = '10';
                             break;
                         }
 
@@ -282,7 +282,7 @@ const AllEntriesView = () => {
           </div>
       </Card>
     </div>
-    
+
   );
 };
 

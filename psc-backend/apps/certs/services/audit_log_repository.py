@@ -65,8 +65,12 @@ class AuditLogRepository:
                 f"""
                 SELECT
                     audit_id, timestamp_utc, vessel_id, actor_user_id, actor_role,
-                    action, entity_type, entity_id, before_json, after_json, reason,
-                    event_metadata, retention_tier, archived_at, schema_version
+                    action, entity_type, entity_id,
+                    CAST(NULL AS NVARCHAR(MAX)) AS before_json,
+                    CAST(NULL AS NVARCHAR(MAX)) AS after_json,
+                    reason,
+                    CAST(NULL AS NVARCHAR(MAX)) AS event_metadata,
+                    retention_tier, archived_at, schema_version
                 FROM dbo.vims_certs_audit_log
                 {where_sql}
                 ORDER BY timestamp_utc DESC

@@ -11,7 +11,7 @@
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, Bell, LogOut, User, Ship, ChevronDown } from 'lucide-react';
+import { Bell, BellRing, ChevronDown, CircleUserRound, LogOut, PanelLeft, Ship } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -43,6 +43,7 @@ export function Header({ onMenuClick, showMenuButton = true, className }: Header
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const { data: unreadCount = 0 } = useUnreadCount();
+  const NotificationIcon = unreadCount > 0 ? BellRing : Bell;
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -58,41 +59,44 @@ export function Header({ onMenuClick, showMenuButton = true, className }: Header
   return (
     <header
       className={cn(
-        'sticky top-0 z-40 flex h-14 items-center justify-between border-b border-neutral-200 bg-white px-4',
-        'md:h-16 md:px-6',
+        'sticky top-0 z-40 flex h-14 items-center justify-between border-b border-neutral-200/80 bg-white/95 px-3 shadow-sm backdrop-blur',
+        'md:h-16 md:px-5',
         className
       )}
     >
       {/* Left section */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2 md:gap-3">
         {showMenuButton && (
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="h-10 w-10 rounded-xl border border-neutral-200 bg-white text-neutral-600 shadow-sm hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 md:hidden"
             onClick={onMenuClick}
             aria-label="Toggle menu"
           >
-            <Menu className="h-5 w-5" />
+            <PanelLeft className="h-5 w-5" />
           </Button>
         )}
 
         <Link
           to={hasProcess(PROCESS_IDS.VIEW_INSPECTIONS) ? ROUTES.INSPECTIONS : ROUTES.CARS}
-          className="flex items-center gap-2"
+          className="group flex min-w-0 items-center gap-3 rounded-xl px-1.5 py-1 transition-colors hover:bg-neutral-50"
           aria-label="VIMS Home"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-white">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm ring-1 ring-primary-400/30 transition-colors group-hover:bg-primary-700">
             <Ship className="h-5 w-5" aria-hidden="true" />
           </div>
-          <span className="hidden text-lg font-semibold text-neutral-800 sm:inline" aria-hidden="true">
-            VIMS
-          </span>
+          <div className="hidden min-w-0 leading-tight sm:block" aria-hidden="true">
+            <p className="text-base font-semibold text-neutral-900 md:text-lg">VIMS</p>
+            <p className="hidden text-xs font-medium text-neutral-500 md:block">
+              Vessel Inspection Management System
+            </p>
+          </div>
         </Link>
       </div>
 
       {/* Right section */}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <CircularHeaderActions />
         <OrbHeaderActions />
 
@@ -100,18 +104,16 @@ export function Header({ onMenuClick, showMenuButton = true, className }: Header
         <Button
           variant="ghost"
           size="icon"
-          className="relative"
+          className="relative h-10 w-10 rounded-full border border-neutral-200 bg-white text-neutral-600 shadow-sm hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
           onClick={() => navigate(ROUTES.NOTIFICATIONS)}
           aria-label="Notifications"
         >
-          <div className="flex h-8 w-8 items-center justify-center ">
-            <Bell className="h-4 w-4 text-neutral-600" />
-          </div>
+          <NotificationIcon className="h-5 w-5" />
           {unreadCount > 0 && (
             <span
               role="status"
               aria-live="polite"
-              className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-medium text-white"
+              className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-red-500 px-1 text-[11px] font-semibold leading-none text-white shadow-sm"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
@@ -121,15 +123,18 @@ export function Header({ onMenuClick, showMenuButton = true, className }: Header
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 px-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100">
-                <User className="h-4 w-4 text-neutral-600" />
+            <Button
+              variant="ghost"
+              className="h-10 gap-2 rounded-full border border-neutral-200 bg-white py-1 pl-1 pr-2 shadow-sm hover:border-primary-200 hover:bg-neutral-50"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700 ring-1 ring-primary-100">
+                <CircleUserRound className="h-4 w-4" />
               </div>
-              <div className="hidden text-left md:block">
-                <p className="text-sm font-medium text-neutral-800">
+              <div className="hidden min-w-0 text-left md:block">
+                <p className="max-w-[10rem] truncate text-sm font-semibold text-neutral-800">
                   {fullName || 'User'}
                 </p>
-                <p className="text-xs text-neutral-500">
+                <p className="max-w-[10rem] truncate text-xs font-medium text-neutral-500">
                   {role || (isVessel ? 'Vessel' : 'Office')}
                 </p>
               </div>

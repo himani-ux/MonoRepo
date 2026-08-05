@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from django.utils import timezone
-from django.db.utils import OperationalError, ProgrammingError
 from rest_framework import serializers
 
-from apps.safety.models import Incident, IncidentCauseTag, MasterSafetyBiasGuard, Recommendation
-from apps.safety.services.alarp_gate import AlarpGate
+from apps.safety.models import Incident, IncidentCauseTag, IncidentPhaseLog, Recommendation
 from apps.safety.services.pdf_preview_generator import PdfPreviewGenerator
 from apps.safety.services.signature_chain import SignatureChainService
 
@@ -16,11 +14,14 @@ GREEN_BAND_PIC_ROLE_CODES = (
     "OFFICE_SSQE",
     "OFFICE_SUPT",
 )
+OFFICE_REVIEW_ROLE_CODES = ("DPA", *GREEN_BAND_PIC_ROLE_CODES)
+OFFICE_REVIEW_PROCESS_IDS = ("SAF_P_004", "SAF_P_006")
 
 
 class IncidentPhase7AcceptSerializer(serializers.Serializer):
     typed_name = serializers.CharField()
     device_fingerprint = serializers.CharField()
+    office_comment = serializers.CharField(required=False, allow_blank=True, trim_whitespace=False)
 
 
 class IncidentPhase7SendBackSerializer(serializers.Serializer):
@@ -29,12 +30,11 @@ class IncidentPhase7SendBackSerializer(serializers.Serializer):
 
     def validate_target_phase(self, value: int) -> int:
         if value not in {3, 4, 5, 6}:
-            raise serializers.ValidationError("Phase 7 send-back target must be one of Phases 3, 4, 5, or 6.")
+            raise serializers.ValidationError("Send-back target must be one of Phases 3, 4, 5, or 6.")
         return value
 
 
 def build_phase7_preflight_payload(incident: Incident) -> dict[str, object]:
-    gate = AlarpGate()
     signature_chain = SignatureChainService()
     recommendations = list(incident.recommendations.filter(is_deleted=False).order_by("id"))
     tier_counts = {
@@ -46,67 +46,23 @@ def build_phase7_preflight_payload(incident: Incident) -> dict[str, object]:
         if recommendation.tier in tier_counts:
             tier_counts[recommendation.tier] += 1
 
-    bias_guards_resolved = False
-    bitmask = (incident.bias_guard_attestations or "").strip()
-    try:
-        active_guard_count = MasterSafetyBiasGuard.objects.filter(active=True).count()
-    except (OperationalError, ProgrammingError):
-        active_guard_count = 0
-
-    if active_guard_count and len(bitmask) >= active_guard_count and set(bitmask[:active_guard_count]) == {"1"}:
-        bias_guards_resolved = True
-    elif active_guard_count:
-        bias_guards_resolved = (
-            incident.bias_guard_responses.filter(acknowledged=True).count() == active_guard_count
-        )
-    else:
-        bias_guards_resolved = bool(bitmask)
-
+    bias_guards_resolved = True
     root_count = incident.cause_tags.filter(causal_layer=IncidentCauseTag.CausalLayer.ROOT).count()
-    alarp_complete = gate.incident_attestation_complete(incident, recommendations)
+    alarp_complete = True
     closer_role = signature_chain.closer_role(incident)
     signature_status = signature_chain.signature_status(incident)
     required_process_id = signature_chain.required_process_id(incident)
-    allowed_role_codes: tuple[str, ...] = ()
-    authority_message = "Incident risk band must be assigned before Phase 7 acceptance."
-
-    if incident.risk_band == Incident.RiskBand.GREEN:
-        required_process_id = "SAF_P_006"
-        allowed_role_codes = GREEN_BAND_PIC_ROLE_CODES
-        authority_message = (
-            "GREEN-band acceptance is restricted to the assigned PIC. "
-            "If the assigned PIC is a role placeholder, PIC, VESSEL SUPERINTENDENT, OFFICE_PIC, OFFICE_SSQE, or OFFICE_SUPT may accept."
-        )
-    elif incident.risk_band == Incident.RiskBand.YELLOW:
-        required_process_id = "SAF_P_004"
-        allowed_role_codes = ("DPA",)
-        authority_message = "YELLOW-band acceptance is restricted to DPA."
-    elif incident.risk_band == Incident.RiskBand.RED:
-        if signature_status["dpa"]["present"]:
-            required_process_id = "SAF_P_005"
-            allowed_role_codes = ("FM", "FLEET MANAGER")
-            authority_message = "RED-band final approval is restricted to FM after DPA acceptance."
-        else:
-            required_process_id = "SAF_P_004"
-            allowed_role_codes = ("DPA",)
-            authority_message = "RED-band first acceptance is restricted to DPA; FM approval follows."
+    allowed_role_codes = OFFICE_REVIEW_ROLE_CODES
+    authority_message = (
+        "PIC or DPA can accept, close, or send this incident back for rework for any risk band."
+    )
 
     blockers = []
 
-    if not bias_guards_resolved:
-        blockers.append("bias_guards")
     if root_count < 1:
         blockers.append("root_cause")
-    if incident.risk_band in {Incident.RiskBand.YELLOW, Incident.RiskBand.RED}:
-        for tier, blocker_code in (
-            (Recommendation.Tier.CORRECTIVE, "corrective_tier"),
-            (Recommendation.Tier.PREVENTIVE, "preventive_tier"),
-            (Recommendation.Tier.LESSONS_LEARNT, "lessons_tier"),
-        ):
-            if tier_counts[tier] < 1:
-                blockers.append(blocker_code)
-    if not alarp_complete:
-        blockers.append("alarp")
+    if not recommendations:
+        blockers.append("recommendations")
 
     blockers.extend(signature_chain.phase_seven_blockers(incident))
 
@@ -122,13 +78,43 @@ def build_phase7_preflight_payload(incident: Incident) -> dict[str, object]:
         "closer_role": closer_role,
         "required_process_id": required_process_id,
         "authority": {
-            "assigned_pic_user_id": incident.pic_user_id if incident.risk_band == Incident.RiskBand.GREEN else None,
+            "assigned_pic_user_id": incident.pic_user_id,
             "allowed_role_codes": list(allowed_role_codes),
+            "allowed_process_ids": list(OFFICE_REVIEW_PROCESS_IDS),
             "required_process_id": required_process_id,
             "message": authority_message,
         },
         "ready_for_acceptance": not blockers,
         "blockers": sorted(set(blockers)),
+        "office_comment": incident.office_comment or "",
+        "rework_summary": build_latest_rework_summary(incident),
         "pdf_preview": PdfPreviewGenerator().build_preview(incident),
         "generated_at": timezone.now().isoformat(),
+    }
+
+
+def build_latest_rework_summary(incident: Incident) -> dict[str, object] | None:
+    if incident.state != Incident.State.SENT_BACK:
+        return None
+
+    phase_log = (
+        IncidentPhaseLog.objects.filter(
+            incident=incident,
+            transition_type=IncidentPhaseLog.TransitionType.REWORK,
+        )
+        .order_by("-occurred_at")
+        .first()
+    )
+    if phase_log is None:
+        return None
+
+    comment = str(phase_log.loop_back_reason or "").strip()
+    if not comment:
+        return None
+
+    return {
+        "comment": comment,
+        "requested_at": phase_log.occurred_at,
+        "requested_by": phase_log.actor_user_id,
+        "requested_by_role": phase_log.actor_role_code,
     }

@@ -76,10 +76,10 @@ export function LoginPage() {
           <Ship className="h-8 w-8" aria-hidden="true" />
         </div>
         <h1 className="mt-5 text-3xl font-bold tracking-tight text-[#0F172A]">
-          VIMS 
+          VIMS
         </h1>
         <p className="mt-2 text-sm font-medium text-[#64748B]">
-          PSC / RS / Audit Close-out System
+          PSC / Safety / Circulars / Certificates / RS / Audit
         </p>
       </div>
 

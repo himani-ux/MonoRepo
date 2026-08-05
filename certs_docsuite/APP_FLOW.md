@@ -25,7 +25,7 @@
    - 3.9 Reconciliation Dashboard `/certs/reconciliation`
    - 3.10 Reconciliation Review (3-panel) `/certs/reconciliation/<run_id>`
    - 3.10a Office Review Messages `/certs/master-messages`
-   - 3.11 Print Builder `/certs/print`
+   - 3.11 Print certs status `/certs/print`
    - 3.12 Print History `/certs/print/history`
    - 3.13 Master Share-Bundle `/certs/share-bundle`
    - 3.14 Notification Inbox (shared bell + Certs filter)
@@ -97,7 +97,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 | 3.8 Gap-Fill UI | RW | R | — | — | — | — | — | — | — |
 | 3.9 Reconciliation Dashboard | RW | R | R | RW (primary reviewer) | R | R own (read-only) | — | — | — |
 | 3.10 Reconciliation Review | RW | R | R | RW | R | notified-only (alert link) | — | — | — |
-| 3.11 Print Builder | per-vessel + fleet-wide | per-vessel + fleet-wide | per-vessel assigned | per-vessel assigned | per-vessel assigned | per-vessel own | — | — | scoped per-vessel |
+| 3.11 Print certs status | current-vessel print | current-vessel print | assigned vessel print | assigned vessel print | assigned vessel print | own vessel print | - | - | scoped per-vessel |
 | 3.12 Print History | full fleet | full fleet | assigned | assigned | assigned | own vessel | — | — | scoped |
 | 3.13 Master Share-Bundle | full fleet | full fleet | — | — | — | own vessel | — | — | — |
 | 3.14 Notification Inbox | own | own | own | own | own | own | own | own | — (auditor portal has no inbox) |
@@ -189,10 +189,10 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Layout:**
 - Header: `canonical_code` (immutable post-creation), `display_name` (editable), `section` (immutable post-creation), Active/Inactive toggle, Audit chip ("created by X on Y, last edited by Z on W").
 - Tabs:
-  - **Metadata** — full row schema editable; validity_type, cadence_months, is_class_tracked, submission_scope, mandatory_for_all_vessels, applicable_ship_types[], parent_id picker, applicability_mode, alert_lead_overrides, regulatory_anchor, legacy_remarks, print_section_label, print_order.
+  - **Metadata** — full row schema editable; print_section_label uses existing section/label choices when available and falls back to text entry otherwise; validity_type, issuing_authority_type, and submission_scope use dropdowns; cadence_months uses clean numeric entry; is_class_tracked, mandatory_for_all_vessels, applicable_ship_types[], parent_id picker, applicability_mode, alert_lead_overrides, regulatory_anchor, legacy_remarks, and print_order remain editable. When applicability_mode is specific vessels, users select vessel names and the system stores the vessel IDs.
   - **Instances** — table of all TrackedItem rows referencing this catalog row, grouped by vessel; status counts per band.
   - **Audit history** — full timeline of edits (5-year retention per D-CERT-099); filterable by actor.
-- Footer: "Save changes" (DPA), "Deprecate row" (DPA, sets is_active=false, audit reason required), "Hard purge" (DPA, gated; cascades per D-CERT-182 / FEAT-CERT-CAT-020).
+- Footer: "Save changes" (DPA), "Deprecate row" (DPA, sets is_active=false, audit reason required). No hard-purge action is shown on the catalog screen.
 
 **Surfaces (FIELD_MAP):** All `vims_certs_catalog_row.*` + joined `vims_certs_tracked_item` aggregates per vessel.
 
@@ -210,11 +210,12 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Purpose:** All certs for a single vessel grouped by section, with status-tier visualization.
 
 **Layout:**
-- Header card: vessel name + IMO + flag + class society + ship type + current Master at top. "Last class snapshot uploaded N days ago" with link to `/certs/reconciliation` filtered to this vessel. Mandatory-coverage % (D-CERT-119) with override banner if applicable.
+- Header card: vessel name + IMO + flag + class society + ship type + current Master at top. "Class report dated N days ago" uses the printed/generated date parsed from the latest class status PDF. When a class snapshot exists, the header shows "Open class status PDF" so office and own-vessel users can view the uploaded report immediately after upload. Mandatory-coverage % (D-CERT-119) with override banner if applicable.
 - Section accordion (9 sections, D-CERT-017): each section header shows section_name + active TrackedItem count + status-band breakdown badges (per D-CERT-136).
 - Per-section table: expanded by default for sections with action items (overdue / window_open / window_closing); collapsed for healthy sections.
 - Per-row columns use user-facing certificate language: Certificate, Cert number, Issued by, Issue date, Expiry date, Status, Valid for, and Action. Internal labels such as tracked item, PDF, validity type, and class-tracked are not shown on the normal vessel dashboard; where needed they are translated to certificate-focused wording such as certificate file, fixed expiry, survey based, short term, or class certificates.
-- Toolbar: "Print this vessel" (D-CERT-140 per-vessel scope), "Share bundle" (Master self / DPA / FM only per D-CERT-142), "Upload class snapshot" (DPA / FM / Sup'tts), filter chips (status / section / `is_class_tracked` / `pdf_missing`).
+- The Action column uses compact icon buttons: upload/open certificate details, then view certificate PDF. The view icon is disabled when no certificate file is attached.
+- Toolbar: "Open class status PDF" when the latest class snapshot exists, "Print certs status" (D-CERT-209 current-vessel print), "Share bundle" (Master self / DPA / FM only per D-CERT-142), "Upload class snapshot" (DPA / FM / Sup'tts), filter chips (status / section / `is_class_tracked` / `pdf_missing`).
 - Vessel users with pending class-status messages from office see a "Messages from office" card linking to `/certs/master-messages`.
 
 **Surfaces (FIELD_MAP):**
@@ -249,6 +250,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
   - Active certificate file name is shown as the view link. Clicking the file name or "View PDF" fetches the authenticated PDF and opens it in a new tab; the PDF is not loaded automatically.
   - Version history tray (D-CERT-019/020): previous files with `superseded_at` timestamps; deleted-pending blobs grayed out (7-day grace per D-CERT-021).
   - Upload certificate button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015).
+  - "Read PDF again" button is visible for users who can upload when an active PDF exists. It re-runs OCR on the stored active PDF, refreshes the OCR payload, and applies the same auto-accepted field rules as upload without creating a duplicate PDF version.
 - **Right col — Review and history:**
   - UI heading is **Review and history**.
   - User-facing approval status (`draft / pending_master_approval / approved / rejected` rendered as readable labels).
@@ -343,7 +345,8 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Step 4 — Class Status Report upload + reconciliation** (D-CERT-100, D-CERT-110, D-CERT-120, FEAT-CERT-WIZ-014, FEAT-CERT-WIZ-015)
 - Select the vessel by name/code, then upload the official Class Status or Vessel Status PDF (NK / KR / BV — auto-detected from format). The selected vessel supplies the backend `vesselId`; users do not type raw vessel IDs.
-- Parser runs per FEAT-CERT-REC-002; results land in reconciliation panel.
+- Parser runs per FEAT-CERT-REC-002, reads the report printed/generated date from the PDF cover, and fails the parse if that date cannot be read. Users do not enter the report date manually.
+- Parsed Conditions of Class land in the reconciliation panel as review items. For NK, KR, and BV reports, only exact Condition of Class / Conditions of Class sections are used; action notes, installation/statutory condition sections, and memoranda are not counted as Conditions of class.
 - Anniversary cross-validation: if DPA-entered anniversary disagrees with class report's implied dates, surface in panel (FEAT-CERT-WIZ-015 / D-CERT-110).
 
 **Step 5 — Reconciliation review** (D-CERT-068, D-CERT-120, FEAT-CERT-WIZ-016)
@@ -416,10 +419,11 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Layout:**
 - Filter bar (D-CERT-069 / FEAT-CERT-REC-023): vessel, class society, date range, parse_status, has_unresolved_mismatches.
 - Table (default sort `printed_on_date DESC`, pagination 25):
-  - Columns: vessel, class society, snapshot date, parse status, parser version, matches count, mismatches count, missing-in-catalog count, missing-in-class count, conditional/STC detected, extended/postponed detected, unresolved flags, last reviewed by + when.
+  - Columns: vessel, class society, run status/time, findings summary, Printed On report date, action.
+- The table uses lightweight run rows; full reconciliation flags and class-report payloads are loaded only after the user opens a run or snapshot detail.
 - Per-row action: "Review" → §3.10. "Re-parse with current mapping" (manual, D-CERT-061).
 - "Export filtered list as CSV" button.
-- Upload class snapshot card (DPA / FM / Sup'tts): vessel dropdown from onboarded fleet data shows vessel name/code/IMO and submits the selected vessel's `vesselId` internally; class society selector auto-fills from the selected vessel when it is NK/KR/BV and remains user-editable; printed-on date; Class Status PDF file input. Helper copy states to upload the latest official Class Status or Vessel Status PDF downloaded/exported from the class society portal, not an individual certificate PDF. Upload immediately runs the class snapshot parser and reconciliation path; text extraction is attempted first, and OCR fallback runs only when the PDF has no text layer.
+- Upload class snapshot card (DPA / FM / Sup'tts): vessel dropdown from onboarded fleet data shows vessel name/code/IMO and submits the selected vessel's `vesselId` internally; class society selector auto-fills from the selected vessel when it is NK/KR/BV and remains user-editable; Class Status PDF file input; optional "Report date from PDF" field for the case where VIMS says it could not read the printed/generated date. Helper copy states to upload the latest official Class Status or Vessel Status PDF downloaded/exported from the class society portal, not an individual certificate PDF. The report date is read from the PDF's printed/generated date first; when unreadable, the uploader must enter the same date shown on the PDF. Upload date is never used for report freshness. Upload immediately runs the class snapshot parser and reconciliation path; text extraction is attempted first, and OCR fallback runs only when the PDF has no text layer.
 
 **Surfaces (FIELD_MAP):** `vims_certs_reconciliation_run.*` columns, joined `vims_certs_class_status_snapshot`, joined `vims_certs_class_code_mapping.version`.
 
@@ -433,12 +437,13 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 **Purpose:** Per-run review of class report checks; help users confirm what already matches, what differs, what needs setup in VIMS, and what is not found in the class report (per D-CERT-068 / FEAT-CERT-REC-022).
 
 **Layout:**
-- Header: vessel, class society, class report date, checked-at timestamp, status counts, and "Open class report PDF" button (D-CERT-148 / FEAT-CERT-PRT-031). Parser version and mapping version are not shown on the normal reviewer page.
-- Review groups use plain language: **Already matched**, **Details differ**, **Needs setup in VIMS**, **Not found in class report**, **Short-term certificate**, **Extended or postponed**, and **Needs manual check**.
+- Header: vessel, class society, class report date, checked-at timestamp, status counts, and an enabled "Open class report PDF" button that streams the uploaded class snapshot PDF (D-CERT-148 / FEAT-CERT-PRT-031). Parser version and mapping version are not shown on the normal reviewer page.
+- Review groups use plain language: **Match**, **Different**, **Add to VIMS**, **Missing in class report**, **Short term**, and **Conditions of class**. Extension/postponement and low-confidence groups are hidden when empty and only appear if they contain review items.
 - Per-group review layout:
   - Left: item list with "Needs review" / "Done" badges.
   - Middle: VIMS certificate record state.
-  - Right: class report item details using user-facing labels such as item, section in class report, issue date, expiry date, next due, and text found in class report.
+  - Right: class report item details using user-facing labels such as item, section in class report, issue date, expiry date, next due, due date, condition ID, and text found in class report.
+  - Review action comparison table shows readable VIMS-vs-class values; nested diff objects are unwrapped into plain labels instead of JSON.
   - Action buttons: `[Notify Master]`, `[Mark reviewed]`, `[Ask vessel to update]`, `[Link to VIMS certificate type]` (DPA only). `Notify Master` creates a vessel-side office review message for the selected flag; `Mark reviewed` is an office-side review action only.
 - Alert banner says "Many items need attention" and explains counts in plain language when review volume is high.
 
@@ -459,7 +464,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout:**
 - The vessel certificate dashboard shows a "Messages from office" card with the pending message count and an "Open messages" action.
-- The messages page lists office-sent class-status items. Each card shows the office note, who sent it, the class report item, VIMS-vs-class differences, and an "Open certificate" link when the item is already linked to a certificate.
+- The messages page lists office-sent class-status items. Each card shows the office note, who sent it, the class report item, readable VIMS-vs-class differences, an "Open class status PDF" link to the uploaded snapshot, and an "Open certificate" link when the item is already linked to a certificate.
 - The Master can add a short review note and click "Mark reviewed". This records vessel acknowledgement in the Certs audit log and removes the item from the default pending list. It does not change certificate validity or expiry dates.
 - A "Show reviewed messages" checkbox lets vessel users see already reviewed office messages.
 
@@ -467,29 +472,25 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 ---
 
-### 3.11 Print Builder `/certs/print`
+### 3.11 Print certs status `/certs/print`
 
 **Route:** `/certs/print`
 **Form ID:** `CERT_F_004` (Print/Export)
 **Process ID:** `CERT_P_005` (Print)
 **Primary user:** Master own vessel; DPA + FM full fleet; Sup'tts assigned vessels (D-CERT-142 / FEAT-CERT-PRT-023).
-**Purpose:** Configure + generate print artifacts (PDF + Excel companion) per FEAT-CERT-PRT-001 → FEAT-CERT-PRT-033.
+**Purpose:** Generate the current vessel's status print artifact (PDF + Excel companion) per FEAT-CERT-PRT-001 to FEAT-CERT-PRT-033, D-CERT-208, D-CERT-209, D-CERT-210, D-CERT-211, and D-CERT-212.
 
 **Layout:**
-- Step 1 — **Choose scope** (D-CERT-140 / FEAT-CERT-PRT-020):
-  - Per-vessel full (single vessel, all 9 sections, all rows — default)
-  - Per-vessel partial (single vessel, filtered by section / status / cadence)
-  - Per-section fleet-wide (single section, all vessels — DPA + FM only per D-CERT-141 / FEAT-CERT-PRT-021)
-  - Custom selection (multi-select cert rows from in-scope vessels)
-- Step 2 — **Filters & options:** sections, status bands, cadence, and certificate dropdowns by certificate name/number for custom selection. Vessel-scoped print actions use the vessel already selected on the vessel dashboard, or the logged-in ship-side vessel; no vessel dropdown is shown. Certificate dropdown panels are opaque and include Select all / Clear all; certificate choices are grouped by section plus status/expiry category, and include vessel name only when more than one vessel is in scope. Watermark toggle (DPA can override default scope-driven watermark per D-CERT-138 / FEAT-CERT-PRT-018); recipient email field with browser email-format validation (optional, opt-in email per D-CERT-149 / FEAT-CERT-PRT-032).
-- Step 3 — **Preview & generate:** sample first page rendering; "Generate" button.
-- During generation: progress bar for sync per-vessel scope ("Generating PDF (page X of Y)…", hard cap 60s per D-CERT-144 / FEAT-CERT-PRT-025); for fleet-wide async, "Submitted — you'll be notified when ready" + queue position.
-- On success: download buttons fetch the generated PDF and Excel through the authenticated print-artifact download API; confirmation that artifact is auto-archived in vessel-scoped "Archived Reports" folder; if recipient email entered, the result shows whether email was sent or failed.
-- Normal Print Builder PDFs show vessel context, certificate rows, and `Printed by: <user> (<role>)`. They do not print internal header/title, scope wording, print ID, hash, validity glossary/column, recipient name, or generation-footer page. When a watermark is selected, the watermark label prints at the bottom-right of each page without the recipient name (D-CERT-202).
+- Step 1 - **Vessel context:** vessel-scoped print actions use the vessel already selected on the vessel dashboard, or the logged-in ship-side vessel; no vessel dropdown is shown.
+- Step 2 - **Certificate sections:** one single-select dropdown containing `All sections` plus the vessel's certificate sections. Selecting one section prints every certificate in that section; the normal UI does not list individual certificates.
+- Step 3 - **Generate:** "Generate PDF and Excel" button. The normal screen does not show Scope, Status, Sections, Watermark, Recipient, Buckets, or Add Vessel filters.
+- During generation: progress bar for sync per-vessel scope ("Generating PDF (page X of Y)...", hard cap 60s per D-CERT-144 / FEAT-CERT-PRT-025); for fleet-wide async, "Submitted - you'll be notified when ready" + queue position.
+- On success: download buttons fetch the generated PDF and Excel through the authenticated print-artifact download API; confirmation that artifact is auto-archived in vessel-scoped "Archived Reports" folder.
+- Normal Print certs status PDFs show vessel context, certificate rows, and `Printed by: <user> (<role>)`. They do not print internal header/title, scope wording, print ID, hash, validity glossary/column, recipient name, or generation-footer page.
+- The Excel companion is a clean data workbook. It does not print `Print ID`, `Scope`, or `System state hash` rows; those values remain stored in DB/API/history/audit records and filenames for traceability.
+- The normal screen submits no watermark; Share Bundle, auditor export, and backend-compatible requests retain their own artifact metadata support.
 
-**Throttling:** Soft-throttle surface at >10/hour per user → audit log entry "high-volume print activity by user X" surfaces in FM dashboard for governance review (D-CERT-143 / FEAT-CERT-PRT-024); no hard block.
-
-**Surfaces (FIELD_MAP):** `vims_certs_print_artifact.*` — print_id, scope, vessels[], sections[], system_state_hash, user_id, role, timestamp_utc, watermark_applied, page_count, pdf_blob_id, excel_blob_id, recipient_email (nullable), `downloadUrls`, immediate `emailDeliveryStatus`.
+**Surfaces (FIELD_MAP):** `vims_certs_print_artifact.*` - print_id, scope, vessels[], sections[], system_state_hash, user_id, role, timestamp_utc, watermark_applied, page_count, pdf_blob_id, excel_blob_id, recipient_email (nullable), `downloadUrls`, immediate `emailDeliveryStatus`.
 
 ---
 
@@ -519,7 +520,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout:**
 - Vessel is taken from context: office users enter from the selected vessel dashboard, and ship-side users use the logged-in vessel. No vessel dropdown is shown.
-- Certificate dropdown by certificate name/number: bulk + single multi-select (D-CERT-096 / FEAT-CERT-PRT-027) with Select all / Clear all, section + status/expiry grouping, and expiry status visible.
+- Certificate sections dropdown: section multi-select (D-CERT-096 / FEAT-CERT-PRT-027 / D-CERT-210) with Select all / Clear all. Selecting a section includes all certificate PDFs in that section; the normal UI does not list individual certificates.
 - Recipient name field (optional; populates `MASTER COPY` watermark recipient per D-CERT-138).
 - Recipient email field uses browser email-format validation.
 - "Generate ZIP" button → `VIMS_CertBundle_<vessel_name>_<yyyymmdd>_<print_id>.zip` (D-CERT-145 / FEAT-CERT-PRT-028).
@@ -534,7 +535,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Route:** Shared platform `/notifications` (existing); Certs filter via `module=certs` query.
 **Primary user:** All Certs roles see their own inbox.
-**Purpose:** Single bell-icon inbox across VIMS modules per D-CERT-151; Certs entries surfaced via `vims_certs_notification_meta` joined to `master_notification.id`.
+**Purpose:** Single bell-icon inbox across VIMS modules per D-CERT-151; Certs entries surface through `vims_certs_notification_meta` joined to `master_notification.id`. CR-111 / D-CERT-203 keeps this join stable by adding nullable Certs compatibility columns to `master_notification` when the shared table is missing them.
 
 **Layout (Certs-relevant rows):**
 - Row format: trigger event (e.g. "Cert expiring in 14 days"), vessel, cert name, days_to_go, action buttons ([Renew] / [Acknowledge] — magic-link backed for email per D-CERT-154 / FEAT-CERT-NOTIF-008).
@@ -591,7 +592,8 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 
 **Layout:**
 - Filter bar: vessel, actor (user), entity type (catalog row / TrackedItem / class snapshot / approval event / print artifact / auditor grant), action (create/update/delete/approve/reject/print/grant), date range, RBAC-scoped automatically.
-- Table: timestamp UTC, vessel, actor (name + role), action, entity ref (clickable to entity detail), before/after diff (expandable JSON), event_metadata.
+- Table: timestamp UTC, vessel, actor (name + role), action, entity ref, change summary, reason, and retention tier.
+- The list request loads only lightweight audit summary columns. Full `before_json`, `after_json`, and `event_metadata` are loaded through the audit-detail endpoint and through DPA export so the main audit list does not pull large JSON snapshots for every row.
 - Hot tier (<2y) loads instantly; cold tier (2–5y) prompts "This range includes archived entries (cold storage). Fetch may take ~30s — Continue?" per D-CERT-183 / FEAT-CERT-AUDIT-003.
 - "Export filtered as PDF" / "Export filtered as CSV" — DPA only, watermarked (D-CERT-091 / FEAT-CERT-AUDIT-005).
 
@@ -678,7 +680,7 @@ Fleet Dashboard ──┬─→ Vessel Cert Dashboard ──┬─→ TrackedIte
                   ├─→ Onboarding Hub ──→ Onboarding Wizard ──→ Gap-Fill UI
                   │                                          ↘ embeds Reconciliation Review (step 5)
                   ├─→ Catalog Admin ──→ Catalog Row Detail ──→ TrackedItem Detail (per instance)
-                  ├─→ Print Builder ──→ Print History
+                  ├─→ Print certs status ──→ Print History
                   ├─→ Master Share-Bundle ──→ Print History (bundle entries)
                   ├─→ Auditor Access ──→ Auditor Access Detail
                   ├─→ Audit Log Read
@@ -720,7 +722,7 @@ Screens not listed here implement the standard 11-state contract exactly.
 | Screen | Deviation |
 |--------|-----------|
 | §3.5 TrackedItem Detail | Adds domain banners ON TOP of the contract (see "Special states" below); PARTIAL_DATA per-panel split = metadata / certificate file / review+history panes. |
-| §3.11 Print Builder | Generation progress bar with ETA (≤60s sync, ≤5min fleet async per D-CERT-144); generation failure = ERROR with retry; soft print-throttle is invisible to user (D-CERT-143). |
+| §3.11 Print certs status | Generation progress bar with ETA (≤60s sync, ≤5min fleet async per D-CERT-144); generation failure = ERROR with retry; soft print-throttle is invisible to user (D-CERT-143). |
 | §3.17 Audit Log Read | Cold-tier (2–5y) rows load on explicit prompt (D-CERT-183) — that prompt is a SUCCESS-state affordance, not LOADING. External-auditor view applies D-CERT-180 redaction (PERMISSION_DENIED at field level). |
 | §3.20 External Auditor Portal | SESSION_EXPIRED ≠ D-CERT-082 modal: grant token is signed + expiry-bound; an expired/exhausted grant shows a terminal "Access expired — contact the DPA" screen (no re-auth path, no early revocation per D-CERT-195). ROUTE_GUARD: invalid/expired token = same terminal screen; portal never redirects into `/certs/*`. |
 | §3.7 Onboarding Wizard / §3.8 Gap-Fill | SESSION_EXPIRED mid-wizard relies on D-CERT-082 form-state preservation — wizard step state MUST survive the re-auth modal (explicit test target). |

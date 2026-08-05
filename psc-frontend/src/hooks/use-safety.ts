@@ -27,6 +27,8 @@ export const safetyKeys = {
     [...safetyKeys.dashboard(), 'ca-aging', { vesselId }] as const,
   incidents: (filters: SafetyIncidentFilters) =>
     [...safetyKeys.all, 'incidents', filters] as const,
+  incidentRegisterVessels: () =>
+    [...safetyKeys.all, 'incidents', 'register-vessels'] as const,
   incidentPhase3Evidence: (id: number | string) =>
     [...safetyKeys.all, 'incidents', id, 'phase-3-evidence'] as const,
   incidentPhase4Facts: (id: number | string) =>
@@ -145,6 +147,14 @@ export function useSafetyIncidents(filters: SafetyIncidentFilters = {}) {
     queryFn: () => safetyApi.getIncidents(filters),
     staleTime: STALE_TIME.INSPECTIONS,
     placeholderData: (previousData) => previousData,
+  });
+}
+
+export function useSafetyIncidentRegisterVessels() {
+  return useQuery({
+    queryKey: safetyKeys.incidentRegisterVessels(),
+    queryFn: () => safetyApi.getIncidentRegisterVessels(),
+    staleTime: STALE_TIME.INSPECTIONS,
   });
 }
 

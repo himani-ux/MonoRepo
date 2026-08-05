@@ -28,16 +28,15 @@ export default function SafetyMscmepc3PositionPicker({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-slate-900">
-            MSC-MEPC.3 position
+            IMO report position
           </h2>
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
             Pull the nearest Reporting Daily Report position within ±12 hours,
-            then allow a manual override if a more recent bridge position is
-            available.
+            You can change it if the bridge has a newer position.
           </p>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-600">
-          {status === "loading" ? "Looking up daily report" : "Manual override allowed"}
+          {status === "loading" ? "Looking up Daily Report" : "Manual entry allowed"}
         </div>
       </div>
 
@@ -50,7 +49,7 @@ export default function SafetyMscmepc3PositionPicker({
               onClick={onApplySuggested}
               type="button"
             >
-              Use Daily Report auto-fill
+              Use Daily Report position
             </button>
             {sourceReference ? (
               <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
@@ -64,7 +63,7 @@ export default function SafetyMscmepc3PositionPicker({
       {status === "awaiting" || awaitingDailyReportMatch ? (
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           No Daily Report within ±12h. Enter latitude and longitude manually.
-          The record stays flagged for DPA review.
+          Office can still review this record.
         </div>
       ) : null}
 

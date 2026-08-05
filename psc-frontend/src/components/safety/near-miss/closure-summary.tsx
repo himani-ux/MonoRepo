@@ -28,9 +28,6 @@ export function SafetyNearMissClosureSummary({
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_48%,#d1fae5_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Near Miss Closure
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">
           Closed Near Miss Summary
         </h1>
@@ -105,8 +102,7 @@ export function SafetyNearMissClosureSummary({
           </div>
           <p className="text-sm leading-6 text-slate-600">{visibilityRule}</p>
           <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900">
-            This closure summary is intentionally read-only in the handover workspace.
-            The close action and signature capture happen on the API seam.
+            This summary is read-only. Use the review screen to close the record and capture signatures.
           </div>
         </aside>
       </div>

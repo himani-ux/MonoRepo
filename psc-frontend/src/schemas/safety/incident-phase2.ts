@@ -16,7 +16,12 @@ export const safetyIncidentPhase2Schema = z.object({
   latitude: z.string().optional(),
   longitude: z.string().optional(),
   loss_type_primary_id: z.coerce.number().int().positive().nullable().optional(),
+  loss_type_secondary_id: z.coerce.number().int().positive().nullable().optional(),
+  loss_type_tertiary_id: z.coerce.number().int().positive().nullable().optional(),
+  loss_type_other: z.string().max(256, "Keep Other loss below 256 characters.").nullable().optional(),
   office_notified_at: z.string().datetime({ offset: true }).nullable().optional(),
+  office_notification_mode: z.enum(["ON_CALL", "WHATSAPP", "EMAIL"]).nullable().optional(),
+  office_notified: z.boolean().nullable().optional(),
   pic_user_id: z.string().nullable().optional(),
   risk_band: safetyIncidentRiskBandSchema.optional(),
   schema_version: safetySchemaVersionSchema.default(
@@ -26,36 +31,59 @@ export const safetyIncidentPhase2Schema = z.object({
 
 export const safetyIncidentPhase2SubmitSchema = safetyIncidentPhase2Schema.superRefine(
   (values, ctx) => {
+    const selectedLossTypes = [
+      values.loss_type_primary_id,
+      values.loss_type_secondary_id,
+      values.loss_type_tertiary_id,
+    ].filter((value): value is number => typeof value === "number");
+    const otherSelected = values.loss_type_other !== null && values.loss_type_other !== undefined;
+    const totalLossTypes = selectedLossTypes.length + (otherSelected ? 1 : 0);
+
+    if (new Set(selectedLossTypes).size !== selectedLossTypes.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Do not select the same loss type twice.",
+        path: ["loss_type_primary_id"],
+      });
+    }
+
+    if (totalLossTypes > 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select up to 3 loss types only.",
+        path: ["loss_type_primary_id"],
+      });
+    }
+
+    if (otherSelected && !values.loss_type_other?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Write the other loss type.",
+        path: ["loss_type_other"],
+      });
+    }
+
     if (!values.risk_band) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Internal risk band is required before submitting Phase 2.",
+        message: "Select risk level before submitting.",
         path: ["risk_band"],
       });
     }
 
-    if (!values.imo_classifier) {
+    if (values.office_notified === null || values.office_notified === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "IMO classifier is required before submitting Phase 2.",
-        path: ["imo_classifier"],
+        message: "Select if office was informed.",
+        path: ["office_notified"],
       });
     }
 
-    if (
-      values.imo_classifier &&
-      values.imo_classifier !== "NOT_APPLICABLE" &&
-      (!values.latitude || !values.longitude)
-    ) {
+    if (values.office_notified === true && !values.office_notification_mode) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Latitude is required for IMO-classified casualties.",
-        path: ["latitude"],
-      });
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Longitude is required for IMO-classified casualties.",
-        path: ["longitude"],
+        message: "Select how office was informed.",
+        path: ["office_notification_mode"],
       });
     }
   },

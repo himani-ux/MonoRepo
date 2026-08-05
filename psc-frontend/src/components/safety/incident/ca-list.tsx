@@ -34,7 +34,7 @@ export default function SafetyCaList({ actions }: SafetyCaListProps) {
                 </span>
                 {action.physical_verification_done ? (
                   <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                    Physical verification logged
+                    Site check done
                   </span>
                 ) : null}
               </div>
@@ -60,10 +60,10 @@ export default function SafetyCaList({ actions }: SafetyCaListProps) {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                  Verifier
+                  Checker
                 </p>
                 <p className="mt-1 text-slate-900">
-                  {action.verifier_user_id ?? "Pending assignment"}
+                  {action.verifier_user_id ?? "Pending"}
                 </p>
               </div>
             </div>

@@ -46,7 +46,7 @@ export default function SafetySoiPickAreasRoute() {
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">SOI Pick Areas</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              The selected and available area lists are now read from the inspection&apos;s live pick-areas payload.
+              Choose the areas to inspect and review what is already selected.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">

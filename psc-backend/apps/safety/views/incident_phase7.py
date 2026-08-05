@@ -20,7 +20,6 @@ from apps.safety.services.signature_chain import SignatureChainService
 from apps.safety.views.incident import IncidentViewMixin, _normalized_role
 
 
-FM_ROLE_CODES = {"FM", "FLEET MANAGER"}
 DPA_ROLE_CODES = {"DPA"}
 HOD_ROLE_CODES = {"HOD", "HEAD OF DEPARTMENT", "CE", "CHIEF ENGINEER", "CO", "CHIEF OFFICER"}
 GREEN_BAND_PIC_ROLE_CODES = {
@@ -30,6 +29,9 @@ GREEN_BAND_PIC_ROLE_CODES = {
     "OFFICE_SSQE",
     "OFFICE_SUPT",
 }
+OFFICE_REVIEW_ROLE_CODES = DPA_ROLE_CODES | GREEN_BAND_PIC_ROLE_CODES
+OFFICE_REVIEW_ACCEPT_PROCESS_IDS = ["SAF_P_004", "SAF_P_006"]
+OFFICE_REVIEW_SEND_BACK_PROCESS_IDS = ["SAF_P_003", "SAF_P_004", "SAF_P_006"]
 
 
 class IncidentPhase7ViewMixin(IncidentViewMixin):
@@ -55,38 +57,53 @@ class IncidentPhase7ViewMixin(IncidentViewMixin):
 
     def _require_phase_seven(self, incident: Incident) -> None:
         if incident.current_phase != 7:
-            raise ValidationError("Phase 7 actions require current_phase = 7.")
+            raise ValidationError("Office review actions require current_phase = 7.")
 
-    def _require_process_permission(self, process_id: str) -> None:
-        permission = HasProcessPermission.requiring(process_id)()
-        if not permission.has_permission(self.request, self):
-            raise PermissionDenied("You do not have permission to perform this Phase 7 action.")
+    def _require_any_process_permission(self, process_ids: list[str]) -> None:
+        for process_id in process_ids:
+            permission = HasProcessPermission.requiring(process_id)()
+            if permission.has_permission(self.request, self):
+                return
+        raise PermissionDenied("You do not have permission to perform this office review action.")
 
-    def _enforce_band_actor(self, incident: Incident, *, action: str) -> str:
+    def _enforce_office_review_actor(self, incident: Incident, *, action: str) -> str:
         role = _normalized_role(self.request.user)
-        actor_id = resolve_actor_id(self.request.user)
-        actor_id_normalized = actor_id.strip().upper()
-        if incident.risk_band == Incident.RiskBand.GREEN:
-            assigned_pic = (incident.pic_user_id or "").strip().upper()
-            is_role_based_pic = assigned_pic in GREEN_BAND_PIC_ROLE_CODES
-            if actor_id_normalized != assigned_pic and not (
-                is_role_based_pic and role in GREEN_BAND_PIC_ROLE_CODES
-            ):
-                raise PermissionDenied("GREEN-band Phase 7 actions are restricted to the assigned PIC.")
+        if role in DPA_ROLE_CODES:
+            return SignatureChainService.DPA
+        if role in GREEN_BAND_PIC_ROLE_CODES:
             return SignatureChainService.PIC
-        if incident.risk_band == Incident.RiskBand.YELLOW:
-            if role not in DPA_ROLE_CODES:
-                raise PermissionDenied("YELLOW-band Phase 7 actions are restricted to DPA.")
-            return SignatureChainService.DPA
-        if incident.risk_band == Incident.RiskBand.RED:
-            if action == "approve-red":
-                if role not in FM_ROLE_CODES:
-                    raise PermissionDenied("RED-band final approval is restricted to FM.")
-                return SignatureChainService.FM
-            if role not in DPA_ROLE_CODES:
-                raise PermissionDenied("RED-band DPA acceptance is restricted to DPA.")
-            return SignatureChainService.DPA
-        raise ValidationError("Incident risk band must be assigned before Phase 7 actions.")
+        raise PermissionDenied("Office Review decisions are restricted to PIC or DPA.")
+
+    def _apply_office_comment(self, incident: Incident, comment: str | None) -> bool:
+        cleaned = (comment or "").strip()
+        if not cleaned or incident.office_comment == cleaned:
+            return False
+        incident.office_comment = cleaned
+        return True
+
+    def _close_incident_after_office_review(self, incident: Incident, user, *, change_reason: str):
+        old_state = capture_model_state(
+            incident,
+            field_names=("current_phase", "state", "closed_at", "closure_reason"),
+        )
+        transition = self.get_phase_state_machine().transition(incident.pk, 9, user)
+        incident.refresh_from_db()
+        incident.state = "CLOSED"
+        incident.closed_at = timezone.now()
+        incident.closure_reason = incident.office_comment or "Closed during Office Review."
+        incident.updated_by = resolve_actor_id(user)
+        incident.updated_date = timezone.now()
+        incident.save(
+            update_fields=("state", "closed_at", "closure_reason", "updated_by", "updated_date")
+        )
+        record_field_changes(
+            incident,
+            old_state,
+            user=user,
+            field_names=("current_phase", "state", "closed_at", "closure_reason"),
+            change_reason=change_reason,
+        )
+        return transition
 
 
 class IncidentPhase7PreflightView(IncidentPhase7ViewMixin, generics.GenericAPIView):
@@ -101,10 +118,8 @@ class IncidentPhase7AcceptView(IncidentPhase7ViewMixin, generics.GenericAPIView)
     def post(self, request, *args, **kwargs):
         incident = self.get_incident()
         self._require_phase_seven(incident)
-        role_code = self._enforce_band_actor(incident, action="accept")
-        self._require_process_permission(
-            "SAF_P_004" if incident.risk_band in {Incident.RiskBand.YELLOW, Incident.RiskBand.RED} else "SAF_P_006"
-        )
+        role_code = self._enforce_office_review_actor(incident, action="accept")
+        self._require_any_process_permission(OFFICE_REVIEW_ACCEPT_PROCESS_IDS)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -113,7 +128,7 @@ class IncidentPhase7AcceptView(IncidentPhase7ViewMixin, generics.GenericAPIView)
         if blockers:
             raise ValidationError({"blockers": sorted(set(blockers))})
 
-        old_state = capture_model_state(incident, field_names=("dpa_accepted_at", "dpa_accepted_by"))
+        old_state = capture_model_state(incident, field_names=("dpa_accepted_at", "dpa_accepted_by", "office_comment"))
         signature_payload = signature_chain.stamp_phase7_signature(
             incident,
             role_code=role_code,
@@ -121,39 +136,30 @@ class IncidentPhase7AcceptView(IncidentPhase7ViewMixin, generics.GenericAPIView)
             device_fingerprint=serializer.validated_data["device_fingerprint"],
             user=request.user,
         )
+        office_comment_changed = self._apply_office_comment(
+            incident,
+            serializer.validated_data.get("office_comment"),
+        )
         record_field_changes(
             incident,
             old_state,
             user=request.user,
-            field_names=("dpa_accepted_at", "dpa_accepted_by"),
-            change_reason="Phase 7 acceptance signature captured.",
+            field_names=("dpa_accepted_at", "dpa_accepted_by", "office_comment"),
+            change_reason="Office Review acceptance signature and comment captured.",
         )
 
-        if incident.risk_band == Incident.RiskBand.RED:
-            preflight = build_phase7_preflight_payload(incident)
-            return Response(
-                {
-                    "state": "PHASE_7_DPA_ACCEPTED",
-                    "current_phase": incident.current_phase,
-                    "dpa_accepted_at": incident.dpa_accepted_at,
-                    "dpa_accepted_by": incident.dpa_accepted_by,
-                    "requires_fm_approval": True,
-                    "signature": {
-                        "typed_name": signature_payload.typed_name,
-                        "device_fingerprint": signature_payload.device_fingerprint,
-                        "signed_at": signature_payload.signed_at,
-                    },
-                    "preflight": preflight,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        incident.state = "APPROVED"
         incident.updated_by = resolve_actor_id(request.user)
         incident.updated_date = timezone.now()
-        incident.save(update_fields=["state", "updated_by", "updated_date"])
+        update_fields = ["updated_by", "updated_date"]
+        if office_comment_changed:
+            update_fields.append("office_comment")
+        incident.save(update_fields=update_fields)
 
-        transition = self.get_phase_state_machine().transition(incident.pk, 8, request.user)
+        transition = self._close_incident_after_office_review(
+            incident,
+            request.user,
+            change_reason="Office Review accepted and closed the incident.",
+        )
         incident.refresh_from_db()
         pdf_export = generate_incident_pdf_export(incident_id=incident.pk, viewer_user=request.user)
         return Response(
@@ -162,6 +168,7 @@ class IncidentPhase7AcceptView(IncidentPhase7ViewMixin, generics.GenericAPIView)
                 "current_phase": incident.current_phase,
                 "dpa_accepted_at": incident.dpa_accepted_at,
                 "dpa_accepted_by": incident.dpa_accepted_by,
+                "office_comment": incident.office_comment,
                 "transition": transition,
                 "pdf_export": {
                     "download_path": pdf_export.download_path,
@@ -182,7 +189,7 @@ class IncidentPhase7HodSignatureView(IncidentPhase7ViewMixin, generics.GenericAP
         self._require_phase_seven(incident)
         role = _normalized_role(request.user)
         if role not in HOD_ROLE_CODES:
-            raise PermissionDenied("Phase 7 HOD signature is restricted to the department HOD.")
+            raise PermissionDenied("Office review HOD signature is restricted to the department HOD.")
 
         signature_chain = self.get_signature_chain()
         if signature_chain.signature_status(incident)["hod"]["present"]:
@@ -221,8 +228,8 @@ class IncidentPhase7ApproveRedView(IncidentPhase7ViewMixin, generics.GenericAPIV
         self._require_phase_seven(incident)
         if incident.risk_band != Incident.RiskBand.RED:
             raise ValidationError("RED approval is only valid for RED-band incidents.")
-        role_code = self._enforce_band_actor(incident, action="approve-red")
-        self._require_process_permission("SAF_P_005")
+        role_code = self._enforce_office_review_actor(incident, action="approve-red")
+        self._require_any_process_permission(OFFICE_REVIEW_ACCEPT_PROCESS_IDS)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -231,7 +238,7 @@ class IncidentPhase7ApproveRedView(IncidentPhase7ViewMixin, generics.GenericAPIV
         if blockers:
             raise ValidationError({"blockers": sorted(set(blockers))})
 
-        old_state = capture_model_state(incident, field_names=("fm_approved_at", "fm_approved_by"))
+        old_state = capture_model_state(incident, field_names=("dpa_accepted_at", "dpa_accepted_by", "office_comment"))
         signature_chain.stamp_phase7_signature(
             incident,
             role_code=role_code,
@@ -239,20 +246,30 @@ class IncidentPhase7ApproveRedView(IncidentPhase7ViewMixin, generics.GenericAPIV
             device_fingerprint=serializer.validated_data["device_fingerprint"],
             user=request.user,
         )
+        office_comment_changed = self._apply_office_comment(
+            incident,
+            serializer.validated_data.get("office_comment"),
+        )
         record_field_changes(
             incident,
             old_state,
             user=request.user,
-            field_names=("fm_approved_at", "fm_approved_by"),
-            change_reason="Phase 7 RED-band FM signature captured.",
+            field_names=("dpa_accepted_at", "dpa_accepted_by", "office_comment"),
+            change_reason="Office Review RED-band compatibility signature and comment captured.",
         )
 
-        incident.state = "APPROVED"
         incident.updated_by = resolve_actor_id(request.user)
         incident.updated_date = timezone.now()
-        incident.save(update_fields=["state", "updated_by", "updated_date"])
+        update_fields = ["updated_by", "updated_date"]
+        if office_comment_changed:
+            update_fields.append("office_comment")
+        incident.save(update_fields=update_fields)
 
-        transition = self.get_phase_state_machine().transition(incident.pk, 8, request.user)
+        transition = self._close_incident_after_office_review(
+            incident,
+            request.user,
+            change_reason="Office Review RED-band compatibility acceptance closed the incident.",
+        )
         incident.refresh_from_db()
         pdf_export = generate_incident_pdf_export(incident_id=incident.pk, viewer_user=request.user)
         return Response(
@@ -263,6 +280,7 @@ class IncidentPhase7ApproveRedView(IncidentPhase7ViewMixin, generics.GenericAPIV
                 "dpa_accepted_by": incident.dpa_accepted_by,
                 "fm_approved_at": incident.fm_approved_at,
                 "fm_approved_by": incident.fm_approved_by,
+                "office_comment": incident.office_comment,
                 "transition": transition,
                 "pdf_export": {
                     "download_path": pdf_export.download_path,
@@ -280,15 +298,15 @@ class IncidentPhase7SendBackView(IncidentPhase7ViewMixin, generics.GenericAPIVie
 
     def post(self, request, *args, **kwargs):
         incident = self.get_incident()
-        self._require_phase_seven(incident)
-        self._enforce_band_actor(incident, action="accept")
-        self._require_process_permission("SAF_P_003")
+        self._enforce_office_review_actor(incident, action="send-back")
+        self._require_any_process_permission(OFFICE_REVIEW_SEND_BACK_PROCESS_IDS)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         target_phase = serializer.validated_data["target_phase"]
         reason = serializer.validated_data["reason"]
+        phase_from = incident.current_phase
         old_state = capture_model_state(incident, field_names=("current_phase", "state"))
 
         incident.current_phase = target_phase
@@ -306,7 +324,7 @@ class IncidentPhase7SendBackView(IncidentPhase7ViewMixin, generics.GenericAPIVie
         )
         IncidentPhaseLog.objects.create(
             incident=incident,
-            phase_from=7,
+            phase_from=phase_from,
             phase_to=target_phase,
             transition_type=IncidentPhaseLog.TransitionType.REWORK,
             loop_back_reason=reason,

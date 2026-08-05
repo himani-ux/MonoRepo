@@ -5,7 +5,7 @@ import unittest
 
 import django
 from django.apps import apps
-from django.db import connection
+from django.db import connection, migrations
 from django.db.migrations.state import ProjectState
 
 
@@ -114,3 +114,68 @@ class SafetyMigrationApplyTests(unittest.TestCase):
             description = connection.introspection.get_table_description(cursor, "master_soi_area_item")
         columns = {column.name: column for column in description}
         self.assertIn("item_number", columns)
+
+    def test_incident_weather_migration_uses_idempotent_database_operations(self) -> None:
+        module = importlib.import_module("apps.safety.migrations.0043_incident_weather_condition_fields")
+        migration = module.Migration("0043_incident_weather_condition_fields", "safety")
+
+        self.assertFalse(any(isinstance(operation, migrations.CreateModel) for operation in migration.operations))
+        self.assertFalse(any(isinstance(operation, migrations.AddField) for operation in migration.operations))
+        self.assertTrue(
+            any(
+                isinstance(operation, migrations.RunPython)
+                and operation.code.__name__ == "_ensure_weather_option_table"
+                for operation in migration.operations
+            )
+        )
+        self.assertTrue(
+            any(
+                isinstance(operation, migrations.RunPython)
+                and operation.code.__name__ == "_ensure_incident_weather_columns"
+                for operation in migration.operations
+            )
+        )
+
+        state_operations = [
+            state_operation
+            for operation in migration.operations
+            if isinstance(operation, migrations.SeparateDatabaseAndState)
+            for state_operation in operation.state_operations
+        ]
+        self.assertTrue(
+            any(
+                isinstance(operation, migrations.CreateModel)
+                and operation.name == "IncidentWeatherOption"
+                for operation in state_operations
+            )
+        )
+        self.assertTrue(
+            any(
+                isinstance(operation, migrations.AddField)
+                and operation.model_name == "incident"
+                and operation.name == "weather_visibility_id"
+                for operation in state_operations
+            )
+        )
+
+    def test_incident_weather_migration_sql_server_ddl_is_conditional(self) -> None:
+        module = importlib.import_module("apps.safety.migrations.0043_incident_weather_condition_fields")
+
+        class CapturingCursor:
+            def __init__(self) -> None:
+                self.statements: list[str] = []
+
+            def execute(self, sql: str) -> None:
+                self.statements.append(sql)
+
+        cursor = CapturingCursor()
+
+        module._ensure_sql_server_weather_option_table(cursor)
+        module._ensure_sql_server_incident_weather_columns(cursor)
+
+        combined_sql = "\n".join(cursor.statements)
+        self.assertIn("IF OBJECT_ID(N'dbo.vims_safety_incident_weather_option', N'U') IS NULL", combined_sql)
+        self.assertIn("NOT EXISTS", combined_sql)
+        self.assertIn("COL_LENGTH(N'dbo.vims_safety_incident', N'weather_visibility_id') IS NULL", combined_sql)
+        self.assertIn("ADD weather_visibility_id CHAR(32) NULL", combined_sql)
+        self.assertIn("DATA_TYPE = N'uniqueidentifier'", combined_sql)

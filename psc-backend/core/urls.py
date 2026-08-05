@@ -123,6 +123,9 @@ urlpatterns = [
     # POST /api/psc/notifications/mark-all-read/
     path('api/psc/notifications/', include('apps.notifications.urls', namespace='notifications')),
 
+    # Help assistant endpoints. File-backed and optional-Qdrant; no SQL schema changes.
+    path('api/psc/help/', include('apps.help_assistant.urls', namespace='help_assistant')),
+
     # Safety module endpoints
     path('api/safety/', include('apps.safety.urls', namespace='safety')),
 

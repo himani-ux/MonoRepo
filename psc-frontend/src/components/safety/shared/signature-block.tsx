@@ -56,7 +56,7 @@ export default function SafetySignatureBlock({
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">
-              Device
+              Signature record
             </dt>
             <dd className="mt-1 text-slate-900">{existingSignature.device_fingerprint_last8}</dd>
           </div>
@@ -69,4 +69,3 @@ export default function SafetySignatureBlock({
     </section>
   );
 }
-

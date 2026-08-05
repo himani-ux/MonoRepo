@@ -94,8 +94,8 @@ class SettingsRepository:
                 """
                 SELECT
                     vc.vessel_id,
-                    v.vessel_name,
-                    v.imo_number,
+                    v.vesselName AS vessel_name,
+                    v.imoNumber AS imo_number,
                     vc.slack_channel_vessel,
                     vc.slack_channel_office_default,
                     vc.updated_at,
@@ -103,7 +103,7 @@ class SettingsRepository:
                 FROM dbo.vims_certs_vessel_config vc
                 LEFT JOIN dbo.VesselData v ON v.id = vc.vessel_id
                 WHERE vc.lifecycle_status <> 'decommissioned'
-                ORDER BY v.vessel_name, vc.vessel_id
+                ORDER BY v.vesselName, vc.vessel_id
                 """
             )
             return _fetch_all(cursor)

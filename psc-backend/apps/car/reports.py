@@ -12,7 +12,7 @@ Tables: #D6EAF8 header, alternating white/#F8F9FA rows, 0.5pt #D1D5DB borders
 import io
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from html import escape
 
@@ -25,7 +25,6 @@ from reportlab.lib.utils import ImageReader
 from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.platypus import (
     Paragraph,
-    KeepTogether,
     SimpleDocTemplate,
     Spacer,
     Table,
@@ -114,6 +113,17 @@ def _build_styles():
         leading=14,
         textColor=COLOR_TEXT,
         wordWrap='CJK',
+    ))
+
+    styles.add(ParagraphStyle(
+        'BoxedBodyText10',
+        parent=styles['BodyText10'],
+        borderWidth=0.5,
+        borderColor=COLOR_BORDER,
+        borderPadding=5,
+        backColor=colors.white,
+        spaceBefore=1 * mm,
+        spaceAfter=2 * mm,
     ))
 
     styles.add(ParagraphStyle(
@@ -261,6 +271,27 @@ def _fmt_uploaded_datetime(value) -> str:
         except ValueError:
             return _fmt_date(value)
     return _fmt_date(value)
+
+
+def _sort_key_datetime(value):
+    """Sort parsed datetime values first, then unparseable values by text."""
+    if isinstance(value, datetime):
+        dt = value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (0, dt.astimezone(timezone.utc).timestamp())
+    if isinstance(value, str):
+        normalized = value.strip()
+        if normalized.endswith('Z'):
+            normalized = f'{normalized[:-1]}+00:00'
+        try:
+            dt = datetime.fromisoformat(normalized)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return (0, dt.astimezone(timezone.utc).timestamp())
+        except ValueError:
+            return (1, normalized)
+    return (1, str(value or ''))
 
 
 def _safe(value, default: str = '—') -> str:
@@ -908,24 +939,62 @@ def _build_follow_up_reports(elements: list, car_data: dict, styles, content_wid
         elements.append(summary_table)
         elements.append(Spacer(1, 3 * mm))
 
-    if follow_up_reports:
-        report_block: list[Any] = [Paragraph('Uploaded Follow-up Report:', styles['BodyBold10'])]
-        report_col_widths = [48 * mm, content_width - 118 * mm, 35 * mm, 35 * mm]
-        report_data: list[list[Any]] = [['File Name', 'Description', 'Uploaded', 'Uploaded By']]
-        for report in follow_up_reports:
-            report_data.append([
-                _wrap_link(_safe(report.get('file_name')), report.get('file_url'), cell),
-                _wrap(_safe(report.get('description')), cell),
-                _wrap(_fmt_uploaded_datetime(report.get('uploaded_at')), cell),
-                _wrap(_safe(report.get('uploaded_by')), cell),
-            ])
+    if follow_up_action_updates:
+        elements.append(Paragraph('Action Code Updates:', styles['BodyBold10']))
+        elements.append(Spacer(1, 2 * mm))
+        sorted_action_updates = sorted(
+            follow_up_action_updates,
+            key=lambda update: _sort_key_datetime(update.get('changed_at')),
+        )
+        for update in sorted_action_updates:
+            action_label = (
+                f"{_safe(update.get('from_action_code'))} to "
+                f"{_safe(update.get('to_action_code'))}"
+            )
+            update_meta = [
+                [_wrap('Deficiency', styles['CellBold']),
+                 _wrap(_safe(update.get('deficiency_code')), cell)],
+                [_wrap('Action Code', styles['CellBold']),
+                 _wrap(action_label, cell)],
+                [_wrap('Changed At', styles['CellBold']),
+                 _wrap(_fmt_uploaded_datetime(update.get('changed_at')), cell)],
+                [_wrap('Changed By', styles['CellBold']),
+                 _wrap(_safe(update.get('changed_by')), cell)],
+            ]
+            update_table = Table(update_meta, colWidths=[40 * mm, content_width - 40 * mm])
+            update_table.setStyle(TableStyle(_info_table_style()))
+            elements.append(update_table)
+            description = str(update.get('deficiency_description') or '').strip()
+            if description:
+                elements.append(Spacer(1, 2 * mm))
+                elements.append(Paragraph('Deficiency Description:', styles['BodyBold10']))
+                elements.append(_wrap(description, styles['BoxedBodyText10']))
+            notes = str(update.get('notes') or '').strip()
+            if notes:
+                elements.append(Spacer(1, 2 * mm))
+                elements.append(Paragraph('Follow-up Notes:', styles['BodyBold10']))
+                elements.append(_wrap(notes, styles['BoxedBodyText10']))
+            elements.append(Spacer(1, 4 * mm))
 
-        report_table = Table(report_data, colWidths=report_col_widths)
-        report_style_cmds = _base_table_style()
-        _add_alternating_rows(report_style_cmds, len(report_data))
-        report_table.setStyle(TableStyle(report_style_cmds))
-        report_block.append(report_table)
-        elements.append(KeepTogether(report_block))
+    if follow_up_reports:
+        elements.append(Paragraph('Uploaded Follow-up Report:', styles['BodyBold10']))
+        elements.append(Spacer(1, 2 * mm))
+        for report in follow_up_reports:
+            report_meta = [
+                [_wrap('File Name', styles['CellBold']),
+                 _wrap_link(_safe(report.get('file_name')), report.get('file_url'), cell)],
+                [_wrap('Uploaded', styles['CellBold']),
+                 _wrap(_fmt_uploaded_datetime(report.get('uploaded_at')), cell)],
+                [_wrap('Uploaded By', styles['CellBold']),
+                 _wrap(_safe(report.get('uploaded_by')), cell)],
+            ]
+            report_table = Table(report_meta, colWidths=[40 * mm, content_width - 40 * mm])
+            report_table.setStyle(TableStyle(_info_table_style()))
+            elements.append(report_table)
+            elements.append(Spacer(1, 2 * mm))
+            elements.append(Paragraph('Description:', styles['BodyBold10']))
+            elements.append(_wrap(_safe(report.get('description')), styles['BoxedBodyText10']))
+            elements.append(Spacer(1, 4 * mm))
 
 
 def _build_review_comments(

@@ -38,7 +38,7 @@ This is the core PSC workflow module. It owns inspection lifecycle, deficiency r
 3. Each new deficiency triggers `auto_create_car`, creating a 1:1 CAR placeholder.
 4. The inspection is submitted for office review.
 5. PIC review and DPA close complete the inspection lifecycle.
-6. If the inspection is PSC, vessel master can register follow-up updates that adjust deficiency action codes and optionally attach a follow-up report.
+6. If the inspection is PSC, vessel master can register follow-up updates that adjust deficiency action codes and optionally attach up to three follow-up report PDFs.
 
 ## Dependencies
 

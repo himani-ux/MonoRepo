@@ -28,9 +28,9 @@ function buildCurrentVesselNote({
     return displayValue;
   }
   if (overdueAreaCount > 0) {
-    return `${overdueAreaCount} applicable area${overdueAreaCount === 1 ? "" : "s"} already sit outside the 90-day window.`;
+    return `${overdueAreaCount} area${overdueAreaCount === 1 ? "" : "s"} need attention.`;
   }
-  return "All applicable areas remain inside the active 90-day SOI cycle.";
+  return "All required areas are on time.";
 }
 
 export default function SafetySoiCompliancePanel({
@@ -39,22 +39,21 @@ export default function SafetySoiCompliancePanel({
   label,
 }: SafetySoiCompliancePanelProps) {
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             {label}
           </p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">
-            Current vessel and fleet average
+            SOI check status
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Current-cycle coverage across applicable SOI areas. The dashboard label remains
-            locked to <code>SOI Compliance %</code> for Safety only.
+            Shows whether required SOI areas are being checked on time.
           </p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          90-day cycle surface with fleet averaging beside the current vessel signal.
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          90-day check cycle.
         </div>
       </div>
 
@@ -73,15 +72,15 @@ export default function SafetySoiCompliancePanel({
           />
         </div>
 
-        <article className="rounded-[1.75rem] border border-slate-200 bg-slate-50 px-5 py-5 shadow-sm">
+        <article className="rounded-md border border-slate-200 bg-slate-50 px-5 py-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
             Fleet average
           </div>
           <div className="mt-3 text-3xl font-semibold text-slate-900">{fleetAverage.displayValue}</div>
           <p className="mt-3 text-sm leading-6 text-slate-600">{fleetAverage.note}</p>
-          <div className="mt-4 rounded-2xl border border-white bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+          <div className="mt-4 rounded-md border border-white bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
             {fleetAverage.vesselCount} vessel{fleetAverage.vesselCount === 1 ? "" : "s"} currently
-            contribute to the fleet average.
+            included in this average.
           </div>
         </article>
       </div>

@@ -127,8 +127,10 @@ Within each section: rows by `catalog.print_order`. Children always immediately 
 ### 5.8 Empty Sections (D-CERT-129)
 Section banner always printed even if empty. Body shows: `— no certs in this section for this vessel —` in italic gray text. Auditor sees that the section was checked, not omitted.
 
-### 5.9 Visible Print Metadata (D-CERT-202)
-Normal Print Builder PDFs do not print an internal header/title, scope label, `print_id`, system-state hash, recipient name, or generation-footer page. The only generator line in the visible PDF is `Printed by: <user> (<role>)`. The stored artifact still carries `print_id`, hash, timestamp, role, and audit metadata in DB/API/history.
+### 5.9 Visible Print Metadata (D-CERT-202, D-CERT-212)
+Normal Print Builder PDFs do not print an internal header/title, scope label, `print_id`, system-state hash, recipient name, or generation-footer page. The only generator line in the visible PDF is `Printed by: <user> (<role>)`.
+
+Normal Excel companions do not print `Print ID`, `Scope`, or `System state hash` rows. The stored artifact still carries `print_id`, scope, hash, timestamp, role, and audit metadata in DB/API/history.
 
 ### 5.10 Validity Glossary (D-CERT-132, D-CERT-202)
 Validity data remains in system records, but normal visible PDFs do not print the validity code column or page-1 glossary.

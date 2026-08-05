@@ -37,12 +37,9 @@ export default function SafetyScmAgendaRoute() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#fef3c7_0%,#ffffff_55%,#dbeafe_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / SCM
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">SCM Agenda</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Agenda decisions and action-item counts are now loaded from the live SCM agenda payload.
+          Review meeting decisions and action items.
         </p>
       </header>
 

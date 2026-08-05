@@ -39,8 +39,7 @@ class IncidentPhase4ViewMixin(IncidentViewMixin):
     def get_incident(self) -> Incident:
         queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
         incident = get_by_id_or_pk(queryset, self.kwargs[self.incident_lookup_url_kwarg])
-        if incident.current_phase != 4:
-            raise ValidationError("Phase 4 facts can only be edited while current_phase = 4.")
+        self._enforce_editable_until_office_approval(incident)
         return incident
 
     def get_object(self):
@@ -135,10 +134,8 @@ def build_phase4_gate_payload(incident: Incident) -> dict[str, object]:
 
     facts_count = incident.facts.count()
     blockers = []
-    if missing_tabs:
-        blockers.append(
-            "Complete or mark N/A for evidence tabs: " + ", ".join(missing_tabs) + "."
-        )
+    if not covered_tabs:
+        blockers.append("Add at least one evidence note, file, interview, or N/A reason.")
     if facts_count < 1:
         blockers.append("Add at least one fact before causal analysis.")
 

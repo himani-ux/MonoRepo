@@ -30,9 +30,9 @@ const periodOptions: Array<{
   id: SafetyDashboardPeriodCode;
   label: string;
 }> = [
-  { id: "90D", label: "90D", description: "Operational view focused on the current 90-day window." },
-  { id: "12M", label: "12M", description: "Annual trend view for the selected scope." },
-  { id: "3Y", label: "3Y", description: "Rolling 3-year baseline for the Safety health score." },
+  { id: "90D", label: "90D", description: "Recent view." },
+  { id: "12M", label: "12M", description: "One-year view." },
+  { id: "3Y", label: "3Y", description: "Longer trend." },
 ];
 
 function getErrorMessage(error: unknown): string {
@@ -48,7 +48,7 @@ function buildCountNote(metrics: {
   open_near_misses: number;
   overdue_corrective_actions: number;
 }) {
-  return `${metrics.open_incidents} incident(s), ${metrics.open_near_misses} near miss(es), ${metrics.open_findings} open finding(s), and ${metrics.overdue_corrective_actions} overdue corrective action(s) are in the current score window.`;
+  return `${metrics.open_incidents} incidents, ${metrics.open_near_misses} near misses, ${metrics.open_findings} findings, and ${metrics.overdue_corrective_actions} overdue actions need attention.`;
 }
 
 function buildScopeLabel(
@@ -77,7 +77,7 @@ function buildVesselOptionLabel(vessel: SafetyDashboardVesselOption) {
 function DashboardPanelLoadingState({ className = "h-36" }: { className?: string }) {
   return (
     <section aria-label="Loading dashboard panel" className="space-y-3" role="status">
-      <div className={`${className} animate-pulse rounded-[1.75rem] border border-slate-200 bg-slate-100`} />
+      <div className={`${className} animate-pulse rounded-lg border border-slate-200 bg-slate-100`} />
     </section>
   );
 }
@@ -90,7 +90,7 @@ function DashboardPanelError({
   title: string;
 }) {
   return (
-    <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 shadow-sm">
+    <section className="rounded-lg border border-rose-200 bg-rose-50 p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-rose-900">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-rose-700">{getErrorMessage(error)}</p>
     </section>
@@ -106,6 +106,7 @@ export default function SafetyDashboardRoute() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedVesselId, setSelectedVesselId] = useState<string>("");
+  const [showAdvancedCards, setShowAdvancedCards] = useState(false);
   const canExport = auth.role?.trim().toUpperCase() === "DPA" && auth.hasProcess("SAF_P_023");
   const dashboardScopeKey = buildSafetyDashboardPeriodScopeKey({
     id: auth.user?.id,
@@ -225,43 +226,39 @@ export default function SafetyDashboardRoute() {
 
   return (
     <section className="space-y-6">
-      <header className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#dcfce7_100%)] p-6 shadow-sm">
+      <header className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Safety / Dashboard
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-              Safety Intelligence Dashboard
+            <h1 className="text-2xl font-semibold text-slate-900">
+              Safety Dashboard
             </h1>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              Live operational rollups for incidents, near misses, SOI compliance, repeat
-              root-cause clusters, and corrective-action aging.
+              What needs attention, what is overdue, and where to review next.
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
             <div>Scope: {scopeSummary}</div>
             <div>Viewer role: {auth.role ?? "Unknown"}</div>
           </div>
         </div>
       </header>
 
-      <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Score window</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Filters</h2>
           </div>
           <div className="flex flex-col gap-3 lg:items-end">
             {hasVesselSelector ? (
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
-                <span>Select vessel drill-down</span>
+                <span>Choose vessel</span>
                 <select
-                  aria-label="Select vessel drill-down"
-                  className="min-w-[18rem] rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-500"
+                  aria-label="Choose vessel"
+                  className="min-w-[18rem] rounded-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-500"
                   onChange={(event) => setSelectedVesselId(event.target.value)}
                   value={selectedVesselId}
                 >
-                  <option value="">Fleet overview</option>
+                  <option value="">All vessels</option>
                   {availableVessels.map((vessel) => (
                     <option key={vessel.id} value={vessel.id}>
                       {buildVesselOptionLabel(vessel)}
@@ -296,7 +293,7 @@ export default function SafetyDashboardRoute() {
 
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {periodOptions.map((option) => (
-            <article key={option.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <article key={option.id} className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {option.label}
               </div>
@@ -315,11 +312,11 @@ export default function SafetyDashboardRoute() {
             componentScores={compositeQuery.data.component_scores}
             compositeScore={compositeQuery.data.composite_score}
             countNote={buildCountNote(compositeQuery.data.metrics)}
-            description={`Live ${period} score for ${buildScopeLabel(
+            description={`${period} view for ${buildScopeLabel(
               compositeQuery.data.scope_type,
               compositeQuery.data.scope_id,
               selectedVessel,
-            )}, calculated from current Safety records between ${compositeQuery.data.window_start} and ${compositeQuery.data.window_end}.`}
+            )}.`}
             metrics={{
               openFindings: compositeQuery.data.metrics.open_findings,
               openIncidents: compositeQuery.data.metrics.open_incidents,
@@ -333,141 +330,163 @@ export default function SafetyDashboardRoute() {
           />
       ) : null}
 
-      {heinrichQuery.isLoading ? <DashboardPanelLoadingState /> : null}
-      {heinrichQuery.error ? (
-        <DashboardPanelError error={heinrichQuery.error} title="Heinrich ratio unavailable" />
-      ) : null}
-      {heinrichQuery.data ? (
-          <SafetyHeinrichRatioPanel
-            confidence={{
-              incidentCount12m: heinrichQuery.data.confidence.incident_count_12m,
-              nearMissCount12m: heinrichQuery.data.confidence.near_miss_count_12m,
-              reason: heinrichQuery.data.confidence.reason,
-              status: heinrichQuery.data.confidence.status,
-              tooltip: heinrichQuery.data.confidence.tooltip,
-            }}
-            layers={heinrichQuery.data.layers}
-            reportingCultureGap={{
-              isGap: heinrichQuery.data.reporting_culture_gap.is_gap,
-              message: heinrichQuery.data.reporting_culture_gap.message,
-            }}
-          />
-      ) : null}
-
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-            {soiComplianceQuery.isLoading ? <DashboardPanelLoadingState className="h-64" /> : null}
-            {soiComplianceQuery.error ? (
-              <DashboardPanelError error={soiComplianceQuery.error} title="SOI compliance unavailable" />
-            ) : null}
-            {soiComplianceQuery.data ? (
-              <SafetySoiCompliancePanel
-                currentVessel={currentVesselCard}
-                fleetAverage={{
-                  displayValue: soiComplianceQuery.data.fleet_average.display_value,
-                  note: soiComplianceQuery.data.fleet_average.note,
-                  vesselCount: soiComplianceQuery.data.fleet_average.vessel_count,
-                }}
-                label={soiComplianceQuery.data.label}
-              />
-            ) : null}
-            <aside className="rounded-[1.75rem] border border-slate-200 bg-slate-900 p-5 text-slate-100 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Details
+                  </p>
+                  <h2 className="mt-2 text-xl font-semibold text-slate-900">
+                    Detailed review
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    Open this when you need repeat issues, top causes, overdue-action age, reporting trend, or SOI check status.
+                  </p>
+                </div>
+                <button
+                  aria-expanded={showAdvancedCards}
+                  className="rounded-md border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-500"
+                  onClick={() => setShowAdvancedCards((value) => !value)}
+                  type="button"
+                >
+                  {showAdvancedCards ? "Hide dashboard details" : "Show dashboard details"}
+                </button>
+              </div>
+
+              {showAdvancedCards ? (
+                <div className="mt-5 space-y-4">
+                  {repeatRootQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+                  {repeatRootQuery.error ? (
+                    <DashboardPanelError error={repeatRootQuery.error} title="Repeat issues unavailable" />
+                  ) : null}
+                  {repeatRootQuery.data ? (
+                    <SafetyRepeatRootRadar
+                      fleet={repeatRootQuery.data.fleet.map((item) => ({
+                        categoryName: item.category_name,
+                        description: item.description,
+                        occurrences: item.occurrences,
+                        relativeStrength: item.relative_strength,
+                        subcodeId: item.subcode_id,
+                        vesselCount: item.vessel_count,
+                      }))}
+                      minimumRepeatCount={repeatRootQuery.data.minimum_repeat_count}
+                      vessel={repeatRootQuery.data.vessel.map((item) => ({
+                        categoryName: item.category_name,
+                        description: item.description,
+                        occurrences: item.occurrences,
+                        relativeStrength: item.relative_strength,
+                        subcodeId: item.subcode_id,
+                        vesselCount: item.vessel_count,
+                      }))}
+                    />
+                  ) : null}
+
+                  {paretoQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+                  {paretoQuery.error ? (
+                    <DashboardPanelError error={paretoQuery.error} title="Top causes unavailable" />
+                  ) : null}
+                  {paretoQuery.data ? (
+                    <SafetyParetoPanel
+                      entries={paretoQuery.data.entries.map((entry) => ({
+                        categoryName: entry.category_name,
+                        cumulativePercent: entry.cumulative_percent,
+                        description: entry.description,
+                        occurrences: entry.occurrences,
+                        rank: entry.rank,
+                        sharePercent: entry.share_percent,
+                        subcodeId: entry.subcode_id,
+                        vesselCode: entry.vessel_code,
+                        vesselDisplayName: entry.vessel_display_name,
+                        vesselId: entry.vessel_id,
+                        vesselName: entry.vessel_name,
+                        within80Cutoff: entry.within_80_cutoff,
+                      }))}
+                      topN={paretoQuery.data.top_n}
+                      totalOccurrences={paretoQuery.data.total_occurrences}
+                    />
+                  ) : null}
+
+                  {caAgingQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+                  {caAgingQuery.error ? (
+                    <DashboardPanelError error={caAgingQuery.error} title="Corrective-action aging unavailable" />
+                  ) : null}
+                  {caAgingQuery.data ? (
+                    <SafetyCaAgingPipeline
+                      buckets={caAgingQuery.data.buckets}
+                      label={caAgingQuery.data.label}
+                      note={caAgingQuery.data.note}
+                      oldestAgeDays={caAgingQuery.data.oldest_age_days}
+                      openActionCount={caAgingQuery.data.open_action_count}
+                    />
+                  ) : null}
+
+                  {heinrichQuery.isLoading ? <DashboardPanelLoadingState /> : null}
+                  {heinrichQuery.error ? (
+                    <DashboardPanelError error={heinrichQuery.error} title="Reporting trend unavailable" />
+                  ) : null}
+                  {heinrichQuery.data ? (
+                    <SafetyHeinrichRatioPanel
+                      confidence={{
+                        incidentCount12m: heinrichQuery.data.confidence.incident_count_12m,
+                        nearMissCount12m: heinrichQuery.data.confidence.near_miss_count_12m,
+                        reason: heinrichQuery.data.confidence.reason,
+                        status: heinrichQuery.data.confidence.status,
+                        tooltip: heinrichQuery.data.confidence.tooltip,
+                      }}
+                      layers={heinrichQuery.data.layers}
+                      reportingCultureGap={{
+                        isGap: heinrichQuery.data.reporting_culture_gap.is_gap,
+                        message: heinrichQuery.data.reporting_culture_gap.message,
+                      }}
+                    />
+                  ) : null}
+
+                  {soiComplianceQuery.isLoading ? <DashboardPanelLoadingState className="h-64" /> : null}
+                  {soiComplianceQuery.error ? (
+                    <DashboardPanelError error={soiComplianceQuery.error} title="SOI check status unavailable" />
+                  ) : null}
+                  {soiComplianceQuery.data ? (
+                    <SafetySoiCompliancePanel
+                      currentVessel={currentVesselCard}
+                      fleetAverage={{
+                        displayValue: soiComplianceQuery.data.fleet_average.display_value,
+                        note: soiComplianceQuery.data.fleet_average.note,
+                        vesselCount: soiComplianceQuery.data.fleet_average.vessel_count,
+                      }}
+                      label={soiComplianceQuery.data.label}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+            <aside className="rounded-lg border border-slate-200 bg-slate-900 p-5 text-slate-100 shadow-sm">
               <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">
-                Rollup Window
+                Current view
               </h2>
               <ul className="mt-4 space-y-3 text-sm leading-6">
                 <li>
-                  Composite score window:{" "}
+                  Score dates:{" "}
                   {compositeQuery.data
                     ? `${compositeQuery.data.window_start} to ${compositeQuery.data.window_end}`
                     : "Loading"}.
                 </li>
                 <li>
-                  Heinrich view:{" "}
-                  {heinrichQuery.data
-                    ? `${heinrichQuery.data.window_start} to ${heinrichQuery.data.window_end}`
-                    : "Loading"}.
-                </li>
-                <li>
-                  Repeat-root radar threshold:{" "}
+                  Repeat issue level:{" "}
                   {repeatRootQuery.data ? `${repeatRootQuery.data.minimum_repeat_count}+ repeats` : "Loading"}.
                 </li>
                 <li>
-                  Pareto total recurring events: {paretoQuery.data ? paretoQuery.data.total_occurrences : "Loading"}.
+                  Repeat events: {paretoQuery.data ? paretoQuery.data.total_occurrences : "Loading"}.
                 </li>
                 <li>
-                  Oldest open corrective action age:{" "}
+                  Oldest open action:{" "}
                   {caAgingQuery.data ? `${caAgingQuery.data.oldest_age_days} day(s)` : "Loading"}.
                 </li>
               </ul>
             </aside>
           </section>
 
-      {repeatRootQuery.isLoading ? <DashboardPanelLoadingState /> : null}
-      {repeatRootQuery.error ? (
-        <DashboardPanelError error={repeatRootQuery.error} title="Repeat root-cause radar unavailable" />
-      ) : null}
-      {repeatRootQuery.data ? (
-          <SafetyRepeatRootRadar
-            fleet={repeatRootQuery.data.fleet.map((item) => ({
-              categoryName: item.category_name,
-              description: item.description,
-              occurrences: item.occurrences,
-              relativeStrength: item.relative_strength,
-              subcodeId: item.subcode_id,
-              vesselCount: item.vessel_count,
-            }))}
-            minimumRepeatCount={repeatRootQuery.data.minimum_repeat_count}
-            vessel={repeatRootQuery.data.vessel.map((item) => ({
-              categoryName: item.category_name,
-              description: item.description,
-              occurrences: item.occurrences,
-              relativeStrength: item.relative_strength,
-              subcodeId: item.subcode_id,
-              vesselCount: item.vessel_count,
-            }))}
-          />
-      ) : null}
-
-      {paretoQuery.isLoading ? <DashboardPanelLoadingState /> : null}
-      {paretoQuery.error ? (
-        <DashboardPanelError error={paretoQuery.error} title="Pareto panel unavailable" />
-      ) : null}
-      {paretoQuery.data ? (
-          <SafetyParetoPanel
-            entries={paretoQuery.data.entries.map((entry) => ({
-              categoryName: entry.category_name,
-              cumulativePercent: entry.cumulative_percent,
-              description: entry.description,
-              occurrences: entry.occurrences,
-              rank: entry.rank,
-              sharePercent: entry.share_percent,
-              subcodeId: entry.subcode_id,
-              vesselCode: entry.vessel_code,
-              vesselDisplayName: entry.vessel_display_name,
-              vesselId: entry.vessel_id,
-              vesselName: entry.vessel_name,
-              within80Cutoff: entry.within_80_cutoff,
-            }))}
-            topN={paretoQuery.data.top_n}
-            totalOccurrences={paretoQuery.data.total_occurrences}
-          />
-      ) : null}
-
-      {caAgingQuery.isLoading ? <DashboardPanelLoadingState /> : null}
-      {caAgingQuery.error ? (
-        <DashboardPanelError error={caAgingQuery.error} title="Corrective-action aging unavailable" />
-      ) : null}
-      {caAgingQuery.data ? (
-          <SafetyCaAgingPipeline
-            buckets={caAgingQuery.data.buckets}
-            label={caAgingQuery.data.label}
-            note={caAgingQuery.data.note}
-            oldestAgeDays={caAgingQuery.data.oldest_age_days}
-            openActionCount={caAgingQuery.data.open_action_count}
-          />
-      ) : null}
-
-          <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -475,11 +494,11 @@ export default function SafetyDashboardRoute() {
                 </p>
                 <h2 className="mt-2 text-xl font-semibold text-slate-900">PDF and Excel export</h2>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                {canExport
-                  ? "Export is available for your login."
-                  : "Export is limited to authorized office users."}
-              </div>
+              {!canExport ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  Export is limited to authorized office users.
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -509,7 +528,7 @@ export default function SafetyDashboardRoute() {
               </div>
 
               <button
-                className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="rounded-md bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 disabled={!canExport || isExporting}
                 onClick={handleExport}
                 type="button"

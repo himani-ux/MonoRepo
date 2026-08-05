@@ -33,9 +33,6 @@ export function SafetyFleetAlertComposer({
     <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Safety / Near Miss / DPA
-          </p>
           <h1 className="text-3xl font-semibold text-slate-900">Fleet Alert Composer</h1>
           <p className="max-w-3xl text-sm leading-6 text-slate-600">
             HIGH-priority near misses require a fleet alert within 7 days. The

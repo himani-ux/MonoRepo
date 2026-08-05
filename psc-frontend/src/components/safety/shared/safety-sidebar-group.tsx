@@ -81,11 +81,6 @@ export function SafetySidebarGroup({
       label: "Search",
     },
     {
-      formId: "SAF_F_018",
-      href: "/safety/admin",
-      label: "Admin",
-    },
-    {
       formId: "SAF_F_020",
       href: "/safety/admin/auditor-export",
       label: "Auditor Export",

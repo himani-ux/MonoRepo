@@ -1,4 +1,4 @@
-﻿// src/components/FilterBar.jsx
+// src/components/FilterBar.jsx
 import React from 'react';
 import { LuSearch } from 'react-icons/lu';
 import { Button } from "./ui/button";
@@ -7,7 +7,7 @@ import { Download } from "lucide-react";
 const FilterBar = ({
   user,
   searchTerm,
-  onSearchChange, 
+  onSearchChange,
   scope,
   onToggleScope,
   selectedTypes,

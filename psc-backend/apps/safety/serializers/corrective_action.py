@@ -30,15 +30,18 @@ class CorrectiveActionSerializer(serializers.ModelSerializer):
     aging_bucket = serializers.SerializerMethodField()
     purchase_request = serializers.SerializerMethodField()
     recommendation_id = serializers.UUIDField(read_only=True)
+    recommendation_title = serializers.SerializerMethodField()
+    recommendation_tier = serializers.SerializerMethodField()
 
     class Meta:
         model = CorrectiveAction
         fields = (
             "id",
-            "id",
             "source_table",
             "source_id",
             "recommendation_id",
+            "recommendation_title",
+            "recommendation_tier",
             "title",
             "description",
             "assigned_crew_id",
@@ -57,6 +60,16 @@ class CorrectiveActionSerializer(serializers.ModelSerializer):
             "closed_by",
         )
         read_only_fields = fields
+
+    def get_recommendation_title(self, obj: CorrectiveAction) -> str | None:
+        if obj.recommendation_id and obj.recommendation:
+            return obj.recommendation.title
+        return None
+
+    def get_recommendation_tier(self, obj: CorrectiveAction) -> str | None:
+        if obj.recommendation_id and obj.recommendation:
+            return obj.recommendation.tier
+        return None
 
     def get_aging_bucket(self, obj: CorrectiveAction) -> str:
         return _aging_service(self.context).aging_bucket(obj)

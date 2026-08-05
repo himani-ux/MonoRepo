@@ -18,8 +18,8 @@ export default function SafetyPurchaseReqLinker({
       </p>
       <p className="mt-2 text-sm text-slate-700">
         {action.purchase_req_id
-          ? `Linked Purchase Req ${action.purchase_req_id} keeps the hard-FK lifecycle visible from Safety.`
-          : "Create the linked Purchase Req from the corrective-action row when parts or services are required."}
+          ? `Purchase Req ${action.purchase_req_id} is linked to this action.`
+          : "Create a Purchase Req if parts or services are needed."}
       </p>
       <a
         className="mt-3 inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-white"

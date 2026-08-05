@@ -148,11 +148,15 @@ class TrackedItemWriteSerializer(serializers.Serializer):
         return attrs
 
 
-def serialize_tracked_item(row: dict[str, Any]) -> dict[str, Any]:
+def serialize_tracked_item(row: dict[str, Any], *, include_display_names: bool = True) -> dict[str, Any]:
     submitted_by = row.get("submitted_by")
     approved_by = row.get("approved_by")
     created_by = row.get("created_by")
     updated_by = row.get("updated_by")
+    submitted_by_display = resolve_principal_display_name(submitted_by) if include_display_names else None
+    approved_by_display = resolve_principal_display_name(approved_by) if include_display_names else None
+    created_by_display = resolve_principal_display_name(created_by) if include_display_names else None
+    updated_by_display = resolve_principal_display_name(updated_by) if include_display_names else None
     return {
         "id": str(row.get("tracked_item_id")),
         "vesselId": str(row["vessel_id"]) if row.get("vessel_id") else None,
@@ -193,10 +197,10 @@ def serialize_tracked_item(row: dict[str, Any]) -> dict[str, Any]:
         "lastClassSyncId": str(row["last_class_sync_id"]) if row.get("last_class_sync_id") else None,
         "approvalState": row.get("approval_state"),
         "submittedBy": submitted_by,
-        "submittedByDisplay": resolve_principal_display_name(submitted_by),
+        "submittedByDisplay": submitted_by_display,
         "submittedAt": row.get("submitted_at"),
         "approvedBy": approved_by,
-        "approvedByDisplay": resolve_principal_display_name(approved_by),
+        "approvedByDisplay": approved_by_display,
         "approvedAt": row.get("approved_at"),
         "rejectionReason": row.get("rejection_reason"),
         "rejectionCount": row.get("rejection_count"),
@@ -206,10 +210,10 @@ def serialize_tracked_item(row: dict[str, Any]) -> dict[str, Any]:
         "version": row.get("version"),
         "createdAt": row.get("created_at"),
         "createdBy": created_by,
-        "createdByDisplay": resolve_principal_display_name(created_by),
+        "createdByDisplay": created_by_display,
         "updatedAt": row.get("updated_at"),
         "updatedBy": updated_by,
-        "updatedByDisplay": resolve_principal_display_name(updated_by),
+        "updatedByDisplay": updated_by_display,
     }
 
 

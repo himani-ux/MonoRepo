@@ -194,7 +194,7 @@ class InspectionReport(models.Model):
     file_path = models.CharField(max_length=500)
     file_size = models.IntegerField(null=True, blank=True)  # bytes
     mime_type = models.CharField(max_length=100, default='application/pdf')
-    description = models.CharField(max_length=500, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
 
     # Soft delete
     is_deleted = models.BooleanField(default=False)
@@ -212,4 +212,3 @@ class InspectionReport(models.Model):
 
     def __str__(self):
         return f"{self.file_name} ({self.inspection})"
-

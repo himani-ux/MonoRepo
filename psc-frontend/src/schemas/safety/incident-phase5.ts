@@ -33,13 +33,19 @@ export const safetyIncidentCauseTagSchema = z.object({
   mscat_subcode_id: z.string().min(1),
   mscat_category_id: z.coerce.number().int().positive().nullable().optional(),
   mscat_description: z.string().default(""),
+  cause_factor: z.enum(["HUMAN", "VESSEL", "MANAGEMENT", "OTHER"]).nullable().optional(),
+  cause_factor_label: z.string().default(""),
+  cause_option_id: z.string().nullable().optional(),
+  cause_option_text: z.string().default(""),
+  cause_other_text: z.string().default(""),
+  cause_stage: z.string().default(""),
   causal_layer: safetyIncidentCauseLayerSchema,
   analysis_tool: safetyIncidentAnalysisToolSchema,
   rationale: z.string().min(1),
 });
 
 export const safetyIncidentSafeguardFailureSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().min(1).optional(),
   safeguard_name: z.string().min(1),
   design_mscat_subcode_id: z.string().min(1),
   installation_mscat_subcode_id: z.string().min(1),

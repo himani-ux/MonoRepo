@@ -1,4 +1,4 @@
-﻿// src/components/ApprovedNotificationsLibrary.jsx
+// src/components/ApprovedNotificationsLibrary.jsx
 import React, { useState, useEffect } from "react";
 import {
     ArrowDownUp,
@@ -49,7 +49,7 @@ const ApprovedNotificationsLibrary = () => {
             .replace(/[^a-z0-9]/g, "");
     };
 
-  
+
 
 
     // --- NEW: Fetch Lookup Maps on Component Mount ---
@@ -266,7 +266,7 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for Send Reminder Button ---
     const handleSendReminder = async (srNoForReminder) => {
-        console.log("ðŸ”” handleSendReminder: Sending reminder for notification SR No:", srNoForReminder);
+        console.log("🔔 handleSendReminder: Sending reminder for notification SR No:", srNoForReminder);
         const confirmed = window.confirm(`Are you sure you want to send a reminder for notification ${srNoForReminder}?`);
         if (!confirmed) {
             console.log("handleSendReminder: User cancelled reminder.");
@@ -287,7 +287,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("âœ… handleSendReminder: Reminder sent successfully for notification", srNoForReminder);
+                console.log("✅ handleSendReminder: Reminder sent successfully for notification", srNoForReminder);
                 alert(`Reminder sent successfully for notification ${srNoForReminder}.`);
                 // Optionally, you could refresh the list here if needed to reflect the updated reminder timestamp
                 // fetchUserNotifications(sortDirection, sortCriteria);
@@ -306,7 +306,7 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for View Seen Crews Button ---
     const handleViewSeenCrews = async (notificationSrNo) => { // Accept the SR No string
-        console.log("ðŸš€ handleViewSeenCrews: Fetching seen crews for notification SR No:", notificationSrNo);
+        console.log("🚀 handleViewSeenCrews: Fetching seen crews for notification SR No:", notificationSrNo);
         setViewingSeenCrews(notificationSrNo); // Set the SR No to view
         setLoadingSeenCrews(true); // Start loading
 
@@ -321,7 +321,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("âœ… handleViewSeenCrews: Successfully fetched delivery records for notification", notificationSrNo);
+                console.log("✅ handleViewSeenCrews: Successfully fetched delivery records for notification", notificationSrNo);
                 setSeenCrewsData(result.delivery_records || []); // Store the data (ensure it's an array)
                 setLoadingSeenCrews(false); // Stop loading
             } else {
@@ -344,7 +344,7 @@ const ApprovedNotificationsLibrary = () => {
 
     // --- NEW: Handler for Send Individual Reminder Button ---
     const handleSendIndividualReminder = async (notificationSrNo, crewId) => {
-        console.log(`ðŸ”” handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
+        console.log(`🔔 handleSendIndividualReminder: Sending individual reminder for notification ${notificationSrNo} to crew ${crewId}`);
         const confirmed = window.confirm(`Are you sure you want to send a reminder to crew ${crewId} for notification ${notificationSrNo}?`);
         if (!confirmed) {
             console.log("handleSendIndividualReminder: User cancelled individual reminder.");
@@ -369,7 +369,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log("âœ… handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
+                console.log("✅ handleSendIndividualReminder: Individual reminder sent successfully for crew", crewId);
                 alert(`Reminder sent successfully to crew ${crewId}.`);
                 // window.location.reload();
 
@@ -397,7 +397,7 @@ const ApprovedNotificationsLibrary = () => {
     // --- NEW: Handler for Delete Button (with Role-Based Check) ---
 
      const handleDelete = async (srNoToDelete) => {
-        console.log(`ðŸš€ handleDelete: Attempting to delete notification ${srNoToDelete}`);
+        console.log(`🚀 handleDelete: Attempting to delete notification ${srNoToDelete}`);
 
         // --- REMOVED: Admin Role Check ---
         // Any user can now attempt to delete
@@ -423,7 +423,7 @@ const ApprovedNotificationsLibrary = () => {
             const result = await response.json();
 
             if (response.ok) {
-                console.log(`âœ… handleDelete: Successfully deleted notification ${srNoToDelete}`);
+                console.log(`✅ handleDelete: Successfully deleted notification ${srNoToDelete}`);
                 alert(result.message || 'Notification deleted successfully.');
 
                 // Update the local state to remove the deleted notification
@@ -435,11 +435,11 @@ const ApprovedNotificationsLibrary = () => {
                 );
 
             } else {
-                console.error(`âŒ handleDelete: Failed to delete notification ${srNoToDelete}`, result.error);
+                console.error(`❌ handleDelete: Failed to delete notification ${srNoToDelete}`, result.error);
                 alert(`Error deleting notification: ${result.error || 'Unknown error'}`);
             }
         } catch (err) {
-            console.error(`ðŸ’¥ handleDelete: Network error deleting notification ${srNoToDelete}`, err);
+            console.error(`💥 handleDelete: Network error deleting notification ${srNoToDelete}`, err);
             alert('Network error occurred while deleting notification.');
         }
     };
@@ -493,11 +493,11 @@ const ApprovedNotificationsLibrary = () => {
                 ? '/circular/admin'
                 : '/circular/office')
             : '/login';
-        console.log(`ðŸš€ handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
+        console.log(`🚀 handleSupersede: Preparing to supersede notification ${srNoToSupersede}`);
 
         try {
             localStorage.setItem('supersedingNotificationId', srNoToSupersede); // Store the OLD SR No
-            console.log(`âœ… handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
+            console.log(`✅ handleSupersede: Stored supersedingNotificationId (${srNoToSupersede}) in localStorage`);
 
             localStorage.setItem('oldNotificationType', notificationToSupersede.msc_type || '');
             localStorage.setItem(
@@ -512,7 +512,7 @@ const ApprovedNotificationsLibrary = () => {
             localStorage.setItem('oldNotificationSubCatNames', JSON.stringify(oldSubCatNames));
             localStorage.setItem('oldNotificationSecondSubCatNames', JSON.stringify(oldSecondSubCatNames));
 
-            console.log(`âœ… handleSupersede: Stored old notification details in localStorage for pre-filling.`);
+            console.log(`✅ handleSupersede: Stored old notification details in localStorage for pre-filling.`);
 
             // 4. Determine user type to redirect correctly
             if (currentUser) {
@@ -534,7 +534,7 @@ const ApprovedNotificationsLibrary = () => {
             // # This frontend handler just initiates the process by storing the OLD details and ID, then redirecting.
 
         } catch (storageError) {
-            console.error(`âŒ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
+            console.error(`❌ handleSupersede: Error preparing supersede data for ${srNoToSupersede}:`, storageError);
             localStorage.setItem('supersedingNotificationId', srNoToSupersede);
             window.location.href = redirectPath;
         }
@@ -586,7 +586,7 @@ const ApprovedNotificationsLibrary = () => {
         );
 
     return (
-         
+
         <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 py-10">
             {/* Header */}
             <div className="text-center mb-6">
@@ -600,7 +600,7 @@ const ApprovedNotificationsLibrary = () => {
             <div className="max-w-7xl mx-auto mb-6 bg-white/95 shadow-md rounded-xl border border-sky-100 px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
 
-                    {/* Left Section â€“ Search + Filters */}
+                    {/* Left Section – Search + Filters */}
                     <div className="flex flex-wrap items-center gap-4">
 
                         {/* Search */}
@@ -641,7 +641,7 @@ const ApprovedNotificationsLibrary = () => {
                         </select>
                     </div>
 
-                    {/* Right Section â€“ Sort & Buttons */}
+                    {/* Right Section – Sort & Buttons */}
                     <div className="flex items-center gap-3">
 
                         {/* Sort */}
@@ -667,7 +667,7 @@ const ApprovedNotificationsLibrary = () => {
                         <button
                             onClick={handleDownloadCSV}
                             className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
-                            
+
                         >
                             <DownloadIcon size={14} />
                             CSV
@@ -910,7 +910,7 @@ const ApprovedNotificationsLibrary = () => {
                 {/* --- END NEW: View Seen Crews Modal --- */}
             </div>
         </div>
-      
+
     );
 };
 

@@ -10,6 +10,8 @@ from apps.safety.models import (
     MasterSafetyIncidentType,
     MasterSoiArea,
     MasterSoiAreaItem,
+    IncidentWeatherOption,
+    InjuryDropdownOption,
     SafetyCaseStudy,
     SOIChecklistVersion,
 )
@@ -154,6 +156,38 @@ class MasterSafetyIncidentTypeSerializer(serializers.ModelSerializer):
             "active",
         )
         read_only_fields = ("id", "legacy_int_id")
+
+
+class IncidentWeatherOptionSerializer(serializers.ModelSerializer):
+    field_label = serializers.CharField(source="get_field_key_display", read_only=True)
+
+    class Meta:
+        model = IncidentWeatherOption
+        fields = (
+            "id",
+            "field_key",
+            "field_label",
+            "option_label",
+            "display_order",
+            "active",
+        )
+        read_only_fields = fields
+
+
+class InjuryDropdownOptionSerializer(serializers.ModelSerializer):
+    field_label = serializers.CharField(source="get_field_key_display", read_only=True)
+
+    class Meta:
+        model = InjuryDropdownOption
+        fields = (
+            "id",
+            "field_key",
+            "field_label",
+            "option_label",
+            "display_order",
+            "active",
+        )
+        read_only_fields = fields
 
 
 class SafetyCaseStudySerializer(serializers.ModelSerializer):

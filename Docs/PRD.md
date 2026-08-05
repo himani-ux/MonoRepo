@@ -1,7 +1,6 @@
 # PRD.md — Product Requirements Document
 ## Inspection Module — PSC/RS/Audit Close-out System
 **Version:** 1.1 | **Date:** 2026-02-05 | **Status:** DRAFT — PENDING APPROVAL
-
 ---
 
 ## 1. Product Overview
@@ -162,6 +161,7 @@ A comprehensive inspection management system for maritime vessels that handles P
 - [ ] Links to original inspection via parent_inspection_id
 - [ ] Records follow-up date, port, authority
 - [ ] Allows batch update of deficiency action codes
+- [ ] Allows optional upload of up to three follow-up report PDFs
 - [ ] Typically sets cleared deficiencies to action_code=10
 - [ ] Creates psc_follow_up_events record
 - [ ] Sends notification to Office + Vessel

@@ -1,0 +1,41 @@
+#!/bin/sh
+# KLOSS Step 5 gate - code changes carry their records, or say why not.
+# Install into .git/hooks/commit-msg during Maintain Mode activation.
+
+if [ -d "/c/Program Files/Git/usr/bin" ]; then
+  PATH="/c/Program Files/Git/usr/bin:$PATH"
+  export PATH
+fi
+
+MSG_FILE="$1"
+MSG=$(cat "$MSG_FILE")
+
+# Repo code roots. Keep this aligned with AGENTS.md Maintain Mode.
+CODE_PATHS='^(psc-backend/|psc-frontend/|src/|apps/|lib/|app/|backend/|frontend/)'
+PROGRESS_PATHS='^(progress\.txt|Docs/progress\.txt|safety_docsuite/progress\.txt)$'
+STAGED=$(git diff --cached --name-only)
+
+echo "$STAGED" | grep -qE "$CODE_PATHS" || exit 0
+
+# Gate 1: code change must carry a progress ledger entry or visible exemption.
+if ! echo "$STAGED" | grep -qE "$PROGRESS_PATHS"; then
+  if ! echo "$MSG" | grep -q 'DOCS-EXEMPT:'; then
+    echo "KLOSS GATE: code changed but no progress ledger is staged."
+    echo "Append the progress entry using the AGENTS.md Maintain Mode schema and stage it,"
+    echo "or add 'DOCS-EXEMPT: <reason>' to this commit message."
+    exit 1
+  fi
+fi
+
+# Gate 2: bugfix commits carry a test change or visible exemption.
+if echo "$MSG" | grep -qiE '\bfix(es|ed)?\b|\bbug\b'; then
+  if ! echo "$STAGED" | grep -qiE '(test|spec)'; then
+    if ! echo "$MSG" | grep -q 'TEST-EXEMPT:'; then
+      echo "KLOSS GATE: commit message says fix/bug but no test file is staged."
+      echo "Stage the regression test, or add 'TEST-EXEMPT: <reason>' to this commit message."
+      exit 1
+    fi
+  fi
+fi
+
+exit 0

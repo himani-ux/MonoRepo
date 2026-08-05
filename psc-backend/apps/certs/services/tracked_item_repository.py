@@ -104,6 +104,8 @@ CAMEL_TO_COLUMN = {
 @dataclass(frozen=True)
 class TrackedItemPage:
     count: int
+    page: int | None
+    page_size: int | None
     results: list[dict[str, Any]]
 
 
@@ -180,12 +182,23 @@ class TrackedItemRepository:
         catalog_id: str | None = None,
         status_value: str | None = None,
         approval_state: str | None = None,
+        vessel_ids: list[str] | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
     ) -> TrackedItemPage:
         where: list[str] = []
         params: list[Any] = []
         if vessel_id:
             where.append("t.vessel_id = %s")
             params.append(vessel_id)
+        elif vessel_ids is not None:
+            clean_vessel_ids = [str(value).strip() for value in vessel_ids if str(value or "").strip()]
+            if clean_vessel_ids:
+                placeholders = ", ".join(["%s"] * len(clean_vessel_ids))
+                where.append(f"t.vessel_id IN ({placeholders})")
+                params.extend(clean_vessel_ids)
+            else:
+                where.append("1 = 0")
         if catalog_id:
             where.append("t.catalog_id = %s")
             params.append(catalog_id)
@@ -197,6 +210,13 @@ class TrackedItemRepository:
             params.append(approval_state)
 
         where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        safe_page = max(1, int(page)) if page is not None else None
+        safe_page_size = min(max(1, int(page_size)), 100) if page_size is not None else None
+        page_sql = ""
+        page_params: list[Any] = []
+        if safe_page is not None and safe_page_size is not None:
+            page_sql = " OFFSET %s ROWS FETCH NEXT %s ROWS ONLY"
+            page_params = [(safe_page - 1) * safe_page_size, safe_page_size]
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
@@ -208,10 +228,10 @@ class TrackedItemRepository:
             )
             count = int(cursor.fetchone()[0])
             cursor.execute(
-                _item_select_sql(where_sql) + " ORDER BY c.print_order, c.display_name, t.expiry_date",
-                params,
+                _item_select_sql(where_sql) + f" ORDER BY c.print_order, c.display_name, t.expiry_date{page_sql}",
+                [*params, *page_params],
             )
-            return TrackedItemPage(count=count, results=_fetch_all(cursor))
+            return TrackedItemPage(count=count, page=safe_page, page_size=safe_page_size, results=_fetch_all(cursor))
 
     def get_item(self, tracked_item_id: str) -> dict[str, Any] | None:
         with connection.cursor() as cursor:

@@ -1287,14 +1287,20 @@ export interface SafetyIncidentCreatePayload {
   awaiting_daily_report_match?: boolean;
   external_party_injury?: Record<string, unknown> | null;
   incident_type_id?: number | null;
+  incident_type_other?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   shore_assistance_required?: boolean | null;
   vessel_location?: string;
+  vessel_location_detail?: string | null;
   onboard_location?: string;
   last_port?: string;
   departure_date?: string | null;
   vessel_condition?: 'LOADED' | 'BALLAST' | '' | null;
+  risk_assessment_carried_out?: 'YES' | 'NO' | 'NA' | '' | null;
+  toolbox_meeting_carried_out?: 'YES' | 'NO' | 'NA' | '' | null;
+  permit_issued?: 'YES' | 'NO' | 'NA' | '' | null;
+  activity_type?: string | null;
   loss_type_primary_id?: number | null;
   loss_type_secondary_id?: number | null;
   loss_type_tertiary_id?: number | null;
@@ -1701,6 +1707,13 @@ export const safetyApi = {
       params: buildParams(filters),
     });
     return unwrapPaginatedResults(response.data);
+  },
+
+  async getIncidentRegisterVessels() {
+    const response = await apiClient.get<SafetyDashboardVesselOption[]>(
+      buildSafetyApiUrl('/incidents/vessels/')
+    );
+    return response.data;
   },
 
   async createIncident(payload: SafetyIncidentCreatePayload) {

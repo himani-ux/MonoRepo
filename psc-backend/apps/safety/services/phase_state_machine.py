@@ -110,7 +110,7 @@ class PhaseStateMachine:
             if not reason:
                 raise PhaseTransitionError("Sending Loss Evaluation back to Phase 4 requires a written reason.")
             return IncidentPhaseLog.TransitionType.REWORK
-        if from_phase == 8 and to_phase == 9:
+        if from_phase in {7, 8} and to_phase == 9:
             return IncidentPhaseLog.TransitionType.CLOSE
         raise PhaseTransitionError(
             f"Illegal incident phase transition from Phase {from_phase} to Phase {to_phase}."

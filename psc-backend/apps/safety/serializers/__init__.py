@@ -54,11 +54,14 @@ from .incident_phase7 import (
 from .incident_phase8 import (
     IncidentPhase8CloseSerializer,
     IncidentPhase8VerifySerializer,
+    IncidentLossEvaluationSerializer,
     RecommendationVerificationSerializer,
     build_phase8_workspace_payload,
 )
 from .near_miss import (
     NearMissCategoryReclassifySerializer,
+    NearMissCategorySerializer,
+    NearMissCauseOptionSerializer,
     NearMissCreateSerializer,
     NearMissGuidancePromptSerializer,
     NearMissKpiTargetSerializer,
@@ -86,6 +89,8 @@ from .scm_attendance import (
 from .soi_finding import SOIFindingCreateSerializer, SOIFindingSerializer, SOIFindingSubmitSerializer
 from .soi_finding import SOIFindingApprovalSerializer, SOIFindingPendingClosureSerializer, SOIFindingReopenSerializer
 from .taxonomy_admin import (
+    IncidentWeatherOptionSerializer,
+    InjuryDropdownOptionSerializer,
     MasterImmediateCauseSerializer,
     MasterLossTypeSerializer,
     MasterMscatTaxonomySerializer,
@@ -164,13 +169,18 @@ __all__ = [
     "IncidentPhase7SendBackSerializer",
     "IncidentPhase8CloseSerializer",
     "IncidentPhase8VerifySerializer",
+    "IncidentLossEvaluationSerializer",
     "IncidentReopenSerializer",
     "IncidentTransitionSerializer",
+    "IncidentWeatherOptionSerializer",
+    "InjuryDropdownOptionSerializer",
     "IncidentCauseTagSerializer",
     "IncidentBiasGuardResponseSerializer",
     "IncidentBlameOverrideSerializer",
     "NearMissCreateSerializer",
     "NearMissCategoryReclassifySerializer",
+    "NearMissCategorySerializer",
+    "NearMissCauseOptionSerializer",
     "NearMissGuidancePromptSerializer",
     "NearMissKpiTargetSerializer",
     "NearMissListSerializer",

@@ -25,6 +25,7 @@ class SignatureChainService:
     DPA = "DPA"
     FM = "FM"
     PIC = "PIC"
+    OFFICE_DECISION_ROLES = {DPA, PIC}
 
     ROLE_ALIASES = {
         REPORTER: {"REPORTER"},
@@ -34,16 +35,7 @@ class SignatureChainService:
         FM: {"FM", "FLEET MANAGER"},
         PIC: {"PIC", "VESSEL SUPERINTENDENT"},
     }
-    ACCEPTANCE_ROLE_BY_BAND = {
-        Incident.RiskBand.GREEN: PIC,
-        Incident.RiskBand.YELLOW: DPA,
-        Incident.RiskBand.RED: FM,
-    }
-    PROCESS_BY_BAND = {
-        Incident.RiskBand.GREEN: "SAF_P_006",
-        Incident.RiskBand.YELLOW: "SAF_P_004",
-        Incident.RiskBand.RED: "SAF_P_005",
-    }
+    ACCEPTANCE_PROCESS_IDS = ("SAF_P_004", "SAF_P_006")
 
     def validate_payload(self, *, typed_name: str, device_fingerprint: str) -> SignaturePayload:
         errors: dict[str, str] = {}
@@ -65,16 +57,14 @@ class SignatureChainService:
         )
 
     def closer_role(self, incident: Incident) -> str:
-        return self.ACCEPTANCE_ROLE_BY_BAND.get(incident.risk_band, self.DPA)
+        return self.DPA
 
     def required_process_id(self, incident: Incident) -> str:
-        return self.PROCESS_BY_BAND.get(incident.risk_band, "SAF_P_004")
+        return "SAF_P_004"
 
     def signature_status(self, incident: Incident) -> dict[str, dict[str, object]]:
         dpa_signed = bool(incident.dpa_accepted_at and incident.dpa_accepted_by)
         fm_signed = bool(incident.fm_approved_at and incident.fm_approved_by)
-        closer_role = self.closer_role(incident)
-
         return {
             "reporter": {
                 "required": True,
@@ -89,49 +79,21 @@ class SignatureChainService:
                 "present": self._role_seen(incident, self.HOD),
             },
             "dpa": {
-                "required": incident.risk_band in {Incident.RiskBand.YELLOW, Incident.RiskBand.RED},
+                "required": True,
                 "present": dpa_signed,
             },
             "fm": {
-                "required": incident.risk_band == Incident.RiskBand.RED,
+                "required": False,
                 "present": fm_signed,
             },
             "pic": {
-                "required": incident.risk_band == Incident.RiskBand.GREEN,
-                "present": closer_role == self.PIC and dpa_signed,
+                "required": False,
+                "present": self._phase7_role_signed(incident, self.PIC),
             },
         }
 
     def phase_seven_blockers(self, incident: Incident, *, action_role: str | None = None) -> list[str]:
-        status = self.signature_status(incident)
-        blockers: list[str] = []
-
-        if not status["reporter"]["present"]:
-            blockers.append("reporter_signature")
-        if not status["master"]["present"]:
-            blockers.append("master_signature")
-        if not status["hod"]["present"]:
-            blockers.append("hod_signature")
-
-        if incident.risk_band == Incident.RiskBand.YELLOW and not status["dpa"]["present"]:
-            if action_role != self.DPA:
-                blockers.append("dpa_signature")
-        if incident.risk_band == Incident.RiskBand.RED:
-            if action_role == self.FM:
-                if not status["dpa"]["present"]:
-                    blockers.append("dpa_signature")
-            elif action_role == self.DPA:
-                if status["fm"]["present"]:
-                    blockers.append("fm_already_signed")
-            else:
-                if not status["dpa"]["present"]:
-                    blockers.append("dpa_signature")
-                if not status["fm"]["present"]:
-                    blockers.append("fm_signature")
-        if incident.risk_band == Incident.RiskBand.GREEN and action_role not in (None, self.PIC):
-            blockers.append("pic_signature")
-
-        return blockers
+        return []
 
     def stamp_phase7_signature(
         self,
@@ -243,3 +205,10 @@ class SignatureChainService:
             ).only("actor_role_code")
         }
         return bool(history_roles.intersection(expected_roles))
+
+    def _phase7_role_signed(self, incident: Incident, role_code: str) -> bool:
+        return SafetyFieldHistory.objects.filter(
+            parent_table=incident._meta.db_table,
+            parent_id=incident.pk,
+            field_name=f"{PHASE7_SIGNATURE_FIELD_PREFIX}{role_code.lower()}",
+        ).exists()

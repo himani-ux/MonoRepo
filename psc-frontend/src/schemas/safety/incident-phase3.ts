@@ -11,6 +11,7 @@ export const safetyIncidentPhase3TabCodeSchema = z.enum([
 ]);
 
 export const safetyIncidentPhase3TabSchema = z.object({
+  id: z.string().optional(),
   tab_code: safetyIncidentPhase3TabCodeSchema,
   summary: z.string().default(""),
   entry_count: z.coerce.number().int().nonnegative().default(0),
@@ -20,7 +21,7 @@ export const safetyIncidentPhase3TabSchema = z.object({
 });
 
 export const safetyChainOfCustodyRowSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().optional(),
   description: z.string().default(""),
   collection_timestamp: z.string().default(""),
   collector_name: z.string().default(""),
@@ -40,7 +41,7 @@ export const safetyChainOfCustodyRowSchema = z.object({
 });
 
 export const safetyEvidenceMatrixRowSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().optional(),
   finding: z.string().default(""),
   pro_evidence: z.string().default(""),
   con_evidence: z.string().default(""),
@@ -49,7 +50,7 @@ export const safetyEvidenceMatrixRowSchema = z.object({
 });
 
 export const safetyEvidenceDeadlineTaskSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().optional(),
   task_code: z.string().default(""),
   title: z.string().default("Evidence task"),
   due_at: z.string().default(""),
@@ -61,7 +62,7 @@ export const safetyEvidenceDeadlineTaskSchema = z.object({
 });
 
 export const safetyWitnessInterviewSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().optional(),
   witness_name: z.string().default("Unnamed witness"),
   interview_type: z.enum(["FORMAL", "INFORMAL"]).default("INFORMAL"),
   reason_formal_impossible: z.string().nullable().optional(),

@@ -1,4 +1,4 @@
-﻿// src/components/PdfViewerPage.jsx
+// src/components/PdfViewerPage.jsx
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
@@ -55,7 +55,7 @@ export default function PdfViewerPage() {
       }
 
       try {
-        console.log("PdfViewerPage loaded â€” notificationId:", notificationId);
+        console.log("PdfViewerPage loaded — notificationId:", notificationId);
         console.log("crew_id:", currentUser.crew_id)
         console.log("crew_role:", currentUser.role)
         const res = await fetch(buildCircularPdfUrl(notificationId, currentUser.crew_id));

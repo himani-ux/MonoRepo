@@ -16,6 +16,7 @@ const followUpRouteMocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   toast: vi.fn(),
   mutateAsync: vi.fn(),
+  wizardSubmitData: null as any,
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -55,13 +56,7 @@ vi.mock('@/components/inspection/follow-up-wizard', () => ({
       <button
         type="button"
         onClick={() =>
-          onSubmit({
-            reinspection_date: '2026-02-08',
-            notes: 'Follow-up notes',
-            deficiency_updates: [{ deficiency_id: 1, action_code_id: 10 }],
-            report_file: null,
-            report_description: '',
-          })
+          onSubmit(followUpRouteMocks.wizardSubmitData)
         }
       >
         Trigger Submit
@@ -92,6 +87,13 @@ describe('RegisterFollowUpPage', () => {
     followUpRouteMocks.useAuth.mockReset();
     followUpRouteMocks.toast.mockReset();
     followUpRouteMocks.mutateAsync.mockReset();
+    followUpRouteMocks.wizardSubmitData = {
+      reinspection_date: '2026-02-08',
+      notes: 'Follow-up notes',
+      deficiency_updates: [{ deficiency_id: 1, action_code_id: 10 }],
+      report_file: null,
+      report_description: '',
+    };
 
     followUpRouteMocks.useParams.mockReturnValue({ id: '123' });
     followUpRouteMocks.useInspection.mockReturnValue({
@@ -128,6 +130,31 @@ describe('RegisterFollowUpPage', () => {
         JSON.stringify([{ deficiency_id: 1, action_code_id: 10 }])
       );
       expect(followUpRouteMocks.navigate).toHaveBeenCalledWith('/inspections/123');
+    });
+  });
+
+  it('test_feat_def_002_happy_path_submits_up_to_three_follow_up_report_pdfs', async () => {
+    const reports = [
+      new File(['pdf-one'], 'follow-up-one.pdf', { type: 'application/pdf' }),
+      new File(['pdf-two'], 'follow-up-two.pdf', { type: 'application/pdf' }),
+      new File(['pdf-three'], 'follow-up-three.pdf', { type: 'application/pdf' }),
+    ];
+    followUpRouteMocks.wizardSubmitData = {
+      reinspection_date: '2026-02-08',
+      notes: '',
+      deficiency_updates: [{ deficiency_id: 1, action_code_id: 10 }],
+      report_files: reports,
+      report_description: 'Three supporting PDFs',
+    };
+
+    render(<RegisterFollowUpPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Trigger Submit' }));
+
+    await waitFor(() => {
+      expect(followUpRouteMocks.mutateAsync).toHaveBeenCalledTimes(1);
+      const formData = followUpRouteMocks.mutateAsync.mock.calls[0][0] as FormData;
+      expect(formData.getAll('report_files')).toEqual(reports);
+      expect(formData.get('report_description')).toBe('Three supporting PDFs');
     });
   });
 

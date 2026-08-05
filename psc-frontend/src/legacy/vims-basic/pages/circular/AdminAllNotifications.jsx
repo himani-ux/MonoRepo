@@ -1,4 +1,4 @@
-﻿// src/components/AdminAllNotifications.jsx
+// src/components/AdminAllNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // For back button if needed
 import PageLayout from '../../components/layout/PageLayout';
@@ -17,7 +17,7 @@ const AdminAllNotifications = () => {
 
 
         // Get user data for header
-   
+
     const { user } = useAuth();
     const userName = user?.display_name || user?.employee_id || user?.crew_id;
 
@@ -134,7 +134,7 @@ const AdminAllNotifications = () => {
     const closeModal = () => setSelectedComment(null);
 
     return (
-         
+
         <div className="max-w-7xl mx-auto p-4 bg-white rounded-xl shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">All Notifications</h1>
@@ -232,13 +232,13 @@ const AdminAllNotifications = () => {
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{new Date(n.created_at).toLocaleDateString()}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{getStatusBadge(n.publish_status)}</td>
 
-                                    {/* âœ… Comment (clickable popup) */}
+                                    {/* ✅ Comment (clickable popup) */}
                                     <td
                                         className="px-3 py-4 text-sm text-gray-500 max-w-xs cursor-pointer hover:text-indigo-600"
                                         onClick={() => handleCommentClick(n.publish_comment)}
                                         title="Click to view full comment"
                                     >
-                                        <div className="line-clamp-2">{n.publish_comment || 'â€”'}</div>
+                                        <div className="line-clamp-2">{n.publish_comment || '—'}</div>
                                     </td>
 
                                     {/* Download */}
@@ -285,7 +285,7 @@ const AdminAllNotifications = () => {
                 </div>
             )}
         </div>
-       
+
     );
 };
 

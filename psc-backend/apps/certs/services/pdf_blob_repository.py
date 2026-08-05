@@ -62,6 +62,7 @@ class PdfBlobRepository:
                 FROM dbo.vims_certs_pdf_blob
                 WHERE tracked_item_id = %s
                   AND content_sha256 = %s
+                  AND is_active = 1
                 ORDER BY uploaded_at DESC
                 {limit_clause}
                 """,

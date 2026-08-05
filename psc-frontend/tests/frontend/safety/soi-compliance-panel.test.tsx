@@ -25,7 +25,7 @@ describe("Safety SOI compliance panel", () => {
     );
 
     expect(screen.getAllByText("SOI Compliance %").length).toBeGreaterThan(0);
-    expect(screen.getByText("Current vessel and fleet average")).toBeInTheDocument();
+    expect(screen.getByText("SOI check status")).toBeInTheDocument();
     expect(screen.getAllByText("N/A - awaiting first cycle").length).toBeGreaterThan(0);
     expect(screen.getByText(/Average across 4 vessels/i)).toBeInTheDocument();
   });

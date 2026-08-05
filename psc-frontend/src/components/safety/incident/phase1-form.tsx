@@ -5,6 +5,7 @@ import SafetyExternalPartyInjuryForm, {
 } from './external-party-injury-form';
 import {
   SAFETY_INCIDENT_PHASE_1_SCHEMA_VERSION,
+  phase1ExternalPartyInjuryPayload,
   type SafetyIncidentPhase1SubmitValues,
   type SafetyIncidentPhase1Values,
   safetyIncidentPhase1Schema,
@@ -18,6 +19,7 @@ import { useToast } from '../../../hooks/use-toast';
 import { getErrorMessage } from '../../../lib/api/client';
 import {
   safetyApi,
+  type SafetyReferenceIncidentTypeOption,
   type SafetyIncidentWeatherFieldKey,
   type SafetyIncidentWeatherOption,
 } from '../../../lib/api/safety';
@@ -38,23 +40,29 @@ interface SafetyIncidentPhase1FormProps {
 }
 
 const defaultValues: SafetyIncidentPhase1Values = {
+  activity_type: '',
   awaiting_daily_report_match: false,
   departure_date: null,
+  incident_type_other: '',
   last_port: '',
   latitude: null,
   longitude: null,
   narrative: '',
   onboard_location: '',
   office_notified: null,
+  permit_issued: null,
   reporter_device_fingerprint: '',
   reporter_name: '',
   reporter_rank: '',
   reporter_user_id: '',
+  risk_assessment_carried_out: null,
   schema_version: SAFETY_INCIDENT_PHASE_1_SCHEMA_VERSION,
   shore_assistance_required: null,
+  toolbox_meeting_carried_out: null,
   vessel_condition: '',
   vessel_id: '',
   vessel_location: '',
+  vessel_location_detail: '',
   weather_ambient_temperature_c: null,
   weather_current_direction_id: null,
   weather_current_strength_knots: null,
@@ -198,6 +206,23 @@ const WEATHER_FALLBACK_OPTIONS = [
 ] as const satisfies ReadonlyArray<
   readonly [SafetyIncidentWeatherFieldKey, string]
 >;
+
+const PHASE1_TRI_STATE_OPTIONS = [
+  ['YES', 'Yes'],
+  ['NO', 'No'],
+  ['NA', 'NA'],
+] as const;
+
+const VESSEL_LOCATION_OPTIONS = [
+  'At Sea (Open sea condition)',
+  'At Sea (Coastal passage)',
+  'In Port',
+  'At Anchorage',
+] as const;
+
+function requiresVesselLocationDetail(value?: string | null) {
+  return value === 'In Port' || value === 'At Anchorage';
+}
 
 function buildWeatherFallbackOptions(): SafetyIncidentWeatherOption[] {
   return WEATHER_FALLBACK_OPTIONS.map(([fieldKey, optionLabel], index) => ({
@@ -355,7 +380,7 @@ function describeValidationIssue(
   const fieldLabels: Record<string, string> = {
     incident_type_id: 'Incident type',
     loss_type_primary_id: 'What was affected',
-    narrative: 'What happened',
+    narrative: 'Describe What happened',
     occurred_at: 'Incident time',
     office_notification_mode: 'How was office informed?',
     office_notified: 'Was office informed?',
@@ -404,6 +429,21 @@ function currentPhase1PayloadValues(values: SafetyIncidentPhase1Values) {
 
   return {
     ...visibleValues,
+    incident_type_other: visibleValues.incident_type_other?.trim() || null,
+    vessel_location_detail: requiresVesselLocationDetail(
+      visibleValues.vessel_location
+    )
+      ? visibleValues.vessel_location_detail?.trim() || null
+      : null,
+    activity_type: visibleValues.activity_type?.trim() || null,
+    risk_assessment_carried_out:
+      visibleValues.risk_assessment_carried_out || null,
+    toolbox_meeting_carried_out:
+      visibleValues.toolbox_meeting_carried_out || null,
+    permit_issued: visibleValues.permit_issued || null,
+    external_party_injury: phase1ExternalPartyInjuryPayload(
+      visibleValues.external_party_injury
+    ),
     office_notification_mode:
       values.office_notification_mode === 'WHATSAPP'
         ? null
@@ -424,6 +464,8 @@ export function SafetyIncidentPhase1Form({
     ...defaultValues,
     ...initialValues,
   });
+  const [selectedIncidentTypeOption, setSelectedIncidentTypeOption] =
+    useState<SafetyReferenceIncidentTypeOption | null>(null);
   const [showConflictGuard, setShowConflictGuard] = useState(false);
   const [weatherOptions, setWeatherOptions] = useState<
     SafetyIncidentWeatherOption[]
@@ -591,6 +633,12 @@ export function SafetyIncidentPhase1Form({
   }, [initialValues]);
 
   const narrativeLength = values.narrative.trim().length;
+  const isOtherIncidentType =
+    selectedIncidentTypeOption?.type_name.trim().toLowerCase() === 'other' ||
+    Boolean(values.incident_type_other?.trim());
+  const showVesselLocationDetail = requiresVesselLocationDetail(
+    values.vessel_location
+  );
   const submitReady =
     safetyIncidentPhase1SubmitSchema.safeParse(
       currentPhase1PayloadValues(values)
@@ -843,12 +891,39 @@ export function SafetyIncidentPhase1Form({
               <label className="space-y-2 text-sm text-slate-700">
                 <span className="font-medium">What type of incident?</span>
                 <SafetyIncidentTypeSelect
-                  onChange={(nextValue) =>
-                    updateField('incident_type_id', nextValue)
-                  }
+                  onChange={(nextValue) => {
+                    updateField('incident_type_id', nextValue);
+                    if (
+                      selectedIncidentTypeOption?.type_name
+                        .trim()
+                        .toLowerCase() !== 'other'
+                    ) {
+                      updateField('incident_type_other', '');
+                    }
+                  }}
+                  onSelectedOptionChange={(option) => {
+                    setSelectedIncidentTypeOption(option);
+                    if (option?.type_name.trim().toLowerCase() !== 'other') {
+                      updateField('incident_type_other', '');
+                    }
+                  }}
                   value={values.incident_type_id ?? null}
                 />
               </label>
+              {isOtherIncidentType ? (
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-medium">Specify other incident type</span>
+                  <input
+                    aria-label="Specify other incident type"
+                    className="min-h-[44px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                    maxLength={128}
+                    onChange={(event) =>
+                      updateField('incident_type_other', event.target.value)
+                    }
+                    value={values.incident_type_other ?? ''}
+                  />
+                </label>
+              ) : null}
               <div className="md:col-span-2">
                 <SafetyLossTypeMultiSelect
                   onChange={updateLossTypes}
@@ -1097,15 +1172,39 @@ export function SafetyIncidentPhase1Form({
               </div>
               <label className="space-y-2 text-sm text-slate-700">
                 <span className="font-medium">Location of Vessel</span>
-                <input
+                <select
                   aria-label="Location of Vessel"
-                  className="min-h-[44px] w-full rounded-2xl border border-slate-200 px-3 py-2"
-                  onChange={(event) =>
-                    updateField('vessel_location', event.target.value)
-                  }
+                  className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                  onChange={(event) => {
+                    updateField('vessel_location', event.target.value);
+                    if (!requiresVesselLocationDetail(event.target.value)) {
+                      updateField('vessel_location_detail', '');
+                    }
+                  }}
                   value={values.vessel_location ?? ''}
-                />
+                >
+                  <option value="">Select location</option>
+                  {VESSEL_LOCATION_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </label>
+              {showVesselLocationDetail ? (
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-medium">Specify Location of Vessel</span>
+                  <input
+                    aria-label="Specify Location of Vessel"
+                    className="min-h-[44px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                    maxLength={128}
+                    onChange={(event) =>
+                      updateField('vessel_location_detail', event.target.value)
+                    }
+                    value={values.vessel_location_detail ?? ''}
+                  />
+                </label>
+              ) : null}
               <label className="space-y-2 text-sm text-slate-700">
                 <span className="font-medium">Location on Board</span>
                 <input
@@ -1115,6 +1214,88 @@ export function SafetyIncidentPhase1Form({
                     updateField('onboard_location', event.target.value)
                   }
                   value={values.onboard_location ?? ''}
+                />
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                <span className="font-medium">
+                  Was a Risk Assessment carried out?
+                </span>
+                <select
+                  aria-label="Was a Risk Assessment carried out?"
+                  className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                  onChange={(event) =>
+                    updateField(
+                      'risk_assessment_carried_out',
+                      event.target
+                        .value as SafetyIncidentPhase1Values['risk_assessment_carried_out']
+                    )
+                  }
+                  value={values.risk_assessment_carried_out ?? ''}
+                >
+                  <option value="">Select</option>
+                  {PHASE1_TRI_STATE_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                <span className="font-medium">
+                  Was Toolbox Meeting carried out?
+                </span>
+                <select
+                  aria-label="Was Toolbox Meeting carried out?"
+                  className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                  onChange={(event) =>
+                    updateField(
+                      'toolbox_meeting_carried_out',
+                      event.target
+                        .value as SafetyIncidentPhase1Values['toolbox_meeting_carried_out']
+                    )
+                  }
+                  value={values.toolbox_meeting_carried_out ?? ''}
+                >
+                  <option value="">Select</option>
+                  {PHASE1_TRI_STATE_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                <span className="font-medium">Was a Permit Issue?</span>
+                <select
+                  aria-label="Was a Permit Issue?"
+                  className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                  onChange={(event) =>
+                    updateField(
+                      'permit_issued',
+                      event.target
+                        .value as SafetyIncidentPhase1Values['permit_issued']
+                    )
+                  }
+                  value={values.permit_issued ?? ''}
+                >
+                  <option value="">Select</option>
+                  {PHASE1_TRI_STATE_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2 text-sm text-slate-700">
+                <span className="font-medium">Type of Activity</span>
+                <input
+                  aria-label="Type of Activity"
+                  className="min-h-[44px] w-full rounded-2xl border border-slate-200 px-3 py-2"
+                  maxLength={128}
+                  onChange={(event) =>
+                    updateField('activity_type', event.target.value)
+                  }
+                  value={values.activity_type ?? ''}
                 />
               </label>
               <label className="space-y-2 text-sm text-slate-700">
@@ -1242,9 +1423,9 @@ export function SafetyIncidentPhase1Form({
             </section>
 
             <label className="block space-y-2 text-sm text-slate-700">
-              <span className="font-medium">What happened?</span>
+              <span className="font-medium">Describe What happened?</span>
               <textarea
-                aria-label="What happened"
+                aria-label="Describe What happened?"
                 className="min-h-[220px] w-full rounded-3xl border border-slate-200 px-4 py-3 leading-6"
                 onChange={(event) =>
                   updateField('narrative', event.target.value)

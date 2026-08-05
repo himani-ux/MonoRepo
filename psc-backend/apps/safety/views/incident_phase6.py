@@ -41,8 +41,7 @@ class IncidentPhase6ViewMixin(IncidentViewMixin):
 
     def _require_phase_six(self) -> Incident:
         incident = self.get_incident()
-        if incident.current_phase != 6:
-            raise ValidationError("Phase 6 recommendations can only be edited while current_phase = 6.")
+        self._enforce_editable_until_office_approval(incident)
         return incident
 
 

@@ -143,6 +143,39 @@ class NearMissTriageTests(unittest.TestCase):
         self.assertIn("Please add what was corrected onboard", response.data["rework_summary"]["comment"])
         self.assertIn("Suggested priority: LOW -> MEDIUM", response.data["rework_summary"]["comment"])
 
+    def test_office_reject_sets_rejected_state_and_keeps_reason_for_rework(self) -> None:
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {
+                "action": "REJECT",
+                "office_comment": "Rejected because the report needs Master clarification before office acceptance.",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"], user_id="pic-1"))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.near_miss.refresh_from_db()
+        self.assertEqual(self.near_miss.state, Incident.State.REJECTED)
+        self.assertEqual(response.data["state"], Incident.State.REJECTED)
+        self.assertIn("Master clarification", response.data["rework_summary"]["comment"])
+        self.assertIn("office_rejected_phase_log", response.data)
+
+    def test_office_reject_requires_reason(self) -> None:
+        request = self.factory.patch(
+            f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
+            {"action": "REJECT"},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"], user_id="pic-1"))
+
+        response = self.view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("office_comment", response.data)
+
     def test_override_without_reason_is_rejected(self) -> None:
         request = self.factory.patch(
             f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
@@ -159,7 +192,7 @@ class NearMissTriageTests(unittest.TestCase):
     def test_category_tag_change_without_reason_is_rejected(self) -> None:
         request = self.factory.patch(
             f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
-            {"near_miss_priority": "LOW", "near_miss_shell_tag": "Safety"},
+            {"near_miss_priority": "LOW", "near_miss_shell_tag": "PPE"},
             format="json",
         )
         force_authenticate(request, user=build_user(role_name="PIC", process_ids=["SAF_P_006"]))
@@ -174,7 +207,7 @@ class NearMissTriageTests(unittest.TestCase):
             f"/api/safety/near-miss/{self.near_miss.pk}/office-comments/",
             {
                 "near_miss_priority": "LOW",
-                "near_miss_shell_tag": "Safety",
+                "near_miss_shell_tag": "PPE",
                 "category_tag_change_reason": "Category corrected after office review.",
             },
             format="json",
@@ -185,7 +218,7 @@ class NearMissTriageTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.near_miss.refresh_from_db()
-        self.assertEqual(self.near_miss.near_miss_shell_tag, "Safety")
+        self.assertEqual(self.near_miss.near_miss_shell_tag, "PPE")
 
     def test_repeated_near_miss_must_be_triaged_high(self) -> None:
         self.near_miss.incident_type_id = 1

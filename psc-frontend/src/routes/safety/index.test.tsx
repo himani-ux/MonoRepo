@@ -25,6 +25,7 @@ const safetyQueryMocks = vi.hoisted(() => ({
   useSafetyDashboardRepeatRoot: vi.fn(),
   useSafetyDashboardSoiCompliance: vi.fn(),
   useSafetyIncidents: vi.fn(),
+  useSafetyIncidentRegisterVessels: vi.fn(),
   useSafetyNearMisses: vi.fn(),
   useSafetyScmCreateAdhocConfig: vi.fn(),
   useSafetyScmCreateRegularConfig: vi.fn(),
@@ -58,6 +59,7 @@ const safetyApiMocks = vi.hoisted(() => ({
   getIncidentPhase5Workspace: vi.fn(),
   getIncidentPhase6Workspace: vi.fn(),
   getIncidentPhase7Preflight: vi.fn(),
+  getIncidentRegisterVessels: vi.fn(),
   getNearMiss: vi.fn(),
   sendBackIncidentPhase7: vi.fn(),
   submitIncidentPhase2: vi.fn(),
@@ -124,6 +126,7 @@ vi.mock('../../lib/api/safety', async () => {
       getIncidentPhase5Workspace: safetyApiMocks.getIncidentPhase5Workspace,
       getIncidentPhase6Workspace: safetyApiMocks.getIncidentPhase6Workspace,
       getIncidentPhase7Preflight: safetyApiMocks.getIncidentPhase7Preflight,
+      getIncidentRegisterVessels: safetyApiMocks.getIncidentRegisterVessels,
       getNearMiss: safetyApiMocks.getNearMiss,
       sendBackIncidentPhase7: safetyApiMocks.sendBackIncidentPhase7,
       submitIncidentPhase2: safetyApiMocks.submitIncidentPhase2,
@@ -169,6 +172,8 @@ vi.mock('../../hooks/use-safety', () => ({
     safetyQueryMocks.useSafetyDashboardSoiCompliance(...args),
   useSafetyIncidents: (...args: unknown[]) =>
     safetyQueryMocks.useSafetyIncidents(...args),
+  useSafetyIncidentRegisterVessels: (...args: unknown[]) =>
+    safetyQueryMocks.useSafetyIncidentRegisterVessels(...args),
   useSafetyNearMisses: (...args: unknown[]) =>
     safetyQueryMocks.useSafetyNearMisses(...args),
   useSafetyScmCreateAdhocConfig: (...args: unknown[]) =>
@@ -631,7 +636,7 @@ describe('safety routes', () => {
       incident_id: 42,
       pdf_preview: {
         available: true,
-        download_path: '/api/safety/export/incident/42/pdf/',
+        download_path: 'http://localhost:8000/api/safety/export/incident/42/pdf/',
       },
       ready_for_acceptance: true,
       recommendation_tier_count: {
@@ -684,6 +689,13 @@ describe('safety routes', () => {
       blob: new Blob(['zip'], { type: 'application/zip' }),
       fileName: 'safety-auditor-bundle.zip',
     });
+    safetyApiMocks.getIncidentRegisterVessels.mockResolvedValue([
+      {
+        id: 'vessel-1',
+        vessel_code: 'YCF',
+        vessel_name: 'Yellow Chief',
+      },
+    ]);
 
     const successState = { data: [], error: null, isLoading: false };
     safetyQueryMocks.useSafetyDashboardComposite.mockReturnValue({
@@ -1070,6 +1082,7 @@ describe('safety routes', () => {
       isLoading: false,
     });
     safetyQueryMocks.useSafetyIncidents.mockReturnValue(successState);
+    safetyQueryMocks.useSafetyIncidentRegisterVessels.mockReturnValue(successState);
     safetyQueryMocks.useSafetyNearMisses.mockReturnValue(successState);
     safetyQueryMocks.useSafetySoiCompliance.mockReturnValue({
       data: {
@@ -1107,7 +1120,7 @@ describe('safety routes', () => {
     });
 
     expect(
-      await screen.findByText('Safety Intelligence Dashboard')
+      await screen.findByText('Safety Dashboard')
     ).toBeInTheDocument();
     expect(screen.getByTestId('safety-layout')).toBeInTheDocument();
   });
@@ -1158,13 +1171,11 @@ describe('safety routes', () => {
       vesselIds: [],
     });
 
-    await screen.findByText('Safety Intelligence Dashboard');
-    expect(
-      screen.getByLabelText('Select vessel drill-down')
-    ).toBeInTheDocument();
+    await screen.findByText('Safety Dashboard');
+    expect(screen.getByLabelText('Choose vessel')).toBeInTheDocument();
     expect(screen.getByText('Scope: Fleet scope')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Select vessel drill-down'), {
+    fireEvent.change(screen.getByLabelText('Choose vessel'), {
       target: { value: 'vessel-2' },
     });
 
@@ -1237,6 +1248,52 @@ describe('safety routes', () => {
       risk_band: undefined,
       state: undefined,
       vessel_id: undefined,
+    });
+  });
+
+  it('filters_the_incident_register_by_selected_vessel_and_uses_current_labels', async () => {
+    safetyQueryMocks.useSafetyIncidentRegisterVessels.mockReturnValue({
+      data: [
+        {
+          id: 'vessel-ycf',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'vessel-eat',
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      error: null,
+      isLoading: false,
+    });
+
+    renderSafetyRoute('/safety/incidents', {
+      formIds: ['SAF_F_001'],
+      id: 'dpa-register',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    await screen.findByText('Safety Incidents');
+
+    expect(screen.getByText('risk_band')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Vessel'), {
+      target: { value: 'vessel-ycf' },
+    });
+
+    await waitFor(() => {
+      expect(safetyQueryMocks.useSafetyIncidents).toHaveBeenLastCalledWith({
+        record_type: 'INCIDENT',
+        risk_band: undefined,
+        state: undefined,
+        vessel_id: 'vessel-ycf',
+      });
     });
   });
 
@@ -1559,7 +1616,7 @@ describe('safety routes', () => {
     });
 
     expect(
-      await screen.findByRole('group', { name: 'Select PDF content' })
+      await screen.findByRole('heading', { name: 'PDF Options' })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Office Check' })
@@ -1568,22 +1625,12 @@ describe('safety routes', () => {
     expect(
       screen.getByLabelText('Office Comments/lesson learnt')
     ).toBeInTheDocument();
-    for (const label of [
-      'Summary',
-      'Reporter Details',
-      'Injury Details',
-      'Estimated Cost',
-      'Root Cause',
-      'Evidence (Documents)',
-      'Corrective / Preventive Actions',
-      'Signature',
-    ]) {
-      expect(screen.getByRole('checkbox', { name: label })).toBeChecked();
-    }
     expect(
-      screen.queryByRole('checkbox', { name: 'Lessons Learned' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'PDF Preview' })).toBeEnabled();
+      screen.getByRole('checkbox', { name: 'Print Loss Evaluation' })
+    ).not.toBeChecked();
+    expect(screen.queryByText('Select PDF content')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Summary' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeEnabled();
     expect(safetyApiMocks.getIncidentPhase7Preflight).toHaveBeenCalledWith(
       '42'
     );
@@ -1603,7 +1650,7 @@ describe('safety routes', () => {
       incident_id: 42,
       pdf_preview: {
         available: true,
-        download_path: '/api/safety/export/incident/42/pdf/',
+        download_path: 'http://localhost:8000/api/safety/export/incident/42/pdf/',
       },
       ready_for_acceptance: true,
       recommendation_tier_count: {

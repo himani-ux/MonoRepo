@@ -82,7 +82,36 @@ class IncidentPhase1ValidationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["reported_at"][0], "Reported time cannot be in the future.")
 
-    def test_submit_rejects_short_narrative_and_incomplete_checklist(self) -> None:
+    def test_create_persists_incident_reporting_context_fields(self) -> None:
+        request = self.factory.post(
+            "/api/safety/incidents/phase-1/",
+            {
+                "vessel_id": "7",
+                "vessel_code": "ABC",
+                "schema_version": 1,
+                "shore_assistance_required": True,
+                "vessel_location": "At sea",
+                "onboard_location": "Main deck",
+                "last_port": "Singapore",
+                "departure_date": "2026-06-03",
+                "vessel_condition": "LOADED",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        response = self.create_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        incident = Incident.objects.get(pk=response.data["id"])
+        self.assertTrue(incident.shore_assistance_required)
+        self.assertEqual(incident.vessel_location, "At sea")
+        self.assertEqual(incident.onboard_location, "Main deck")
+        self.assertEqual(incident.last_port, "Singapore")
+        self.assertEqual(str(incident.departure_date), "2026-06-03")
+        self.assertEqual(incident.vessel_condition, "LOADED")
+
+    def test_submit_rejects_short_narrative_without_requiring_first_checks(self) -> None:
         incident = Incident.objects.create(
             incident_number="DRAFT-ABC/2026/T001",
             vessel_id="7",
@@ -107,10 +136,6 @@ class IncidentPhase1ValidationTests(unittest.TestCase):
         response = self.submit_view(request, id=incident.pk)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            response.data["first_hour_checklist_done"][0],
-            "Complete the first-hour scene-protection checklist before submitting Phase 1.",
-        )
         self.assertEqual(
             response.data["narrative"][0],
             "Incident narrative must be at least 200 characters.",

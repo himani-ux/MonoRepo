@@ -79,7 +79,7 @@ class CorrectiveActionWriteSerializer(serializers.Serializer):
         allow_blank=False,
         max_length=CORRECTIVE_ACTION_ACTOR_ID_MAX_LENGTH,
     )
-    due_date = serializers.DateField(required=True)
+    due_date = serializers.DateField(required=False, allow_null=True)
 
 
 class CorrectiveActionSerializer(serializers.ModelSerializer):
@@ -154,15 +154,6 @@ class RecommendationSerializer(serializers.ModelSerializer):
                 "Tolerable-failure flag is restricted to GREEN-band incidents."
             )
 
-        duplicate_queryset = incident.recommendations.filter(
-            is_deleted=False,
-            tier=tier,
-        )
-        if self.instance is not None:
-            duplicate_queryset = duplicate_queryset.exclude(pk=self.instance.pk)
-        if tier and duplicate_queryset.exists():
-            errors["tier"] = "Only one active recommendation row is allowed per tier for an incident."
-
         merged_values = self._instance_defaults()
         merged_values.update(attrs)
 
@@ -171,25 +162,14 @@ class RecommendationSerializer(serializers.ModelSerializer):
                 errors["theme_code"] = "Unknown recommendation theme."
 
             likelihood = merged_values.get("estimated_likelihood_reduction")
-            if likelihood in (None, ""):
-                errors["estimated_likelihood_reduction"] = "Select how much the action will reduce risk."
-            elif likelihood not in gate.likelihood_codes:
+            if likelihood not in (None, "") and likelihood not in gate.likelihood_codes:
                 errors["estimated_likelihood_reduction"] = "Unknown likelihood-reduction code."
-
-            if gate.require_alarp(incident, tier):
-                for field_name in gate.missing_fields(merged_values):
-                    errors[field_name] = "Risk reduction is mandatory for YELLOW/RED preventive recommendations."
         else:
             if attrs.get("theme_code") not in (None, ""):
                 errors["theme_code"] = "Only preventive recommendations may carry a system-action theme."
 
         corrective_action = attrs.get("corrective_action")
-        if tier in {Recommendation.Tier.CORRECTIVE, Recommendation.Tier.PREVENTIVE}:
-            if self.instance is None and corrective_action is None:
-                errors["corrective_action"] = (
-                    "Action due date details are required."
-                )
-        elif corrective_action is not None:
+        if tier not in {Recommendation.Tier.CORRECTIVE, Recommendation.Tier.PREVENTIVE} and corrective_action is not None:
             errors["corrective_action"] = (
                 "Action linkage is only valid for corrective or preventive recommendations."
             )
@@ -244,7 +224,7 @@ class RecommendationSerializer(serializers.ModelSerializer):
             "assigned_crew_id": corrective_action_data.get("assigned_crew_id"),
             "assigned_office_user_id": corrective_action_data.get("assigned_office_user_id"),
             "verifier_user_id": corrective_action_data["verifier_user_id"],
-            "due_date": corrective_action_data["due_date"],
+            "due_date": corrective_action_data.get("due_date"),
             "status": CorrectiveAction.Status.OPEN,
             "schema_version": recommendation.schema_version or 1,
             "updated_by": actor_id,

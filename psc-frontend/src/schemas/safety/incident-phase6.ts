@@ -17,7 +17,7 @@ export const safetyRecommendationThemeSchema = z.object({
 });
 
 export const safetyCorrectiveActionSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().min(1).optional(),
   title: z.string().min(1),
   description: z.string().min(1),
   assigned_crew_id: z.string().nullable().optional(),
@@ -29,7 +29,7 @@ export const safetyCorrectiveActionSchema = z.object({
 });
 
 export const safetyRecommendationSchema = z.object({
-  id: z.coerce.number().int().positive().optional(),
+  id: z.string().min(1).optional(),
   tier: safetyRecommendationTierSchema,
   theme_code: z.string().nullable().optional(),
   title: z.string().min(1),
@@ -37,7 +37,7 @@ export const safetyRecommendationSchema = z.object({
   rationale: z.string().nullable().optional(),
   estimated_effort: z.string().nullable().optional(),
   estimated_likelihood_reduction: z
-    .enum(["LOW", "MED", "HIGH", "QUANTIFIED"])
+    .enum(["LOW", "MED", "HIGH"])
     .nullable()
     .optional(),
   residual_risk_statement: z.string().nullable().optional(),
@@ -48,7 +48,7 @@ export const safetyRecommendationSchema = z.object({
 });
 
 export const safetyIncidentPhase6WorkspaceSchema = z.object({
-  incident_id: z.coerce.number().int().positive(),
+  incident_id: z.string().min(1),
   threshold_hint: z.string().nullable().optional(),
   themes: z.array(safetyRecommendationThemeSchema).default([]),
   tier_counts: z.record(z.coerce.number().int().nonnegative()).default({}),

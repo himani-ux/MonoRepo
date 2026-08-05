@@ -14,18 +14,15 @@ from apps.safety.models import (
     MasterLossType,
     MasterMscatTaxonomy,
     MasterSafetyIncidentType,
+    NearMissCauseOption,
     SafetyFieldHistory,
 )
 from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import NearMissSerializer, PhaseLogSerializer
-from apps.safety.serializers.near_miss import (
-    NEAR_MISS_CATEGORY_TAGS,
-    NEAR_MISS_LOSS_CATEGORY_TAGS,
-    NEAR_MISS_OTHER_PREFIX,
-)
+from apps.safety.serializers.near_miss import NEAR_MISS_OTHER_CATEGORY, NEAR_MISS_OTHER_PREFIX, resolve_near_miss_category
 from apps.safety.services import NotificationWriter, capture_model_state, record_field_changes
 from apps.safety.services.signature_chain import SignatureChainService
-from apps.safety.views.near_miss import NearMissViewMixin, _normalized_role, _resolve_actor_id
+from apps.safety.views.near_miss import NearMissViewMixin, _is_master_user, _normalized_role, _resolve_actor_id
 
 
 VESSEL_REVIEW_ROLES = {
@@ -73,6 +70,7 @@ class NearMissReworkSubmitSerializer(serializers.Serializer):
     near_miss_category_tags = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, max_length=3)
     near_miss_incident_type_ids = serializers.ListField(child=serializers.IntegerField(), required=False, allow_empty=True, max_length=3)
     near_miss_mscat_subcode_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True, max_length=3)
+    near_miss_factor_causes = serializers.ListField(child=serializers.DictField(), required=True, allow_empty=False)
     near_miss_severity = serializers.ChoiceField(choices=("HIGH", "MED", "LOW"))
     near_miss_shell_tag = serializers.CharField(required=False, allow_blank=True, allow_null=True, trim_whitespace=True)
     near_miss_suggestion = serializers.CharField(required=False, allow_blank=True, trim_whitespace=True)
@@ -113,35 +111,25 @@ class NearMissReworkSubmitSerializer(serializers.Serializer):
         shell_tag = str(attrs.get("near_miss_shell_tag") or "").strip()
         if shell_tag and shell_tag not in category_tags:
             category_tags.insert(0, shell_tag)
-        allowed_category_tags = NEAR_MISS_CATEGORY_TAGS | NEAR_MISS_LOSS_CATEGORY_TAGS
-        invalid_tags = [
-            tag
-            for tag in category_tags
-            if tag not in allowed_category_tags and not tag.startswith(NEAR_MISS_OTHER_PREFIX)
-        ]
-        if invalid_tags:
-            raise serializers.ValidationError({"near_miss_category_tags": "Category must match the Safety SSOT values."})
+        normalized_category_tags = []
+        for tag in category_tags:
+            normalized = resolve_near_miss_category(tag)
+            if normalized is None:
+                raise serializers.ValidationError({"near_miss_category_tags": "Category must match the Safety SSOT values."})
+            normalized_category_tags.append(normalized)
+        category_tags = normalized_category_tags
         attrs["near_miss_category_tags"] = category_tags[:3]
         first_category = attrs["near_miss_category_tags"][0] if attrs["near_miss_category_tags"] else None
-        if first_category and (first_category in NEAR_MISS_LOSS_CATEGORY_TAGS or first_category.startswith(NEAR_MISS_OTHER_PREFIX)):
-            attrs["near_miss_shell_tag"] = "Others"
-        else:
-            attrs["near_miss_shell_tag"] = first_category
+        attrs["near_miss_shell_tag"] = (
+            NEAR_MISS_OTHER_CATEGORY
+            if first_category and first_category.startswith(NEAR_MISS_OTHER_PREFIX)
+            else first_category
+        )
 
-        subcode_ids = self._clean_text_list(attrs.get("near_miss_mscat_subcode_ids") or [])
-        if subcode_ids:
-            rows = MasterMscatTaxonomy.objects.filter(subcode_id__in=subcode_ids, active=True)
-            row_by_subcode = {row.subcode_id: row for row in rows}
-            missing_subcodes = [subcode for subcode in subcode_ids if subcode not in row_by_subcode]
-            if missing_subcodes:
-                raise serializers.ValidationError({"near_miss_mscat_subcode_ids": "Select valid immediate causes."})
-            first_row = row_by_subcode[subcode_ids[0]]
-            attrs["near_miss_mscat_subcode_id"] = first_row.subcode_id
-            attrs["near_miss_mscat_category_id"] = first_row.category_id
-        else:
-            attrs["near_miss_mscat_subcode_id"] = None
-            attrs["near_miss_mscat_category_id"] = None
-        attrs["near_miss_mscat_subcode_ids"] = subcode_ids[:3]
+        attrs["near_miss_factor_causes"] = self._validate_factor_causes(attrs.get("near_miss_factor_causes") or [])
+        attrs["near_miss_mscat_subcode_id"] = None
+        attrs["near_miss_mscat_category_id"] = None
+        attrs["near_miss_mscat_subcode_ids"] = []
 
         occurred_at = attrs["occurred_at"]
         if occurred_at > timezone.now():
@@ -172,6 +160,47 @@ class NearMissReworkSubmitSerializer(serializers.Serializer):
                 cleaned.append(normalized)
                 seen.add(normalized)
         return cleaned[:3]
+
+    def _validate_factor_causes(self, rows: list[dict]) -> list[dict]:
+        required_factors = {choice[0] for choice in NearMissCauseOption.Factor.choices}
+        cleaned_by_factor: dict[str, dict] = {}
+        option_ids: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                raise serializers.ValidationError({"near_miss_factor_causes": "Each cause row must be an object."})
+            factor = str(row.get("factor") or "").strip().upper()
+            if factor not in required_factors:
+                raise serializers.ValidationError({"near_miss_factor_causes": "Select a valid near-miss factor."})
+            cleaned = {"factor": factor}
+            for stage in ("immediate", "root"):
+                option_id = str(row.get(f"{stage}_option_id") or "").strip()
+                if not option_id:
+                    raise serializers.ValidationError({"near_miss_factor_causes": "Select immediate and root causes for every factor."})
+                cleaned[f"{stage}_option_id"] = option_id
+                cleaned[f"{stage}_other_text"] = str(row.get(f"{stage}_other_text") or "").strip()
+                option_ids.add(option_id)
+            cleaned_by_factor[factor] = cleaned
+        if set(cleaned_by_factor) != required_factors:
+            raise serializers.ValidationError({"near_miss_factor_causes": "Select immediate and root causes for every factor."})
+        options = NearMissCauseOption.objects.filter(id__in=option_ids, active=True)
+        option_by_id = {str(option.id): option for option in options}
+        if len(option_by_id) != len(option_ids):
+            raise serializers.ValidationError({"near_miss_factor_causes": "Select valid near-miss cause options."})
+        for factor, cleaned in cleaned_by_factor.items():
+            for stage, cause_stage in (
+                ("immediate", NearMissCauseOption.CauseStage.IMMEDIATE),
+                ("root", NearMissCauseOption.CauseStage.ROOT),
+            ):
+                option = option_by_id[cleaned[f"{stage}_option_id"]]
+                if option.factor != factor or option.cause_stage != cause_stage:
+                    raise serializers.ValidationError({"near_miss_factor_causes": "Cause option does not match its factor/type."})
+                cleaned[f"{stage}_option_text"] = option.option_text
+                if option.option_text.strip().lower() in {"other", "others"}:
+                    if not cleaned[f"{stage}_other_text"]:
+                        raise serializers.ValidationError({"near_miss_factor_causes": "Specify the cause when Other is selected."})
+                else:
+                    cleaned[f"{stage}_other_text"] = ""
+        return [cleaned_by_factor[factor] for factor in sorted(cleaned_by_factor)]
 
 
 class NearMissReviewView(NearMissViewMixin, generics.GenericAPIView):
@@ -459,6 +488,7 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
         "incident_type_id",
         "loss_type_primary_id",
         "narrative",
+        "near_miss_priority",
         "near_miss_immediate_action",
         "near_miss_place",
         "near_miss_category_tags",
@@ -466,6 +496,7 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
         "near_miss_mscat_category_id",
         "near_miss_mscat_subcode_id",
         "near_miss_mscat_subcode_ids",
+        "near_miss_factor_causes",
         "near_miss_severity",
         "near_miss_shell_tag",
         "near_miss_suggestion",
@@ -488,7 +519,7 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
         near_miss = get_by_id_or_pk(self.get_queryset(), self.kwargs[self.lookup_url_kwarg])
         if near_miss.record_type != Incident.RecordType.NEAR_MISS:
             raise ValidationError("Rework is only available for near-miss records.")
-        if near_miss.state != Incident.State.REWORK_REQUIRED:
+        if near_miss.state not in {Incident.State.REWORK_REQUIRED, Incident.State.REJECTED}:
             raise ValidationError("Near miss is not awaiting reporter rework.")
 
         serializer = self.get_serializer(data=request.data)
@@ -500,7 +531,11 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
             field_names=(*self.rework_update_fields, "state", "updated_by", "updated_date"),
         )
         self._apply_rework_updates(near_miss, serializer.validated_data)
-        near_miss.state = Incident.State.PENDING_VESSEL_REVIEW
+        near_miss.state = (
+            Incident.State.READY_FOR_OFFICE_COMMENTS
+            if _is_master_user(request.user)
+            else Incident.State.PENDING_VESSEL_REVIEW
+        )
         near_miss.updated_by = actor_id
         near_miss.updated_date = timezone.now()
         near_miss.save(update_fields=(*self.rework_update_fields, "state", "updated_by", "updated_date"))
@@ -543,10 +578,19 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
 
     def _apply_rework_updates(self, near_miss: Incident, data: dict[str, object]) -> None:
         for field_name in self.rework_update_fields:
+            if field_name == "near_miss_priority":
+                severity_priority = {
+                    "HIGH": "HIGH",
+                    "MED": "MEDIUM",
+                    "LOW": "LOW",
+                }.get(str(data.get("near_miss_severity") or "").strip().upper())
+                setattr(near_miss, field_name, severity_priority)
+                continue
             if field_name in {
                 "near_miss_category_tags",
                 "near_miss_incident_type_ids",
                 "near_miss_mscat_subcode_ids",
+                "near_miss_factor_causes",
             }:
                 setattr(near_miss, field_name, json.dumps(data.get(field_name) or [], separators=(",", ":")))
             else:

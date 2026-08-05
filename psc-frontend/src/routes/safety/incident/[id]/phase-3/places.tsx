@@ -1,5 +1,6 @@
-import { IncidentPhase3Route } from "../office-workflow";
+import { Navigate, useParams } from "react-router-dom";
 
 export default function SafetyIncidentPhase3PlacesPage() {
-  return <IncidentPhase3Route activeTab="position" />;
+  const { id } = useParams();
+  return <Navigate replace to={`/safety/incidents/${id}/phase-3`} />;
 }

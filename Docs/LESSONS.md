@@ -349,15 +349,72 @@
 **Why:** A purge workflow can ask for an audit trail and also require parent-tied audit cleanup; if both are implemented on the same parent-bound history surface, the summary audit row deletes itself in the same operation.
 **Rule:** When a workflow needs a durable purge summary but the normal append-only history is contractually tied to the deleted parent, store the purge summary under a separate system-scoped audit parent and record that seam explicitly in `progress.txt` and `tasks/todo.md` instead of violating the parent-retention rule.
 
+## L-068 - When the user says remove a title, identify whether it is a page heading or a field label before editing
+**What happened:** A Maintain Mode cleanup initially removed Phase 3 page/PDF headings when the requested target was the `Title` field shown alongside `Type`, `Description`, and `Why is this needed?`.
+**Why:** The word "title" can refer to a visible page heading, a phase navigation label, a PDF section title, or a form field label. Treating it as a generic heading created the wrong change.
+**Rule:** Before removing ambiguous "title" text, search for the surrounding labels or wording the user cites and patch that exact UI/PDF field surface. If the surrounding labels are provided, use them as the selector and do not change unrelated headings.
+
+## L-069 - Reclassify immediately when a validation request contradicts canonical warn-only behavior
+**What happened:** CR-014 was initially classified as Tier 2 because it changed SCM validation, but discovery showed canonical APP_FLOW, BACKEND_STRUCTURE, VALIDATION_RULES, USER_GUIDE, and SSOT statements explicitly made SCM WRH gaps warn-only and non-blocking for meeting creation.
+**Why:** A validation rule can look local until docs reveal it supersedes a frozen cross-module decision such as D-GAP-M11.
+**Rule:** When Maintain Mode discovery finds a requested validation change contradicts a documented "warn-only", "never blocks", or equivalent canonical statement, stop before coding, reclassify to Tier 3, add an implementation-plan amendment and superseding SSOT decision, then continue.
+
+## L-070 - UI removal can still be Tier 3 when docs make the tool a canonical guard
+**What happened:** CR-015 was initially classified as Tier 2 because it looked like a Phase 4 UI cleanup, but discovery showed SSOT, PRD, APP_FLOW, USER_GUIDE, and VALIDATION_RULES still described Evidence Check / Evidence Matrix as a current Phase 4 supporting tool and confirmation-bias gate.
+**Why:** A visible tool can be part of a documented validation or investigation-control contract even if the code change is mostly frontend routing.
+**Rule:** When removing a UI tool, search the canonical docs for that tool's validation, route, and decision references before coding. If the tool is documented as a gate or canonical workflow element, reclassify to Tier 3, add an implementation-plan amendment, and record the superseding SSOT decision.
+
+## L-071 - Removing form fields can be Tier 3 when docs define them as investigation controls
+**What happened:** CR-016 looked like a Phase 4 Witness Notes simplification, but discovery showed SSOT, PRD, APP_FLOW, USER_GUIDE, and VALIDATION_RULES still described formal/informal selection, 4-phase interview fields, read-back, witness signature, and copy-to-witness as current investigation controls.
+**Why:** Form fields may encode documented evidence-quality or legal-defensibility behavior even when the user experiences them as UI clutter.
+**Rule:** Before removing Safety investigation form fields, search canonical docs for the field labels and validation IDs. If the fields are tied to a canonical decision or validation rule, reclassify to Tier 3, keep legacy API compatibility explicit, and add a superseding SSOT decision for the current UI.
+
+## L-072 - Removing stale validation controls must update UI, API, PDF, and docs together
+**What happened:** CR-018 removed the Incident Phase 1 First Checks checklist after discovery showed the current backend submit path no longer required it, while SSOT, PRD, APP_FLOW, VALIDATION_RULES, FRONTEND_GUIDELINES, and PDF field summaries still described it as a current control.
+**Why:** A control can become stale unevenly: backend validation may stop enforcing it while UI, serializers, PDF output, and canonical docs continue to surface the old concept.
+**Rule:** When removing a stale Safety validation/control field, search all four surfaces before coding: visible UI, frontend/API payload contracts, PDF/report output, and canonical docs. If any canonical doc still defines the field as current behavior, treat the removal as Tier 3, add a superseding SSOT decision, and leave any database-only compatibility explicitly documented.
+
+## L-073 - Hiding a field can supersede a prior CR even when the DB column stays
+**What happened:** CR-032 was initially classified as Tier 2 because it looked like a Phase 1 UI cleanup, but discovery showed CR-024 and the current SSOT explicitly defined Last Port as a visible Phase 1 reporting-context field.
+**Why:** Keeping the database column for compatibility does not make the change only cosmetic when the current docs say the field is part of the visible user workflow.
+**Rule:** Before hiding or omitting a Safety form field, search recent CRs and SSOT field-contract rows for that exact label/column. If current docs state it is visible/current, reclassify to Tier 3, add an implementation-plan amendment, and supersede only the visible/payload behavior while documenting database compatibility.
+
+## L-074 - Backend editability is incomplete without visible UI affordances
+**What happened:** CR-039 made Incident phases 2-6 save endpoints editable before office approval, but the Phase 2 RCA saved-cause cards still had no Edit action, so users could not discover how to correct saved Immediate/Root causes.
+**Recurrence:** CR-041 found the same gap on later incident phases: Corrective Action, Preventive Action, Lessons Learned, Documents, and Witness Statement saved cards also needed visible Edit controls and existing-row update tests.
+**Why:** Treating an API update path as "editable" misses the user-facing workflow requirement: users need an obvious control at the saved item they want to change.
+**Rule:** When declaring a screen state editable, verify the visible UI has an edit affordance, the form can load existing values, the save path updates the existing row rather than duplicating it, and a regression test covers that interaction.
+
+## L-075 - Visible workflow phases must be reversible across nav, routes, gates, PDFs, and docs
+**What happened:** CR-038 split Incident Corrective Action, Preventive Action, and Lessons Learned into separate visible phases, but the user later removed the Lessons Learned phase and requested Office Review comments instead.
+**Why:** A phase split can look like a UI-only improvement, but it changes navigation, route compatibility, continue buttons, office-review readiness, PDF section defaults, and canonical workflow docs. Removing one phase later requires touching every one of those surfaces, not only hiding a tab.
+**Rule:** When adding or removing a visible workflow phase, verify the phase switcher, direct routes, redirect/back-link behavior, transition targets, validation/preflight copy, PDF selector defaults, endpoint contracts, tests, SSOT, implementation plan, and user docs in one change. Keep old URLs as redirects when existing links may still point there.
+
+## L-076 - Removing a visible phase requires renumbering the remaining visible sequence
+**What happened:** CR-042 removed the visible Lessons Learned phase but left Add Evidence, Office Review, and Check Actions displayed as Phase 6, Phase 7, and Phase 8, so the UI appeared to skip from Phase 4 to Phase 6.
+**Why:** Keeping backend compatibility numbers in the visible labels leaks implementation details and makes a cleaned workflow look broken to users.
+**Rule:** After any visible workflow phase is removed, verify the user-facing sequence has no numbering gaps. Keep legacy backend phase numbers only in compatibility notes, route/API names, and helper mappings, not in tab labels or user training copy.
+
+## L-077 - Do not hide a direct navigation task behind a second click
+**What happened:** CR-045 found the Phase 5 Add Evidence Witness Statement card expanded first and then showed an **Open Witness Statement** link, even though the user expected the Witness Statement click to open the witness page directly.
+**Why:** Disclosure cards are useful for optional detail, but they add friction when the card label is itself the intended navigation action.
+**Rule:** For support-tool cards like Witness Statement, decide whether the first click should expand details or perform navigation. If the user asks to open a tool, make the labelled card/link navigate directly and add a regression test that the intermediate action copy is absent.
+
 ## L-078 - PDF availability wording can hide a validation contract
 **What happened:** CR-050 was initially classified as Tier 2 because it looked like an Office Review UI wording cleanup, but the requested removal of "Formal incident PDF export is available after Phase 7 acceptance" also removed backend export validation and superseded canonical PDF availability behavior.
 **Why:** A visible warning line can be backed by the same backend guard that blocks the user, so removing the wording without checking the renderer would leave the product behavior unchanged.
 **Rule:** When a user asks to remove export availability wording and "no such validation", search both the preview message and the actual renderer/export endpoint. If the guard contradicts current docs, reclassify to Tier 3, add an implementation-plan amendment, and test both preview and download paths.
 
+## L-079 - Cardinality changes can contradict frozen plan locks
+**What happened:** CR-057 was initially classified as Tier 2 because it looked like a local duplicate-row validation change, but the frozen implementation plan explicitly locked recommendation cardinality to one-row-per-tier.
+**Why:** A uniqueness constraint or duplicate-row guard may encode an old architecture decision, not just a field validation rule.
+**Rule:** Before changing Safety row cardinality, search the implementation plan and backend-structure docs for the table name, constraint name, and domain word such as cardinality. If a frozen plan lock is superseded, reclassify to Tier 3, add an implementation-plan amendment, and record the superseding SSOT decision before closing the change.
+
 ## L-080 - Prefer ORM relationship checks over RawSQL for list flags
 **What happened:** The CAR list `pv_due` flag used a raw SQL table subquery while the matching filter used ORM joins, so a dashboard probe with `pv_due=true&page_size=1` could fail on the SQL Server runtime path even though lightweight test coverage did not expose the raw-table dependency.
 **Why:** List flags often look like harmless annotations, but raw SQL bypasses Django's backend quoting, relationship metadata, and test portability. SQLite-style coverage can miss SQL Server-specific failures until a normal frontend query hits the endpoint.
 **Rule:** For booleans derived from related rows, use ORM `Exists`, `Prefetch`, or serializer methods before RawSQL. If RawSQL is unavoidable, add a regression test for the exact frontend query shape and validate against the SQL Server path when available.
+
 <!-- Session close review completed 2026-04-30 10:21. No new lesson added for Step 5.5. Latest standing addition remains L-056. Session closure confirmed after Step 5.5 completion in the handover workspace. -->
 <!-- Session close review completed 2026-04-30 10:37. No new lesson added for Step 5.6. Latest standing addition remains L-056. Session closure confirmed after Step 5.6 completion in the handover workspace. -->
 <!-- Session close review completed 2026-04-30 10:57. Added L-057 for the Step 6.1 PDF export permission-registry drift. Session closure confirmed after Step 6.1 completion in the handover workspace. -->
@@ -380,3 +437,44 @@
 **What happened:** A Certs print PDF cleanup was initially classified as Tier 1 because it looked like a renderer text change, but discovery showed the implementation plan, PRD, design system, security, and field map explicitly required visible print ID, state hash, footer, and validity output.
 **Why:** Report labels can encode audit and identifiability decisions even when they look like visual clutter.
 **Rule:** Before removing labels from generated PDFs, search canonical docs for the exact labels and related control IDs. If the labels are tied to artifact identity, security, footer, watermark, or glossary decisions, reclassify to Tier 3 and supersede only the visible-output behavior while preserving DB/API/audit traceability.
+
+## L-082 - Class report memoranda are not Conditions of Class
+**What happened:** BV Class Memoranda and Statutory Memoranda were treated as Conditions of class because docs and code broadened the class-report review bucket beyond the exact BV Conditions of Class section. The user corrected the behavior, and the change had to be reclassified from Tier 1 to Tier 3 because canonical docs described the broader behavior.
+**Recurrence:** Immediately after the BV-only correction, the user clarified that the same strict rule applies to all class societies: KR Actionable Note / Statutory Condition rows and NK Condition of Installation / Condition of Statutory Survey rows must also stay out of the Conditions of class bucket.
+**Why:** Class society reports can place operationally relevant note sections near Conditions of Class, but nearby note sections are not the same regulatory condition bucket.
+**Rule:** Before putting parsed class-report text into Conditions of class, match the exact Condition of Class / Conditions of Class source section for that class society and add negative regressions for adjacent note, installation, statutory, and memoranda sections. If canonical docs generalized the section incorrectly, reclassify to Tier 3 and add a superseding SSOT decision.
+
+## L-083 - Print UI simplification can supersede locked print controls
+**What happened:** CR-121 initially looked like a visible Certs print-form simplification, but discovery showed locked decisions for normal print scope variants, watermark controls, and optional recipient email.
+**Why:** Print controls are not only visual form fields; they encode documented artifact scope, delivery, and audit behavior even when backend compatibility remains.
+**Rule:** Before removing Certs print controls, search SSOT and docs for D-CERT-138, D-CERT-140, D-CERT-149, scope labels, watermark labels, and recipient/email labels. If current docs define those controls as visible behavior, reclassify to Tier 3, add a superseding SSOT decision, and document which API/artifact capabilities remain compatible.
+
+## L-084 - Locked UI labels need the same cascade as behavior
+**What happened:** The normal Certs print label was locked as "Print Vessel Status" in D-CERT-208, then the user corrected it to "Print certs status".
+**Why:** A label-only change can still contradict canonical docs when the exact visible text was recorded as a decision.
+**Rule:** When changing a label that appears in SSOT, implementation-plan amendments, user guide, app flow, or tests, treat it as a docs cascade and add a superseding decision if the old wording was locked.
+
+## L-085 - Large certificate lists should be section-first in print/share UI
+**What happened:** The Certs print/share UI exposed individual certificate selection even though vessels can have hundreds of certificate rows, making the picker impractical.
+**Why:** A technically precise selection model can fail operationally when the normal user intent is section-wise printing or sharing.
+**Rule:** For Certs print/share user workflows, prefer section-based selection in the normal UI and keep individual certificate IDs only as backend-compatible payload support unless the user explicitly asks for per-certificate selection.
+
+## L-086 - Section dropdowns must use catalog sections, not paged certificate rows
+**What happened:** The Print certs status and Share Bundle section pickers were built from the current tracked-item query, so the dropdown could be empty or incomplete instead of matching the vessel dashboard Section filter.
+**Why:** Tracked-item queries are paged and may not carry a complete section list, while the user's mental model is the canonical catalog section list.
+**Rule:** When a UI asks for certificate sections, source options from `useCatalogSections()` / `vims_certs_catalog_section`. Use tracked items only for vessel context or row data, not for the section option list.
+
+## L-087 - Section dropdown labels should say sections
+**What happened:** The Print certs status dropdown contained certificate sections but still used the older "Certificate List" label.
+**Why:** A generic list label is ambiguous after the workflow changed from certificate-row selection to section selection.
+**Rule:** When replacing certificate-row pickers with section pickers, update the visible label to "Certificate sections" on every user-facing section-selection control and cascade exact locked labels in docs/tests.
+
+## L-088 - Generated result panels should stay action-focused
+**What happened:** The Certs generated artifact result panel showed Scope, Hash, Watermark, and Recipient even after the normal print workflow was simplified for users.
+**Why:** Audit metadata is still stored, but showing it in the immediate success panel makes the post-generation view look technical and crowded.
+**Rule:** For normal Certs print/share success panels, show the user what they can act on: generated time, page count, downloads, and email status. Keep audit/hash/scope/watermark metadata in stored records/history unless explicitly needed on the screen.
+
+## L-089 - Clean print output rules must cover every generated format
+**What happened:** The normal Certs PDF had already stopped printing internal print ID/hash/scope metadata, but the Excel companion still printed Print ID, Scope, and System state hash rows.
+**Why:** A print/export workflow can generate multiple artifacts from separate renderers, so fixing only the PDF leaves the user-facing Excel with the same technical clutter.
+**Rule:** When removing internal metadata from generated print output, inspect and test every delivered format in the workflow: PDF, Excel, ZIP manifest, result panel, email body, and Print History. Preserve DB/API/audit traceability, but keep normal user-facing files clean unless the user explicitly asks for those identifiers.

@@ -20,18 +20,18 @@ export default function SafetyCaAgingPipeline({
   openActionCount,
 }: SafetyCaAgingPipelineProps) {
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             {label}
           </p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">
-            Corrective action pressure by age band
+            Open actions by age
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{note}</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           {openActionCount} open action{openActionCount === 1 ? "" : "s"} with the oldest aging at{" "}
           {oldestAgeDays} day{oldestAgeDays === 1 ? "" : "s"}.
         </div>
@@ -41,7 +41,7 @@ export default function SafetyCaAgingPipeline({
         {buckets.map((bucket) => (
           <article
             key={bucket.bucket}
-            className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm"
+            className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm"
           >
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               {bucket.label}

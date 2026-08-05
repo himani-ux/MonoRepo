@@ -1,4 +1,4 @@
-﻿// src/components/dashboardlayout/PdfViewer.jsx
+// src/components/dashboardlayout/PdfViewer.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -36,7 +36,7 @@ const PdfViewer = ({
 
   const pdfContainerRef = useRef(null);
 
-  // ðŸ”¹ Fetch PDF URL
+  // 🔹 Fetch PDF URL
   console.log('PdfViewer notification', notification);
   useEffect(() => {
     const fetchPdfUrl = async () => {
@@ -67,7 +67,7 @@ const PdfViewer = ({
     }
   }, [notification?.id, user?.crew_id]);
 
-  // ðŸ”¹ Render PDF with PDF.js
+  // 🔹 Render PDF with PDF.js
   useEffect(() => {
     if (!pdfUrl || !pdfContainerRef.current) return;
 
@@ -105,7 +105,7 @@ const PdfViewer = ({
           container.appendChild(pageDiv);
         }
 
-        // ðŸ”¹ Scroll listener for bottom detection
+        // 🔹 Scroll listener for bottom detection
         const handleScroll = () => {
           const el = container;
           const isBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
@@ -123,7 +123,7 @@ const PdfViewer = ({
     renderPdf();
   }, [pdfUrl]);
 
-  // ðŸ”¹ Handle Acknowledgment
+  // 🔹 Handle Acknowledgment
   const handleAcknowledgeClick = async () => {
     if (hasAcknowledged) return;
 console.log('Acknowledging notification:', notification.id,user.crew_id,user.role);
@@ -153,7 +153,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
     }
   };
 
-  // ðŸ”¹ Handle Download
+  // 🔹 Handle Download
   const handleDownloadPdf = () => {
     if (pdfUrl) {
       const link = document.createElement('a');
@@ -163,7 +163,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
     }
   };
 
-  // ðŸŸ¡ Loading / Error states
+  // 🟡 Loading / Error states
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -182,7 +182,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* ðŸ”¸ Header */}
+      {/* 🔸 Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -210,9 +210,9 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
         </div>
       </div>
 
-      
 
-      {/* ðŸ”¸ PDF Container */}
+
+      {/* 🔸 PDF Container */}
       <div
         ref={pdfContainerRef}
         className="max-w-7xl mx-auto px-4 pb-24 overflow-y-auto"
@@ -221,7 +221,7 @@ console.log('Acknowledging notification:', notification.id,user.crew_id,user.rol
         {/* PDF pages rendered by PDF.js */}
       </div>
 
-      {/* ðŸ”¸ Scroll-to-bottom Ack Button */}
+      {/* 🔸 Scroll-to-bottom Ack Button */}
       {canAcknowledge && !hasAcknowledged && isScrolledToBottom && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg">
           <div className="max-w-7xl mx-auto flex justify-center">

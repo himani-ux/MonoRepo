@@ -1,34 +1,34 @@
 const taxonomySections = [
   {
-    count: "174 rows",
-    title: "M-SCAT taxonomy",
+    count: "Reference list",
+    title: "Cause taxonomy",
   },
   {
-    count: "52 rows",
+    count: "Reference list",
     title: "Immediate causes",
   },
   {
-    count: "7 rows",
+    count: "Reference list",
     title: "Loss types",
   },
   {
-    count: "8 rows",
-    title: "Bias guards",
+    count: "Review safeguards",
+    title: "Review checks",
   },
   {
-    count: "13 areas",
-    title: "SOI area template",
+    count: "Area list",
+    title: "SOI areas",
   },
   {
-    count: "329 items",
+    count: "Checklist",
     title: "SOI checklist items",
   },
   {
-    count: "versioned",
-    title: "SOI checklist versions",
+    count: "Version history",
+    title: "SOI checklist history",
   },
   {
-    count: "11 rows",
+    count: "Reference list",
     title: "Incident types",
   },
 ] as const;
@@ -38,9 +38,9 @@ export default function SafetyTaxonomyAdminPanel() {
     <section className="space-y-4">
       <article className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-          Reference Admin
+          Reference Settings
         </p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Taxonomy Admin</h2>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-900">Safety Lists</h2>
       </article>
 
       <div className="grid gap-4 xl:grid-cols-2">

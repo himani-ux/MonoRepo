@@ -41,7 +41,12 @@ describe('BottomNav', () => {
     bottomNavMocks.useAuth.mockReset();
 
     bottomNavMocks.useLocation.mockReturnValue({ pathname: '/inspections' });
-    bottomNavMocks.useAuth.mockReturnValue({ isVessel: true, isOffice: false, isMaster: true });
+    bottomNavMocks.useAuth.mockReturnValue({
+      isVessel: true,
+      isOffice: false,
+      isMaster: true,
+      hasForm: vi.fn(() => true),
+    });
   });
 
   it('test_feat_auth_002_vessel_user_sees_sync_navigation_item', () => {
@@ -49,8 +54,19 @@ describe('BottomNav', () => {
     expect(screen.getByText('Sync')).toBeInTheDocument();
   });
 
+  it('shows_certs_navigation_when_user_has_certs_access', () => {
+    render(<BottomNav />);
+
+    expect(screen.getByRole('link', { name: /certs/i })).toHaveAttribute('href', '/certs');
+  });
+
   it('test_feat_auth_002_office_user_does_not_see_sync_navigation_item', () => {
-    bottomNavMocks.useAuth.mockReturnValue({ isVessel: false, isOffice: true, isMaster: false });
+    bottomNavMocks.useAuth.mockReturnValue({
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      hasForm: vi.fn((formId: string) => formId !== 'PSC_F_006'),
+    });
     render(<BottomNav />);
 
     expect(screen.queryByText('Sync')).not.toBeInTheDocument();

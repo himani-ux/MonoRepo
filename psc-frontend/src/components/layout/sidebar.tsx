@@ -13,21 +13,26 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Ship,
-  Shield,
+  ShieldCheck,
   ClipboardList,
+  ClipboardCheck,
   ListChecks,
   Bell,
   RefreshCw,
   Settings,
   BarChart3,
   LayoutDashboard,
+  ShipWheel,
+  TriangleAlert,
+  Search,
+  UsersRound,
+  FileBarChart2,
   BookText,
   BookOpenCheck,
   FileCheck2,
   X,
   ChevronDown,
   ChevronRight,
-  LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -57,6 +62,7 @@ interface SafetyNavItem {
   formId: string;
   href: string;
   label: string;
+  icon: typeof Ship;
 }
 
 const navItems: NavItem[] = [
@@ -120,15 +126,14 @@ const pscPriorityOrder = [
 ] as const;
 
 const safetyNavItems: SafetyNavItem[] = [
-  { formId: 'SAF_F_015', href: '/safety/dashboard', label: 'Dashboard' },
-  { formId: 'SAF_F_001', href: '/safety/incidents', label: 'Incidents' },
-  { formId: 'SAF_F_002', href: '/safety/near-miss', label: 'Near Miss' },
-  { formId: 'SAF_F_003', href: '/safety/scm', label: 'Committee Meetings' },
-  { formId: 'SAF_F_004', href: '/safety/soi', label: 'Safety Officer Inspection' },
-  { formId: 'SAF_F_013', href: '/safety/soi', label: 'SOI Applicability' },
-  { formId: 'SAF_F_005', href: '/safety/search', label: 'Search' },
-  { formId: 'SAF_F_018', href: '/safety/admin', label: 'Admin' },
-  { formId: 'SAF_F_020', href: '/safety/admin/auditor-export', label: 'Auditor Export' },
+  { formId: 'SAF_F_015', href: '/safety/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { formId: 'SAF_F_001', href: '/safety/incidents', label: 'Incidents', icon: TriangleAlert },
+  { formId: 'SAF_F_002', href: '/safety/near-miss', label: 'Near Miss', icon: Search },
+  { formId: 'SAF_F_003', href: '/safety/scm', label: 'Committee Meetings', icon: UsersRound },
+  { formId: 'SAF_F_004', href: '/safety/soi', label: 'Safety Officer Inspection', icon: ClipboardCheck },
+  { formId: 'SAF_F_013', href: '/safety/soi', label: 'SOI Applicability', icon: ListChecks },
+  { formId: 'SAF_F_005', href: '/safety/search', label: 'Search', icon: Search },
+  { formId: 'SAF_F_020', href: '/safety/admin/auditor-export', label: 'Auditor Export', icon: FileBarChart2 },
 ];
 
 const certsFormIds = [
@@ -141,6 +146,30 @@ const certsFormIds = [
   FORM_IDS.CERTS_AUDITOR_ACCESS,
   FORM_IDS.CERTS_AUDIT_LOG,
 ] as const;
+
+const navItemBase =
+  'group flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150';
+const navItemActive = 'bg-primary-50 text-primary-700 shadow-sm ring-1 ring-primary-100';
+const navItemIdle = 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 hover:shadow-sm';
+const nestedListClass = 'mt-1 space-y-1 border-l border-neutral-100 pl-2';
+
+function navItemClass(active: boolean) {
+  return cn(navItemBase, active ? navItemActive : navItemIdle);
+}
+
+function navIconClass(active: boolean) {
+  return cn(
+    'h-5 w-5 shrink-0 transition-colors duration-150',
+    active ? 'text-primary-600' : 'text-neutral-500 group-hover:text-neutral-700'
+  );
+}
+
+function chevronClass(active: boolean) {
+  return cn(
+    'h-4 w-4 shrink-0 transition-colors duration-150',
+    active ? 'text-primary-500' : 'text-neutral-400 group-hover:text-neutral-600'
+  );
+}
 
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
@@ -226,8 +255,6 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
     });
   };
 
-  const helpActive = isActive(ROUTES.HELP);
-
   return (
     <>
       {/* Mobile overlay */}
@@ -242,8 +269,8 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full w-64 shrink-0 flex-col bg-white shadow-lg transition-transform duration-300',
-          'md:relative md:z-0 md:h-auto md:translate-x-0 md:shadow-none md:border-r md:border-neutral-200',
+          'fixed left-0 top-0 z-50 flex h-full min-h-0 w-72 shrink-0 flex-col bg-white shadow-lg transition-transform duration-300',
+          'md:relative md:z-0 md:h-full md:translate-x-0 md:shadow-none md:border-r md:border-neutral-200',
           isOpen ? 'translate-x-0' : '-translate-x-full',
           className
         )}
@@ -262,59 +289,54 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4">
-          <ul className="space-y-1">
+        <nav
+          aria-label="Main navigation"
+          className="min-h-0 flex-1 overflow-x-auto overflow-y-auto px-3 py-4 pr-2 [scrollbar-gutter:stable] [scrollbar-width:thin]"
+        >
+          <ul className="w-max min-w-full space-y-1.5">
             <li>
               {/* New hierarchy: Inspection -> PSC -> existing sidebar destinations. */}
               <button
                 type="button"
                 onClick={handleInspectionToggle}
                 aria-expanded={inspectionOpen}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  hasActivePscItem || inspectionOpen
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                )}
+                className={navItemClass(hasActivePscItem || inspectionOpen)}
               >
                 <Ship
-                  className={cn(
-                    'h-5 w-5',
-                    hasActivePscItem || inspectionOpen ? 'text-primary-600' : 'text-neutral-500'
-                  )}
+                  aria-hidden="true"
+                  className={navIconClass(hasActivePscItem || inspectionOpen)}
                 />
-                <span className="flex-1 text-left">Inspection</span>
+                <span className="min-w-max flex-1 text-left">Inspection</span>
                 {inspectionOpen ? (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className={chevronClass(hasActivePscItem || inspectionOpen)} />
                 ) : (
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className={chevronClass(hasActivePscItem || inspectionOpen)} />
                 )}
               </button>
 
               {inspectionOpen && (
-                <ul className="mt-1 space-y-1 pl-3">
+                <ul className={cn(nestedListClass, 'ml-4')}>
                   <li>
                     <button
                       type="button"
                       onClick={() => setPscOpen((open) => !open)}
                       aria-expanded={pscOpen}
-                      className={cn(
-                        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                        hasActivePscItem || pscOpen
-                          ? 'bg-primary-50/70 text-primary-700'
-                          : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                      )}
+                      className={navItemClass(hasActivePscItem || pscOpen)}
                     >
-                      <span className="flex-1 text-left">PSC</span>
+                      <ShipWheel
+                        aria-hidden="true"
+                        className={navIconClass(hasActivePscItem || pscOpen)}
+                      />
+                      <span className="min-w-max flex-1 text-left">PSC</span>
                       {pscOpen ? (
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className={chevronClass(hasActivePscItem || pscOpen)} />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className={chevronClass(hasActivePscItem || pscOpen)} />
                       )}
                     </button>
 
                     {pscOpen && (
-                      <ul className="mt-1 space-y-1 pl-3">
+                      <ul className={cn(nestedListClass, 'ml-4')}>
                         {orderedNavItems.map((item) => {
                           const Icon = item.icon;
                           const active = isActive(item.href);
@@ -324,22 +346,15 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                               <NavLink
                                 to={item.href}
                                 onClick={onClose}
-                                className={cn(
-                                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                                  active
-                                    ? 'bg-primary-50 text-primary-700'
-                                    : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                                )}
+                                className={navItemClass(active)}
                               >
                                 <Icon
-                                  className={cn(
-                                    'h-5 w-5',
-                                    active ? 'text-primary-600' : 'text-neutral-500'
-                                  )}
+                                  aria-hidden="true"
+                                  className={navIconClass(active)}
                                 />
-                                <span className="flex-1">{item.label}</span>
+                                <span className="min-w-max flex-1 text-left">{item.label}</span>
                                 {item.href === ROUTES.NOTIFICATIONS && unreadCount > 0 && (
-                                  <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-semibold text-white">
+                                  <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-semibold text-white">
                                     {unreadCount > 99 ? '99+' : unreadCount}
                                   </span>
                                 )}
@@ -357,29 +372,23 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                         type="button"
                         onClick={() => setSafetyOpen((open) => !open)}
                         aria-expanded={safetyOpen}
-                        className={cn(
-                          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                          hasActiveSafetyItem || safetyOpen
-                            ? 'bg-primary-50/70 text-primary-700'
-                            : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                        )}
+                        className={navItemClass(hasActiveSafetyItem || safetyOpen)}
                       >
-                        <Shield
-                          className={cn(
-                            'h-5 w-5',
-                            hasActiveSafetyItem || safetyOpen ? 'text-primary-600' : 'text-neutral-500'
-                          )}
+                        <ShieldCheck
+                          aria-hidden="true"
+                          className={navIconClass(hasActiveSafetyItem || safetyOpen)}
                         />
-                        <span className="flex-1 text-left">Safety</span>
+                        <span className="min-w-max flex-1 text-left">Safety</span>
                         {safetyOpen ? (
-                          <ChevronDown className="h-4 w-4" />
+                          <ChevronDown className={chevronClass(hasActiveSafetyItem || safetyOpen)} />
                         ) : (
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight className={chevronClass(hasActiveSafetyItem || safetyOpen)} />
                         )}
                       </button>
                       {safetyOpen ? (
-                        <ul className="mt-1 space-y-1 pl-3">
+                        <ul className={cn(nestedListClass, 'ml-4')}>
                           {visibleSafetyItems.map((item) => {
+                            const Icon = item.icon;
                             const active = location.pathname.startsWith(item.href);
 
                             return (
@@ -387,14 +396,10 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                                 <NavLink
                                   to={item.href}
                                   onClick={onClose}
-                                  className={cn(
-                                    'flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                                    active
-                                      ? 'bg-primary-50 text-primary-700'
-                                      : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                                  )}
+                                  className={navItemClass(active)}
                                 >
-                                  <span className="flex-1 text-left">{item.label}</span>
+                                  <Icon aria-hidden="true" className={navIconClass(active)} />
+                                  <span className="min-w-max flex-1 text-left">{item.label}</span>
                                 </NavLink>
                               </li>
                             );
@@ -416,20 +421,13 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                   <NavLink
                     to={item.href}
                     onClick={onClose}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                      active
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-                    )}
+                    className={navItemClass(active)}
                   >
                     <Icon
-                      className={cn(
-                        'h-5 w-5',
-                        active ? 'text-primary-600' : 'text-neutral-500'
-                      )}
+                      aria-hidden="true"
+                      className={navIconClass(active)}
                     />
-                    <span className="flex-1 text-left">{item.label}</span>
+                    <span className="min-w-max flex-1 text-left">{item.label}</span>
                   </NavLink>
                 </li>
               );
@@ -438,33 +436,9 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="space-y-3 border-t border-neutral-200 p-4">
-          <NavLink
-            to={ROUTES.HELP}
-            onClick={onClose}
-            className={cn(
-              'flex items-center gap-3 rounded-lg border px-3 py-3 text-sm font-medium transition-colors',
-              helpActive
-                ? 'border-primary-200 bg-primary-50 text-primary-700'
-                : 'border-neutral-200 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
-            )}
-          >
-            <LifeBuoy
-              className={cn(
-                'h-5 w-5',
-                helpActive ? 'text-primary-600' : 'text-neutral-500'
-              )}
-            />
-            <div className="min-w-0 flex-1">
-              <p>Help</p>
-              <p className="text-xs font-normal text-neutral-400">
-                User guides by module
-              </p>
-            </div>
-          </NavLink>
-
+        {/* <div className="border-t border-neutral-200 p-4">
           <p className="text-xs text-neutral-400">VIMS v0.1.0</p>
-        </div>
+        </div> */}
       </aside>
     </>
   );

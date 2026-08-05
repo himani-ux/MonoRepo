@@ -50,6 +50,7 @@ from .print_views import (
 from .snapshot_views import (
     ClassSnapshotDetailView,
     ClassSnapshotListCreateView,
+    ClassSnapshotPdfInlineView,
     ClassSnapshotReparseView,
 )
 from .settings_views import AlertConfigView, SettingsView
@@ -59,6 +60,7 @@ from .tracked_item_views import (
     TrackedItemListCreateView,
     TrackedItemPdfInlineView,
     TrackedItemQuarantineResolveView,
+    TrackedItemReparsePdfView,
     TrackedItemRemovePdfView,
     TrackedItemRejectView,
     TrackedItemSubmitView,
@@ -93,6 +95,7 @@ __all__ = [
     "CatalogSectionListView",
     "ClassSnapshotDetailView",
     "ClassSnapshotListCreateView",
+    "ClassSnapshotPdfInlineView",
     "ClassSnapshotReparseView",
     "CertNotificationAckView",
     "CertNotificationListView",
@@ -132,6 +135,7 @@ __all__ = [
     "TrackedItemListCreateView",
     "TrackedItemPdfInlineView",
     "TrackedItemQuarantineResolveView",
+    "TrackedItemReparsePdfView",
     "TrackedItemRemovePdfView",
     "TrackedItemRejectView",
     "TrackedItemSubmitView",

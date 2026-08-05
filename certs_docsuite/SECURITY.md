@@ -125,7 +125,7 @@ The Certs module introduces **no password surface of its own** — login is the 
 | Export | DPA only — watermarked PDF + CSV for ISM external audit | D-CERT-091 |
 | External-auditor view | Free-text reasons rendered `[REDACTED — internal note]` at serializer layer | **D-CERT-180** |
 | Cross-module writeback attribution | `vims_certs_cert_change_log` (append-only, same GRANT regime) records `source_module ∈ {CERTS, AUDIT, SYSTEM}` + `version_after` CAS trail | BACKEND_STRUCTURE §3.19 (D-AUDRS-236/239) |
-| Print artifact identifiability | Stored artifact/audit/history records retain UTC date/time, user name + role, 8-char system-state hash, and unique `print_id`; normal visible PDFs omit these internal identifiers except `Printed by` | **D-CERT-128, D-CERT-202** |
+| Print artifact identifiability | Stored artifact/audit/history records retain UTC date/time, user name + role, 8-char system-state hash, scope, and unique `print_id`; normal visible PDFs omit these internal identifiers except `Printed by`, and normal visible Excel workbooks omit `Print ID`, `Scope`, and `System state hash` rows | **D-CERT-128, D-CERT-202, D-CERT-212** |
 | Notification audit trail | Trigger event, recipients, channels, delivery/ack status, escalation level; metadata 5y, body content 1y | D-CERT-155, D-CERT-181 |
 
 ---
@@ -187,7 +187,7 @@ The Certs module introduces **no password surface of its own** — login is the 
 | SEC-CERT-06 | No auditor activity tracking (grant-level only) | D-CERT-196 |
 | SEC-CERT-07 | Audit free-text redaction for external view | D-CERT-180 |
 | SEC-CERT-08 | Magic-link single-use 24h signed URLs | D-CERT-154 |
-| SEC-CERT-09 | Print artifact identifiability in stored artifact/audit/history records | D-CERT-128, D-CERT-202 |
+| SEC-CERT-09 | Print artifact identifiability in stored artifact/audit/history records; normal visible Excel omits internal metadata rows | D-CERT-128, D-CERT-202, D-CERT-212 |
 | SEC-CERT-10 | Soft-limit print throttle + FM surfacing | D-CERT-143 |
 | SEC-CERT-11 | Bulk-delete cap (≤50) + ingest cap (≤10) | D-CERT-092, D-CERT-104 |
 | SEC-CERT-12 | No MFA / no break-glass / no acting-Master | D-CERT-081, D-CERT-097, D-CERT-077 |

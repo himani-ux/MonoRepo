@@ -53,18 +53,13 @@ class RecommendationTierTests(unittest.TestCase):
             schema_version=1,
         )
 
-    def test_corrective_recommendation_auto_creates_corrective_action(self) -> None:
+    def test_corrective_recommendation_records_description_without_linked_action(self) -> None:
         request = self.factory.post(
             f"/api/safety/incidents/{self.incident.pk}/recommendations/",
             {
                 "tier": Recommendation.Tier.CORRECTIVE,
                 "title": "Replace failed guard on vessel crane interlock",
                 "description": "Immediate vessel action to restore the failed protective control.",
-                "corrective_action": {
-                    "assigned_crew_id": "bosun-4",
-                    "verifier_user_id": "master-7",
-                    "due_date": "2026-05-30",
-                },
             },
             format="json",
         )
@@ -74,10 +69,8 @@ class RecommendationTierTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["tier"], Recommendation.Tier.CORRECTIVE)
-        self.assertEqual(CorrectiveAction.objects.count(), 1)
-        action = CorrectiveAction.objects.get()
-        self.assertEqual(action.recommendation.incident_id, self.incident.pk)
-        self.assertEqual(action.verifier_user_id, "master-7")
+        self.assertEqual(response.data["corrective_actions"], [])
+        self.assertEqual(CorrectiveAction.objects.count(), 0)
 
     def test_corrective_recommendation_rejects_long_corrective_action_ids(self) -> None:
         request = self.factory.post(
@@ -102,7 +95,7 @@ class RecommendationTierTests(unittest.TestCase):
         self.assertIn("corrective_action", response.data)
         self.assertEqual(CorrectiveAction.objects.count(), 0)
 
-    def test_preventive_recommendation_requires_due_date_and_risk_reduction(self) -> None:
+    def test_preventive_recommendation_records_description_without_due_date_or_risk_reduction(self) -> None:
         request = self.factory.post(
             f"/api/safety/incidents/{self.incident.pk}/recommendations/",
             {
@@ -116,9 +109,11 @@ class RecommendationTierTests(unittest.TestCase):
 
         response = self.list_view(request, id=self.incident.pk)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("corrective_action", response.data)
-        self.assertIn("estimated_likelihood_reduction", response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["tier"], Recommendation.Tier.PREVENTIVE)
+        self.assertEqual(response.data["estimated_likelihood_reduction"], None)
+        self.assertEqual(response.data["corrective_actions"], [])
+        self.assertEqual(CorrectiveAction.objects.count(), 0)
 
     def test_preventive_recommendation_creates_due_date_action(self) -> None:
         request = self.factory.post(

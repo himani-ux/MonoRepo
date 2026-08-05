@@ -17,7 +17,7 @@ bootstrap_django()
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
+from apps.safety.models import Incident, IncidentPhaseLog, NearMissCauseOption, SafetyFieldHistory
 from apps.safety.views.near_miss import NearMissDetailView
 from apps.safety.views.near_miss_review import NearMissReviewView, NearMissReworkSubmitView
 
@@ -71,8 +71,8 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
             near_miss_incident_type_ids="[1]",
             near_miss_severity="LOW",
             near_miss_place="AT_SEA",
-            near_miss_shell_tag="Safety",
-            near_miss_category_tags='["Safety"]',
+            near_miss_shell_tag="PPE",
+            near_miss_category_tags='["PPE"]',
             near_miss_immediate_action="Area isolated and watch team warned before anyone used the access.",
             near_miss_suggestion="Inspect platform pins during every pre-work safety round.",
             reporter_id="crew-7",
@@ -95,11 +95,12 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
             ),
             "near_miss_immediate_action": "Access platform isolated and duty officer informed immediately.",
             "near_miss_place": "AT_SEA",
-            "near_miss_category_tags": ["Safety"],
+            "near_miss_category_tags": ["PPE"],
             "near_miss_incident_type_ids": [1],
             "near_miss_mscat_subcode_ids": ["10.01"],
+            "near_miss_factor_causes": self._factor_causes_payload(),
             "near_miss_severity": "LOW",
-            "near_miss_shell_tag": "Safety",
+            "near_miss_shell_tag": "PPE",
             "near_miss_suggestion": "Add platform pin check to pre-work safety rounds.",
             "near_miss_root_cause_detail": "",
             "near_miss_corrective_action": "",
@@ -111,6 +112,26 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         }
         payload.update(overrides)
         return payload
+
+    def _factor_causes_payload(self) -> list[dict[str, str]]:
+        rows = []
+        for factor in ("HUMAN", "VESSEL", "MANAGEMENT", "OTHER"):
+            immediate = NearMissCauseOption.objects.get(
+                factor=factor,
+                cause_stage=NearMissCauseOption.CauseStage.IMMEDIATE,
+            )
+            root = NearMissCauseOption.objects.get(
+                factor=factor,
+                cause_stage=NearMissCauseOption.CauseStage.ROOT,
+            )
+            rows.append(
+                {
+                    "factor": factor,
+                    "immediate_option_id": str(immediate.id),
+                    "root_option_id": str(root.id),
+                }
+            )
+        return rows
 
     def test_master_can_submit_near_miss_to_dpa_triage(self) -> None:
         request = self.factory.post(
@@ -145,6 +166,21 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(signature_row.new_value["device_fingerprint"], "bridge-review-7")
         self.assertEqual(response.data["review_signature"]["typed_name"], "Master Seven")
         self.assertTrue(response.data["review_phase_log"]["signature_valid"])
+        self.assertEqual(
+            response.data["vessel_review_summary"]["comment"],
+            "Reviewed onboard and ready for DPA triage.",
+        )
+
+        detail_request = self.factory.get(f"/api/safety/near-miss/{self.near_miss.pk}/")
+        force_authenticate(detail_request, user=build_user(role_name="DPA", user_id="dpa-7"))
+
+        detail_response = self.detail_view(detail_request, id=self.near_miss.pk)
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(
+            detail_response.data["vessel_review_summary"]["comment"],
+            "Reviewed onboard and ready for DPA triage.",
+        )
 
     def test_engine_near_miss_requires_ce_review_before_master_submission(self) -> None:
         self.near_miss.reporter_department = "Engine"
@@ -263,12 +299,37 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.PENDING_VESSEL_REVIEW)
         self.assertEqual(self.near_miss.near_miss_immediate_action, "Access platform isolated and duty officer informed immediately.")
-        self.assertEqual(self.near_miss.near_miss_mscat_subcode_id, "10.01")
+        self.assertIsNone(self.near_miss.near_miss_mscat_subcode_id)
+        self.assertIn("immediate_option_id", self.near_miss.near_miss_factor_causes)
         self.assertTrue(
             SafetyFieldHistory.objects.filter(
                 parent_id=self.near_miss.pk,
                 field_name="near_miss_rework_resubmission",
             ).exists()
+        )
+
+    def test_master_can_submit_rework_after_office_rejects_near_miss(self) -> None:
+        self.near_miss.state = Incident.State.REJECTED
+        self.near_miss.save(update_fields=("state",))
+
+        rework_request = self.factory.post(
+            f"/api/safety/near-miss/{self.near_miss.pk}/rework/",
+            self._rework_payload(comment="Master corrected the rejected near miss."),
+            format="json",
+        )
+        force_authenticate(
+            rework_request,
+            user=build_user(role_name="MASTER", process_ids=["SAF_P_001"], user_id="master-7"),
+        )
+
+        response = self.rework_view(rework_request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.near_miss.refresh_from_db()
+        self.assertEqual(self.near_miss.state, Incident.State.READY_FOR_OFFICE_COMMENTS)
+        self.assertEqual(
+            response.data["rework_summary"]["comment"],
+            "Master corrected the rejected near miss.",
         )
 
     def test_engine_rework_requires_fresh_hod_review_after_resubmission(self) -> None:

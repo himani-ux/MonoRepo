@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../../hooks/use-auth";
 import { getErrorMessage } from "../../../lib/api/client";
 import { safetyApi } from "../../../lib/api/safety";
+import { incidentPhaseRoute, incidentPhaseStepLabel } from "../../../lib/safety/incident-phase-display";
 import type { SafetyIncidentClosureSummary } from "../../../schemas/safety/incident-closure";
 
 function emptySummary(): SafetyIncidentClosureSummary {
@@ -44,18 +45,18 @@ function authorityForBand(riskBand: SafetyIncidentClosureSummary["incident"]["ri
   if (riskBand === "RED") {
     return {
       roles: ["FM", "FLEET MANAGER"],
-      text: "RED reopen is restricted to FM.",
+      text: "Only Fleet Manager can reopen a RED incident.",
     };
   }
   if (riskBand === "GREEN" || riskBand === "YELLOW") {
     return {
       roles: ["DPA"],
-      text: `${riskBand} reopen is restricted to DPA.`,
+      text: `Only DPA can reopen a ${riskBand} incident.`,
     };
   }
   return {
     roles: [],
-    text: "Risk band must be assigned before reopen.",
+    text: "Risk level must be set before reopening.",
   };
 }
 
@@ -97,8 +98,8 @@ export function SafetyIncidentReopenWorkspace() {
   const currentRole = normalizeCode(user?.role || role || user?.safety_role_name || user?.role_name);
   const hasAuthority = authority.roles.includes(currentRole);
   const hasReopenProcess = hasProcess("SAF_P_008");
-  const isClosedPhaseNine = incident.state === "CLOSED" && incident.current_phase === 9;
-  const canSubmit = hasAuthority && hasReopenProcess && isClosedPhaseNine;
+  const isClosedFinalPhase = incident.state === "CLOSED" && incident.current_phase === 9;
+  const canSubmit = hasAuthority && hasReopenProcess && isClosedFinalPhase;
 
   async function submitReopen(event: FormEvent) {
     event.preventDefault();
@@ -112,7 +113,7 @@ export function SafetyIncidentReopenWorkspace() {
       const response = await safetyApi.reopenIncident(id, { reason: reason.trim() });
       const currentPhase = Number((response as { current_phase?: number }).current_phase ?? 5);
       setResultMessage("Incident reopened.");
-      navigate(`/safety/incidents/${id}/phase-${currentPhase}`);
+      navigate(incidentPhaseRoute(id, currentPhase));
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -123,14 +124,11 @@ export function SafetyIncidentReopenWorkspace() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Incident / Reopen
-        </p>
         <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Reopen Request</h1>
+            <h1 className="text-3xl font-semibold text-slate-900">Reopen Incident</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Reopen a closed Phase 9 incident with band-gated authority and an auditable reason. Reopened incidents return to Phase 5.
+              Reopen a closed incident when more work is needed. Reopened incidents go back to Phase 4.
             </p>
           </div>
         </div>
@@ -140,12 +138,12 @@ export function SafetyIncidentReopenWorkspace() {
       {resultMessage ? <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{resultMessage}</section> : null}
 
       {isLoading ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading reopen authority...</section>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading reopen details...</section>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,0.85fr)_minmax(420px,1.15fr)]">
           <aside className="space-y-4">
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Closed Record</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Closed Incident</h2>
               <dl className="mt-4 space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <dt className="text-slate-500">Incident</dt>
@@ -157,44 +155,44 @@ export function SafetyIncidentReopenWorkspace() {
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <dt className="text-slate-500">Phase</dt>
-                  <dd className="font-semibold text-slate-900">{incident.current_phase}</dd>
+                  <dd className="font-semibold text-slate-900">{incidentPhaseStepLabel(incident.current_phase)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <dt className="text-slate-500">Risk band</dt>
+                  <dt className="text-slate-500">Risk level</dt>
                   <dd className="font-semibold text-slate-900">{incident.risk_band ?? "Not set"}</dd>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <dt className="text-slate-500">Closure note</dt>
+                  <dt className="text-slate-500">Closing note</dt>
                   <dd className="mt-2 text-slate-700">{incident.closure_reason || "Not recorded"}</dd>
                 </div>
               </dl>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Authority</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Who Can Reopen</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">{authority.text}</p>
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                 <p>Allowed role: <span className="font-semibold text-slate-900">{authority.roles.join(", ") || "None"}</span></p>
                 <p className="mt-2">Current role: <span className="font-semibold text-slate-900">{currentRole || "Not available"}</span></p>
-                <p className="mt-2">Process permission: <span className="font-semibold text-slate-900">{hasReopenProcess ? "Present" : "Missing"}</span></p>
+                <p className="mt-2">Permission: <span className="font-semibold text-slate-900">{hasReopenProcess ? "Present" : "Missing"}</span></p>
               </div>
             </section>
           </aside>
 
           <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={submitReopen}>
-            <h2 className="text-xl font-semibold text-slate-900">Submit Reopen</h2>
-            {!isClosedPhaseNine ? (
+            <h2 className="text-xl font-semibold text-slate-900">Reopen</h2>
+            {!isClosedFinalPhase ? (
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                Only closed Phase 9 incidents can be reopened.
+                Only closed incidents can be reopened.
               </div>
             ) : null}
             {!canSubmit ? (
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                Your current session cannot submit this reopen request. Backend authority remains enforced.
+                Your current login cannot reopen this incident.
               </div>
             ) : null}
             <label className="mt-4 block text-sm font-medium text-slate-700">
-              Reopen reason
+              Reason for reopening
               <textarea
                 className="mt-2 min-h-44 w-full rounded-2xl border border-slate-300 p-3"
                 onChange={(event) => setReason(event.target.value)}
@@ -206,15 +204,15 @@ export function SafetyIncidentReopenWorkspace() {
               disabled={isSubmitting || !canSubmit || !reason.trim()}
               type="submit"
             >
-              {isSubmitting ? "Reopening..." : "Reopen to Phase 5"}
+              {isSubmitting ? "Reopening..." : "Reopen to Phase 4"}
             </button>
           </form>
         </div>
       )}
 
       <div className="flex flex-wrap gap-3">
-        <Link className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700" to={`/safety/incidents/${id}/phase-9`}>
-          Back to Phase 9
+        <Link className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700" to="/safety/incidents">
+          Back to incidents
         </Link>
       </div>
     </section>

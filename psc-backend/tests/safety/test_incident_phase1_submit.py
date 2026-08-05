@@ -68,6 +68,13 @@ class IncidentPhase1SubmitTests(unittest.TestCase):
                 "occurred_at": "2026-04-20T10:00:00Z",
                 "reported_at": "2026-04-20T10:30:00Z",
                 "narrative": "Initial intake " + ("details " * 30),
+                "risk_assessment_carried_out": "YES",
+                "toolbox_meeting_carried_out": "NO",
+                "permit_issued": "NA",
+                "activity_type": "Cargo hose transfer",
+                "incident_type_other": "Mooring line snapback",
+                "vessel_location": "In Port",
+                "vessel_location_detail": "Singapore",
                 "office_notified": False,
                 "reporter_user_id": "master-7",
                 "reporter_name": "Master Seven",
@@ -83,6 +90,13 @@ class IncidentPhase1SubmitTests(unittest.TestCase):
 
         self.assertEqual(create_response.status_code, 201)
         incident_id = create_response.data["id"]
+        self.assertEqual(create_response.data["risk_assessment_carried_out"], "YES")
+        self.assertEqual(create_response.data["toolbox_meeting_carried_out"], "NO")
+        self.assertEqual(create_response.data["permit_issued"], "NA")
+        self.assertEqual(create_response.data["activity_type"], "Cargo hose transfer")
+        self.assertEqual(create_response.data["incident_type_other"], "Mooring line snapback")
+        self.assertEqual(create_response.data["vessel_location"], "In Port")
+        self.assertEqual(create_response.data["vessel_location_detail"], "Singapore")
         self.assertEqual(IncidentPhaseLog.objects.count(), 1)
 
         patch_request = self.factory.patch(

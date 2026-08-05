@@ -18,8 +18,29 @@ from apps.safety.serializers.corrective_action import (
     CorrectiveActionTransitionSerializer,
     CorrectiveActionWriteSerializer,
 )
+from apps.safety.authentication.roles import normalized_authority_role
 from apps.safety.services.ca_aging import CorrectiveActionAgingService
 from apps.safety.views.incident import _resolve_actor_id
+
+
+CORRECTIVE_ACTION_OFFICE_ROLES = {
+    "DPA",
+    "FM",
+    "FLEET MANAGER",
+    "OFFICE_PIC",
+    "OFFICE_SSQE",
+    "OFFICE_SUPT",
+    "PHYSICAL_VERIFIER",
+}
+CORRECTIVE_ACTION_CREATE_ROLES = CORRECTIVE_ACTION_OFFICE_ROLES | {
+    "MASTER",
+    "HOD",
+    "HEAD OF DEPARTMENT",
+    "CO",
+    "CE",
+    "CHIEF OFFICER",
+    "CHIEF ENGINEER",
+}
 
 
 class CorrectiveActionViewMixin:
@@ -133,9 +154,9 @@ class CorrectiveActionViewMixin:
             queryset = queryset.filter(source_id=source_id)
         if incident_id := params.get("incident_id"):
             queryset = queryset.filter(
-                Q(source_table="vims_safety_incident", source_id=incident_id)
+                Q(source_id=incident_id)
                 | Q(recommendation__incident_id=incident_id)
-            )
+            ).distinct()
         if vessel_id := params.get("vessel_id"):
             queryset = queryset.filter(recommendation__incident__vessel_id=str(vessel_id))
         if status_value := params.get("status"):
@@ -153,7 +174,13 @@ class CorrectiveActionListCreateView(CorrectiveActionViewMixin, generics.Generic
     serializer_class = CorrectiveActionWriteSerializer
 
     def get_process_permission_class(self):
-        return HasProcessPermission.requiring("SAF_P_020")
+        return None
+
+    def _can_create_action(self) -> bool:
+        permission = HasProcessPermission.requiring("SAF_P_020")()
+        if permission.has_permission(self.request, self):
+            return True
+        return normalized_authority_role(self.request.user) in CORRECTIVE_ACTION_CREATE_ROLES
 
     def get(self, request, *args, **kwargs):
         serializer = CorrectiveActionSerializer(
@@ -164,6 +191,9 @@ class CorrectiveActionListCreateView(CorrectiveActionViewMixin, generics.Generic
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
+        if not self._can_create_action():
+            raise PermissionDenied("Only Master, HOD, senior officers, or authorized office users can create corrective actions.")
+
         serializer = self.get_serializer(data=request.data, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
         self._ensure_write_vessel_scope(serializer.validated_data)
@@ -230,12 +260,37 @@ class CorrectiveActionTransitionView(CorrectiveActionViewMixin, generics.Generic
     serializer_class = CorrectiveActionTransitionSerializer
 
     def get_process_permission_class(self):
-        return HasProcessPermission.requiring("SAF_P_020")
+        return None
+
+    def _can_transition_action(self, action: CorrectiveAction, target_status: str) -> bool:
+        permission = HasProcessPermission.requiring("SAF_P_020")()
+        if permission.has_permission(self.request, self):
+            return True
+
+        if action.status == CorrectiveAction.Status.OPEN and target_status == CorrectiveAction.Status.IN_PROGRESS:
+            return True
+
+        actor_id = _resolve_actor_id(self.request.user).strip().upper()
+        role = normalized_authority_role(self.request.user)
+        allowed_refs = {
+            str(value).strip().upper()
+            for value in (
+                action.assigned_crew_id,
+                action.assigned_office_user_id,
+                action.verifier_user_id,
+            )
+            if value not in (None, "")
+        }
+        return actor_id in allowed_refs or role in allowed_refs or role in CORRECTIVE_ACTION_OFFICE_ROLES
 
     def post(self, request, *args, **kwargs):
         action = self.get_object()
         serializer = self.get_serializer(data=request.data, context={"action": action})
         serializer.is_valid(raise_exception=True)
+        if not self._can_transition_action(action, serializer.validated_data["status"]):
+            raise PermissionDenied(
+                "Only the assigned owner, verifier, or authorized office user can update this corrective action."
+            )
 
         action.status = serializer.validated_data["status"]
         action.updated_by = _resolve_actor_id(request.user)
@@ -259,10 +314,25 @@ class CorrectiveActionPhysicalVerifyView(CorrectiveActionViewMixin, generics.Gen
     serializer_class = CorrectiveActionPhysicalVerifySerializer
 
     def get_process_permission_class(self):
-        return HasProcessPermission.requiring("SAF_P_022")
+        return None
+
+    def _can_verify_action(self, action: CorrectiveAction) -> bool:
+        permission = HasProcessPermission.requiring("SAF_P_022")()
+        if permission.has_permission(self.request, self):
+            return True
+
+        actor_id = _resolve_actor_id(self.request.user).strip().upper()
+        role = normalized_authority_role(self.request.user)
+        verifier = str(action.verifier_user_id or "").strip().upper()
+        return actor_id == verifier or role == verifier or role in CORRECTIVE_ACTION_OFFICE_ROLES
 
     def post(self, request, *args, **kwargs):
         action = self.get_object()
+        if not self._can_verify_action(action):
+            raise PermissionDenied(
+                "Only the assigned verifier or authorized office user can record physical verification."
+            )
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         action.physical_verification_done = True

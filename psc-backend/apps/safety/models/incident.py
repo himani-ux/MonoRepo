@@ -21,11 +21,14 @@ INCIDENT_ACTIVE_STATES = (
     "READY_FOR_OFFICE_COMMENTS",
     "REWORK_REQUIRED",
     "OFFICE_COMMENTS_COMPLETED",
+    "REJECTED",
     "SUPERSEDED",
 )
 INCIDENT_RISK_BANDS = ("GREEN", "YELLOW", "RED")
 INCIDENT_IMO_CLASSIFIERS = ("SMC", "MC", "MI", "NOT_APPLICABLE")
 INCIDENT_INVESTIGATION_DEPTHS = ("SHALLOW", "MEDIUM", "DEEP")
+INCIDENT_OFFICE_NOTIFICATION_MODES = ("ON_CALL", "WHATSAPP", "EMAIL")
+INCIDENT_TRI_STATE_RESPONSES = ("YES", "NO", "NA")
 NEAR_MISS_SEVERITIES = ("HIGH", "MED", "LOW")
 NEAR_MISS_PLACES = ("AT_ANCHOR", "AT_SEA", "AT_PORT")
 
@@ -50,6 +53,7 @@ class Incident(BaseSafetyRecord):
         READY_FOR_OFFICE_COMMENTS = "READY_FOR_OFFICE_COMMENTS", "Ready for Office Comments"
         REWORK_REQUIRED = "REWORK_REQUIRED", "Rework Required"
         OFFICE_COMMENTS_COMPLETED = "OFFICE_COMMENTS_COMPLETED", "Office Comments Completed"
+        REJECTED = "REJECTED", "Rejected"
         SUPERSEDED = "SUPERSEDED", "Superseded"
 
     class RiskBand(models.TextChoices):
@@ -67,6 +71,15 @@ class Incident(BaseSafetyRecord):
         SHALLOW = "SHALLOW", "Shallow"
         MEDIUM = "MEDIUM", "Medium"
         DEEP = "DEEP", "Deep"
+
+    class OfficeNotificationMode(models.TextChoices):
+        ON_CALL = "ON_CALL", "On call"
+        WHATSAPP = "WHATSAPP", "On WhatsApp"
+        EMAIL = "EMAIL", "On email"
+
+    class VesselCondition(models.TextChoices):
+        LOADED = "LOADED", "Loaded"
+        BALLAST = "BALLAST", "Ballast"
 
     incident_number = models.CharField(max_length=32, unique=True)
     state = models.CharField(
@@ -99,6 +112,10 @@ class Incident(BaseSafetyRecord):
     )
     incident_type_id = models.IntegerField(null=True, blank=True)
     loss_type_primary_id = models.IntegerField(null=True, blank=True)
+    loss_type_secondary_id = models.IntegerField(null=True, blank=True)
+    loss_type_tertiary_id = models.IntegerField(null=True, blank=True)
+    loss_type_other = models.CharField(max_length=256, null=True, blank=True)
+    incident_type_other = models.CharField(max_length=128, null=True, blank=True)
     investigation_depth = models.CharField(
         max_length=8,
         choices=InvestigationDepth.choices,
@@ -109,8 +126,36 @@ class Incident(BaseSafetyRecord):
     reported_at = models.DateTimeField(null=True, blank=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    shore_assistance_required = models.BooleanField(null=True, blank=True)
+    vessel_location = models.CharField(max_length=128, null=True, blank=True)
+    vessel_location_detail = models.CharField(max_length=128, null=True, blank=True)
+    onboard_location = models.CharField(max_length=128, null=True, blank=True)
+    last_port = models.CharField(max_length=128, null=True, blank=True)
+    departure_date = models.DateField(null=True, blank=True)
+    vessel_condition = models.CharField(
+        max_length=16,
+        choices=VesselCondition.choices,
+        null=True,
+        blank=True,
+    )
     position_source = models.CharField(max_length=32, null=True, blank=True)
     position_daily_report_id = models.CharField(max_length=64, null=True, blank=True)
+    weather_visibility_id = models.UUIDField(null=True, blank=True)
+    weather_precipitation_id = models.UUIDField(null=True, blank=True)
+    weather_sea_state_id = models.UUIDField(null=True, blank=True)
+    weather_wind_scale_id = models.UUIDField(null=True, blank=True)
+    weather_wind_direction_id = models.UUIDField(null=True, blank=True)
+    weather_lighting_source_id = models.UUIDField(null=True, blank=True)
+    weather_current_direction_id = models.UUIDField(null=True, blank=True)
+    weather_current_strength_knots = models.TextField(null=True, blank=True)
+    weather_ambient_temperature_c = models.TextField(null=True, blank=True)
+    weather_ice_condition_onboard_id = models.UUIDField(null=True, blank=True)
+    weather_ice_condition_at_sea_id = models.UUIDField(null=True, blank=True)
+    weather_light_condition_id = models.UUIDField(null=True, blank=True)
+    risk_assessment_carried_out = models.CharField(max_length=8, null=True, blank=True)
+    toolbox_meeting_carried_out = models.CharField(max_length=8, null=True, blank=True)
+    permit_issued = models.CharField(max_length=8, null=True, blank=True)
+    activity_type = models.CharField(max_length=128, null=True, blank=True)
     narrative = models.TextField(null=True, blank=True)
     awaiting_daily_report_match = models.BooleanField(default=False)
     first_hour_checklist_done = models.BooleanField(default=False)
@@ -121,6 +166,13 @@ class Incident(BaseSafetyRecord):
     dpa_notified_at = models.DateTimeField(null=True, blank=True)
     fm_notified_at = models.DateTimeField(null=True, blank=True)
     office_notified_at = models.DateTimeField(null=True, blank=True)
+    office_notified = models.BooleanField(null=True, blank=True)
+    office_notification_mode = models.CharField(
+        max_length=16,
+        choices=OfficeNotificationMode.choices,
+        null=True,
+        blank=True,
+    )
     near_miss_priority = models.CharField(max_length=8, null=True, blank=True)
     near_miss_severity = models.CharField(max_length=8, null=True, blank=True)
     near_miss_place = models.CharField(max_length=16, null=True, blank=True)
@@ -130,6 +182,7 @@ class Incident(BaseSafetyRecord):
     near_miss_mscat_category_id = models.IntegerField(null=True, blank=True)
     near_miss_mscat_subcode_id = models.CharField(max_length=16, null=True, blank=True)
     near_miss_mscat_subcode_ids = models.TextField(null=True, blank=True)
+    near_miss_factor_causes = models.TextField(null=True, blank=True)
     near_miss_immediate_action = models.TextField(null=True, blank=True)
     near_miss_suggestion = models.TextField(null=True, blank=True)
     near_miss_root_cause_detail = models.TextField(null=True, blank=True)
@@ -155,6 +208,7 @@ class Incident(BaseSafetyRecord):
     dpa_accepted_by = models.CharField(max_length=64, null=True, blank=True)
     fm_approved_at = models.DateTimeField(null=True, blank=True)
     fm_approved_by = models.CharField(max_length=64, null=True, blank=True)
+    office_comment = models.TextField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     closure_reason = models.TextField(null=True, blank=True)
     linked_incident_id = models.UUIDField(null=True, blank=True)
@@ -204,6 +258,25 @@ class Incident(BaseSafetyRecord):
                 | Q(investigation_depth__in=INCIDENT_INVESTIGATION_DEPTHS)
                 | Q(schema_version__lt=INCIDENT_ENUM_TIGHTENED_SCHEMA_VERSION),
                 name="ck_vims_safety_incident_depth_schema_v2",
+            ),
+            models.CheckConstraint(
+                condition=Q(office_notification_mode__isnull=True)
+                | Q(office_notification_mode__in=INCIDENT_OFFICE_NOTIFICATION_MODES),
+                name="ck_vims_safety_incident_office_notification_mode",
+            ),
+            models.CheckConstraint(
+                condition=Q(risk_assessment_carried_out__isnull=True)
+                | Q(risk_assessment_carried_out__in=INCIDENT_TRI_STATE_RESPONSES),
+                name="ck_vims_safety_incident_risk_assessment",
+            ),
+            models.CheckConstraint(
+                condition=Q(toolbox_meeting_carried_out__isnull=True)
+                | Q(toolbox_meeting_carried_out__in=INCIDENT_TRI_STATE_RESPONSES),
+                name="ck_vims_safety_incident_toolbox_meeting",
+            ),
+            models.CheckConstraint(
+                condition=Q(permit_issued__isnull=True) | Q(permit_issued__in=INCIDENT_TRI_STATE_RESPONSES),
+                name="ck_vims_safety_incident_permit_issued",
             ),
             models.CheckConstraint(
                 condition=Q(near_miss_severity__isnull=True) | Q(near_miss_severity__in=NEAR_MISS_SEVERITIES),

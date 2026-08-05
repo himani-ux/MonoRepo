@@ -12,14 +12,17 @@ export default function SafetyNearMissCreatePage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(values: SafetyNearMissSubmitValues) {
+  async function handleSubmit(values: SafetyNearMissSubmitValues, highSeverityPhotoFile?: File | null) {
     if (isSubmitting) {
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const nearMiss = await safetyApi.createNearMiss(values);
+      const nearMiss = await safetyApi.createNearMiss({
+        ...values,
+        high_severity_photo_file: highSeverityPhotoFile ?? null,
+      });
       toast({
         title: "Near miss created successfully",
         description: "The near miss record has been refreshed and opened.",

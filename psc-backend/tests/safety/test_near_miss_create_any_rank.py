@@ -13,6 +13,7 @@ bootstrap_django()
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
+from apps.safety.models import NearMissCauseOption
 from apps.safety.views.near_miss import NearMissListCreateView
 
 
@@ -56,8 +57,9 @@ def build_payload(*, narrative: str) -> dict[str, object]:
         "narrative": narrative,
         "occurred_at": (timezone.now() - timedelta(minutes=10)).isoformat(),
         "near_miss_severity": "MED",
-        "near_miss_shell_tag": "Liveware",
+        "near_miss_shell_tag": "PPE",
         "near_miss_mscat_subcode_id": "10.01",
+        "near_miss_factor_causes": build_factor_causes_payload(),
         "near_miss_immediate_action": "The unsecured item was moved away from the work path.",
         "near_miss_suggestion": "Add a pre-watch loose gear check during rolling weather.",
         "reporter_device_fingerprint": "device-wiper-7",
@@ -66,6 +68,21 @@ def build_payload(*, narrative: str) -> dict[str, object]:
         "reporter_user_id": "wiper-7",
         "schema_version": 1,
     }
+
+
+def build_factor_causes_payload() -> list[dict[str, str]]:
+    rows = []
+    for factor in ("HUMAN", "VESSEL", "MANAGEMENT", "OTHER"):
+        immediate = NearMissCauseOption.objects.get(factor=factor, cause_stage=NearMissCauseOption.CauseStage.IMMEDIATE)
+        root = NearMissCauseOption.objects.get(factor=factor, cause_stage=NearMissCauseOption.CauseStage.ROOT)
+        rows.append(
+            {
+                "factor": factor,
+                "immediate_option_id": str(immediate.id),
+                "root_option_id": str(root.id),
+            }
+        )
+    return rows
 
 
 class NearMissCreateAnyRankTests(unittest.TestCase):
@@ -116,7 +133,8 @@ class NearMissCreateAnyRankTests(unittest.TestCase):
                 ),
                 "occurred_at": (timezone.now() - timedelta(minutes=10)).isoformat(),
                 "near_miss_severity": "LOW",
-                "near_miss_shell_tag": "Hardware",
+                "near_miss_shell_tag": "Maintenance",
+                "near_miss_factor_causes": build_factor_causes_payload(),
                 "near_miss_immediate_action": "The bracket was isolated and marked for inspection.",
                 "near_miss_suggestion": "Add bracket checks to the pre-cargo watch walk-around.",
                 "reporter_device_fingerprint": "device-wiper-ef90",
@@ -154,7 +172,7 @@ class NearMissCreateAnyRankTests(unittest.TestCase):
         payload.update(
             {
                 "near_miss_place": "AT_SEA",
-                "near_miss_category_tags": ["Safety", "Operational", "Environment"],
+                "near_miss_category_tags": ["PPE", "Maintenance", "Pollution"],
                 "near_miss_incident_type_ids": [1, 2, 3],
                 "near_miss_mscat_subcode_ids": ["10.01", "10.02", "10.03"],
             }
@@ -169,12 +187,13 @@ class NearMissCreateAnyRankTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["near_miss_place"], "AT_SEA")
-        self.assertEqual(response.data["near_miss_shell_tag"], "Safety")
-        self.assertEqual(response.data["near_miss_category_tags"], ["Safety", "Operational", "Environment"])
+        self.assertEqual(response.data["near_miss_shell_tag"], "PPE")
+        self.assertEqual(response.data["near_miss_category_tags"], ["PPE", "Maintenance", "Pollution"])
         self.assertEqual(str(response.data["incident_type_id"]), "1")
         self.assertEqual(response.data["near_miss_incident_type_ids"], [1, 2, 3])
-        self.assertEqual(response.data["near_miss_mscat_subcode_id"], "10.01")
-        self.assertEqual(response.data["near_miss_mscat_subcode_ids"], ["10.01", "10.02", "10.03"])
+        self.assertIsNone(response.data["near_miss_mscat_subcode_id"])
+        self.assertEqual(response.data["near_miss_mscat_subcode_ids"], [])
+        self.assertEqual(len(response.data["near_miss_factor_causes"]), 4)
 
     def test_create_rejects_more_than_three_near_miss_classifiers(self) -> None:
         payload = build_payload(
@@ -183,7 +202,7 @@ class NearMissCreateAnyRankTests(unittest.TestCase):
                 "the exposure before the item could shift into the access path during sea passage."
             )
         )
-        payload["near_miss_category_tags"] = ["Safety", "Operational", "Environment", "Training"]
+        payload["near_miss_category_tags"] = ["PPE", "Maintenance", "Pollution", "Navigation"]
         request = self.factory.post("/api/safety/near-miss/", payload, format="json")
         force_authenticate(
             request,

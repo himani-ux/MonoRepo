@@ -166,7 +166,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-REC-001 | Manual class snapshot PDF upload (no portal API) | REC | V1 | D-CERT-005, D-CERT-169 |
 | FEAT-CERT-REC-002 | Per-class parser modules (NK / KR / BV) | REC | V1 | D-CERT-005, §7.2 SSOT |
 | FEAT-CERT-REC-003 | Class snapshot text-extract first, with OCR fallback for PDFs that expose no text layer | REC | V1 | D-CERT-048, D-CERT-200 |
-| FEAT-CERT-REC-004 | Per-class date format whitelist (KR=ISO; NK+BV=DD Mon YYYY) | REC | V1 | D-CERT-049, D-CERT-049a |
+| FEAT-CERT-REC-004 | Per-class report date extraction is mandatory: KR `Printed on`, NK `Printed on`, BV `Generated on`; no upload-time fallback | REC | V1 | D-CERT-049, D-CERT-049a |
 | FEAT-CERT-REC-005 | 3-month upload cadence + 1-month lead alert (DPA-configurable) | REC | V1 | D-CERT-006 |
 | FEAT-CERT-REC-006 | Event-driven snapshot refresh prompt (14d grace) | REC | V1 | D-CERT-007 |
 | FEAT-CERT-REC-007 | SHA-256 dedup + re-process prompt | REC | V1 | D-CERT-051 |
@@ -182,7 +182,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-REC-017 | ClassCodeMapping versioned per edit | REC | V1 | D-CERT-061 |
 | FEAT-CERT-REC-018 | Schema version on `parsed_payload` | REC | V1 | D-CERT-062 |
 | FEAT-CERT-REC-019 | Parser SKIPS PSC/MoU + vessel particulars | REC | V1 | D-CERT-038, D-CERT-066 |
-| FEAT-CERT-REC-020 | Parser PARSES Conditions of Class → `vessel.conditions_of_class[]` | REC | V1 | D-CERT-066 |
+| FEAT-CERT-REC-020 | Parser PARSES only exact Conditions of Class content into Conditions of class review items; non-COC note/statutory/installation/memoranda sections are excluded | REC | V1 | D-CERT-066, D-CERT-207 |
 | FEAT-CERT-REC-021 | UTF-8 encoding; class symbols stripped | REC | V1 | D-CERT-067 |
 | FEAT-CERT-REC-022 | Reconciliation 3-panel UI (Matches / Mismatches / Unmapped) | REC | V1 | D-CERT-068 |
 | FEAT-CERT-REC-023 | Snapshot list filters + 25-row pagination + CSV export | REC | V1 | D-CERT-069 |
@@ -247,7 +247,7 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-PRT-003 | Vessel header block on every page | PRT | V1 | D-CERT-126, D-CERT-127 |
 | FEAT-CERT-PRT-004 | Company logo from shared endpoint (PSC Inspection pattern) | PRT | V1 | D-CERT-127 |
 | FEAT-CERT-PRT-005 | Logo size 30mm × 15mm top-left | PRT | V1 | D-CERT-127 |
-| FEAT-CERT-PRT-006 | Stored print identity with print_id, state hash, user, role, and UTC timestamp in DB/API/audit/history; normal visible PDFs print only `Printed by` | PRT | V1 | D-CERT-128, D-CERT-202 |
+| FEAT-CERT-PRT-006 | Stored print identity with print_id, state hash, user, role, and UTC timestamp in DB/API/audit/history; normal visible PDFs print only `Printed by`, and normal visible Excel workbooks omit print ID/scope/hash rows | PRT | V1 | D-CERT-128, D-CERT-202, D-CERT-212 |
 | FEAT-CERT-PRT-007 | `print_id` format `SQE-S633-<imo>-<yyyymmdd>-<seq>` for single-vessel artifacts; `SQE-S633-FLEET-<yyyymmdd>-<seq>` for fleet/multi-vessel artifacts | PRT | V1 | D-CERT-128; B-PRT-01 |
 | FEAT-CERT-PRT-008 | Empty-section banner ("no certs in this section") | PRT | V1 | D-CERT-129 |
 | FEAT-CERT-PRT-009 | Clean 10-column normal print PDF schema without validity-code column | PRT | V1 | D-CERT-130, D-CERT-202 |
@@ -259,21 +259,21 @@ First-use expansions applied once; re-occurrences use the acronym.
 | FEAT-CERT-PRT-015 | Status visualization = color + shape hybrid (B/W resilient) | PRT | V1 | D-CERT-135 |
 | FEAT-CERT-PRT-016 | 5-tier expiry urgency (>90 / ≤90 / ≤30 / ≤7 / ≤0 days) | PRT | V1 | D-CERT-136 |
 | FEAT-CERT-PRT-017 | English-only V1 (no multi-language) | PRT | V1 | D-CERT-137 |
-| FEAT-CERT-PRT-018 | Watermark scope (INTERNAL / AUDIT COPY / MASTER COPY / DRAFT) | PRT | V1 | D-CERT-138 |
+| FEAT-CERT-PRT-018 | Watermark scope retained for share/auditor/backend-compatible artifact paths; normal Print certs status UI submits no watermark | PRT | V1 | D-CERT-138, D-CERT-208, D-CERT-209 |
 | FEAT-CERT-PRT-019 | Digital signature indicator only (no wet-sig block) | PRT | V1 | D-CERT-139 |
-| FEAT-CERT-PRT-020 | 4 print scopes (per-vessel full / partial / per-section fleet-wide / custom) | PRT | V1 | D-CERT-140 |
+| FEAT-CERT-PRT-020 | Normal Print certs status uses current vessel plus one Certificate sections dropdown containing All sections plus section names; backend scope/custom ID compatibility retained | PRT | V1 | D-CERT-140, D-CERT-208, D-CERT-209, D-CERT-210, D-CERT-211 |
 | FEAT-CERT-PRT-021 | Per-section fleet-wide RBAC = DPA + FM only | PRT | V1 | D-CERT-141, D-CERT-142 |
-| FEAT-CERT-PRT-022 | Excel export = data-only + companion PDF (no live formulas) | PRT | V1 | D-CERT-141 |
+| FEAT-CERT-PRT-022 | Excel export = data-only + companion PDF (no live formulas); user-visible Excel omits internal print ID, scope, and state hash rows | PRT | V1 | D-CERT-141, D-CERT-212 |
 | FEAT-CERT-PRT-023 | Print RBAC matrix per scope × role | PRT | V1 | D-CERT-142 |
 | FEAT-CERT-PRT-024 | Soft-throttle >10/hr surfaced to FM dashboard | PRT | V1 | D-CERT-143 |
 | FEAT-CERT-PRT-025 | Sync ≤60s per-vessel; async 5min fleet-wide | PRT | V1 | D-CERT-144 |
 | FEAT-CERT-PRT-026 | Third-party deliverable = ZIP (manifest PDF + cert PDFs) | PRT | V1 | D-CERT-096, D-CERT-145 |
-| FEAT-CERT-PRT-027 | Master share-bundle (bulk/single select) | PRT | V1 | D-CERT-096 |
+| FEAT-CERT-PRT-027 | Master share-bundle section multi-select; backend-compatible custom certificate IDs retained | PRT | V1 | D-CERT-096, D-CERT-210 |
 | FEAT-CERT-PRT-028 | Bundle filename `VIMS_CertBundle_<vessel>_<yyyymmdd>_<print_id>.zip` | PRT | V1 | D-CERT-145 |
 | FEAT-CERT-PRT-029 | Single live template; immutable artifacts in audit log | PRT | V1 | D-CERT-146 |
 | FEAT-CERT-PRT-030 | Audit log granularity: hash + artifact refs (no row JSON dump) | PRT | V1 | D-CERT-147 |
 | FEAT-CERT-PRT-031 | Historical reprint via audit-log artifact + downloadable original Class Status PDF | PRT | V1 | D-CERT-148 |
-| FEAT-CERT-PRT-032 | Print delivery = browser download + auto-archive + optional email | PRT | V1 | D-CERT-149 |
+| FEAT-CERT-PRT-032 | Normal Print certs status delivery = browser download + auto-archive; optional email remains for share/backend-compatible generation | PRT | V1 | D-CERT-149, D-CERT-208, D-CERT-209 |
 | FEAT-CERT-PRT-033 | Hard-fail with support ticket + retry; no auto-retry | PRT | V1 | D-CERT-150 |
 | FEAT-CERT-NOTIF-001 | Reuse `master_notification` (in-app) + `email_dispatcher` (email) | NOTIF | V1 | D-CERT-151 |
 | FEAT-CERT-NOTIF-002 | Slack added to V1 (per-vessel + fleet office channels) | NOTIF | V1 | D-CERT-151 |

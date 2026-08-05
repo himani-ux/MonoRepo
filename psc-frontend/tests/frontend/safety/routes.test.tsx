@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { SafetySidebarGroup } from "../../../src/components/safety/shared/safety-sidebar-group";
@@ -9,7 +9,7 @@ import { safetyRoutes } from "../../../src/routes/safety";
 describe("Safety route scaffold", () => {
   it("renders /safety/incidents when the user has SAF_F_001", async () => {
     const router = createMemoryRouter(safetyRoutes, {
-      initialEntries: ["/safety/incidents"],
+      initialEntries: ["/incidents"],
     });
 
     render(
@@ -25,7 +25,7 @@ describe("Safety route scaffold", () => {
 
   it("renders /safety/incidents/create when the user has SAF_F_001", async () => {
     const router = createMemoryRouter(safetyRoutes, {
-      initialEntries: ["/safety/incidents/create"],
+      initialEntries: ["/incidents/create"],
     });
 
     render(
@@ -43,7 +43,7 @@ describe("Safety route scaffold", () => {
 
   it("renders /safety/incidents/:id/phase-2 when the user has SAF_F_001", async () => {
     const router = createMemoryRouter(safetyRoutes, {
-      initialEntries: ["/safety/incidents/42/phase-2"],
+      initialEntries: ["/incidents/42/phase-2"],
     });
 
     render(
@@ -65,5 +65,21 @@ describe("Safety route scaffold", () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("keeps auditor export in the sidebar without showing the broad admin item", () => {
+    render(
+      <SafetyAuthProvider value={{ formIds: ["SAF_F_018", "SAF_F_020"] }}>
+        <MemoryRouter>
+          <SafetySidebarGroup />
+        </MemoryRouter>
+      </SafetyAuthProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Auditor Export" })).toHaveAttribute(
+      "href",
+      "/safety/admin/auditor-export",
+    );
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
   });
 });

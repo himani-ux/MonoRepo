@@ -272,7 +272,7 @@ Steps:
 4. enter the reinspection date
 5. update the action code for each selected deficiency
 6. add notes if needed
-7. optionally attach the follow-up report
+7. optionally attach up to three follow-up report PDFs
 8. confirm and submit
 
 Current follow-up rules:
@@ -282,15 +282,16 @@ Current follow-up rules:
 - reinspection date cannot be in the future
 - reinspection date cannot be before the original inspection date
 - at least one deficiency update is required
-- follow-up report is optional
-- if follow-up report is uploaded, description is mandatory
-- follow-up report must be PDF only
-- follow-up report maximum size is 5 MB
+- follow-up report PDFs are optional
+- up to three follow-up report PDFs can be attached
+- if any follow-up report PDF is uploaded, description is mandatory
+- follow-up report attachments must be PDF only
+- each follow-up report PDF maximum size is 5 MB
 
 What happens after follow-up submission:
 
 - selected deficiency action codes are updated
-- follow-up report is stored under the same inspection
+- follow-up report PDFs are stored under the same inspection
 - activity history records the follow-up event
 
 5.11 Download all CARs for one inspection

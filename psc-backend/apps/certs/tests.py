@@ -4,9 +4,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
 from django.urls import resolve, reverse
 from contextlib import nullcontext
+from datetime import datetime, timezone
 from decimal import Decimal
 from django.db import DatabaseError
 from io import BytesIO
+import importlib
+import inspect
 import json
 from pathlib import Path
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -43,15 +46,38 @@ from apps.certs.services.parsers.bv import BVClassParser
 from apps.certs.services.parsers.kr import KRClassParser
 from apps.certs.services.parsers.nk import NKClassParser
 from apps.certs.services.pdf_blob_storage import resolve_pdf_blob_path
+from apps.certs.services.pdf_blob_repository import PdfBlobRepository
 from apps.certs.services.print_delivery import PrintArtifactDeliveryService
+from apps.certs.services.excel_renderer import render_print_excel
 from apps.certs.services.pdf_renderer import ReportLabPdfRenderer
-from apps.certs.services.reconciliation import build_reconciliation_flags, dispatch_parser_anomaly_notifications
+from apps.certs.services.reconciliation import (
+    ReconciliationRepository,
+    build_reconciliation_flags,
+    dispatch_parser_anomaly_notifications,
+)
 from apps.certs.services.notification_dispatcher import CertNotificationRecipient
+from apps.certs.services.audit_log_repository import AuditLogRepository
+from apps.certs.services.snapshot_repository import ClassSnapshotRepository
+from apps.certs.services.settings_repository import SettingsRepository
+from apps.certs.services.slack_relay import (
+    CertSlackRelay,
+    DEFAULT_CERTS_SLACK_CHANNEL,
+    DEFAULT_DPA_SLACK_CHANNEL,
+    DEFAULT_MARINE_SLACK_CHANNEL,
+    DEFAULT_OFFICE_SLACK_CHANNEL,
+    DEFAULT_TECHNICAL_SLACK_CHANNEL,
+)
+from apps.certs.services.vessel_dashboard import _serialize_snapshot
+from apps.certs.services import ocr_pipeline
 from apps.certs.services.tracked_item_repository import TrackedItemRepository
 from apps.certs.services.audit_log import record_audit_event
-from apps.certs.serializers.print import serialize_print_artifact
-from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer
-from apps.certs.views import print_views, reconciliation_views, snapshot_views
+from apps.certs.serializers.print import ShareBundleRequestSerializer, serialize_print_artifact
+from apps.certs.serializers.tracked_item import TrackedItemWriteSerializer, serialize_tracked_item
+from apps.certs.views import notification_views, print_views, reconciliation_views, snapshot_views, tracked_item_views
+
+notification_compat_migration = importlib.import_module(
+    "apps.certs.migrations.0005_master_notification_certs_columns"
+)
 
 
 class CertsAppRegistrationTests(SimpleTestCase):
@@ -66,9 +92,50 @@ class CertsAppRegistrationTests(SimpleTestCase):
             "print-artifact-download",
         )
         self.assertEqual(
+            reverse("certs:tracked-item-reparse-pdf", kwargs={"tracked_item_id": "tracked-1"}),
+            "/api/certs/tracked-items/tracked-1/reparse-pdf/",
+        )
+        self.assertEqual(
+            reverse("certs:class-snapshot-pdf-view", kwargs={"snapshot_id": "11111111-1111-1111-1111-111111111111"}),
+            "/api/certs/class-snapshots/11111111-1111-1111-1111-111111111111/pdf/view/",
+        )
+        self.assertEqual(
+            resolve("/api/certs/class-snapshots/BE1F386E-A689-F111-ADEC-FDB8CC7078D1/pdf/view/").url_name,
+            "class-snapshot-pdf-view",
+        )
+        self.assertEqual(
+            resolve("/api/certs/audit-log/1080624C-3C8B-F111-ADEC-FDB8CC7078D1/").url_name,
+            "audit-log-detail",
+        )
+        self.assertEqual(
             reverse("certs-auditor:signup", kwargs={"token": "sample"}),
             "/api/auditor/signup/sample/",
         )
+
+
+class CertSlackRelayTests(SimpleTestCase):
+    def test_builtin_certs_slack_routes_use_production_channel_id(self):
+        self.assertEqual(DEFAULT_CERTS_SLACK_CHANNEL, "C0BMCASMNKS")
+        self.assertEqual(DEFAULT_OFFICE_SLACK_CHANNEL, "C0BMCASMNKS")
+        self.assertEqual(DEFAULT_DPA_SLACK_CHANNEL, "C0BMCASMNKS")
+        self.assertEqual(DEFAULT_TECHNICAL_SLACK_CHANNEL, "C0BMCASMNKS")
+        self.assertEqual(DEFAULT_MARINE_SLACK_CHANNEL, "C0BMCASMNKS")
+
+    def test_missing_slack_token_reports_failed_delivery_to_vims_certs_channel(self):
+        with patch.dict("os.environ", {}, clear=True):
+            relay = CertSlackRelay()
+
+        status = relay.send_office_notification(
+            channel="",
+            title="Cert alert",
+            message="Certificate requires review.",
+            payload={"certRowId": "cert-1"},
+        )
+
+        self.assertEqual(status["channel"], "slack")
+        self.assertEqual(status["status"], "failed")
+        self.assertEqual(status["slackChannel"], "C0BMCASMNKS")
+        self.assertEqual(status["error"], "SLACK_BOT_TOKEN not configured")
 
 
 class CatalogRepositoryPaginationTests(TestCase):
@@ -97,6 +164,94 @@ class TrackedItemRepositoryFilterTests(TestCase):
         self.assertIn("t.approval_state = %s", cursor.executed[0][0])
         self.assertIn("t.approval_state = %s", cursor.executed[1][0])
         self.assertEqual(cursor.executed[0][1], ["pending_master_approval"])
+
+    def test_list_items_uses_bounded_sql_pagination_when_requested(self):
+        cursor = _FakeTrackedItemCursor(count=2754)
+
+        with patch("apps.certs.services.tracked_item_repository.connection.cursor", return_value=cursor):
+            page = TrackedItemRepository().list_items(page=3, page_size=250)
+
+        self.assertEqual(page.count, 2754)
+        self.assertEqual(page.page, 3)
+        self.assertEqual(page.page_size, 100)
+        self.assertIn("OFFSET %s ROWS FETCH NEXT %s ROWS ONLY", cursor.executed[1][0])
+        self.assertEqual(cursor.executed[1][1][-2:], [200, 100])
+
+
+class TrackedItemSerializerPerformanceTests(SimpleTestCase):
+    def test_lightweight_list_serialization_skips_principal_display_lookup(self):
+        row = _tracked_item_serializer_row()
+
+        with patch("apps.certs.serializers.tracked_item.resolve_principal_display_name") as resolver:
+            serialized = serialize_tracked_item(row, include_display_names=False)
+
+        resolver.assert_not_called()
+        self.assertEqual(serialized["createdBy"], "seed-user")
+        self.assertIsNone(serialized["createdByDisplay"])
+
+
+class CertsListPayloadRepositoryTests(TestCase):
+    def test_class_snapshot_list_omits_parsed_payload_json(self):
+        cursor = _FakeRepositoryListCursor(count=7)
+
+        with patch("apps.certs.services.snapshot_repository.connection.cursor", return_value=cursor):
+            ClassSnapshotRepository().list_snapshots(page=1, page_size=25)
+
+        list_sql = cursor.executed[1][0]
+        self.assertIn("CAST(NULL AS NVARCHAR(MAX)) AS parsed_payload_json", list_sql)
+        self.assertNotIn("s.parsed_payload_json, s.parsed_payload_schema_version", list_sql)
+
+    def test_reconciliation_run_list_omits_flags_json(self):
+        cursor = _FakeRepositoryListCursor(count=7)
+
+        with patch("apps.certs.services.reconciliation.connection.cursor", return_value=cursor):
+            ReconciliationRepository().list_runs(page=1, page_size=25)
+
+        list_sql = cursor.executed[1][0]
+        self.assertNotIn("r.flags_json", list_sql)
+        self.assertIn("r.notifications_sent_json", list_sql)
+
+    def test_audit_log_list_omits_large_json_columns(self):
+        cursor = _FakeRepositoryListCursor(count=626)
+
+        with patch("apps.certs.services.audit_log_repository.connection.cursor", return_value=cursor):
+            AuditLogRepository().list_events(filters={"page": 1, "pageSize": 25}, vessel_scope=None)
+
+        list_sql = cursor.executed[1][0]
+        self.assertIn("CAST(NULL AS NVARCHAR(MAX)) AS before_json", list_sql)
+        self.assertIn("CAST(NULL AS NVARCHAR(MAX)) AS after_json", list_sql)
+        self.assertIn("CAST(NULL AS NVARCHAR(MAX)) AS event_metadata", list_sql)
+
+
+class CertsSettingsRepositoryTests(TestCase):
+    def test_slack_routes_use_vesseldata_brownfield_column_names(self):
+        cursor = _FakeRepositoryListCursor()
+
+        with patch("apps.certs.services.settings_repository.connection.cursor", return_value=cursor):
+            SettingsRepository().list_slack_routes()
+
+        sql = cursor.executed[0][0]
+        self.assertIn("v.vesselName AS vessel_name", sql)
+        self.assertIn("v.imoNumber AS imo_number", sql)
+        self.assertNotIn("v.vessel_name", sql)
+        self.assertNotIn("v.imo_number", sql)
+
+
+class CertNotificationListPaginationTests(SimpleTestCase):
+    def test_notification_list_uses_sql_pagination(self):
+        cursor = _FakeRepositoryListCursor(count=626)
+        user = SimpleNamespace(is_authenticated=True, user_id="office-user")
+        request = APIRequestFactory().get("/api/certs/notifications/?page=2&page_size=25")
+        force_authenticate(request, user=user)
+
+        with patch("apps.certs.views.notification_views.connection", SimpleNamespace(vendor="microsoft", cursor=lambda: cursor)):
+            response = notification_views.CertNotificationListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["pagination"]["total_count"], 626)
+        self.assertEqual(response.data["pagination"]["total_pages"], 26)
+        self.assertIn("OFFSET %s ROWS FETCH NEXT %s ROWS ONLY", cursor.executed[1][0])
+        self.assertEqual(cursor.executed[1][1][-2:], [25, 25])
 
 
 class TrackedItemApprovalAuthorityTests(SimpleTestCase):
@@ -164,6 +319,31 @@ class AuditLogWriteTests(SimpleTestCase):
         self.assertNotIn("entityRef", metadata)
 
 
+class MasterNotificationCompatibilityMigrationTests(SimpleTestCase):
+    def test_migration_guards_every_certs_master_notification_column(self):
+        required_columns = {
+            "module_code",
+            "record_id",
+            "recipient_ref",
+            "notification_kind",
+            "title",
+            "message",
+            "delivery_channel",
+            "payload_json",
+            "created_at",
+        }
+
+        migration_columns = {
+            column_name
+            for column_name, _column_definition in notification_compat_migration.MASTER_NOTIFICATION_CERTS_COLUMNS
+        }
+        migration_source = inspect.getsource(notification_compat_migration.add_master_notification_certs_columns)
+
+        self.assertEqual(migration_columns, required_columns)
+        self.assertIn("OBJECT_ID", migration_source)
+        self.assertIn("COL_LENGTH", migration_source)
+
+
 class PdfBlobStoragePathTests(SimpleTestCase):
     def test_resolves_pdf_blob_path_inside_upload_root(self):
         with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root):
@@ -200,6 +380,35 @@ class PrintArtifactSerializationTests(SimpleTestCase):
             serialized["downloadUrls"]["zip"],
             "/api/certs/print/artifacts/SQE-S633-TEST-001/download/zip/",
         )
+
+
+class ShareBundleSerializerTests(SimpleTestCase):
+    def test_accepts_sections_without_certificate_ids(self):
+        serializer = ShareBundleRequestSerializer(
+            data={
+                "vesselIds": ["11111111-1111-1111-1111-111111111111"],
+                "sections": ["STATUTORY"],
+                "customCertIds": [],
+                "recipientEmail": "agent@example.com",
+            }
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["scope"], "share_bundle")
+        self.assertEqual(serializer.validated_data["sections"], ["STATUTORY"])
+        self.assertEqual(serializer.validated_data["customCertIds"], [])
+
+    def test_requires_sections_or_certificate_ids(self):
+        serializer = ShareBundleRequestSerializer(
+            data={
+                "vesselIds": ["11111111-1111-1111-1111-111111111111"],
+                "sections": [],
+                "customCertIds": [],
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("sections", serializer.errors)
 
 
 class PrintArtifactDeliveryTests(SimpleTestCase):
@@ -330,6 +539,136 @@ class PrintArtifactDeliveryTests(SimpleTestCase):
             response.close()
 
 
+class TrackedItemPdfReparseViewTests(SimpleTestCase):
+    def test_reparse_active_pdf_updates_ocr_payload_and_auto_fields(self):
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="OFFICE",
+            role="DPA",
+            form_ids=["CERT_F_002"],
+            process_ids=["CERT_P_001"],
+            has_global_vessel_access=True,
+        )
+        request = APIRequestFactory().post(
+            "/api/certs/tracked-items/tracked-1/reparse-pdf/",
+            data={"context": "office", "reason": "Read the uploaded PDF again."},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        ocr_payload = {
+            "engine": DEFAULT_OCR_ENGINE_NAME,
+            "status": "processed",
+            "fields": {
+                "certificate_number": {"value": "CERT-NEW", "confidence": 0.99, "mode": "auto_accept"},
+                "expiry_date": {"value": "2030-07-24", "confidence": 0.98, "mode": "auto_accept"},
+            },
+        }
+        item_before = _tracked_item_test_row(status="pending_first_upload", certificate_number=None, expiry_date=None)
+        item_after = _tracked_item_test_row(status="ok", certificate_number="CERT-NEW", expiry_date="2030-07-24", version=2)
+
+        class FakeTrackedItemRepository:
+            def __init__(self):
+                self.update_values = None
+
+            def get_item(self, tracked_item_id):
+                return item_before if tracked_item_id == "tracked-1" else None
+
+            def update_item(self, tracked_item_id, values, *, actor_id):
+                self.update_values = values
+                self.actor_id = actor_id
+                return item_before, item_after
+
+        class FakePdfRepository:
+            def __init__(self, before, after):
+                self.before = before
+                self.after = after
+                self.updated_payload = None
+
+            def get_blob(self, blob_id):
+                return self.before if blob_id == "blob-1" else None
+
+            def update_ocr_result(self, blob_id, payload):
+                self.updated_payload = payload
+                return self.after
+
+        with tempfile.TemporaryDirectory() as upload_root, override_settings(UPLOAD_BASE_PATH=upload_root):
+            relative_path = "certs/vessels/vessel-1/tracked-items/tracked-1/certificate.pdf"
+            _write_upload_blob(upload_root, relative_path, b"%PDF-1.4")
+            blob_before = _pdf_blob_test_row(blob_storage_path=relative_path, ocr_payload_json={})
+            blob_after = _pdf_blob_test_row(blob_storage_path=relative_path, ocr_payload_json=ocr_payload)
+            fake_repository = FakeTrackedItemRepository()
+            fake_pdf_repository = FakePdfRepository(blob_before, blob_after)
+
+            with (
+                patch.object(tracked_item_views, "repository", fake_repository),
+                patch.object(tracked_item_views, "pdf_repository", fake_pdf_repository),
+                patch.object(tracked_item_views, "process_cert_pdf", return_value=ocr_payload) as process_pdf,
+                patch.object(tracked_item_views, "record_audit_event") as audit,
+                patch.object(tracked_item_views, "record_cert_change_log") as change_log,
+                patch.object(tracked_item_views, "record_approval_event") as approval_event,
+                patch.object(tracked_item_views.transaction, "atomic", return_value=nullcontext()),
+            ):
+                response = tracked_item_views.TrackedItemReparsePdfView.as_view()(request, tracked_item_id="tracked-1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["trackedItem"]["certificateNumber"], "CERT-NEW")
+        self.assertEqual(response.data["pdfBlob"]["id"], "blob-1")
+        self.assertEqual(response.data["ocrPayload"], ocr_payload)
+        process_pdf.assert_called_once()
+        self.assertEqual(process_pdf.call_args.kwargs["context"], "office")
+        self.assertEqual(fake_pdf_repository.updated_payload, ocr_payload)
+        self.assertEqual(fake_repository.update_values["certificateNumber"], "CERT-NEW")
+        self.assertEqual(fake_repository.update_values["expiryDate"], "2030-07-24")
+        self.assertEqual(fake_repository.update_values["status"], "ok")
+        self.assertFalse(fake_repository.update_values["pdfMissing"])
+        self.assertEqual(audit.call_count, 2)
+        self.assertEqual(change_log.call_count, 1)
+        approval_event.assert_not_called()
+
+
+class PdfBlobRepositoryTests(SimpleTestCase):
+    def test_duplicate_sha_lookup_only_blocks_active_pdf_versions(self):
+        class FakeCursor:
+            description = [("blob_id",)]
+
+            def __init__(self):
+                self.sql = ""
+                self.params = None
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def execute(self, sql, params):
+                self.sql = sql
+                self.params = params
+
+            def fetchone(self):
+                return None
+
+        class FakeConnection:
+            vendor = "microsoft"
+
+            def __init__(self):
+                self.cursor_instance = FakeCursor()
+
+            def cursor(self):
+                return self.cursor_instance
+
+        fake_connection = FakeConnection()
+        with patch("apps.certs.services.pdf_blob_repository.connection", fake_connection):
+            PdfBlobRepository().get_blob_for_tracked_item_sha(
+                tracked_item_id="tracked-1",
+                content_sha256="same-sha",
+            )
+
+        self.assertIn("AND is_active = 1", fake_connection.cursor_instance.sql)
+        self.assertEqual(fake_connection.cursor_instance.params, ["tracked-1", "same-sha"])
+
+
 class ShareBundleManifestRendererTests(SimpleTestCase):
     def test_manifest_removes_internal_header_footer_and_uses_printed_by_label(self):
         result = ReportLabPdfRenderer().render_share_bundle_manifest(
@@ -420,6 +759,52 @@ class PrintArtifactRendererTests(SimpleTestCase):
         self.assertNotIn("User:", text)
 
 
+class PrintArtifactExcelRendererTests(SimpleTestCase):
+    def test_print_excel_omits_internal_metadata_rows(self):
+        content = render_print_excel(
+            print_id="SQE-S633-TEST-001",
+            rows=[
+                {
+                    "vessel_name": "MV Test",
+                    "catalog_section_name": "Statutory",
+                    "catalog_display_name": "Safety Management Certificate",
+                    "catalog_print_order": 1,
+                    "certificate_number": "SMC-001",
+                    "issuing_authority": "Class Society",
+                    "issue_date": "2026-01-01",
+                    "expiry_date": "2031-01-01",
+                    "last_done_date": "2026-01-01",
+                    "next_due_date": "2031-01-01",
+                    "validity_type": "full",
+                    "status": "valid",
+                }
+            ],
+            payload={"scope": "per_vessel_full"},
+            system_state_hash="ABC12345",
+        )
+
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(BytesIO(content), data_only=True)
+        worksheet = workbook.active
+        visible_values = [
+            str(cell.value)
+            for row in worksheet.iter_rows()
+            for cell in row
+            if cell.value not in (None, "")
+        ]
+
+        self.assertIn("SQE S 633", visible_values)
+        self.assertIn("Certificate / Survey", visible_values)
+        self.assertIn("Safety Management Certificate", visible_values)
+        self.assertNotIn("Print ID", visible_values)
+        self.assertNotIn("SQE-S633-TEST-001", visible_values)
+        self.assertNotIn("Scope", visible_values)
+        self.assertNotIn("per_vessel_full", visible_values)
+        self.assertNotIn("System state hash", visible_values)
+        self.assertNotIn("ABC12345", visible_values)
+
+
 class ClassSnapshotUploadParsingTests(SimpleTestCase):
     def test_upload_immediately_reparses_and_returns_run_ready_snapshot(self):
         vessel_id = "11111111-1111-1111-1111-111111111111"
@@ -479,7 +864,55 @@ class ClassSnapshotUploadParsingTests(SimpleTestCase):
         self.assertEqual(response.data["parseStatus"], "success")
         self.assertEqual(response.data["reconciliationRunId"], run_id)
         create_snapshot.assert_called_once()
+        self.assertEqual(str(create_snapshot.call_args.kwargs["printed_on_date"]), "2026-07-20")
         parser_worker.assert_called_once_with(snapshot_id, repository=snapshot_views.repository)
+
+    def test_class_snapshot_pdf_view_streams_uploaded_snapshot_for_accessible_vessel(self):
+        vessel_id = "11111111-1111-1111-1111-111111111111"
+        snapshot_id = "22222222-2222-2222-2222-222222222222"
+        blob_id = "44444444-4444-4444-4444-444444444444"
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="VESSEL",
+            role_name="MASTER",
+            rank="MASTER",
+            form_ids=["CERT_F_002"],
+            process_ids=[],
+            vessel_id=vessel_id,
+        )
+        request = APIRequestFactory().get(f"/api/certs/class-snapshots/{snapshot_id}/pdf/view/")
+        force_authenticate(request, user=user)
+
+        with tempfile.TemporaryDirectory() as upload_dir:
+            relative_path = Path("certs") / "vessels" / vessel_id / "class-snapshots" / "class-status.pdf"
+            absolute_path = Path(upload_dir) / relative_path
+            absolute_path.parent.mkdir(parents=True, exist_ok=True)
+            absolute_path.write_bytes(b"%PDF-1.4\n% class status")
+            snapshot = _class_snapshot_row(
+                snapshot_id=snapshot_id,
+                vessel_id=vessel_id,
+                blob_id=blob_id,
+                parse_status="success",
+                reconciliation_run_id="33333333-3333-3333-3333-333333333333",
+            )
+            blob = {
+                "blob_id": blob_id,
+                "blob_storage_path": relative_path.as_posix(),
+                "filename": "class-status.pdf",
+            }
+
+            with (
+                override_settings(UPLOAD_BASE_PATH=Path(upload_dir)),
+                patch.object(snapshot_views.repository, "get_snapshot", return_value=snapshot),
+                patch.object(snapshot_views.pdf_repository, "get_blob", return_value=blob),
+            ):
+                response = snapshot_views.ClassSnapshotPdfInlineView.as_view()(request, snapshot_id=snapshot_id)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertIn("inline", response["Content-Disposition"])
+            self.assertIn("class-status.pdf", response["Content-Disposition"])
+            response.close()
 
 
 class ReconciliationMasterMessageApiTests(SimpleTestCase):
@@ -572,6 +1005,7 @@ class ClassSnapshotParserAndReconciliationSmokeTests(SimpleTestCase):
         ocr_text = """KOREAN REGISTER
 Ship Name EAST AYUTTHAYA Work ID VANS004726
 Class No. 1000010 IMO No. 9584293
+Printed on 07-Jul-2026
 Certificates
 Class Certificates
 Cargo Gear(CG2) Certificate CG2 Full 2026-02-27 2031-02-26 CL26001506350
@@ -591,7 +1025,273 @@ Load Line Certificate ILL Full 2025-08-11 2030-07-11 0N25015926559
         self.assertEqual(parsed.payload["text_extraction"]["engine"], "paddleocr_fallback")
         self.assertEqual(parsed.payload["vessel"]["name"], "EAST AYUTTHAYA")
         self.assertEqual(parsed.payload["vessel"]["imo"], "9584293")
+        self.assertEqual(parsed.payload["printed_on_date"], "2026-07-07")
         self.assertGreaterEqual(len(parsed.payload["rows"]), 2)
+
+    def test_class_snapshot_parser_requires_pdf_printed_date(self):
+        ocr_text = """KOREAN REGISTER
+Ship Name EAST AYUTTHAYA Work ID VANS004726
+Class No. 1000010 IMO No. 9584293
+Certificates
+Class Certificates
+Cargo Gear(CG2) Certificate CG2 Full 2026-02-27 2031-02-26 CL26001506350
+"""
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf") as pdf_file:
+            with (
+                patch("pdfplumber.open", return_value=_EmptyPdfPlumberDocument(page_count=3)),
+                patch("apps.certs.services.parsers.base.extract_pdf_image_ocr_text", return_value=ocr_text),
+                self.assertRaisesRegex(ClassSnapshotParseError, "printed/generated date"),
+            ):
+                KRClassParser().parse(pdf_file.name)
+
+    def test_class_snapshot_parser_uses_manual_report_date_only_when_pdf_date_is_unreadable(self):
+        text = """KOREAN REGISTER
+VESSEL STATUS FOR SHIP'S OWNER EAST AYUTTHAYA Class No : 1000010 IMO No : 9584293
+Certificates
+Class Certificates
+Classification Certificate(Full) CC Full 2025-08-11 2030-07-11 CL25004603552
+"""
+
+        with patch(
+            "apps.certs.services.parsers.base.extract_pdf_text",
+            return_value=ExtractedClassSnapshotText(text, 19, "pdfplumber"),
+        ):
+            parsed = KRClassParser().parse("class-status.pdf", printed_on_date="2026-07-20")
+
+        self.assertEqual(parsed.payload["printed_on_date"], "2026-07-20")
+        self.assertEqual(parsed.payload["printed_on_date_source"], "manual")
+
+    def test_kr_parser_reads_printed_date_from_first_ocr_page(self):
+        self.assertEqual(KRClassParser.ocr_page_numbers, (1, 5, 6, 7, 8, 9))
+
+        payload = KRClassParser().parse_text(
+            """KOREAN REGISTER
+VESSEL STATUS FOR SHIP'S OWNER EAST AYUTTHAYA Class No : 1000010 IMO No : 9584293
+Printed on 07-Jul-2026
+Certificates
+Class Certificates
+Classification Certificate(Full) CC Full 2025-08-11 2030-07-11 CL25004603552
+""",
+            page_count=19,
+        )
+
+        self.assertEqual(payload["printed_on_date"], "2026-07-07")
+
+    def test_kr_parser_reads_only_class_conditions(self):
+        payload = KRClassParser().parse_text(
+            """KOREAN REGISTER
+VESSEL STATUS FOR SHIP'S OWNER EAST AYUTTHAYA Class No : 1000010 IMO No : 9584293
+Printed on 07-Jul-2026
+C.1 2026-07-01 2026-08-13 KRREPORT001 Class
+Auxiliary Boiler automation system repair/replacement condition
+C.2 2026-07-01 2026-09-01 KRREPORT002 Statutory
+Statutory note that should not appear as Condition of Class
+Actionable Note
+Actionable note that should not appear as Condition of Class
+Informative Notes
+None
+""",
+            page_count=19,
+        )
+
+        self.assertEqual(payload["printed_on_date"], "2026-07-07")
+        self.assertEqual(len(payload["conditions_of_class"]), 1)
+        condition = payload["conditions_of_class"][0]
+        self.assertEqual(condition["id"], "C.1")
+        self.assertEqual(condition["section"], "Condition of Class")
+        self.assertEqual(condition["due_date"], "2026-08-13")
+        self.assertIn("Auxiliary Boiler", condition["text"])
+        self.assertFalse(any("Statutory note" in condition["text"] for condition in payload["conditions_of_class"]))
+        self.assertFalse(any("Actionable note" in condition["text"] for condition in payload["conditions_of_class"]))
+
+    def test_nk_parser_reads_condition_of_class_with_due_date(self):
+        payload = NKClassParser().parse_text(
+            """NK-SHIPS Information Service
+SFYC ARAYA Class No. NK 107011 IMO No. 9487043
+Printed on 27.Jul.2026
+Survey Status:: Class
+Hull Annual Survey 29 Jul 2026
+Condition & Note
+Condition of Class
+The malfunctioned Auxiliary Boiler automation system is to be repaired/replaced at the owner earliest convenience
+but no later than the below mentioned due date.
+(DueDate: 13 Aug 2026 )
+Note
+Nil.
+""",
+            page_count=22,
+        )
+
+        self.assertEqual(payload["printed_on_date"], "2026-07-27")
+        self.assertEqual(len(payload["conditions_of_class"]), 1)
+        condition = payload["conditions_of_class"][0]
+        self.assertEqual(condition["section"], "Condition of Class")
+        self.assertEqual(condition["due_date"], "2026-08-13")
+        condition_rows = [row for row in payload["rows"] if row["row_type"] == "condition"]
+        self.assertEqual(condition_rows[0]["source_section"], "Condition of Class")
+
+    def test_nk_parser_ignores_non_class_condition_sections(self):
+        payload = NKClassParser().parse_text(
+            """NK-SHIPS Information Service
+SFYC ARAYA Class No. NK 107011 IMO No. 9487043
+Printed on 27.Jul.2026
+Condition & Note
+Condition of Class
+Nil.
+Condition of Installation
+Installation condition that should not appear as Condition of Class
+(DueDate: 13 Aug 2026 )
+Condition of Statutory Survey
+Statutory survey condition that should not appear as Condition of Class
+(DueDate: 14 Aug 2026 )
+Note
+Nil.
+""",
+            page_count=22,
+        )
+
+        self.assertEqual(payload["printed_on_date"], "2026-07-27")
+        self.assertEqual(payload["conditions_of_class"], [])
+        self.assertFalse(any(row["row_type"] == "condition" for row in payload["rows"]))
+
+    def test_bv_parser_ignores_memoranda_when_conditions_of_class_is_empty(self):
+        payload = BVClassParser().parse_text(
+            """MOVE Fleet in Service Survey Status Report
+Ship name: YC FORTITUDE BV Nr: 25272W IMO Number: 9587178
+Generated on 27 Jul 2026 Page 3 / 4
+Conditions of Class / Statutory Recommendations
+None
+ISM Code Non-Conformities
+None
+Class Memoranda
+Issued Description of Memoranda
+07 Sep 2024 The following damages found on the propeller blade are to be repaired by owner not later than next dry docking survey.
+07 Sep 2024 Permanent engrave for BV letter at plimsol marking to be carried out at next dry-docking.
+Statutory Memoranda
+Issued Description of Statutory Memoranda
+07 Sep 2024 Sampling point shall be fitted not later than the first renewal survey of IAPP certificate.
+""",
+            page_count=20,
+        )
+
+        self.assertEqual(payload["printed_on_date"], "2026-07-27")
+        self.assertEqual(payload["conditions_of_class"], [])
+        self.assertFalse(any(row["row_type"] == "condition" for row in payload["rows"]))
+
+    def test_reconciliation_surfaces_conditions_in_dedicated_review_bucket(self):
+        result = build_reconciliation_flags(
+            parsed_payload={
+                "rows": [
+                    {
+                        "class_society": "NK",
+                        "class_code_or_name": "NK-CONDITION-OF-CLASS-1",
+                        "source_section": "Condition of Class",
+                        "row_type": "condition",
+                        "raw_text": "Repair boiler automation system.",
+                        "due_date": "2026-08-13",
+                        "confidence": 1.0,
+                    }
+                ]
+            },
+            tracked_items=[],
+            mappings=[],
+        )
+
+        self.assertEqual(result.flags[0]["bucket"], "conditions_of_class")
+        self.assertEqual(result.counts["missing_in_catalog_count"], 0)
+
+    def test_reconciliation_does_not_surface_memoranda_as_conditions(self):
+        result = build_reconciliation_flags(
+            parsed_payload={
+                "rows": [
+                    {
+                        "class_society": "BV",
+                        "class_code_or_name": "BV-CLASS-MEMORANDA-1",
+                        "source_section": "Class Memoranda",
+                        "row_type": "condition",
+                        "kind": "memorandum",
+                        "raw_text": "Memorandum text should not be treated as Condition of Class.",
+                        "confidence": 1.0,
+                    }
+                ]
+            },
+            tracked_items=[],
+            mappings=[],
+        )
+
+        self.assertEqual(result.flags, [])
+        self.assertEqual(result.counts["missing_in_catalog_count"], 0)
+
+    def test_reconciliation_does_not_surface_non_class_condition_sections(self):
+        result = build_reconciliation_flags(
+            parsed_payload={
+                "rows": [
+                    {
+                        "class_society": "KR",
+                        "class_code_or_name": "KR-ACTIONABLE-NOTE-1",
+                        "source_section": "Actionable Note",
+                        "row_type": "condition",
+                        "kind": "actionable_note",
+                        "raw_text": "Actionable note should not be treated as Condition of Class.",
+                        "confidence": 1.0,
+                    },
+                    {
+                        "class_society": "NK",
+                        "class_code_or_name": "NK-CONDITION-OF-INSTALLATION-1",
+                        "source_section": "Condition of Installation",
+                        "row_type": "condition",
+                        "raw_text": "Installation condition should not be treated as Condition of Class.",
+                        "confidence": 1.0,
+                    },
+                    {
+                        "class_society": "KR",
+                        "class_code_or_name": "C.2",
+                        "source_section": "Statutory Condition",
+                        "row_type": "condition",
+                        "raw_text": "Statutory condition should not be treated as Condition of Class.",
+                        "confidence": 1.0,
+                    },
+                ]
+            },
+            tracked_items=[],
+            mappings=[],
+        )
+
+        self.assertEqual(result.flags, [])
+        self.assertEqual(result.counts["missing_in_catalog_count"], 0)
+
+    def test_vessel_dashboard_snapshot_age_uses_printed_report_date(self):
+        printed_on_date = datetime.now(timezone.utc).date().isoformat()
+
+        serialized = _serialize_snapshot(
+            {
+                "snapshot_id": "90975FDE-C384-F111-ADEC-FDB8CC7078D1",
+                "class_society": "NK",
+                "uploaded_at": "2000-01-01T00:00:00+00:00",
+                "printed_on_date": printed_on_date,
+                "parse_status": "success",
+                "reconciliation_run_id": None,
+            }
+        )
+
+        self.assertEqual(serialized["printedOnDate"], printed_on_date)
+        self.assertEqual(serialized["daysAgo"], 0)
+
+    def test_vessel_dashboard_snapshot_age_never_uses_upload_date_when_report_date_missing(self):
+        serialized = _serialize_snapshot(
+            {
+                "snapshot_id": "90975FDE-C384-F111-ADEC-FDB8CC7078D1",
+                "class_society": "NK",
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                "printed_on_date": None,
+                "parse_status": "failed",
+                "reconciliation_run_id": None,
+            }
+        )
+
+        self.assertIsNone(serialized["printedOnDate"])
+        self.assertIsNone(serialized["daysAgo"])
 
     def test_class_snapshot_ocr_fallback_uses_paddleocr_page_cap(self):
         fake_engine = _FakeOcrEngine(
@@ -662,17 +1362,50 @@ Load Line Certificate ILL Full 2025-08-11 2030-07-11 0N25015926559
             fields={"certificate_number": OcrFieldCandidate("KR-001", 0.94)},
         )
 
-        with patch("apps.certs.services.ocr_pipeline.PaddleOcrEngine", return_value=_FakeOcrEngine(output)) as engine_class:
-            payload = process_cert_pdf(
-                "certificate.png",
-                thresholds=OcrThresholds(office_auto_accept=0.80, vessel_auto_accept=0.85, manual_floor=0.60),
-            )
+        ocr_pipeline._DEFAULT_CERTIFICATE_OCR_ENGINE = None
+        try:
+            with patch("apps.certs.services.ocr_pipeline.PaddleOcrEngine", return_value=_FakeOcrEngine(output)) as engine_class:
+                payload = process_cert_pdf(
+                    "certificate.png",
+                    thresholds=OcrThresholds(office_auto_accept=0.80, vessel_auto_accept=0.85, manual_floor=0.60),
+                )
+        finally:
+            ocr_pipeline._DEFAULT_CERTIFICATE_OCR_ENGINE = None
 
-        engine_class.assert_called_once_with()
+        engine_class.assert_called_once_with(
+            max_pdf_pages=ocr_pipeline.CERTIFICATE_OCR_MAX_PDF_PAGES,
+            pdf_render_scale=ocr_pipeline.CERTIFICATE_OCR_PDF_RENDER_SCALE,
+            text_detection_model_name=ocr_pipeline.CERTIFICATE_OCR_TEXT_DETECTION_MODEL_NAME,
+            text_recognition_model_name=ocr_pipeline.CERTIFICATE_OCR_TEXT_RECOGNITION_MODEL_NAME,
+            text_det_limit_side_len=ocr_pipeline.CERTIFICATE_OCR_TEXT_DET_LIMIT_SIDE_LEN,
+            text_recognition_batch_size=ocr_pipeline.CERTIFICATE_OCR_TEXT_RECOGNITION_BATCH_SIZE,
+        )
         self.assertEqual(payload["engine"], DEFAULT_OCR_ENGINE_NAME)
         self.assertEqual(payload["status"], "processed")
         self.assertEqual(payload["fields"]["certificate_number"]["value"], "KR-001")
         self.assertEqual(payload["fields"]["imo_number"]["value"], "9584293")
+
+    def test_process_cert_pdf_reuses_default_paddleocr_engine(self):
+        output = OcrEngineOutput(
+            raw_text="Certificate No.: KR-001\nIMO No. 9584293",
+            mean_confidence=0.92,
+            fields={},
+        )
+        ocr_pipeline._DEFAULT_CERTIFICATE_OCR_ENGINE = None
+        try:
+            with patch("apps.certs.services.ocr_pipeline.PaddleOcrEngine", return_value=_FakeOcrEngine(output)) as engine_class:
+                process_cert_pdf(
+                    "certificate-1.png",
+                    thresholds=OcrThresholds(office_auto_accept=0.80, vessel_auto_accept=0.85, manual_floor=0.60),
+                )
+                process_cert_pdf(
+                    "certificate-2.png",
+                    thresholds=OcrThresholds(office_auto_accept=0.80, vessel_auto_accept=0.85, manual_floor=0.60),
+                )
+        finally:
+            ocr_pipeline._DEFAULT_CERTIFICATE_OCR_ENGINE = None
+
+        engine_class.assert_called_once()
 
     def test_paddleocr_v3_prediction_result_is_flattened_to_text_and_confidence(self):
         text, confidence = _paddle_prediction_to_text(
@@ -1119,6 +1852,101 @@ def _print_artifact_row(
     }
 
 
+def _tracked_item_test_row(
+    *,
+    status: str = "ok",
+    certificate_number: str | None = "CERT-OLD",
+    expiry_date: str | None = "2029-07-24",
+    version: int = 1,
+) -> dict[str, object]:
+    return {
+        "tracked_item_id": "tracked-1",
+        "vessel_id": "vessel-1",
+        "vessel_name": "MV Test",
+        "vessel_code": "TST",
+        "vessel_imo_number": "1234567",
+        "catalog_id": "catalog-1",
+        "catalog_code": "SMC",
+        "catalog_display_name": "Safety Management Certificate",
+        "catalog_short_name": "SMC",
+        "catalog_section_code": "STATUTORY",
+        "catalog_section_name": "Statutory",
+        "catalog_is_class_tracked": False,
+        "catalog_retain_all_versions": False,
+        "catalog_submission_scope": "all_ranks_with_approval",
+        "type": "certificate",
+        "validity_type": "full",
+        "form_variant": None,
+        "cadence_months": 60,
+        "cadence_custom_days": None,
+        "parent_id": None,
+        "relationship_type": None,
+        "supersedes_id": None,
+        "issue_date": "2026-07-24",
+        "expiry_date": expiry_date,
+        "anniversary_date": None,
+        "window_open": None,
+        "window_close": None,
+        "last_done_date": None,
+        "next_due_date": None,
+        "postponed_until": None,
+        "status": status,
+        "certificate_number": certificate_number,
+        "issuing_authority": "Class Society",
+        "place_of_issue": None,
+        "extension_authority": None,
+        "extension_letter_pdf_id": None,
+        "extension_reason": None,
+        "pdf_attachment_id": "blob-1",
+        "pdf_missing": False,
+        "source": "manual",
+        "last_class_sync_id": None,
+        "approval_state": "approved",
+        "submitted_by": "Harman.S",
+        "submitted_at": "2026-07-24T08:00:00Z",
+        "approved_by": "Harman.S",
+        "approved_at": "2026-07-24T08:00:00Z",
+        "rejection_reason": None,
+        "rejection_count": 0,
+        "draft_expires_at": None,
+        "lifecycle_status": "active",
+        "row_version": b"\x00\x00\x00\x00\x00\x00\x00\x01",
+        "version": version,
+        "created_at": "2026-07-24T08:00:00Z",
+        "created_by": "Harman.S",
+        "updated_at": "2026-07-24T08:00:00Z",
+        "updated_by": "Harman.S",
+    }
+
+
+def _pdf_blob_test_row(
+    *,
+    blob_storage_path: str,
+    ocr_payload_json: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "blob_id": "blob-1",
+        "tracked_item_id": "tracked-1",
+        "snapshot_id": None,
+        "blob_storage_path": blob_storage_path,
+        "filename": "certificate.pdf",
+        "content_sha256": "sha",
+        "content_size_bytes": 8,
+        "uploaded_by": "Harman.S",
+        "uploaded_at": "2026-07-24T08:00:00Z",
+        "is_active": True,
+        "superseded_at": None,
+        "retention_policy": "retain_18_months_then_purge",
+        "scheduled_delete_at": None,
+        "delete_pending_since": None,
+        "dpa_retention_override_until": None,
+        "ocr_payload_json": ocr_payload_json,
+        "ocr_confidence_per_field": {},
+        "ocr_processed_at": "2026-07-24T08:01:00Z" if ocr_payload_json else None,
+        "ocr_engine_version": DEFAULT_OCR_ENGINE_NAME if ocr_payload_json else "",
+    }
+
+
 def _write_upload_blob(upload_root: str, relative_path: str, content: bytes) -> None:
     absolute_path = Path(upload_root) / relative_path
     absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1303,9 +2131,10 @@ class _FakeAuditLogCursor:
 
 
 class _FakeTrackedItemCursor:
-    def __init__(self):
+    def __init__(self, *, count=0):
         self.executed = []
         self.description = [("tracked_item_id",)]
+        self.count = count
 
     def __enter__(self):
         return self
@@ -1317,10 +2146,55 @@ class _FakeTrackedItemCursor:
         self.executed.append((sql, list(params or [])))
 
     def fetchone(self):
-        return (0,)
+        return (self.count,)
 
     def fetchall(self):
         return []
+
+
+class _FakeRepositoryListCursor:
+    def __init__(self, *, count=0):
+        self.executed = []
+        self.description = [("id",)]
+        self.count = count
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, list(params or [])))
+
+    def fetchone(self):
+        return (self.count,)
+
+    def fetchall(self):
+        return []
+
+
+def _tracked_item_serializer_row() -> dict[str, object]:
+    return {
+        "tracked_item_id": "11111111-1111-1111-1111-111111111111",
+        "vessel_id": "22222222-2222-2222-2222-222222222222",
+        "catalog_id": "33333333-3333-3333-3333-333333333333",
+        "catalog_code": "CERT-001",
+        "catalog_display_name": "Safety Management Certificate",
+        "catalog_short_name": "SMC",
+        "catalog_submission_scope": "all_ranks_with_approval",
+        "type": "certificate",
+        "validity_type": "full",
+        "status": "pending_first_upload",
+        "issuing_authority": "Class",
+        "pdf_missing": True,
+        "source": "manual",
+        "approval_state": "approved",
+        "lifecycle_status": "active",
+        "created_by": "seed-user",
+        "updated_by": "seed-user",
+        "version": 1,
+    }
 
 
 class TrackedItemMetadataSerializerTests(SimpleTestCase):

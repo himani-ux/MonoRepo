@@ -14,7 +14,7 @@ export function SafetyChainOfCustodyTable({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
             Evidence control
           </p>
-          <h2 className="text-xl font-semibold text-slate-900">Chain of Custody</h2>
+          <h2 className="text-xl font-semibold text-slate-900">Who Has the Evidence</h2>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
           {rows.length} items
@@ -26,15 +26,15 @@ export function SafetyChainOfCustodyTable({
             <article key={row.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <h3 className="font-medium text-slate-900">{row.description}</h3>
               <p className="mt-1 text-sm text-slate-600">
-                Collector: {row.collector_name} | Storage: {row.storage_location}
+                Collected by: {row.collector_name} | Kept at: {row.storage_location}
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Current holder: {row.current_holder} | Handovers: {row.handover_log.length}
+                Now with: {row.current_holder} | Handovers: {row.handover_log.length}
               </p>
             </article>
           ))
         ) : (
-          <p className="text-sm text-slate-500">No custody items captured yet.</p>
+          <p className="text-sm text-slate-500">No evidence control items added yet.</p>
         )}
       </div>
     </section>

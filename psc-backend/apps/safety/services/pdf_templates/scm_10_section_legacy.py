@@ -765,6 +765,7 @@ class SCMTenSectionLegacyTemplate:
 
     def _styled_table(self, rows: list[list[object]], **kwargs) -> Table:
         repeat_rows = int(kwargs.get("repeatRows") or 0)
+        rows = self._split_oversized_single_cell_rows(rows, repeat_rows=repeat_rows)
         wrapped_rows = [
             [self._cell(value, header=repeat_rows > 0 and row_index < repeat_rows) for value in row]
             for row_index, row in enumerate(rows)
@@ -791,6 +792,49 @@ class SCMTenSectionLegacyTemplate:
             style.add("BACKGROUND", (0, 1), (-1, repeat_rows - 1), colors.HexColor("#EDF2F7"))
         table.setStyle(style)
         return table
+
+    @staticmethod
+    def _split_oversized_single_cell_rows(
+        rows: list[list[object]],
+        *,
+        repeat_rows: int,
+        max_chars: int = 900,
+    ) -> list[list[object]]:
+        split_rows: list[list[object]] = []
+        for row_index, row in enumerate(rows):
+            if row_index < repeat_rows or len(row) != 1:
+                split_rows.append(row)
+                continue
+            text = str(row[0] if row and row[0] not in (None, "") else "-")
+            chunks = SCMTenSectionLegacyTemplate._split_text_for_pdf_rows(text, max_chars=max_chars)
+            split_rows.extend([[chunk] for chunk in chunks])
+        return split_rows
+
+    @staticmethod
+    def _split_text_for_pdf_rows(text: str, *, max_chars: int) -> list[str]:
+        normalized = str(text or "-").strip() or "-"
+        if len(normalized) <= max_chars:
+            return [normalized]
+
+        chunks: list[str] = []
+        remaining = normalized
+        while len(remaining) > max_chars:
+            split_at = max(
+                remaining.rfind("\n", 0, max_chars),
+                remaining.rfind(". ", 0, max_chars),
+                remaining.rfind("; ", 0, max_chars),
+                remaining.rfind(", ", 0, max_chars),
+                remaining.rfind(" ", 0, max_chars),
+            )
+            if split_at < max_chars // 2:
+                split_at = max_chars
+            chunk = remaining[:split_at].strip()
+            if chunk:
+                chunks.append(chunk)
+            remaining = remaining[split_at:].strip()
+        if remaining:
+            chunks.append(remaining)
+        return chunks or ["-"]
 
     @staticmethod
     def _can_keep_with_section_title(flowable: object) -> bool:

@@ -6,6 +6,7 @@ Validation Reference: Docs/VALIDATION_RULES.md Sections 2.1, 2.2, 3.1, 3.2
 RBAC Reference: Docs/BACKEND_STRUCTURE.md Section 11
 """
 
+import json
 import shutil
 import tempfile
 import uuid
@@ -2691,8 +2692,25 @@ class TestFEAT_DEF_002_RegisterPSCFollowUp(BaseInspectionAPITestCase):
             force_authenticate(request, user=user)
         return self.view(request)
 
+    def _register_canonical_multipart(self, payload, user=None):
+        request = self.factory.post(
+            f"/api/psc/inspections/{self.parent_psc.id}/follow-up/",
+            payload,
+            format="multipart",
+        )
+        if user:
+            force_authenticate(request, user=user)
+        return self.view(request, inspection_id=self.parent_psc.id)
+
     def _action_code_getter(self, action_code):
         return SimpleNamespace(action_code=action_code, definition=f"Action {action_code}")
+
+    def _pdf_upload(self, name):
+        return SimpleUploadedFile(
+            name,
+            b"%PDF-1.4 follow-up report",
+            content_type="application/pdf",
+        )
 
     @patch("apps.inspection.followup_views.notify_psc_follow_up_recorded")
     def test_happy_path_creates_follow_up_inspection_with_required_fields(self, mock_notify):
@@ -2904,6 +2922,85 @@ class TestFEAT_DEF_002_RegisterPSCFollowUp(BaseInspectionAPITestCase):
             event_type="PSC_FOLLOW_UP_RECORDED",
         ).count()
         self.assertEqual(after, before + 1)
+
+    @patch("apps.inspection.followup_serializers.PSCActionCode.objects.filter")
+    @patch("apps.inspection.followup_views.PSCActionCode.objects.get")
+    @patch("apps.inspection.followup_views.notify_psc_follow_up_recorded")
+    def test_happy_path_register_follow_up_accepts_three_pdf_reports(
+        self,
+        mock_notify,
+        mock_action_get,
+        mock_action_filter,
+    ):
+        """Follow-up registration accepts up to three PDF report attachments."""
+        mock_action_filter.return_value.exists.return_value = True
+        mock_action_get.side_effect = self._action_code_getter
+        payload = {
+            "reinspection_date": "2026-01-20",
+            "deficiency_updates": json.dumps([
+                {"deficiency_id": str(self.def_1.id), "action_code_id": 10},
+            ]),
+            "report_description": "Follow-up supporting PDFs",
+            "report_files": [
+                self._pdf_upload("follow-up-1.pdf"),
+                self._pdf_upload("follow-up-2.pdf"),
+                self._pdf_upload("follow-up-3.pdf"),
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as upload_dir:
+            with override_settings(UPLOAD_BASE_PATH=upload_dir):
+                response = self._register_canonical_multipart(payload, user=self.vessel_master)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        reports = InspectionReport.objects.filter(
+            inspection=self.parent_psc,
+            report_type="FOLLOW_UP",
+            is_deleted=False,
+        )
+        self.assertEqual(reports.count(), 3)
+        self.assertCountEqual(
+            list(reports.values_list("file_name", flat=True)),
+            ["follow-up-1.pdf", "follow-up-2.pdf", "follow-up-3.pdf"],
+        )
+        mock_notify.assert_called_once_with(self.parent_psc, str(self.parent_psc.vessel_id))
+
+    @patch("apps.inspection.followup_serializers.PSCActionCode.objects.filter")
+    def test_validation_register_follow_up_rejects_more_than_three_pdf_reports(
+        self,
+        mock_action_filter,
+    ):
+        """Follow-up registration rejects four PDF report attachments."""
+        mock_action_filter.return_value.exists.return_value = True
+        payload = {
+            "reinspection_date": "2026-01-20",
+            "deficiency_updates": json.dumps([
+                {"deficiency_id": str(self.def_1.id), "action_code_id": 10},
+            ]),
+            "report_description": "Too many PDFs",
+            "report_files": [
+                self._pdf_upload("follow-up-1.pdf"),
+                self._pdf_upload("follow-up-2.pdf"),
+                self._pdf_upload("follow-up-3.pdf"),
+                self._pdf_upload("follow-up-4.pdf"),
+            ],
+        }
+
+        response = self._register_canonical_multipart(payload, user=self.vessel_master)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "VALIDATION_ERROR")
+        self.assertEqual(
+            response.data["message"],
+            "Up to 3 follow-up report PDFs can be attached.",
+        )
+        self.assertFalse(
+            InspectionReport.objects.filter(
+                inspection=self.parent_psc,
+                report_type="FOLLOW_UP",
+                is_deleted=False,
+            ).exists()
+        )
 
 
 class TestFEAT_DEF_003_MarkDeficiencyCleared(BaseInspectionAPITestCase):

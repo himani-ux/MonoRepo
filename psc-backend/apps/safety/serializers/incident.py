@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.safety.authentication.anonymity import AnonymityMixin
 from apps.safety.authentication.vessel_scope import user_has_vessel_access
-from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
+from apps.safety.models import ExternalPartyInjury, Incident, IncidentPhaseLog, SafetyFieldHistory
 from apps.safety.serializers.incident_external_party import ExternalPartyInjurySerializer
 from apps.safety.serializers.vessel_display import VesselDisplayMixin
 
@@ -48,23 +49,51 @@ class IncidentSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "risk_band",
             "imo_classifier",
             "incident_type_id",
+            "incident_type_other",
             "loss_type_primary_id",
+            "loss_type_secondary_id",
+            "loss_type_tertiary_id",
+            "loss_type_other",
             "investigation_depth",
             "occurred_at",
             "reported_at",
             "latitude",
             "longitude",
+            "shore_assistance_required",
+            "vessel_location",
+            "vessel_location_detail",
+            "onboard_location",
+            "last_port",
+            "departure_date",
+            "vessel_condition",
             "position_source",
             "position_daily_report_id",
+            "weather_visibility_id",
+            "weather_precipitation_id",
+            "weather_sea_state_id",
+            "weather_wind_scale_id",
+            "weather_wind_direction_id",
+            "weather_lighting_source_id",
+            "weather_current_direction_id",
+            "weather_current_strength_knots",
+            "weather_ambient_temperature_c",
+            "weather_ice_condition_onboard_id",
+            "weather_ice_condition_at_sea_id",
+            "weather_light_condition_id",
+            "risk_assessment_carried_out",
+            "toolbox_meeting_carried_out",
+            "permit_issued",
+            "activity_type",
             "narrative",
             "awaiting_daily_report_match",
-            "first_hour_checklist_done",
             "notification_channel_count",
             "resources_allocated",
             "pic_user_id",
             "dpa_notified_at",
             "fm_notified_at",
             "office_notified_at",
+            "office_notified",
+            "office_notification_mode",
             "near_miss_priority",
             "external_party_injury",
             "reporter_user_id",
@@ -85,6 +114,7 @@ class IncidentSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "dpa_accepted_by",
             "fm_approved_at",
             "fm_approved_by",
+            "office_comment",
             "closed_at",
             "closure_reason",
             "linked_incident_id",
@@ -134,6 +164,7 @@ class IncidentListSerializer(IncidentSerializer):
 
 
 class IncidentCreateSerializer(IncidentSerializer):
+    external_party_injury = ExternalPartyInjurySerializer(required=False, allow_null=True)
     vessel_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta(IncidentSerializer.Meta):
@@ -181,12 +212,54 @@ class IncidentCreateSerializer(IncidentSerializer):
 
     def create(self, validated_data):
         repository = self.context["incident_repository"]
-        return repository.create(validated_data)
+        has_injury_payload = "external_party_injury" in validated_data
+        injury_payload = validated_data.pop("external_party_injury", None)
+        incident = repository.create(validated_data)
+        if has_injury_payload and injury_payload:
+            self._upsert_injury(incident, injury_payload)
+        return incident
 
     def update(self, instance, validated_data):
         repository = self.context["incident_repository"]
         validated_data.pop("vessel_code", None)
-        return repository.update(instance.pk, validated_data)
+        has_injury_payload = "external_party_injury" in validated_data
+        injury_payload = validated_data.pop("external_party_injury", None)
+        incident = repository.update(instance.pk, validated_data)
+        if has_injury_payload and injury_payload:
+            self._upsert_injury(incident, injury_payload)
+        return incident
+
+    def _upsert_injury(self, incident: Incident, injury_payload: dict) -> None:
+        user = getattr(self.context.get("request"), "user", None)
+        actor_id = str(
+            getattr(user, "id", None)
+            or getattr(user, "username", None)
+            or getattr(user, "crew_id", None)
+            or "system"
+        )
+        record, was_created = ExternalPartyInjury.objects.get_or_create(
+            incident=incident,
+            defaults={
+                **injury_payload,
+                "created_by": actor_id,
+                "schema_version": incident.schema_version or 1,
+                "updated_by": actor_id,
+                "updated_date": timezone.now(),
+            },
+        )
+        if was_created:
+            return
+
+        update_fields = []
+        for field_name, value in {
+            **injury_payload,
+            "schema_version": incident.schema_version or 1,
+            "updated_by": actor_id,
+            "updated_date": timezone.now(),
+        }.items():
+            setattr(record, field_name, value)
+            update_fields.append(field_name)
+        record.save(update_fields=update_fields)
 
 
 class IncidentTransitionSerializer(serializers.Serializer):

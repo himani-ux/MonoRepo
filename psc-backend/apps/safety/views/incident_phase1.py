@@ -50,8 +50,7 @@ class IncidentPhase1UpdateView(IncidentViewMixin, generics.RetrieveUpdateAPIView
 
     def get_object(self):
         incident = super().get_object()
-        if incident.current_phase != 1:
-            raise ValidationError("Phase 1 intake can only be edited while current_phase = 1.")
+        self._enforce_phase_reached_for_edit(incident, 1, "Phase 1 intake")
         return incident
 
     def perform_update(self, serializer):
@@ -105,10 +104,10 @@ class IncidentPhase1SubmitView(IncidentViewMixin, generics.GenericAPIView):
                 record_id=incident.pk,
                 recipients=list(PHASE_2_HANDOFF_RECIPIENTS),
                 kind="INCIDENT_PHASE_2_HANDOFF_REQUIRED",
-                title="Phase 2 resource allocation required",
+                title="Office communication confirmation required",
                 message=(
-                    f"Incident draft {incident.pk} completed Phase 1 and awaits Phase 2 "
-                    "resource allocation by an authorized role."
+                    f"Incident draft {incident.pk} completed Phase 1 and awaits "
+                    "office communication confirmation by an authorized user."
                 ),
                 payload={
                     "authorized_roles": list(PHASE_2_HANDOFF_RECIPIENTS),
@@ -126,10 +125,9 @@ class IncidentPhase1SubmitView(IncidentViewMixin, generics.GenericAPIView):
             "authorized_roles": list(PHASE_2_HANDOFF_RECIPIENTS),
             "can_edit_phase_2": can_edit_phase_2,
             "message": (
-                "Phase 2 editing is restricted to Master, CO, CE, DPA, or FM. "
-                "Awaiting resource allocation."
+                "Office communication can be confirmed by Master, CO, CE, DPA, or FM."
                 if not can_edit_phase_2
-                else "Phase 2 editing is available for your role."
+                else "Office communication can be confirmed by your role."
             ),
             "notifications_emitted": len(handoff_notification_rows),
         }

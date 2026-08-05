@@ -55,9 +55,6 @@ export default function SafetyNearMissIndexRoute() {
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_55%,#fef3c7_100%)] p-6 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Safety / Near Miss
-            </p>
             <h1 className="text-3xl font-semibold text-slate-900">
               Near Miss Register
             </h1>

@@ -72,6 +72,10 @@ Database: **`ksm_marine_live`** (shared instance, SQL Server). Safety uses the s
 | django-celery-beat | 2.6.0 | Periodic tasks: 80%-overdue flag evaluation (D-GAP-F3), CA aging-pipeline rollup (D-GAP-M29), 3-year retention job (D-GAP-G2), SOI cycle counter |
 | django-celery-results | 2.5.1 | Task result persistence |
 
+### 1.5a Email Delivery
+
+Safety Fleet Alert email delivery uses Django's built-in SMTP email backend. Sender credentials are configured through environment variables loaded by `python-dotenv`, including `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL`; secrets must not be stored in tracked source files.
+
 ### 1.6 Utilities
 
 | Package | Version | Safety use |
@@ -120,7 +124,7 @@ Database: **`ksm_marine_live`** (shared instance, SQL Server). Safety uses the s
 | @radix-ui/react-label | 2.1.0 | Form labels |
 | @radix-ui/react-slot | 1.1.0 | Slot pattern |
 | @radix-ui/react-toast | 1.2.1 | Notification toasts |
-| @radix-ui/react-tabs | 1.1.0 | Causal-layer tabs (Immediate / Intermediate / Root) |
+| @radix-ui/react-tabs | 1.1.0 | Causal-layer tabs (Immediate / Root; legacy Intermediate rows display under Root) |
 | @radix-ui/react-dropdown-menu | 2.1.1 | Record-action menus |
 | lucide-react | 0.408.0 | Icon library (includes `eye-off` for anonymity badge — D-GAP-J1) |
 

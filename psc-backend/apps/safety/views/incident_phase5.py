@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasProcessPermission
 from apps.safety.models import (
+    EvidenceItem,
     Incident,
     IncidentBiasGuardResponse,
     IncidentCauseTag,
+    IncidentFact,
     IncidentPhase5Assessment,
     IncidentSafeguardFailure,
 )
@@ -53,20 +56,47 @@ class IncidentPhase5ViewMixin(IncidentViewMixin):
 
     def _enforce_phase_5_mutation_role(self) -> None:
         if _normalized_role(self.request.user) not in ALLOWED_PHASE_5_MUTATION_ROLES:
-            raise PermissionDenied("Only investigation roles may edit Phase 5 analysis.")
+            raise PermissionDenied("Only investigation roles may edit root cause.")
 
     def _require_phase_five(self) -> Incident:
         incident = self.get_incident()
-        if incident.current_phase != 5:
-            raise ValidationError("Phase 5 analysis can only be edited while current_phase = 5.")
+        self._enforce_editable_until_office_approval(incident)
         return incident
+
+
+def _ensure_root_cause_source_fact(incident: Incident, actor_id: str) -> IncidentFact:
+    existing = incident.facts.order_by("sequence_index", "id").first()
+    if existing is not None:
+        return existing
+    evidence = EvidenceItem.objects.create(
+        incident=incident,
+        item_type=EvidenceItem.ItemType.PHYSICAL,
+        title="Initial root cause entry",
+        description="Root cause was entered before evidence upload. Evidence will be added in the next phase.",
+        source_label="Root cause first workflow",
+        created_by=actor_id,
+        updated_by=actor_id,
+        updated_date=timezone.now(),
+        schema_version=incident.schema_version or 1,
+    )
+    return IncidentFact.objects.create(
+        incident=incident,
+        sequence_index=1,
+        fact_text="Initial root cause entered before evidence upload.",
+        source_evidence_id=evidence.id,
+        confidence=IncidentFact.Confidence.MEDIUM,
+        created_by=actor_id,
+        updated_by=actor_id,
+        updated_date=timezone.now(),
+        schema_version=incident.schema_version or 1,
+    )
 
 
 class IncidentPhase5WorkspaceView(IncidentPhase5ViewMixin, generics.GenericAPIView):
     serializer_class = IncidentPhase5AssessmentSerializer
 
     def get(self, request, *args, **kwargs):
-        incident = self.get_incident()
+        incident = self._require_phase_five()
         return Response(build_phase5_workspace_payload(incident), status=status.HTTP_200_OK)
 
     def patch(self, request, *args, **kwargs):
@@ -126,9 +156,16 @@ class IncidentPhase5CauseListCreateView(IncidentPhase5ViewMixin, generics.ListCr
         return context
 
     def create(self, request, *args, **kwargs):
-        self._require_phase_five()
+        incident = self._require_phase_five()
         self._enforce_phase_5_mutation_role()
-        return super().create(request, *args, **kwargs)
+        data = request.data.copy()
+        if not data.get("source_fact_id"):
+            data["source_fact_id"] = str(_ensure_root_cause_source_fact(incident, _resolve_actor_id(request.user)).id)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class IncidentPhase5CauseDetailView(IncidentPhase5ViewMixin, generics.UpdateAPIView):
@@ -202,7 +239,7 @@ class IncidentBiasGuardChecklistView(IncidentPhase5ViewMixin, generics.GenericAP
         return Response(build_phase5_workspace_payload(incident)["bias_guards"], status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
-        incident = self.get_incident()
+        incident = self._require_phase_five()
         self._enforce_phase_5_mutation_role()
         responses = request.data.get("responses", [])
         if not isinstance(responses, list):
@@ -229,7 +266,7 @@ class IncidentBlameOverrideView(IncidentPhase5ViewMixin, generics.GenericAPIView
         return [self.form_permission_class(), self.process_permission_class()]
 
     def post(self, request, *args, **kwargs):
-        incident = self.get_incident()
+        incident = self._require_phase_five()
         role = _normalized_role(request.user)
         if incident.risk_band == Incident.RiskBand.RED:
             if role not in {"FM", "FLEET MANAGER"}:

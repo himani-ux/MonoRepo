@@ -32,19 +32,10 @@ class AlarpGate:
         )
 
     def missing_fields(self, recommendation_or_payload: Any) -> list[str]:
-        missing: list[str] = []
-        for field_name in (
-            "estimated_likelihood_reduction",
-        ):
-            value = self._read_field(recommendation_or_payload, field_name)
-            if value in (None, ""):
-                missing.append(field_name)
-        return missing
+        return []
 
     def transition_ready(self, incident: Incident, recommendation: Recommendation) -> bool:
-        if not self.require_alarp(incident, recommendation):
-            return True
-        return not self.missing_fields(recommendation) and recommendation.alarp_attested
+        return True
 
     def incident_attestation_complete(
         self,

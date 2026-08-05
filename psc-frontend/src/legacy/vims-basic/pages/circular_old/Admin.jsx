@@ -1,4 +1,4 @@
-﻿// Admin.jsx
+// Admin.jsx
 import React, { useState, useEffect, useLayoutEffect, useRef, navigate } from 'react';
 import '../../styles/circular/Officeuser.css';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/circular/ui/card';
@@ -429,7 +429,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
     useEffect(() => {
         const handleRefresh = () => {
-            console.log("ðŸ”„ Page refreshed â€” clearing supersede data");
+            console.log("🔄 Page refreshed — clearing supersede data");
 
             clearCircularPrefillStorage();
         };
@@ -459,7 +459,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         submitted: req.created_at
 
                             ? new Date(req.created_at).toLocaleString()
-                            : 'â€”',
+                            : '—',
                         status: 'Pending',
                         created_by: req.created_by,
                         attachment_url: req.attachment_url,
@@ -503,7 +503,7 @@ const Admin = ({ onNotificationSubmit }) => {
                     priority: req.priority || 'Medium',
                     submitted: req.created_at
                         ? new Date(req.created_at).toLocaleString()
-                        : 'â€”',
+                        : '—',
                     status: 'Pending',
                     created_by: req.created_by,
                     attachment_url: req.attachment_url,
@@ -681,7 +681,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
     // --- NEW: Handler for Edit Pending Notification Button ---
     const handleEditPendingNotification = async (srNoToEdit) => {
-        console.log("ðŸš€ handleEditPendingNotification: Edit clicked for notification SR No:", srNoToEdit);
+        console.log("🚀 handleEditPendingNotification: Edit clicked for notification SR No:", srNoToEdit);
 
         // 1. Fetch the notification details by its SR No
         console.log("handleEditPendingNotification: Fetching notification details for SR No:", srNoToEdit);
@@ -698,7 +698,7 @@ const Admin = ({ onNotificationSubmit }) => {
             localStorage.setItem('editingPendingNotificationData', JSON.stringify(notificationDetails));
             localStorage.setItem('editingPendingNotificationSrNo', notificationDetails.sr_no); // Store SR No
             localStorage.setItem('editingPendingNotificationId', notificationDetails.id); // Store DB ID (UUID)
-            console.log("âœ… Stored editingPendingNotificationData, editingPendingNotificationSrNo, and editingPendingNotificationId in localStorage.");
+            console.log("✅ Stored editingPendingNotificationData, editingPendingNotificationSrNo, and editingPendingNotificationId in localStorage.");
 
             // 3. Navigate to the main create page to load the form with the data
             // This will trigger the main form component (Officeuser/Admin) to check localStorage
@@ -708,7 +708,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         } catch (detailsError) {
             console.error("handleEditPendingNotification: Error fetching notification details:", detailsError);
-            alert(`âš ï¸ Could not fetch notification details for editing: ${detailsError.message}`);
+            alert(`⚠️ Could not fetch notification details for editing: ${detailsError.message}`);
         }
     };
     // --- END NEW ---
@@ -825,7 +825,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
 
     const handleApproveReject = async (sr_no, action) => {
-        console.log("ðŸš€ handleApproveReject: Start â†’ SR No:", sr_no, "Action:", action);
+        console.log("🚀 handleApproveReject: Start → SR No:", sr_no, "Action:", action);
 
         const status = action === "approve" ? 2 : 3;
         setCurrentAction(action);
@@ -839,10 +839,10 @@ const Admin = ({ onNotificationSubmit }) => {
         }
 
         /* ============================================================
-           1ï¸âƒ£ APPROVE â†’ First fetch details â†’ then open vessel popup
+           1️⃣ APPROVE → First fetch details → then open vessel popup
            ============================================================ */
         if (action === "approve") {
-            console.log("ðŸ“Œ Approve flow â†’ Fetching notification details...");
+            console.log("📌 Approve flow → Fetching notification details...");
 
             try {
                 const detailsResponse = await fetch(
@@ -856,7 +856,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 }
 
                 const notificationDetails = await detailsResponse.json();
-                console.log("ðŸ“„ Notification details:", notificationDetails);
+                console.log("📄 Notification details:", notificationDetails);
 
                 // Store SR No for later update
                 localStorage.setItem(
@@ -875,27 +875,27 @@ const Admin = ({ onNotificationSubmit }) => {
                 localStorage.setItem("approvingNotificationDept", deptName);
 
                 console.log(
-                    "ðŸ’¾ Stored dept + sr_no for popup vessel selection",
+                    "💾 Stored dept + sr_no for popup vessel selection",
                     deptName
                 );
             } catch (err) {
-                console.error("âŒ Failed to fetch details for approval:", err);
+                console.error("❌ Failed to fetch details for approval:", err);
                 alert(
                     `Could not fetch details for approval.\nContinuing without vessel list.\n${err.message}`
                 );
             }
 
-            // Show vessel popup and stop here â€” final approval happens after popup confirm
+            // Show vessel popup and stop here — final approval happens after popup confirm
             setShowVesselPopup(true);
-            console.log("ðŸ“Œ Vessel popup opened.");
+            console.log("📌 Vessel popup opened.");
             return;
         }
 
         /* ============================================================
-           2ï¸âƒ£ REJECT â†’ Show modal and wait for comment
+           2️⃣ REJECT → Show modal and wait for comment
            ============================================================ */
         setShowCommentModal(true);
-        console.log("ðŸ“ Reject â†’ showing comment modal.");
+        console.log("📝 Reject → showing comment modal.");
 
         // The rest will run ONLY after comment submit, so we stop here
         // This prevents premature status update
@@ -903,12 +903,12 @@ const Admin = ({ onNotificationSubmit }) => {
     };
 
     /* ============================================================
-       3ï¸âƒ£ FINAL APPROVAL / REJECTION API CALL
+       3️⃣ FINAL APPROVAL / REJECTION API CALL
            CALL THIS AFTER COMMENT or AFTER VESSEL POPUP CONFIRM
        ============================================================ */
 
     const submitApprovalOrRejection = async (sr_no, action, comment, vesselIds = null) => {
-        console.log("ðŸš€ Final submit:", { sr_no, action, comment, vesselIds });
+        console.log("🚀 Final submit:", { sr_no, action, comment, vesselIds });
 
         const currentUser = user
         const status = action === "approve" ? 2 : 3;
@@ -942,13 +942,13 @@ const Admin = ({ onNotificationSubmit }) => {
             }
 
             alert(action === "approve" ? "Approved!" : "Rejected!");
-            console.log("âœ… Status updated");
+            console.log("✅ Status updated");
 
             /* ---------------------------------------------------
-               ðŸ“§ EMAIL SENDING ONLY FOR APPROVAL
+               📧 EMAIL SENDING ONLY FOR APPROVAL
             --------------------------------------------------- */
             if (action === "approve" && vesselIds && vesselIds.length > 0) {
-                console.log("ðŸ“§ Sending emails to vessels:", vesselIds);
+                console.log("📧 Sending emails to vessels:", vesselIds);
 
                 const emailPayload = {
                     notification_sr_no: sr_no,
@@ -968,7 +968,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                 if (emailResponse.ok) {
                     console.log(
-                        `ðŸ“¨ Emails sent to ${emailResult.emails_sent} vessels.`
+                        `📨 Emails sent to ${emailResult.emails_sent} vessels.`
                     );
                 } else {
                     alert(`Approved, but email error: ${emailResult.error}`);
@@ -990,7 +990,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 priority: req.priority || "Medium",
                 submitted: req.created_at
                     ? new Date(req.created_at).toLocaleString()
-                    : "â€”",
+                    : "—",
                 status: "Pending",
                 created_by: req.created_by,
                 attachment_url: req.attachment_url,
@@ -1008,7 +1008,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
             setSubmittedRequests(mappedRequests);
         } catch (err) {
-            console.error("ðŸ’¥ Network error:", err);
+            console.error("💥 Network error:", err);
             alert("Network error occurred");
         }
     };
@@ -1027,7 +1027,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         if (!approvingNotificationSrNo) {
             // If creating a new notification, delegate to handleConfirmPublish as before
-            console.log("No approvingNotificationSrNo found â€” treating this as a new submission.");
+            console.log("No approvingNotificationSrNo found — treating this as a new submission.");
             await handleConfirmPublish();
             return;
         }
@@ -1044,7 +1044,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
         // Show the comment modal. Do NOT submit server request here.
         setShowCommentModal(true);
-        console.log("handleConfirmVesselSelectionForApproval: Opened comment modal â€” waiting for user to confirm comment.");
+        console.log("handleConfirmVesselSelectionForApproval: Opened comment modal — waiting for user to confirm comment.");
     };
 
 
@@ -1108,7 +1108,7 @@ const Admin = ({ onNotificationSubmit }) => {
             // Store vessel ids for email step (if you keep email separate)
             localStorage.setItem('selectedVesselIdsForNotification', JSON.stringify(vesselIdsForComment));
 
-            // Send emails (optional: you already have this logic elsewhere â€” keep it here or delegate)
+            // Send emails (optional: you already have this logic elsewhere — keep it here or delegate)
             try {
                 const emailPayload = {
                     notification_sr_no: notificationSrNoForComment,
@@ -1208,7 +1208,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 sr_no: req.sr_no,
                 type: req.msc_type?.toLowerCase() || 'alert',
                 priority: req.priority || 'Medium',
-                submitted: req.created_at ? new Date(req.created_at).toLocaleString() : 'â€”',
+                submitted: req.created_at ? new Date(req.created_at).toLocaleString() : '—',
                 status: 'Pending',
                 created_by: req.created_by,
                 attachment_url: req.attachment_url,
@@ -1480,7 +1480,7 @@ const Admin = ({ onNotificationSubmit }) => {
             console.error("Missing ID for selected type:", selectedType, "Map:", typeToIdMap);
             return;
         }
-        formData.append('type', selectedTypeId); // âœ… Send the UUID ID
+        formData.append('type', selectedTypeId); // ✅ Send the UUID ID
 
         // Get the ID for 'department' using the map
         // Assuming selectedMainOption is 'seq' or 'technical'
@@ -1492,7 +1492,7 @@ const Admin = ({ onNotificationSubmit }) => {
             console.error("Missing ID for department key:", deptNameForMap, "Map:", deptToIdMap);
             return;
         }
-        formData.append('department', selectedDeptId); // âœ… Send the UUID ID
+        formData.append('department', selectedDeptId); // ✅ Send the UUID ID
 
         // For 'category', assuming it's still a string field (not a FK yet)
         formData.append('category', selectedCategory); // Send the name string
@@ -1506,20 +1506,20 @@ const Admin = ({ onNotificationSubmit }) => {
             console.error("Missing ID for selected priority key:", selectedSeverity, "Map:", priorityToIdMap);
             return;
         }
-        formData.append('priority', selectedPriorityId); // âœ… Send the UUID ID
+        formData.append('priority', selectedPriorityId); // ✅ Send the UUID ID
 
         // Add other simple fields
         formData.append('title', title);
         formData.append('body', body);
         formData.append('hashtags', hashtags);
-        formData.append('publish_status', 0); // âœ… Draft status
+        formData.append('publish_status', 0); // ✅ Draft status
         formData.append('created_by', currentUser.employee_id);
 
         // Add sub-categories (send array of IDs using maps)
         Array.from(selectedSub1).forEach(name => {
             const id = subCatToIdMap[name]; // Look up the ID using the name
             if (id) {
-                formData.append('sub_cat', id); // âœ… Append the UUID ID
+                formData.append('sub_cat', id); // ✅ Append the UUID ID
             } else {
                 console.warn(`handleSaveDraft: Could not find ID for sub-category name: ${name}`);
                 // You might want to alert the user or handle this differently
@@ -1533,7 +1533,7 @@ const Admin = ({ onNotificationSubmit }) => {
         Array.from(selectedSub2).forEach(name => {
             const id = secondSubCatToIdMap[name]; // Look up the ID using the name
             if (id) {
-                formData.append('second_sub_cat', id); // âœ… Append the UUID ID
+                formData.append('second_sub_cat', id); // ✅ Append the UUID ID
             } else {
                 console.warn(`handleSaveDraft: Could not find ID for second sub-category name: ${name}`);
                 // You might want to alert the user or handle this differently
@@ -1561,13 +1561,13 @@ const Admin = ({ onNotificationSubmit }) => {
             return;
         }
 
-        console.log("ðŸ“¤ Saving draft with FormData:", Object.fromEntries(formData.entries())); // Debug log
+        console.log("📤 Saving draft with FormData:", Object.fromEntries(formData.entries())); // Debug log
 
         try {
             const response = await fetch(
                 draftUpdateUrl || 'http://localhost:8000/api/circular/api/notifications/', {
                 method: 'POST',
-                //  DO NOT set Content-Type â€” browser sets it automatically with boundary for FormData
+                //  DO NOT set Content-Type — browser sets it automatically with boundary for FormData
                 body: formData, //  Send formData, not JSON
             });
 
@@ -1578,7 +1578,7 @@ const Admin = ({ onNotificationSubmit }) => {
                 setEditingDraftSrNo(null);
                 setDraftPrefillData(null);
                 clearCircularDraftEditSession();
-                console.log("âœ… Draft saved with ID:", result.id);
+                console.log("✅ Draft saved with ID:", result.id);
                 window.location.reload();
                 // Optional: Reset form or redirect
                 // resetForm(); // Implement this if you want to clear the form
@@ -1816,7 +1816,7 @@ const Admin = ({ onNotificationSubmit }) => {
 
                         if (deptNameForRanks === 'Unknown') {
                             console.warn("handleConfirmPublish: Could not determine department for notification SR No", approvingNotificationSrNo, ". Cannot fetch ranks for popup.");
-                            alert("âš ï¸ Could not determine department for rank selection.");
+                            alert("⚠️ Could not determine department for rank selection.");
                             // Continue without rank selection if department cannot be determined
                             // Optionally, you could store the department in localStorage when the approval starts
                             // and access it here without refetching.
@@ -1982,14 +1982,14 @@ const Admin = ({ onNotificationSubmit }) => {
                     const newNotificationId = result.id;
 
                     if (newNotificationSrNo) {
-                        console.log("âœ… New notification created successfully! SR No:", newNotificationSrNo);
+                        console.log("✅ New notification created successfully! SR No:", newNotificationSrNo);
                         // Store the new SR No in localStorage for subsequent use (e.g., vessel selection popup)
                         localStorage.setItem('approvingNotificationSrNo', newNotificationSrNo);
-                        console.log("âœ… Stored new notification SR No in localStorage for vessel selection.");
+                        console.log("✅ Stored new notification SR No in localStorage for vessel selection.");
 
                         // Also store the ID if you need it later
                         localStorage.setItem('approvingNotificationId', newNotificationId);
-                        console.log("âœ… Stored new notification ID in localStorage.");
+                        console.log("✅ Stored new notification ID in localStorage.");
 
                         // NOW Show the Vessel Selection Popup
                         // Clear any previously selected vessels for this *new* notification
@@ -1997,7 +1997,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         setShowVesselPopup(true); // Show the popup AFTER creation
                         console.log("handleConfirmPublish: Vessel selection popup displayed for newly created notification.");
                     } else {
-                        console.error("âŒ Error: Backend did not return an SR No in the creation response:", result);
+                        console.error("❌ Error: Backend did not return an SR No in the creation response:", result);
                         alert("Notification was saved, but an error occurred (SR No not returned).");
                     }
 
@@ -2355,7 +2355,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         }
 
                         const crews = await crewResponse.json();
-                        console.log("âœ… Successfully fetched crews:", crews);
+                        console.log("✅ Successfully fetched crews:", crews);
 
                         // --- NEW: Display the crew list ---
                         if (Array.isArray(crews) && crews.length > 0) {
@@ -2365,21 +2365,21 @@ const Admin = ({ onNotificationSubmit }) => {
                             ).join('\n');
 
                             // Show alert with crew list
-                            // alert(`ðŸ”” Notification will be sent to:\n\n${crewList}`);
+                            // alert(`🔔 Notification will be sent to:\n\n${crewList}`);
 
                             // Or log it to console in a nicely formatted way
-                            console.log("ðŸ“‹ Crew List for Notification:");
+                            console.log("📋 Crew List for Notification:");
                             crews.forEach((crew, index) => {
                                 console.log(`  ${index + 1}. ${crew.name || crew.employee_id || crew.CrewID || 'Unknown'}`);
                             });
                         } else {
-                            console.warn("âš ï¸ No crews found for department:", deptNameForShipside);
-                            // alert("âš ï¸ No crew members found for this department.");
+                            console.warn("⚠️ No crews found for department:", deptNameForShipside);
+                            // alert("⚠️ No crew members found for this department.");
                         }
                         // --- END: Display the Crew list ---
                     } catch (crewListError) {
                         // Handle network errors or other issues during the crew list fetch
-                        console.error("ðŸ’¥ Error during crew list fetch process:", crewListError);
+                        console.error("💥 Error during crew list fetch process:", crewListError);
                         // alert(`Notification saved, but there was an error fetching crew list: ${crewListError.message}`);
                     }
                     console.log("=== Finished Crew List Display Process ===");
@@ -2697,7 +2697,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                     <path d="M12 14l-4-4m4 4l4-4"></path>
                                     <path d="M12 14v6"></path>
                                 </svg>
-                                <span>Add filesâ€¦</span>
+                                <span>Add files…</span>
                                 <input type="file" className="hidden" multiple onChange={handleFileChange} accept=".pdf" />
                             </label>
                             {files.length > 0 && (
@@ -3206,7 +3206,7 @@ const Admin = ({ onNotificationSubmit }) => {
                             <div className="mb-3">
                                 <strong>Body / Instructions:</strong><br />
                                 <div className="bg-sky-50 p-3 rounded-md mt-1 border border-sky-200 whitespace-pre-wrap">
-                                    {viewingRequest.details.body || 'â€”'}
+                                    {viewingRequest.details.body || '—'}
                                 </div>
                             </div>
 
@@ -3220,7 +3220,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                         {/* Construct the full URL using the backend host and the path from the API response */}
                                         {/* Ensure the URL starts with  (or your actual backend URL) */}
                                         <a
-                                            href={/^https?:\/\//i.test(viewingRequest.attachment_url) ? viewingRequest.attachment_url : "http://localhost:8000" + viewingRequest.attachment_url} //Correctly prepend the base URL
+                                            href={/^https?:\/\//i.test(viewingRequest.attachment_url) ? viewingRequest.attachment_url : "" + viewingRequest.attachment_url} //Correctly prepend the base URL
                                             target="_blank" // Opens the PDF in a new tab
                                             rel="noopener noreferrer" // Security best practice for target="_blank"
                                             className="inline-flex items-center px-3 py-1 border border-sky-300 text-sm font-medium rounded-md text-sky-700 bg-white hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-200"
@@ -3379,7 +3379,7 @@ const Admin = ({ onNotificationSubmit }) => {
                         <div className="mb-3">
                             <strong>Body / Instructions:</strong><br />
                             <div className="bg-sky-50 p-3 rounded-md mt-1 border border-sky-200 whitespace-pre-wrap">
-                                {viewingRequest.details.body || 'â€”'}
+                                {viewingRequest.details.body || '—'}
                             </div>
                         </div>
 
@@ -3390,7 +3390,7 @@ const Admin = ({ onNotificationSubmit }) => {
                                 <div className="mt-2">
 
                                     <a
-                                        href={/^https?:\/\//i.test(viewingRequest.attachment_url) ? viewingRequest.attachment_url : "http://localhost:8000" + viewingRequest.attachment_url}
+                                        href={/^https?:\/\//i.test(viewingRequest.attachment_url) ? viewingRequest.attachment_url : "" + viewingRequest.attachment_url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center px-3 py-2 border border-sky-300 text-sm font-medium rounded-md text-sky-700 bg-white hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors duration-200"

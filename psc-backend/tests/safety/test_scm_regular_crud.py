@@ -86,14 +86,16 @@ class CountingWRHFetcher:
         self.fetch_many_count = 0
 
     def fetch_timezone_offset(self, *, vessel_id, meeting_date):
-        return None
+        return 330
 
     def fetch_24h_and_7d(self, *, crew_id, meeting_date, vessel_id):
         self.fetch_24h_count += 1
         return {
-            "timezone_offset_minutes": None,
+            "timezone_offset_minutes": 330,
             "warning_codes": [],
+            "warnings": [],
             "wrh_data_available": True,
+            "wrh_flag": "GREEN",
             "wrh_rest_hours_24h": "12.00",
             "wrh_rest_hours_7d": "77.00",
             "wrh_non_compliance_flag": False,
@@ -103,12 +105,53 @@ class CountingWRHFetcher:
         self.fetch_many_count += 1
         return {
             str(crew_id): {
-                "timezone_offset_minutes": None,
+                "timezone_offset_minutes": 330,
                 "warning_codes": [],
+                "warnings": [],
                 "wrh_data_available": True,
+                "wrh_flag": "GREEN",
                 "wrh_rest_hours_24h": "12.00",
                 "wrh_rest_hours_7d": "77.00",
                 "wrh_non_compliance_flag": False,
+            }
+            for crew_id in crew_ids
+        }
+
+
+class MissingShipTimeWRHFetcher(CountingWRHFetcher):
+    def fetch_timezone_offset(self, *, vessel_id, meeting_date):
+        return None
+
+    def fetch_many_24h_and_7d(self, *, crew_ids, meeting_date, vessel_id):
+        self.fetch_many_count += 1
+        return {
+            str(crew_id): {
+                "timezone_offset_minutes": None,
+                "warning_codes": ["missing_timezone"],
+                "warnings": ["WRH ship-time configuration unavailable for this vessel/date."],
+                "wrh_data_available": True,
+                "wrh_flag": "GREEN",
+                "wrh_non_compliance_flag": False,
+                "wrh_rest_hours_24h": "12.00",
+                "wrh_rest_hours_7d": "77.00",
+            }
+            for crew_id in crew_ids
+        }
+
+
+class MissingCrewWRHFetcher(CountingWRHFetcher):
+    def fetch_many_24h_and_7d(self, *, crew_ids, meeting_date, vessel_id):
+        self.fetch_many_count += 1
+        return {
+            str(crew_id): {
+                "timezone_offset_minutes": 330,
+                "warning_codes": ["missing_data"] if str(crew_id) == "ce-7" else [],
+                "warnings": ["WRH data unavailable for the requested crew/date."] if str(crew_id) == "ce-7" else [],
+                "wrh_data_available": str(crew_id) != "ce-7",
+                "wrh_flag": "RED" if str(crew_id) == "ce-7" else "GREEN",
+                "wrh_non_compliance_flag": False,
+                "wrh_rest_hours_24h": None if str(crew_id) == "ce-7" else "12.00",
+                "wrh_rest_hours_7d": None if str(crew_id) == "ce-7" else "77.00",
             }
             for crew_id in crew_ids
         }
@@ -202,8 +245,9 @@ class SCMRegularCrudTests(unittest.TestCase):
 
     def setUp(self) -> None:
         recreate_scm_tables()
+        FastSCMRepository.wrh_fetcher = CountingWRHFetcher()
         self.factory = APIRequestFactory()
-        self.list_create_view = SCMListCreateView.as_view()
+        self.list_create_view = FastSCMListCreateView.as_view()
         self.detail_view = SCMDetailView.as_view()
         self.submit_view = SCMSubmitView.as_view()
         self.attendance_view = SCMAttendanceListCreateView.as_view()
@@ -385,6 +429,35 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(attendance_rows[1].crew_id, "co-7")
         self.assertTrue(attendance_rows[1].present)
 
+    def test_regular_create_blocks_when_ship_time_is_not_configured(self) -> None:
+        FastSCMRepository.wrh_fetcher = MissingShipTimeWRHFetcher()
+        request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 400)
+        readiness = response.data["wrh_host_readiness"]
+        self.assertFalse(readiness["ready"])
+        self.assertTrue(readiness["missing_ship_time"])
+        self.assertIn("SCM cannot be hosted until ship time is configured for this vessel/date.", readiness["warnings"])
+        self.assertEqual(SCMMeeting.objects.count(), 0)
+
+    def test_regular_create_blocks_when_any_attendee_wrh_data_is_missing(self) -> None:
+        FastSCMRepository.wrh_fetcher = MissingCrewWRHFetcher()
+        request = self.factory.post("/api/safety/scm/", build_payload(), format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 400)
+        readiness = response.data["wrh_host_readiness"]
+        self.assertFalse(readiness["ready"])
+        self.assertFalse(readiness["missing_ship_time"])
+        self.assertIn("WRH data is unavailable for Chief Engineer Seven.", readiness["warnings"])
+        self.assertEqual(readiness["blocking_crew"][0]["crew_id"], "ce-7")
+        self.assertEqual(SCMMeeting.objects.count(), 0)
+
     def test_create_and_edit_batch_wrh_lookup(self) -> None:
         FastSCMRepository.wrh_fetcher = CountingWRHFetcher()
         list_create_view = FastSCMListCreateView.as_view()
@@ -397,7 +470,7 @@ class SCMRegularCrudTests(unittest.TestCase):
 
         self.assertEqual(create_response.status_code, 201)
         self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_24h_count, 0)
-        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_many_count, 1)
+        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_many_count, 2)
         self.assertTrue(
             all(
                 row.wrh_data_available
@@ -426,7 +499,7 @@ class SCMRegularCrudTests(unittest.TestCase):
 
         self.assertEqual(patch_response.status_code, 200)
         self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_24h_count, 0)
-        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_many_count, 2)
+        self.assertEqual(FastSCMRepository.wrh_fetcher.fetch_many_count, 3)
         self.assertTrue(
             all(
                 row.wrh_data_available
@@ -654,12 +727,12 @@ class SCMRegularCrudTests(unittest.TestCase):
 
     def test_finalize_blocks_when_attendance_is_missing(self) -> None:
         payload = build_payload()
-        payload["attendance_rows"] = []
         payload["sections"] = build_legacy_sections()
         create_request = self.factory.post("/api/safety/scm/", payload, format="json")
         force_authenticate(create_request, user=build_user(role_name="CO", user_id="co-7"))
         create_response = self.list_create_view(create_request)
         self.assertEqual(create_response.status_code, 201)
+        SCMAttendance.objects.filter(meeting_id=create_response.data["id"]).delete()
 
         submit_request = self.factory.post(
             f"/api/safety/scm/{create_response.data['id']}/submit/",

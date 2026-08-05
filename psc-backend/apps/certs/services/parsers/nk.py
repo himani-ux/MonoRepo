@@ -4,7 +4,7 @@ from datetime import datetime
 import re
 from typing import Any
 
-from apps.certs.services.parsers.base import BaseClassParser, clean_space, first_match, row, strip_ignored_sections
+from apps.certs.services.parsers.base import BaseClassParser, clean_space, condition_row, first_match, row, strip_ignored_sections
 
 
 NK_DATE = r"\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}"
@@ -21,6 +21,7 @@ class NKClassParser(BaseClassParser):
         status_text = normalized.split("Survey History", 1)[0]
         lines = strip_ignored_sections([clean_space(line) for line in status_text.splitlines() if clean_space(line)])
         rows: list[dict[str, Any]] = []
+        conditions = _parse_conditions(lines)
         current_section = ""
 
         in_status_section = False
@@ -37,6 +38,9 @@ class NKClassParser(BaseClassParser):
             if parsed:
                 rows.append(parsed)
 
+        for condition in conditions:
+            rows.append(_condition_to_row(condition))
+
         return {
             "schema_version": 1,
             "parser_version": self.parser_version,
@@ -50,7 +54,7 @@ class NKClassParser(BaseClassParser):
             },
             "printed_on_date": _to_iso(first_match(r"Printed on\s+(\d{2}\.+[A-Za-z]{3}\.+\d{4})", metadata_text)),
             "rows": rows,
-            "conditions_of_class": [],
+            "conditions_of_class": conditions,
             "unmapped_rows": [],
             "text_extraction": {"engine": "pdfplumber", "page_count": page_count, "char_count": len(text)},
         }
@@ -124,6 +128,62 @@ def _parse_status_line(line: str, current_section: str) -> dict[str, Any] | None
         next_due_date=iso_dates[0],
         raw_text=line,
     )
+
+
+def _parse_conditions(lines: list[str]) -> list[dict[str, Any]]:
+    conditions: list[dict[str, Any]] = []
+    target_sections = {"condition of class"}
+    stop_sections = target_sections | {"condition of installation", "condition of statutory survey"}
+    for index, line in enumerate(lines):
+        section_key = clean_space(line).lower()
+        if section_key not in target_sections:
+            continue
+        section = clean_space(line)
+        content: list[str] = []
+        for next_line in lines[index + 1 :]:
+            cleaned = clean_space(next_line)
+            if not cleaned:
+                continue
+            lowered = cleaned.lower()
+            if lowered == "note" or lowered in stop_sections or re.match(r"^\d+\.\.?\s+", cleaned):
+                break
+            if cleaned.startswith("NK-SHIPS") or cleaned.startswith("NIPPON KAIJI KYOKAI") or cleaned.startswith("Page "):
+                break
+            content.append(cleaned)
+        text = clean_space(" ".join(content))
+        if not text or _is_nil_condition(text):
+            continue
+        due_date = _condition_due_date(text)
+        text_without_due = clean_space(re.sub(r"\(?\s*DueDate\s*:\s*[^)]+\)?", "", text, flags=re.IGNORECASE))
+        condition_id = f"NK-{re.sub(r'[^A-Z0-9]+', '-', section.upper()).strip('-')}-{len(conditions) + 1}"
+        conditions.append(condition_row(condition_id, text_without_due or text, section, due_date))
+    return conditions
+
+
+def _condition_to_row(condition: dict[str, Any]) -> dict[str, Any]:
+    return row(
+        class_society="NK",
+        class_code_or_name=condition["id"],
+        source_section=condition.get("section") or "Condition of Class",
+        row_type="condition",
+        raw_text=condition["text"],
+        due_date=condition.get("due_date"),
+        postponed_until=condition.get("due_date"),
+        condition_id=condition["id"],
+        display_name=condition.get("section") or condition["id"],
+    )
+
+
+def _condition_due_date(text: str) -> str | None:
+    match = re.search(r"DueDate\s*:\s*([0-9]{1,2}\s+[A-Z][a-z]{2}\s+[0-9]{4}|--)", text)
+    if not match or match.group(1) == "--":
+        return None
+    return _to_iso(match.group(1))
+
+
+def _is_nil_condition(text: str) -> bool:
+    cleaned = re.sub(r"\(?\s*DueDate\s*:\s*--\s*\)?", "", text, flags=re.IGNORECASE)
+    return clean_space(cleaned).strip(".- ").lower() in {"nil", "none", "n/a", "na"}
 
 
 def _to_iso(value: str | None) -> str | None:

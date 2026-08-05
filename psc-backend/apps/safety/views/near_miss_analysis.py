@@ -212,7 +212,10 @@ class NearMissAnalysisEvidencePhotoView(NearMissAnalysisViewMixin, generics.Gene
     lookup_url_kwarg = "id"
 
     def get(self, request, *args, **kwargs):
-        near_miss = self.get_near_miss()
+        queryset = self._apply_filters(Incident.objects.filter(is_deleted=False))
+        near_miss = get_by_id_or_pk(queryset, self.kwargs[self.lookup_url_kwarg])
+        if near_miss.record_type != Incident.RecordType.NEAR_MISS:
+            raise ValidationError("Photo attachments are only available for near-miss records.")
         evidence_item = get_by_id_or_pk(near_miss.evidence_items.all(), kwargs["evidence_id"])
         metadata = evidence_item.metadata_json or {}
         attachment_path = str(metadata.get("attachment_path") or "").strip()

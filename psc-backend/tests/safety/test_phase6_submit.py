@@ -50,7 +50,7 @@ class Phase6SubmitTests(unittest.TestCase):
             narrative="Phase 6 record with neutral investigation language.",
         )
 
-    def test_yellow_band_requires_all_three_recommendation_tiers(self) -> None:
+    def test_yellow_band_preventive_recommendation_without_alarp_fields_can_advance(self) -> None:
         Recommendation.objects.create(
             incident=self.incident,
             tier=Recommendation.Tier.CORRECTIVE,
@@ -66,17 +66,16 @@ class Phase6SubmitTests(unittest.TestCase):
             theme_code="EQUIPMENT_MANAGEMENT",
             title="Standardise electrical inspection checklist",
             description="Fleet-wide preventive action.",
-            estimated_effort="2 superintendent days",
-            estimated_likelihood_reduction="MED",
-            residual_risk_statement="Residual electrical risk becomes tolerable after checklist control.",
-            alarp_attested=True,
             created_by="dpa-1",
             updated_by="dpa-1",
             schema_version=1,
         )
 
-        with self.assertRaises(PhaseTransitionError):
-            self.machine.transition(self.incident.id, 7, build_user())
+        result = self.machine.transition(self.incident.id, 7, build_user())
+
+        self.incident.refresh_from_db()
+        self.assertEqual(result["phase_to"], 7)
+        self.assertTrue(self.incident.alarp_attested)
 
     def test_green_band_requires_at_least_one_recommendation(self) -> None:
         incident = Incident.objects.create(

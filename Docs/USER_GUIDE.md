@@ -112,7 +112,8 @@ A **Corrective Action Report (CAR)** is automatically created for each deficienc
 3. Enter follow-up date, port, and authority
 4. Select deficiencies to include
 5. Set action codes for each (default: 10 = Rectified)
-6. Click **Submit**
+6. Optionally attach up to three PDF follow-up reports
+7. Click **Submit**
 
 ---
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
 import unittest
 
 from PyPDF2 import PdfReader
 from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.units import mm
 
 from tests.safety.support import bootstrap_django, recreate_incident_table
 
@@ -57,6 +58,33 @@ class IncidentPdfSectionTests(unittest.TestCase):
             ["Generated at", "01 Jul 2026, 05:28", "", ""],
         )
 
+    def test_full_width_detail_block_uses_single_column_without_filler_label(self) -> None:
+        template = IncidentTenSectionTemplate()
+        comment = (
+            "Closure comment with  two spaces and no separate field label. "
+            + "This sentence is intentionally repeated to exceed the generic chunk threshold. " * 20
+            + "\nTyped second line remains part of the same comment block."
+        )
+
+        story = template._build_detail_blocks(
+            [
+                IncidentPdfDetailBlock(
+                    "Office comments/ lesson learnt",
+                    [("", comment)],
+                )
+            ]
+        )
+
+        table = story[0]
+        self.assertEqual(table._colWidths, [170 * mm])
+        self.assertEqual(len(table._cellvalues), 2)
+        self.assertEqual(table._cellvalues[0][0].getPlainText(), "Office comments/ lesson learnt")
+        self.assertIn("with &#160;two spaces", template._format_plain_text_preserving_spacing(comment))
+        content_text = table._cellvalues[1][0].getPlainText()
+        self.assertIn("Closure comment with", content_text)
+        self.assertIn("two spaces and no separate field label.", content_text)
+        self.assertIn("Typed second line remains part of the same comment block.", content_text)
+
     def test_renderer_outputs_incident_report_without_duplicate_sections(self) -> None:
         incident = Incident.objects.create(
             incident_number="KSM-INC-2026-0042",
@@ -67,6 +95,8 @@ class IncidentPdfSectionTests(unittest.TestCase):
             imo_classifier=Incident.ImoClassifier.MC,
             occurred_at=datetime.fromisoformat("2026-04-27T10:15:00+00:00"),
             reported_at=datetime.fromisoformat("2026-04-27T11:30:00+00:00"),
+            vessel_location="In Port",
+            vessel_location_detail="Singapore",
             reporter_id="rep-7",
             reporter_name="Reporter Seven",
             reporter_rank="Chief Officer",
@@ -142,7 +172,7 @@ class IncidentPdfSectionTests(unittest.TestCase):
             created_by="dpa-7",
             schema_version=1,
         )
-        recommendation = Recommendation.objects.create(
+        lessons_recommendation = Recommendation.objects.create(
             incident=incident,
             tier=Recommendation.Tier.LESSONS_LEARNT,
             title="Fleet ladder-condition alert",
@@ -151,37 +181,90 @@ class IncidentPdfSectionTests(unittest.TestCase):
             created_by="dpa-7",
             schema_version=1,
         )
+        corrective_recommendation = Recommendation.objects.create(
+            incident=incident,
+            tier=Recommendation.Tier.CORRECTIVE,
+            title="Replace anti-slip strip",
+            description="Fit a new anti-slip strip.",
+            created_by="dpa-7",
+            schema_version=1,
+        )
+        preventive_recommendation = Recommendation.objects.create(
+            incident=incident,
+            tier=Recommendation.Tier.PREVENTIVE,
+            title="Improve housekeeping inspection",
+            description="Add housekeeping verification before purifier work.",
+            created_by="dpa-7",
+            schema_version=1,
+        )
         corrective_action = CorrectiveAction.objects.create(
             source_table="vims_safety_incident",
             source_id=incident.pk,
-            recommendation=recommendation,
+            recommendation=corrective_recommendation,
             title="Replace anti-slip edge strip",
             description="Fit a new anti-slip strip and inspect adjacent access points.",
+            due_date=date(2026, 5, 10),
             status=CorrectiveAction.Status.IN_PROGRESS,
+            physical_verification_note="Vessel later confirmed the strip was fitted.",
+            closed_at=datetime.fromisoformat("2026-05-12T08:30:00+00:00"),
+            created_by="dpa-7",
+            schema_version=1,
+        )
+        CorrectiveAction.objects.create(
+            source_table="vims_safety_incident",
+            source_id=incident.pk,
+            recommendation=preventive_recommendation,
+            title="Add housekeeping verification",
+            description="Add a pre-job housekeeping verification before purifier platform work.",
+            due_date=date(2026, 5, 15),
+            status=CorrectiveAction.Status.OPEN,
+            physical_verification_note="Preventive verification is intentionally not printed.",
             created_by="dpa-7",
             schema_version=1,
         )
         RecommendationVerification.objects.create(
-            recommendation=recommendation,
+            recommendation=corrective_recommendation,
             is_effective=False,
             residual_risk="MEDIUM",
             verified_by="dpa-7",
             notes="Awaiting vessel close-out confirmation.",
         )
 
-        result = IncidentPdfRenderer().render_incident_pdf(incident_id=incident.pk, viewer_user=None, persist=False)
+        renderer = IncidentPdfRenderer()
+        context = renderer._build_context(incident)
+        actions_by_heading = {block.heading: block for block in context.action_blocks}
+        self.assertEqual(
+            actions_by_heading["Corrective Actions"].rows,
+            [
+                (
+                    "",
+                    "Fit a new anti-slip strip and inspect adjacent access points.\nDue Date: 2026-05-10",
+                )
+            ],
+        )
+        self.assertEqual(
+            actions_by_heading["Preventive Actions"].rows,
+            [
+                (
+                    "",
+                    "Add a pre-job housekeeping verification before purifier platform work.\nDue Date: 2026-05-15",
+                )
+            ],
+        )
+
+        result = renderer.render_incident_pdf(incident_id=incident.pk, viewer_user=None, persist=False)
 
         self.assertTrue(result.content.startswith(b"%PDF"))
         self.assertEqual(result.section_titles, [
             "Summary",
             "Reporter Details",
             "Injury Details",
-            "Estimated Cost",
-            "Root Cause",
+            "Root Cause Analysis",
+            "Corrective and Preventive Actions",
             "Evidence (Documents)",
-            "Corrective / Preventive Actions",
             "Lessons Learned",
             "Signature",
+            "Estimated Cost",
         ])
 
         reader = PdfReader(BytesIO(result.content))
@@ -190,14 +273,14 @@ class IncidentPdfSectionTests(unittest.TestCase):
         for title in [
             "Summary",
             "Reporter Details",
-            "Root Cause",
+            "Root Cause Analysis",
             "Evidence (Documents)",
-            "Corrective / Preventive Actions",
+            "Corrective and Preventive Actions",
             "Lessons Learned",
         ]:
             self.assertIn(title, text)
         self.assertIn("KSM-INC-2026-0042", text)
-        self.assertIn("Root Cause", text)
+        self.assertIn("Root Cause Analysis", text)
         self.assertNotIn("Attachments", text)
         self.assertNotIn("Attachment 1", text)
         self.assertNotIn("Document 1", text)
@@ -207,34 +290,68 @@ class IncidentPdfSectionTests(unittest.TestCase):
         self.assertNotIn("Retain for appendix.", text)
         self.assertIn("Purifier platform condition", text)
         self.assertIn("photo-set-a.jpg", text)
+        self.assertIn("Vessel location", text)
+        self.assertIn("In Port - Singapore", text)
+        self.assertNotIn("Specific vessel", text)
         self.assertNotIn("Fleet ladder-condition alert", text)
         self.assertNotIn("Corrective action - Replace anti-slip edge strip", text)
-        self.assertEqual(text.count("Corrective action"), 1)
+        self.assertIn("Corrective Actions", text)
+        self.assertIn("Preventive Actions", text)
+        self.assertNotIn("Corrective action", text)
+        self.assertLess(
+            text.index("Corrective Actions\nFit a new anti-slip strip"),
+            text.index("Preventive Actions\nAdd a pre-job housekeeping verification"),
+        )
+        self.assertLess(
+            text.index("Preventive Actions\nAdd a pre-job housekeeping verification"),
+            text.index("Evidence (Documents)"),
+        )
         self.assertIn("Fit a new anti-slip strip and inspect adjacent access points.", text)
+        self.assertIn("Due Date:", text)
+        self.assertNotIn("Due date:", text)
+        self.assertIn("2026-05-10", text)
+        self.assertIn("Add a pre-job housekeeping verification before purifier platform", text)
+        self.assertIn("work.", text)
+        self.assertIn("2026-05-15", text)
+        self.assertNotIn("Status:", text)
+        self.assertNotIn("In Progress", text)
+        self.assertNotIn("Physical verification note", text)
+        self.assertNotIn("Vessel later confirmed the strip was fitted.", text)
+        self.assertNotIn("Preventive verification is intentionally not printed.", text)
+        self.assertNotIn("Closed at:", text)
+        self.assertNotIn("12 May 2026", text)
+        self.assertNotIn("Verification 1", text)
+        self.assertNotIn("Awaiting vessel close-out confirmation.", text)
         self.assertIn("27 Apr 2026", text)
-        self.assertEqual(text.count("Root Cause"), 2)
-        self.assertEqual(text.count("Cause 1"), 1)
-        self.assertEqual(text.count("Cause 2"), 1)
-        self.assertIn("Cause factor: Management", text)
-        self.assertIn("Cause:", text)
+        self.assertLess(text.index("Summary"), text.index("Engine-room slip while inspecting purifier platform"))
+        self.assertLess(text.index("Engine-room slip while inspecting purifier platform"), text.index("Root Cause Analysis"))
+        self.assertEqual(text.count("Root Cause Analysis"), 1)
+        self.assertNotIn("Cause 1", text)
+        self.assertNotIn("Cause 2", text)
+        self.assertIn("Cause factor", text)
+        self.assertIn("Management", text)
+        self.assertIn("Cause", text)
         self.assertNotIn("Cause option", text)
         self.assertNotIn("Management Factor", text)
         self.assertNotIn("Vessel Factor", text)
         self.assertNotIn("Human Factor", text)
-        self.assertIn("Reason:", text)
+        self.assertIn("Reason", text)
         self.assertNotIn("Rationale:", text)
         self.assertNotIn("Other detail", text)
         self.assertNotIn("Source fact", text)
         self.assertNotIn("M-SCAT category", text)
         self.assertEqual(text.count("Issue a ladder housekeeping lesson to all vessels."), 1)
         self.assertNotIn("The same purifier ladder layout exists fleet-wide.", text)
-        self.assertIn("Closure reason", text)
-        self.assertIn("Office Review", text)
+        self.assertIn("Office comments/ lesson learnt", text)
         self.assertIn("Office reviewed and accepted with loss evaluation pending.", text)
-        self.assertIn("DPA accepted the corrective actions and closed the incident after final review.", text)
-        self.assertLess(text.index("Lessons Learned"), text.index("Closure reason"))
-        self.assertLess(text.index("Office Review"), text.index("Signature"))
-        self.assertLess(text.index("Closure reason"), text.index("Signature"))
+        self.assertNotIn("\nComment\n", text)
+        self.assertNotIn("Closure reason", text)
+        self.assertNotIn("DPA accepted the corrective actions and closed the incident after final review.", text)
+        self.assertLess(text.index("Lessons Learned"), text.index("Office comments/ lesson learnt"))
+        self.assertLess(text.index("Office comments/ lesson learnt"), text.index("Signature"))
+        self.assertNotIn("Master signature", text)
+        self.assertNotIn("HOD signature", text)
+        self.assertIn("PIC / DPA office", text)
         self.assertNotIn("Recommendation - Fleet ladder-condition alert", text)
         self.assertNotIn("Prepared by", text)
         self.assertNotIn("8. Office Review and Fleet Alert", text)
@@ -248,7 +365,7 @@ class IncidentPdfSectionTests(unittest.TestCase):
         incident.shore_assistance_required = True
         incident.vessel_location = "At sea"
         incident.onboard_location = "Main deck"
-        incident.last_port = "Singapore"
+        incident.last_port = "Incident Legacy Last Port"
         incident.departure_date = "2026-06-03"
         incident.vessel_condition = "LOADED"
         incident.save(
@@ -270,6 +387,7 @@ class IncidentPdfSectionTests(unittest.TestCase):
             nature_of_injury="Cuts / Lacerations",
             source_of_injury="Sharp edge",
             affected_body_areas="Right hand",
+            last_port="Injury Legacy Last Port",
             first_aid_details="Wound cleaned and dressed onboard.",
             why_it_happened_analysis="Sharp edge was not identified during pre-job inspection.",
             risk_assessment_carried_out="YES",
@@ -288,14 +406,23 @@ class IncidentPdfSectionTests(unittest.TestCase):
         text = self._extract_pdf_text(result.content)
         self.assertIn("Injury Report", text)
         self.assertLess(text.index("Injury Report"), text.index("Summary"))
+        self.assertRegex(text, r"Describe What\s+happened\?")
+        self.assertIn("Incident report title regression check.", text)
+        self.assertLess(text.index("Reporter Details"), text.index("Describe What"))
+        self.assertLess(text.index("Describe What"), text.index("Injury Details"))
+        self.assertLess(text.index("Reporter Details"), text.index("Incident report title regression check."))
+        self.assertLess(text.index("Incident report title regression check."), text.index("Injury Details"))
         self.assertIn("Injury details", text)
         self.assertIn("Type of activity", text)
         self.assertIn("Hot work", text)
         self.assertIn("Shore assistance", text)
         self.assertIn("At sea", text)
         self.assertIn("Main deck", text)
-        self.assertIn("Singapore", text)
+        self.assertNotIn("Last port", text)
+        self.assertNotIn("Incident Legacy Last Port", text)
+        self.assertNotIn("Injury Legacy Last Port", text)
         self.assertIn("Loaded", text)
+        self.assertNotIn("Crew member cut hand while preparing hot work shielding.", text)
         self.assertIn("Cuts / Lacerations", text)
         self.assertIn("Right hand", text)
         self.assertIn("Injury investigation", text)
@@ -341,11 +468,11 @@ class IncidentPdfSectionTests(unittest.TestCase):
         self.assertIn("Injury Report", text)
         self.assertIn("Summary", text)
         self.assertIn("Injury Details", text)
-        self.assertIn("Crew member cut hand while preparing hot work shielding.", text)
+        self.assertNotIn("Crew member cut hand while preparing hot work shielding.", text)
         self.assertNotIn("Reporter Details", text)
         self.assertNotIn("Estimated Cost", text)
         self.assertNotIn("Total estimated cost", text)
-        self.assertNotIn("Root Cause", text)
+        self.assertNotIn("Root Cause Analysis", text)
         self.assertNotIn("Evidence (Documents)", text)
 
     def test_pdf_estimated_cost_prints_loss_evaluation(self) -> None:
@@ -377,14 +504,17 @@ class IncidentPdfSectionTests(unittest.TestCase):
 
         text = self._extract_pdf_text(result.content)
         self.assertEqual(result.section_titles, ["Estimated Cost"])
-        self.assertIn("Loss Evaluation - Risk Assessment", text)
+        self.assertIn("Risk Assessment", text)
         self.assertIn("Major", text)
         self.assertIn("Possible", text)
         self.assertIn("High", text)
-        self.assertIn("Loss Evaluation - Other Details", text)
+        self.assertIn("Details", text)
+        self.assertNotIn("Other Details", text)
         self.assertIn("Master One", text)
         self.assertIn("Temporary repair completed onboard.", text)
-        self.assertIn("Loss Evaluation - Estimated Costs", text)
+        self.assertIn("Cost Evaluation", text)
+        self.assertIn("Estimated Costs", text)
+        self.assertNotIn("Loss Evaluation -", text)
         self.assertIn("150.00", text)
 
     def test_pdf_loss_evaluation_uses_saved_report_type_over_injury_presence(self) -> None:
@@ -537,14 +667,25 @@ class IncidentPdfSectionTests(unittest.TestCase):
         self.assertNotIn("Legacy con evidence should not print", text)
         self.assertNotIn("Legacy comment should not print", text)
 
-    def test_pdf_evidence_section_prints_saved_witness_notes(self) -> None:
+    def test_pdf_evidence_section_suppresses_saved_witness_statement_text(self) -> None:
         incident = self._create_exportable_incident("KSM-INC-2026-WITNESS")
-        WitnessInterview.objects.create(
+        first_interview = WitnessInterview.objects.create(
             incident=incident,
             witness_name="AB Witness",
             interview_type=WitnessInterview.InterviewType.INFORMAL,
             meeting_notes="Witness saw water on the deck before the slip.",
             conclusion_notes="Witness statement closed after read-back.",
+            reason_formal_impossible="Simplified witness note recorded from Phase 4.",
+            witness_signature="data:image/png;base64,YXR0YWNoZWQtc3RhdGVtZW50",
+            created_by="rep-7",
+            schema_version=1,
+        )
+        WitnessInterview.objects.create(
+            incident=incident,
+            witness_name="Bosun Witness",
+            interview_type=WitnessInterview.InterviewType.INFORMAL,
+            meeting_notes="Bosun saw the deck cleaned after the incident.",
+            conclusion_notes="Follow-up remark added by office.",
             reason_formal_impossible="Simplified witness note recorded from Phase 4.",
             created_by="rep-7",
             schema_version=1,
@@ -553,12 +694,22 @@ class IncidentPdfSectionTests(unittest.TestCase):
         renderer = IncidentPdfRenderer()
         context = renderer._build_context(incident, included_sections=["evidence_documents"])
 
-        self.assertEqual([block.heading for block in context.evidence_blocks], ["Witness Statement"])
+        blocks_by_heading = {block.heading: block for block in context.evidence_blocks}
         self.assertEqual(
-            context.evidence_blocks[0].rows,
+            set(blocks_by_heading),
+            {"Witness Statement - AB Witness", "Witness Statement - Bosun Witness"},
+        )
+        self.assertEqual(
+            blocks_by_heading["Witness Statement - AB Witness"].rows,
             [
-                ("Witness name", "AB Witness"),
-                ("What the witness said", "Witness saw water on the deck before the slip."),
+                (
+                    "Witness statement attachment",
+                    (
+                        "PDF_LINK::"
+                        f"/api/safety/incidents/{incident.id}/phase-4/interviews/{first_interview.id}/statement-attachment/"
+                        "::Witness statement attachment"
+                    ),
+                ),
                 ("Remark", "Witness statement closed after read-back."),
             ],
         )
@@ -573,12 +724,20 @@ class IncidentPdfSectionTests(unittest.TestCase):
         text = self._extract_pdf_text(result.content)
         self.assertIn("Evidence (Documents)", text)
         self.assertIn("Witness Statement", text)
-        self.assertIn("Witness name", text)
         self.assertIn("AB Witness", text)
-        self.assertIn("What the witness said", text)
-        self.assertIn("Witness saw water on the deck before the slip.", text)
+        self.assertNotIn("What the witness said", text)
+        self.assertNotIn("Witness saw water on the deck before the slip.", text)
+        self.assertIn("Witness statement attachment", text)
+        self.assertNotIn("Attached", text)
         self.assertIn("Remark", text)
         self.assertIn("Witness statement closed after read-back.", text)
+        self.assertIn("Witness Statement - Bosun Witness", text)
+        self.assertNotIn("Bosun saw the deck cleaned after the incident.", text)
+        self.assertIn("Follow-up remark added by office.", text)
+        self.assertNotIn("Witness name", text)
+        self.assertNotIn("Witness 1 name", text)
+        self.assertNotIn("What witness 1 said", text)
+        self.assertNotIn("Remark 1", text)
         self.assertNotIn("Interview type", text)
         self.assertNotIn("Reason formal impossible", text)
 

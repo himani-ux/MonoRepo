@@ -14,9 +14,13 @@ from apps.safety.models import (
     IncidentSafeguardFailure,
     MasterMscatTaxonomy,
     MasterSafetyBiasGuard,
+    NearMissCauseOption,
 )
 from apps.safety.services import BlameDetector
 from apps.safety.serializers.incident_phase4 import IncidentFactSerializer
+
+OTHER_ROOT_CAUSE_SUBCODE = "OTHER"
+MAX_ROOT_CAUSES = 3
 
 
 def _resolve_actor_id_from_context(context) -> str:
@@ -42,18 +46,26 @@ class IncidentCauseTagSerializer(serializers.ModelSerializer):
         source="source_fact",
         queryset=IncidentFact.objects.all(),
     )
+    mscat_subcode_id = serializers.CharField(required=False, allow_blank=True)
     mscat_description = serializers.SerializerMethodField()
     mscat_category_id = serializers.SerializerMethodField()
+    cause_factor_label = serializers.SerializerMethodField()
+    cause_stage = serializers.SerializerMethodField()
 
     class Meta:
         model = IncidentCauseTag
         fields = (
             "id",
-            "id",
             "source_fact_id",
             "mscat_subcode_id",
             "mscat_category_id",
             "mscat_description",
+            "cause_factor",
+            "cause_factor_label",
+            "cause_option_id",
+            "cause_option_text",
+            "cause_other_text",
+            "cause_stage",
             "causal_layer",
             "analysis_tool",
             "rationale",
@@ -64,9 +76,11 @@ class IncidentCauseTagSerializer(serializers.ModelSerializer):
         )
         read_only_fields = (
             "id",
-            "id",
             "mscat_category_id",
             "mscat_description",
+            "cause_factor_label",
+            "cause_option_text",
+            "cause_stage",
             "created_by",
             "created_date",
             "updated_by",
@@ -75,13 +89,42 @@ class IncidentCauseTagSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         incident: Incident = self.context["incident"]
-        source_fact = attrs["source_fact"]
+        source_fact = attrs.get("source_fact") or getattr(self.instance, "source_fact", None)
+        if source_fact is None:
+            raise serializers.ValidationError({"source_fact_id": "Select the evidence note for this cause."})
         if source_fact.incident_id != incident.pk:
             raise serializers.ValidationError({"source_fact": "Cause tags must reference a fact on the same incident."})
-        if not MasterMscatTaxonomy.objects.filter(subcode_id=attrs["mscat_subcode_id"], active=True).exists():
+        causal_layer = attrs.get("causal_layer") or getattr(self.instance, "causal_layer", None)
+        if causal_layer == IncidentCauseTag.CausalLayer.INTERMEDIATE:
+            raise serializers.ValidationError({"causal_layer": "Use Immediate Cause or Root Cause."})
+        mscat_subcode_id = str(attrs.get("mscat_subcode_id") or getattr(self.instance, "mscat_subcode_id", OTHER_ROOT_CAUSE_SUBCODE)).strip()
+        cause_option_id = attrs.get("cause_option_id", getattr(self.instance, "cause_option_id", None))
+        cause_stage = self._cause_stage_for_layer(causal_layer)
+        if cause_option_id:
+            option = NearMissCauseOption.objects.filter(id=cause_option_id, active=True).first()
+            if option is None:
+                raise serializers.ValidationError({"cause_option_id": "Select a valid cause factor option."})
+            if cause_stage and option.cause_stage != cause_stage:
+                raise serializers.ValidationError({"cause_option_id": "Cause option does not match the selected cause type."})
+            attrs["cause_factor"] = option.factor
+            attrs["cause_option_text"] = option.option_text
+            attrs["mscat_subcode_id"] = OTHER_ROOT_CAUSE_SUBCODE
+            cause_other_text = str(attrs.get("cause_other_text", getattr(self.instance, "cause_other_text", "")) or "").strip()
+            if option.option_text.strip().lower() == "other" and not cause_other_text:
+                raise serializers.ValidationError({"cause_other_text": "Specify the other cause."})
+            if option.option_text.strip().lower() != "other":
+                attrs["cause_other_text"] = ""
+        elif mscat_subcode_id != OTHER_ROOT_CAUSE_SUBCODE and not MasterMscatTaxonomy.objects.filter(subcode_id=mscat_subcode_id, active=True).exists():
             raise serializers.ValidationError({"mscat_subcode_id": "Unknown M-SCAT subcode."})
-        if not attrs["rationale"].strip():
+        rationale = str(attrs.get("rationale", getattr(self.instance, "rationale", "")) or "").strip()
+        if not rationale:
             raise serializers.ValidationError({"rationale": "Every cause code requires a free-text rationale."})
+        if causal_layer == IncidentCauseTag.CausalLayer.ROOT:
+            existing_roots = incident.cause_tags.filter(causal_layer=IncidentCauseTag.CausalLayer.ROOT)
+            if self.instance is not None:
+                existing_roots = existing_roots.exclude(pk=self.instance.pk)
+            if existing_roots.count() >= MAX_ROOT_CAUSES:
+                raise serializers.ValidationError({"causal_layer": "Maximum three root causes are allowed."})
         return attrs
 
     def create(self, validated_data):
@@ -106,12 +149,31 @@ class IncidentCauseTagSerializer(serializers.ModelSerializer):
         return instance
 
     def get_mscat_description(self, instance: IncidentCauseTag) -> str:
+        if instance.mscat_subcode_id == OTHER_ROOT_CAUSE_SUBCODE:
+            return "Other"
         row = MasterMscatTaxonomy.objects.filter(subcode_id=instance.mscat_subcode_id).first()
         return row.subcode_description if row is not None else ""
 
     def get_mscat_category_id(self, instance: IncidentCauseTag) -> int | None:
+        if instance.mscat_subcode_id == OTHER_ROOT_CAUSE_SUBCODE:
+            return None
         row = MasterMscatTaxonomy.objects.filter(subcode_id=instance.mscat_subcode_id).first()
         return row.category_id if row is not None else None
+
+    def get_cause_factor_label(self, instance: IncidentCauseTag) -> str:
+        labels = dict(NearMissCauseOption.Factor.choices)
+        return labels.get(instance.cause_factor or "", "")
+
+    def get_cause_stage(self, instance: IncidentCauseTag) -> str:
+        return self._cause_stage_for_layer(instance.causal_layer) or ""
+
+    @staticmethod
+    def _cause_stage_for_layer(causal_layer: str | None) -> str | None:
+        if causal_layer == IncidentCauseTag.CausalLayer.IMMEDIATE:
+            return NearMissCauseOption.CauseStage.IMMEDIATE
+        if causal_layer == IncidentCauseTag.CausalLayer.ROOT:
+            return NearMissCauseOption.CauseStage.ROOT
+        return None
 
 
 class IncidentPhase5AssessmentSerializer(serializers.ModelSerializer):
@@ -314,27 +376,7 @@ def build_phase5_workspace_payload(incident: Incident) -> dict[str, object]:
     except IncidentPhase5Assessment.DoesNotExist:
         assessment_payload = None
 
-    guard_rows = list(MasterSafetyBiasGuard.objects.filter(active=True).order_by("bit_position"))
-    response_map = {
-        row.guard_code: row for row in incident.bias_guard_responses.all()
-    }
     bias_guards = []
-    for guard in guard_rows:
-        response = response_map.get(guard.guard_code)
-        bias_guards.append(
-            {
-                "guard_code": guard.guard_code,
-                "guard_name": guard.guard_name,
-                "family": guard.family,
-                "bit_position": guard.bit_position,
-                "acknowledged": bool(response.acknowledged) if response else False,
-                "evaluation_state": response.evaluation_state if response else IncidentBiasGuardResponse.EvaluationState.UNCHECKED,
-                "justification": response.justification if response else None,
-            }
-        )
-
-    detector = BlameDetector()
-    evaluation = detector.evaluate_incident(incident)
     minimum_tools_required = 2
     if incident.risk_band == Incident.RiskBand.RED:
         minimum_tools_required = 5
@@ -352,10 +394,10 @@ def build_phase5_workspace_payload(incident: Incident) -> dict[str, object]:
         "safeguards": IncidentSafeguardFailureSerializer(incident.safeguard_failures.order_by("id"), many=True).data,
         "bias_guards": bias_guards,
         "blame_evaluation": {
-            "blocked": evaluation.blocked,
-            "trigger_terms": list(evaluation.trigger_terms),
-            "all_root_personal_factors": evaluation.all_root_personal_factors,
-            "has_lack_of_control": evaluation.has_lack_of_control,
+            "blocked": False,
+            "trigger_terms": [],
+            "all_root_personal_factors": False,
+            "has_lack_of_control": True,
             "override_by": incident.blame_fixation_override_by,
         },
         "analysis_tools_used": assessment_payload["analysis_tools_used"] if assessment_payload else [],

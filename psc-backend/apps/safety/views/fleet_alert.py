@@ -6,6 +6,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.safety.models import Incident
+from apps.safety.serializers import NearMissSerializer
 from apps.safety.services import FleetAlertIssueError, FleetAlertIssuer
 from apps.safety.views.near_miss import NearMissViewMixin, _normalized_role
 
@@ -64,10 +65,15 @@ class FleetAlertIssueView(NearMissViewMixin, generics.GenericAPIView):
         if _normalized_role(self.request.user) != "DPA":
             raise PermissionDenied("Fleet alert issuance is restricted to DPA.")
 
+    def _build_response_payload(self, near_miss: Incident) -> dict:
+        payload = self.get_fleet_alert_issuer().build_workspace_payload(near_miss, user=self.request.user)
+        payload["near_miss"] = NearMissSerializer(near_miss, context=self.get_serializer_context()).data
+        return payload
+
     def get(self, request, *args, **kwargs):
         near_miss = self.get_object()
         self._enforce_dpa_role()
-        payload = self.get_fleet_alert_issuer().build_workspace_payload(near_miss, user=request.user)
+        payload = self._build_response_payload(near_miss)
         return Response(payload, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
@@ -90,6 +96,6 @@ class FleetAlertIssueView(NearMissViewMixin, generics.GenericAPIView):
         except FleetAlertIssueError as exc:
             raise ValidationError(str(exc)) from exc
 
-        response_payload = self.get_fleet_alert_issuer().build_workspace_payload(near_miss, user=request.user)
+        response_payload = self._build_response_payload(near_miss)
         response_payload.update(payload)
         return Response(response_payload, status=status.HTTP_200_OK)

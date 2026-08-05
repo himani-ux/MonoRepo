@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Iterable
 
 from django.db import connection
+from django.db.models import Case, IntegerField, Value, When
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
@@ -20,6 +21,8 @@ from apps.safety.authentication.permissions import (
     HasRolePermission,
 )
 from apps.safety.models import (
+    IncidentWeatherOption,
+    InjuryDropdownOption,
     MasterImmediateCause,
     MasterLossType,
     MasterMscatTaxonomy,
@@ -31,6 +34,8 @@ from apps.safety.models import (
     SOIChecklistVersion,
 )
 from apps.safety.serializers import (
+    IncidentWeatherOptionSerializer,
+    InjuryDropdownOptionSerializer,
     MasterImmediateCauseSerializer,
     MasterLossTypeSerializer,
     MasterMscatTaxonomySerializer,
@@ -42,6 +47,43 @@ from apps.safety.serializers import (
     SOIChecklistVersionAdminSerializer,
 )
 from apps.safety.services.field_history_recorder import capture_model_state, record_field_changes, resolve_actor_id
+from apps.safety.services.incident_weather_schema_guard import ensure_incident_weather_runtime_schema
+
+
+CURRENT_INCIDENT_TYPE_ORDER = (
+    "INC_COLLISION",
+    "INC_GROUNDING",
+    "INC_STRANDING",
+    "INC_TOUCHED_BOTTOM_BERTH_ANCHORAGE",
+    "INC_TOUCHED_BOTTOM_RIVERS_CANALS",
+    "INC_ALLISION_JETTY_BERTH_LOCKS",
+    "INC_ALLISION_OTHER_VESSELS",
+    "INC_ALLISION_ICE",
+    "INC_ALLISION_NAV_AIDS_BUOYS_OBJECTS",
+    "INC_FOUNDERING",
+    "INC_CAPSIZING_LOSS_STABILITY",
+    "INC_FLOODING",
+    "INC_EXPLOSION",
+    "INC_FIRE",
+    "INC_CARGO_DAMAGE",
+    "INC_HULL_STRUCTURAL_FAILURE",
+    "INC_FOULING_PIPELINE_SUBMARINE_CABLE",
+    "INC_FOULING_AID_TO_NAVIGATION",
+    "INC_FOULING_PORT_TERMINAL_INSTALLATION",
+    "INC_EQUIPMENT_FAILURE_ELECTRICAL_POWER",
+    "INC_EQUIPMENT_FAILURE_PROPULSION",
+    "INC_EQUIPMENT_FAILURE_STEERING",
+    "INC_EQUIPMENT_FAILURE_CARGO_DELAY",
+    "INC_EQUIPMENT_FAILURE_UNSEAWORTHY",
+    "INC_EQUIPMENT_OR_HULL_CARGO_DAMAGE",
+    "INC_CREW_INJURY",
+    "INC_POLLUTION",
+    "INC_LOCAL_REGULATION_BREACH",
+    "INC_STOWAWAY",
+    "INC_SECURITY",
+    "INC_CYBER_SECURITY_BREACH",
+    "INC_OTHER",
+)
 
 
 _NUMBER_RE = re.compile(r"\d+")
@@ -382,8 +424,21 @@ class ReferenceBiasGuardListView(ReferenceListView):
 
 
 class ReferenceIncidentTypeListView(ReferenceListView):
-    queryset = MasterSafetyIncidentType.objects.order_by("type_code")
     serializer_class = MasterSafetyIncidentTypeSerializer
+
+    def get_queryset(self):
+        ordering = Case(
+            *[
+                When(type_code=type_code, then=Value(index))
+                for index, type_code in enumerate(CURRENT_INCIDENT_TYPE_ORDER)
+            ],
+            default=Value(len(CURRENT_INCIDENT_TYPE_ORDER)),
+            output_field=IntegerField(),
+        )
+        return MasterSafetyIncidentType.objects.annotate(_incident_type_order=ordering).order_by(
+            "_incident_type_order",
+            "type_code",
+        )
 
 
 class ReferenceIncidentTypeDetailView(ReferenceDetailView):
@@ -397,6 +452,43 @@ class ReferenceIncidentTypeDetailView(ReferenceDetailView):
         "active",
     )
     write_reason = "DPA updated incident-type taxonomy."
+
+
+class ReferenceIncidentWeatherOptionListView(ReferenceListView):
+    serializer_class = IncidentWeatherOptionSerializer
+
+    def get_permissions(self):
+        return [HasFormPermission.requiring("SAF_F_001")()]
+
+    def get_queryset(self):
+        ensure_incident_weather_runtime_schema()
+        queryset = IncidentWeatherOption.objects.filter(active=True).order_by(
+            "field_key",
+            "display_order",
+            "option_label",
+        )
+        field_key = self.request.query_params.get("field_key")
+        if field_key not in (None, ""):
+            queryset = queryset.filter(field_key=str(field_key).strip().upper())
+        return queryset
+
+
+class ReferenceInjuryDropdownOptionListView(ReferenceListView):
+    serializer_class = InjuryDropdownOptionSerializer
+
+    def get_permissions(self):
+        return [HasFormPermission.requiring("SAF_F_001")()]
+
+    def get_queryset(self):
+        queryset = InjuryDropdownOption.objects.filter(active=True).order_by(
+            "field_key",
+            "display_order",
+            "option_label",
+        )
+        field_key = self.request.query_params.get("field_key")
+        if field_key not in (None, ""):
+            queryset = queryset.filter(field_key=str(field_key).strip().upper())
+        return queryset
 
 
 class ReferenceCaseStudyListCreateView(ReferenceListCreateView):

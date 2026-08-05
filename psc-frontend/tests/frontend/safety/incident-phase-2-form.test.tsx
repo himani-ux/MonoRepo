@@ -8,32 +8,23 @@ describe("SafetyIncidentPhase2Form", () => {
     render(<SafetyIncidentPhase2Form incidentId="42" />);
 
     expect(
-      screen.getByRole("heading", { name: "Notifications + Resource Allocation" }),
+      screen.getByRole("heading", { name: "Tell Office" }),
     ).toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: "Submit to office" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
   });
 
-  it("enables submit when band, classifier, pic, and position are present", () => {
+  it("enables submit when risk and office communication are present", () => {
     render(<SafetyIncidentPhase2Form incidentId="42" />);
 
-    fireEvent.change(screen.getByLabelText("Internal risk band"), {
+    fireEvent.change(screen.getByLabelText("Risk level"), {
       target: { value: "YELLOW" },
     });
-    fireEvent.change(screen.getByLabelText("IMO classifier"), {
-      target: { value: "MI" },
-    });
-    fireEvent.change(screen.getByLabelText("PIC user ID"), {
-      target: { value: "pic-9" },
-    });
-    fireEvent.change(screen.getByLabelText("Latitude"), {
-      target: { value: "12.345678" },
-    });
-    fireEvent.change(screen.getByLabelText("Longitude"), {
-      target: { value: "103.456789" },
+    fireEvent.change(screen.getByLabelText("Was office informed?"), {
+      target: { value: "NO" },
     });
 
-    expect(screen.getByRole("button", { name: "Submit to office" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeEnabled();
   });
 
   it("shows the external expert prompt panel for RED incidents", () => {
@@ -43,12 +34,25 @@ describe("SafetyIncidentPhase2Form", () => {
       <SafetyIncidentPhase2Form incidentId="42" onSubmitPhase={onSubmitPhase} />,
     );
 
-    fireEvent.change(screen.getByLabelText("Internal risk band"), {
+    fireEvent.change(screen.getByLabelText("Risk level"), {
       target: { value: "RED" },
     });
 
     expect(
-      screen.getByRole("heading", { name: "External expert engagement prompt" }),
+      screen.getByRole("heading", { name: "Get outside expert help" }),
     ).toBeInTheDocument();
+  });
+
+  it("does not offer WhatsApp as an office communication method", () => {
+    render(
+      <SafetyIncidentPhase2Form
+        incidentId="42"
+        initialValues={{ office_notified: true }}
+      />,
+    );
+
+    expect(screen.getByLabelText("How was office informed?")).toHaveTextContent("On call");
+    expect(screen.getByLabelText("How was office informed?")).toHaveTextContent("On email");
+    expect(screen.getByLabelText("How was office informed?")).not.toHaveTextContent("WhatsApp");
   });
 });

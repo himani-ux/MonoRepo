@@ -5,6 +5,7 @@ import {
   certsApi,
   type CertTrackedItemFilters,
   type CertTrackedItemMetadataUpdatePayload,
+  type CertTrackedItemReparsePdfPayload,
   type CertTrackedItemRemovePdfPayload,
   type CertTrackedItemUploadPdfPayload,
   type CertTrackedItemTransitionPayload,
@@ -77,6 +78,17 @@ export function useUploadTrackedItemPdf(id: string, imo: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: CertTrackedItemUploadPdfPayload) => certsApi.uploadTrackedItemPdf(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: certTrackedItemKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: certVesselDashboardKeys.vessel(imo) });
+    },
+  });
+}
+
+export function useReparseTrackedItemPdf(id: string, imo: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CertTrackedItemReparsePdfPayload = {}) => certsApi.reparseTrackedItemPdf(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: certTrackedItemKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: certVesselDashboardKeys.vessel(imo) });

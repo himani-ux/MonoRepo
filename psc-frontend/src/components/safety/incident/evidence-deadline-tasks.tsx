@@ -34,21 +34,7 @@ export function SafetyEvidenceDeadlineTasks({
   }
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-            Evidence deadlines
-          </p>
-          <h2 className="text-xl font-semibold text-slate-900">
-            Evidence Preservation Deadlines
-          </h2>
-        </div>
-        <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-          {tasks.length} tasks
-        </div>
-      </div>
-      <div className="mt-4 grid gap-3">
+    <div className="grid gap-3">
         {tasks.length > 0 ? (
           tasks.map((task) => (
             <article
@@ -61,7 +47,6 @@ export function SafetyEvidenceDeadlineTasks({
                   {task.status}
                 </span>
               </div>
-              <p className="mt-2 text-xs opacity-80">Due: {task.due_at}</p>
               {task.justification ? (
                 <p className="mt-2 text-xs opacity-80">Note: {task.justification}</p>
               ) : null}
@@ -73,7 +58,7 @@ export function SafetyEvidenceDeadlineTasks({
                     onChange={(event) =>
                       setNotes((current) => ({ ...current, [task.task_code]: event.target.value }))
                     }
-                    placeholder="Completion note or N/A justification"
+                    placeholder="What was done, or why not needed"
                     value={notes[task.task_code] ?? ""}
                   />
                   <button
@@ -82,17 +67,16 @@ export function SafetyEvidenceDeadlineTasks({
                     onClick={() => void completeTask(task)}
                     type="button"
                   >
-                    {savingTask === task.task_code ? "Saving..." : "Mark complete"}
+                    {savingTask === task.task_code ? "Saving..." : "Mark done"}
                   </button>
                 </div>
               ) : null}
             </article>
           ))
         ) : (
-          <p className="text-sm text-slate-500">No preservation tasks generated yet.</p>
+          <p className="text-sm text-slate-500">No urgent evidence tasks yet.</p>
         )}
-      </div>
-    </section>
+    </div>
   );
 }
 

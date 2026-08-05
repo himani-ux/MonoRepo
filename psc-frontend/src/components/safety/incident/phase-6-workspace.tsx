@@ -20,7 +20,6 @@ import {
 import SafetyRecommendationEditor from './recommendation-editor';
 
 const TIERS = ['CORRECTIVE', 'PREVENTIVE'] as const;
-const LIKELIHOOD = ['LOW', 'MED', 'HIGH'] as const;
 const MAX_RECOMMENDATION_TITLE_LENGTH = 256;
 
 type Tier = (typeof TIERS)[number];
@@ -35,8 +34,6 @@ interface RecommendationDraft {
   tier: Tier;
   tolerable_failure_filter: boolean;
 }
-
-type PreventiveRiskReduction = '' | (typeof LIKELIHOOD)[number];
 
 interface SafetyIncidentPhase6Props {
   fixedTier?: Tier;
@@ -99,21 +96,9 @@ function deriveTitleFromDescription(description: string) {
   return normalized.slice(0, MAX_RECOMMENDATION_TITLE_LENGTH);
 }
 
-function resolveCurrentActorId(user: ReturnType<typeof useAuth>['user']) {
-  if (!user) {
-    return 'system';
-  }
-  const userWithBackendIds = user as typeof user & {
-    user_id?: string | number | null;
-  };
-  return String(
-    user.username ||
-      user.employee_id ||
-      user.crew_id ||
-      userWithBackendIds.user_id ||
-      user.id ||
-      'system'
-  ).trim();
+function firstLinkedDueDate(recommendation: SafetyRecommendation | null) {
+  return recommendation?.corrective_actions?.find((action) => action.due_date)
+    ?.due_date ?? '';
 }
 
 function defaultFormTitle(tier?: Tier) {
@@ -149,7 +134,6 @@ export function SafetyIncidentPhase6({
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const actorId = resolveCurrentActorId(user);
   const resolvedTransitionTargetPhase =
     transitionTargetPhase === undefined
       ? nextPath
@@ -161,8 +145,6 @@ export function SafetyIncidentPhase6({
   const [draft, setDraft] = useState<RecommendationDraft>(() =>
     emptyDraftForTier(fixedTier ?? 'CORRECTIVE')
   );
-  const [preventiveRiskReduction, setPreventiveRiskReduction] =
-    useState<PreventiveRiskReduction>('');
   const [error, setError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [phaseAdvanceError, setPhaseAdvanceError] = useState<string | null>(
@@ -208,13 +190,6 @@ export function SafetyIncidentPhase6({
     () => (fixedTier ? [fixedTier] : TIERS),
     [fixedTier]
   );
-  const availableTiers = useMemo(
-    () =>
-      visibleTiers.filter(
-        (tier) => (workspace.recommendations[tier]?.length ?? 0) === 0
-      ),
-    [visibleTiers, workspace.recommendations]
-  );
   const isEditingRecommendation = Boolean(editingRecommendationId);
   const editingRecommendation = useMemo(
     () =>
@@ -223,36 +198,7 @@ export function SafetyIncidentPhase6({
       ) ?? null,
     [editingRecommendationId, workspace.recommendations]
   );
-  const selectedTierAlreadyExists = (
-    workspace.recommendations[draft.tier] ?? []
-  ).some((recommendation) => recommendation.id !== editingRecommendationId);
-  const savedPreventiveRiskReduction = useMemo(
-    () =>
-      workspace.recommendations.PREVENTIVE.find(
-        (recommendation) => recommendation.estimated_likelihood_reduction
-      )?.estimated_likelihood_reduction ?? '',
-    [workspace.recommendations.PREVENTIVE]
-  );
-
-  useEffect(() => {
-    if (savedPreventiveRiskReduction) {
-      setPreventiveRiskReduction(
-        savedPreventiveRiskReduction as PreventiveRiskReduction
-      );
-    }
-  }, [savedPreventiveRiskReduction]);
-
-  useEffect(() => {
-    if (
-      !fixedTier &&
-      !isLoading &&
-      selectedTierAlreadyExists &&
-      availableTiers.length > 0
-    ) {
-      setDraft((current) => ({ ...current, tier: availableTiers[0] }));
-    }
-  }, [availableTiers, fixedTier, isLoading, selectedTierAlreadyExists]);
-
+  const actorId = String(user?.username || user?.id || 'system');
   const gateHints = useMemo(() => {
     const hints: string[] = [];
     if (workspace.gate_blockers.includes('recommendations')) {
@@ -283,26 +229,19 @@ export function SafetyIncidentPhase6({
     if (!recommendation.id) {
       return;
     }
-    const linkedAction = recommendation.corrective_actions[0];
     setError(null);
     setSaveNotice(null);
     setEditingRecommendationId(recommendation.id);
     setDraft({
       alarp_attested: recommendation.alarp_attested,
       description: recommendation.description,
-      due_date: linkedAction?.due_date ?? '',
+      due_date: firstLinkedDueDate(recommendation),
       estimated_effort: recommendation.estimated_effort ?? '',
       residual_risk_statement: recommendation.residual_risk_statement ?? '',
       theme_code: recommendation.theme_code ?? '',
       tier: recommendation.tier,
       tolerable_failure_filter: recommendation.tolerable_failure_filter,
     });
-    if (recommendation.tier === 'PREVENTIVE') {
-      setPreventiveRiskReduction(
-        (recommendation.estimated_likelihood_reduction ??
-          preventiveRiskReduction) as PreventiveRiskReduction
-      );
-    }
     window.setTimeout(() => {
       recommendationFormRef.current?.scrollIntoView({
         behavior: 'smooth',
@@ -316,12 +255,6 @@ export function SafetyIncidentPhase6({
     if (!id) {
       return;
     }
-    if (selectedTierAlreadyExists) {
-      setError(
-        `${tierLabel(draft.tier)} recommendation already exists for this incident.`
-      );
-      return;
-    }
     const description = draft.description.trim();
     const title = deriveTitleFromDescription(description);
     const payload: Record<string, unknown> = {
@@ -329,25 +262,21 @@ export function SafetyIncidentPhase6({
       tier: draft.tier,
       title,
     };
-    const existingVerifier =
-      editingRecommendation?.corrective_actions[0]?.verifier_user_id;
+    const shouldPersistDueDate =
+      Boolean(draft.due_date) ||
+      Boolean(editingRecommendation?.corrective_actions?.length);
+    if (shouldPersistDueDate) {
+      payload.corrective_action = {
+        due_date: draft.due_date || null,
+        verifier_user_id: actorId,
+      };
+    }
     if (draft.tier === 'PREVENTIVE') {
       payload.theme_code = null;
       payload.estimated_effort = null;
-      payload.estimated_likelihood_reduction =
-        preventiveRiskReduction || null;
+      payload.estimated_likelihood_reduction = null;
       payload.residual_risk_statement = description;
       payload.alarp_attested = true;
-      payload.corrective_action = {
-        due_date: draft.due_date,
-        verifier_user_id: existingVerifier || actorId || 'system',
-      };
-    }
-    if (draft.tier === 'CORRECTIVE') {
-      payload.corrective_action = {
-        due_date: draft.due_date,
-        verifier_user_id: existingVerifier || actorId || 'system',
-      };
     }
     if (workspace.tolerable_failure_allowed) {
       payload.tolerable_failure_filter = draft.tolerable_failure_filter;
@@ -407,17 +336,9 @@ export function SafetyIncidentPhase6({
     }
   }
 
-  const preventiveMissingRequiredFields =
-    draft.tier === 'PREVENTIVE' &&
-    (!draft.due_date || !preventiveRiskReduction);
   const saveDisabled =
     isMutating ||
-    (!isEditingRecommendation && availableTiers.length === 0) ||
-    selectedTierAlreadyExists ||
-    !draft.description.trim() ||
-    ((draft.tier === 'CORRECTIVE' || draft.tier === 'PREVENTIVE') &&
-      !draft.due_date) ||
-    preventiveMissingRequiredFields;
+    !draft.description.trim();
 
   return (
     <section className="space-y-6">
@@ -509,17 +430,8 @@ export function SafetyIncidentPhase6({
                     value={draft.tier}
                   >
                     {TIERS.map((tier) => (
-                      <option
-                        disabled={
-                          (workspace.recommendations[tier]?.length ?? 0) > 0
-                        }
-                        key={tier}
-                        value={tier}
-                      >
+                      <option key={tier} value={tier}>
                         {tierLabel(tier)}
-                        {(workspace.recommendations[tier]?.length ?? 0) > 0
-                          ? ' (already added)'
-                          : ''}
                       </option>
                     ))}
                   </select>
@@ -540,10 +452,7 @@ export function SafetyIncidentPhase6({
                   value={draft.description}
                 />
               </label>
-            </div>
-
-            {draft.tier === 'CORRECTIVE' || draft.tier === 'PREVENTIVE' ? (
-              <label className="mt-4 block max-w-sm text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-slate-700">
                 Due date
                 <input
                   className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
@@ -557,33 +466,7 @@ export function SafetyIncidentPhase6({
                   value={draft.due_date}
                 />
               </label>
-            ) : null}
-
-            {draft.tier === 'PREVENTIVE' ? (
-              <section className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <label className="block text-sm font-medium text-slate-700">
-                    How much will this reduce risk?
-                    <select
-                      className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3"
-                      onChange={(event) =>
-                        setPreventiveRiskReduction(
-                          event.target.value as PreventiveRiskReduction
-                        )
-                      }
-                      value={preventiveRiskReduction}
-                    >
-                      <option value="">Select reduction</option>
-                      {LIKELIHOOD.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </section>
-            ) : null}
+            </div>
 
             {workspace.tolerable_failure_allowed ? (
               <label className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
@@ -612,40 +495,6 @@ export function SafetyIncidentPhase6({
             </button>
           </form>
 
-          {!fixedTier || fixedTier === 'CORRECTIVE' ? (
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Actions To Complete
-              </h2>
-              <div className="mt-4 grid gap-3">
-                {workspace.corrective_actions.length > 0 ? (
-                  workspace.corrective_actions.map((action) => (
-                    <article
-                      key={action.id ?? action.title}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
-                          {action.status}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-600">
-                        {action.description}
-                      </p>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-                        <p>Due: {action.due_date || 'Pending'}</p>
-                        <p>Status: {action.status}</p>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    No corrective actions created yet.
-                  </p>
-                )}
-              </div>
-            </section>
-          ) : null}
         </>
       )}
 

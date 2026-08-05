@@ -18,7 +18,7 @@ import {
 function makeUploadUrl(clientId: string, expiresAt: string): AttachmentUploadURL {
   return {
     client_id: clientId,
-    upload_url: '/api/psc/sync/upload/mock-token/',
+    upload_url: 'http://localhost:8000/api/psc/sync/upload/mock-token/',
     expires_at: expiresAt,
   };
 }

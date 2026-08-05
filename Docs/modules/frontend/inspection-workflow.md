@@ -30,7 +30,7 @@ This module renders the end-to-end inspection workflow in the modern frontend: l
 3. `/inspections/:id` shows reports, deficiencies, and action affordances.
 4. Adding a deficiency from detail triggers backend deficiency creation and automatic CAR creation.
 5. `/deficiencies` surfaces vessel-side review and allocation state across deficiencies.
-6. `/inspections/:id/follow-up` runs the multi-step PSC follow-up wizard.
+6. `/inspections/:id/follow-up` runs the multi-step PSC follow-up wizard, including optional upload of up to three PDF reports.
 
 ## Dependencies
 

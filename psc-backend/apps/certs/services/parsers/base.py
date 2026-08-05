@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 import re
@@ -41,12 +42,22 @@ class BaseClassParser:
     date_pattern = re.compile(r"$^")
     ocr_page_numbers: tuple[int, ...] | None = None
 
-    def parse(self, pdf_path: str | Path) -> ParsedClassSnapshot:
+    def parse(self, pdf_path: str | Path, *, printed_on_date: Any | None = None) -> ParsedClassSnapshot:
         extracted = extract_pdf_text(pdf_path, ocr_page_numbers=self.ocr_page_numbers)
         text = extracted.text
         if not text.strip():
             raise ClassSnapshotParseError("Class status PDF did not expose a text layer and OCR fallback read no text.")
         payload = self.parse_text(text, page_count=extracted.page_count)
+        if not payload.get("printed_on_date"):
+            manual_printed_on_date = normalize_manual_printed_on_date(printed_on_date)
+            if not manual_printed_on_date:
+                raise ClassSnapshotParseError(
+                    f"{self.class_society} class status PDF did not contain a readable printed/generated date."
+                )
+            payload["printed_on_date"] = manual_printed_on_date
+            payload["printed_on_date_source"] = "manual"
+        else:
+            payload["printed_on_date_source"] = "parser"
         stamp_text_extraction_metadata(payload, extracted)
         return ParsedClassSnapshot(
             payload=payload,
@@ -181,9 +192,14 @@ def stamp_text_extraction_metadata(payload: dict[str, Any], extracted: Extracted
     }
 
 
-def parse_class_snapshot_pdf(pdf_path: str | Path, class_society: str | None = None) -> ParsedClassSnapshot:
+def parse_class_snapshot_pdf(
+    pdf_path: str | Path,
+    class_society: str | None = None,
+    *,
+    printed_on_date: Any | None = None,
+) -> ParsedClassSnapshot:
     parser = parser_for(class_society, pdf_path)
-    return parser.parse(pdf_path)
+    return parser.parse(pdf_path, printed_on_date=printed_on_date)
 
 
 def parser_for(class_society: str | None, pdf_path: str | Path) -> BaseClassParser:
@@ -224,6 +240,17 @@ def first_match(pattern: str, text: str, flags: int = re.IGNORECASE) -> str | No
     return match.group(1).strip() if match else None
 
 
+def normalize_manual_printed_on_date(value: Any | None) -> str | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    text = str(value).strip()
+    return text[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text[:10]) else None
+
+
 def clean_space(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
@@ -234,12 +261,20 @@ def normalize_utc_date(value: str | None) -> str | None:
     return value
 
 
-def condition_row(condition_id: str, text: str, section: str | None = None, due_date: str | None = None) -> dict[str, Any]:
+def condition_row(
+    condition_id: str,
+    text: str,
+    section: str | None = None,
+    due_date: str | None = None,
+    *,
+    kind: str = "condition",
+) -> dict[str, Any]:
     return {
         "id": condition_id,
         "section": section,
         "due_date": due_date,
         "text": clean_space(text),
+        "kind": kind,
     }
 
 

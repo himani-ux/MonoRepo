@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import generics, status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.safety.authentication.permissions import HasFormPermission, HasProcessPermission
@@ -13,6 +17,7 @@ from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import IncidentRepository
 from apps.safety.serializers import NearMissCreateSerializer, NearMissListSerializer, NearMissSerializer
 from apps.safety.services import NotificationWriter, PhaseStateMachine
+from apps.safety.services.near_miss_photo_evidence import store_near_miss_photo_evidence
 
 
 def _normalized_role(user) -> str:
@@ -72,6 +77,18 @@ def _resolve_reporter_identity(user) -> dict[str, str]:
             getattr(user, "dept", None),
         ),
     }
+
+
+def _is_master_user(user) -> bool:
+    role = _normalized_role(user)
+    rank = _first_text(
+        getattr(user, "rank", None),
+        getattr(user, "rank_name", None),
+        getattr(user, "safety_role_name", None),
+        getattr(user, "role_name", None),
+        getattr(user, "role", None),
+    ).upper()
+    return role in {"MASTER", "CAPTAIN", "VESSEL_MASTER"} or rank in {"MASTER", "CAPTAIN"}
 
 
 def _resolve_vessel_id(request) -> str | None:
@@ -143,6 +160,7 @@ class NearMissViewMixin:
 class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
     lookup_url_kwarg = "id"
     queryset = Incident.objects.filter(is_deleted=False)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get_queryset(self):
         return self._apply_filters(super().get_queryset())
@@ -153,14 +171,34 @@ class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
         return NearMissListSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        payload = self._extract_create_payload(request)
+        uploaded_file = request.FILES.get("photo") or request.FILES.get("file")
+
+        serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
 
-        self.perform_create(serializer)
+        if serializer.validated_data.get("near_miss_severity") == "HIGH" and uploaded_file is None:
+            raise ValidationError({"photo": "Image upload is required when severity is HIGH."})
+
+        with transaction.atomic():
+            self.perform_create(serializer, uploaded_file=uploaded_file)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    def perform_create(self, serializer):
+    def _extract_create_payload(self, request):
+        if "payload" not in request.data:
+            return request.data
+
+        raw_payload = request.data.get("payload")
+        try:
+            payload = json.loads(raw_payload)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError({"payload": "Near miss payload must be valid JSON."}) from exc
+        if not isinstance(payload, dict):
+            raise ValidationError({"payload": "Near miss payload must be a JSON object."})
+        return payload
+
+    def perform_create(self, serializer, *, uploaded_file=None):
         user = self.request.user
         actor_id = _resolve_actor_id(user)
         reporter_identity = _resolve_reporter_identity(user)
@@ -169,19 +207,34 @@ class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
             created_by=actor_id,
             updated_by=actor_id,
             reported_at=serializer.validated_data.get("reported_at") or timezone.now(),
+            state=(
+                Incident.State.READY_FOR_OFFICE_COMMENTS
+                if _is_master_user(user)
+                else Incident.State.PENDING_VESSEL_REVIEW
+            ),
             reporter_id=reporter_identity["reporter_id"],
             reporter_name=reporter_identity["reporter_name"],
             reporter_rank=reporter_identity["reporter_rank"],
             reporter_email=reporter_identity["reporter_email"],
             reporter_department=reporter_identity["reporter_department"],
         )
+        if serializer.validated_data.get("near_miss_severity") == "HIGH" and uploaded_file is not None:
+            store_near_miss_photo_evidence(
+                near_miss=near_miss,
+                uploaded_file=uploaded_file,
+                actor_id=actor_id,
+            )
         self.get_phase_state_machine().log_creation(near_miss, user)
         self.get_notification_writer().dispatch_notification(
             record_id=near_miss.pk,
             recipients=["PIC", "DPA", "SAFETY_CHANNEL"],
             kind="NEAR_MISS_SUBMITTED",
             title="New near miss submitted",
-            message=f"Near miss {near_miss.incident_number} is awaiting vessel-side review.",
+            message=(
+                f"Near miss {near_miss.incident_number} is ready for office comments."
+                if near_miss.state == Incident.State.READY_FOR_OFFICE_COMMENTS
+                else f"Near miss {near_miss.incident_number} is awaiting vessel-side review."
+            ),
             payload={
                 "near_miss_id": near_miss.pk,
                 "incident_number": near_miss.incident_number,
@@ -190,6 +243,7 @@ class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
             },
             send_slack=True,
         )
+        return near_miss
 
 
 class NearMissDetailView(NearMissViewMixin, generics.RetrieveAPIView):

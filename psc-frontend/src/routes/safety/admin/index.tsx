@@ -4,12 +4,12 @@ import { useSafetyAuth } from "../../../hooks/safety/use-auth";
 
 const adminCards = [
   {
-    description: "M-SCAT, immediate causes, loss types, SOI template rows, checklist versions, and bias-guard visibility.",
+    description: "Manage cause lists, loss types, SOI templates, checklist versions, and review visibility.",
     href: "/safety/admin/taxonomy",
-    title: "Taxonomy Admin",
+    title: "Safety Lists",
   },
   {
-    description: "Navigator and Sinkfast seeded worked examples plus the DPA-managed case-study surface.",
+    description: "Manage training and review case studies.",
     href: "/safety/admin/case-studies",
     title: "Case Study Library",
   },
@@ -22,9 +22,6 @@ export default function SafetyAdminIndexRoute() {
   return (
     <section className="space-y-6">
       <header className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_48%,#dcfce7_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Admin
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">Safety Admin</h1>
       </header>
 

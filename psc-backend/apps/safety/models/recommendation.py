@@ -54,11 +54,6 @@ class Recommendation(PublicIdMixin):
                 condition=models.Q(tier__in=["CORRECTIVE", "PREVENTIVE", "LESSONS_LEARNT"]),
                 name="ck_vims_safety_recommendation_tier",
             ),
-            models.UniqueConstraint(
-                fields=("incident", "tier"),
-                condition=models.Q(is_deleted=False),
-                name="uq_vims_safety_recommendation_incident_tier_active",
-            ),
         ]
         indexes = [
             models.Index(fields=("incident", "tier"), name="ix_safe_rec_inc"),

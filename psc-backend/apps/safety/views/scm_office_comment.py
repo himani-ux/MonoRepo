@@ -128,7 +128,7 @@ class SCMOfficeCommentView(SCMViewMixin, generics.GenericAPIView):
                 "SCM office comments are restricted to DPA/FM/shore HOD/Marine Superintendent oversight."
             )
         meeting = self.get_meeting()
-        if meeting.office_comment_at is not None or meeting.state == SCMMeeting.State.CLOSED:
+        if meeting.office_comment_at is not None or meeting.state in {SCMMeeting.State.CLOSED, SCMMeeting.State.SIGNED_OFF}:
             raise ValidationError({"office_comment": "SCM office review is already completed."})
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -139,7 +139,7 @@ class SCMOfficeCommentView(SCMViewMixin, generics.GenericAPIView):
         meeting.office_comment = serializer.validated_data["office_comment"].strip()
         meeting.office_comment_by = _resolve_actor_id(request.user)
         meeting.office_comment_at = timezone.now()
-        meeting.state = SCMMeeting.State.CLOSED
+        meeting.state = SCMMeeting.State.SIGNED_OFF
         meeting.save(update_fields=("state", "office_comment", "office_comment_by", "office_comment_at"))
         self.get_scm_repository()._save_legacy_fields(
             meeting_id=meeting.id,

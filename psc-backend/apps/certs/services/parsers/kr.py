@@ -21,7 +21,7 @@ class KRClassParser(BaseClassParser):
     class_society = "KR"
     parser_version = "kr-pdfplumber-v1"
     date_pattern = re.compile(ISO_DATE)
-    ocr_page_numbers = (5, 6, 7, 8)
+    ocr_page_numbers = (1, 5, 6, 7, 8, 9)
 
     def parse_text(self, text: str, *, page_count: int) -> dict[str, Any]:
         lines = strip_ignored_sections([clean_space(line) for line in text.splitlines() if clean_space(line)])
@@ -54,16 +54,7 @@ class KRClassParser(BaseClassParser):
             condition = _parse_condition(lines, index)
             if condition:
                 conditions.append(condition)
-                rows.append(
-                    row(
-                        class_society=self.class_society,
-                        class_code_or_name=condition["id"],
-                        source_section="Condition of Class / Statutory Condition",
-                        row_type="condition",
-                        raw_text=condition["text"],
-                        postponed_until=condition.get("due_date"),
-                    )
-                )
+                rows.append(_condition_to_row(condition))
 
         return {
             "schema_version": 1,
@@ -166,8 +157,24 @@ def _parse_condition(lines: list[str], index: int) -> dict[str, Any] | None:
     match = re.match(rf"(?P<id>C\.\d+)\s*(?P<issued>{ISO_DATE})\s+(?P<due>{ISO_DATE})\s+(?P<report>\S+)\s+(?P<section>\w+)", line)
     if not match:
         return None
+    if match.group("section").strip().lower() != "class":
+        return None
     text = lines[index + 1] if index + 1 < len(lines) else ""
-    return condition_row(match.group("id"), text, match.group("section"), match.group("due"))
+    return condition_row(match.group("id"), text, "Condition of Class", match.group("due"))
+
+
+def _condition_to_row(condition: dict[str, Any]) -> dict[str, Any]:
+    return row(
+        class_society="KR",
+        class_code_or_name=condition["id"],
+        source_section=condition.get("section") or "Condition of Class",
+        row_type="condition",
+        raw_text=condition["text"],
+        due_date=condition.get("due_date"),
+        postponed_until=condition.get("due_date"),
+        condition_id=condition["id"],
+        display_name=condition.get("section") or condition["id"],
+    )
 
 
 def _to_iso(value: str | None) -> str | None:

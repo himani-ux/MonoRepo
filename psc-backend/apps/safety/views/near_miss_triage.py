@@ -35,16 +35,13 @@ class NearMissTriageView(NearMissViewMixin, generics.GenericAPIView):
 
     def _enforce_office_comment_role(self, *, priority: str | None, action: str) -> None:
         role = _normalized_role(self.request.user)
-        if action == "SEND_BACK":
+        if action in {"SEND_BACK", "REJECT"}:
             if role == "DPA" or role in PIC_OFFICE_ROLES:
                 return
-            raise PermissionDenied("Only the assigned office reviewer can send this near miss back for rework.")
-        if priority == "HIGH":
-            if role != "DPA":
-                raise PermissionDenied("High-priority near misses must be accepted by DPA.")
+            raise PermissionDenied("Only the assigned office reviewer can send this near miss back or reject it.")
+        if role == "DPA" or role in PIC_OFFICE_ROLES:
             return
-        if role not in PIC_OFFICE_ROLES:
-            raise PermissionDenied("Low and medium near misses must be accepted by the PIC.")
+        raise PermissionDenied("Near misses must be accepted by an authorized office reviewer.")
 
     def patch(self, request, *args, **kwargs):
         near_miss = self.get_object()
@@ -73,12 +70,16 @@ class NearMissTriageView(NearMissViewMixin, generics.GenericAPIView):
         decision_reason = " | ".join(part for part in decision_reason_parts if part)
         self._enforce_office_comment_role(priority=priority, action=action)
 
-        if action == "SEND_BACK":
+        if action in {"SEND_BACK", "REJECT"}:
             old_state = capture_model_state(
                 near_miss,
                 field_names=("state", "updated_by", "updated_date"),
             )
-            near_miss.state = Incident.State.REWORK_REQUIRED
+            near_miss.state = (
+                Incident.State.REJECTED
+                if action == "REJECT"
+                else Incident.State.REWORK_REQUIRED
+            )
             near_miss.updated_by = actor_id
             near_miss.updated_date = timezone.now()
             near_miss.save(update_fields=("state", "updated_by", "updated_date"))
@@ -102,6 +103,8 @@ class NearMissTriageView(NearMissViewMixin, generics.GenericAPIView):
             )
             payload = NearMissSerializer(near_miss, context=self.get_serializer_context()).data
             payload["office_comment_phase_log"] = PhaseLogSerializer(phase_log).data
+            if action == "REJECT":
+                payload["office_rejected_phase_log"] = payload["office_comment_phase_log"]
             return Response(payload, status=status.HTTP_200_OK)
 
         supersede_to_incident = serializer.validated_data.get("supersede_to_incident", False)

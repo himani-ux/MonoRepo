@@ -181,48 +181,4 @@ class IncidentPhase8CloseView(IncidentPhase8ViewMixin, generics.GenericAPIView):
     serializer_class = IncidentPhase8CloseSerializer
 
     def post(self, request, *args, **kwargs):
-        incident = self.get_incident()
-        self._require_phase_eight(incident)
-        self._enforce_band_actor(incident)
-
-        try:
-            incident.loss_evaluation
-        except IncidentLossEvaluation.DoesNotExist as exc:
-            raise ValidationError(
-                {"loss_evaluation": "Save Loss Evaluation before closing the incident."}
-            ) from exc
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        old_state = capture_model_state(
-            incident,
-            field_names=("current_phase", "state", "closed_at", "closure_reason"),
-        )
-        transition = self.get_phase_state_machine().transition(incident.pk, 9, request.user)
-        incident.refresh_from_db()
-        incident.state = "CLOSED"
-        incident.closed_at = timezone.now()
-        incident.closure_reason = serializer.validated_data["closure_reason"]
-        incident.updated_by = resolve_actor_id(request.user)
-        incident.updated_date = timezone.now()
-        incident.save(
-            update_fields=("state", "closed_at", "closure_reason", "updated_by", "updated_date")
-        )
-        record_field_changes(
-            incident,
-            old_state,
-            user=request.user,
-            field_names=("current_phase", "state", "closed_at", "closure_reason"),
-            change_reason="Phase 7 Loss Evaluation closed the incident.",
-        )
-        return Response(
-            {
-                "state": incident.state,
-                "current_phase": incident.current_phase,
-                "closed_at": incident.closed_at,
-                "closure_reason": incident.closure_reason,
-                "transition": transition,
-            },
-            status=status.HTTP_200_OK,
-        )
+        raise ValidationError("Incident close is handled in Phase 6 Office Review.")

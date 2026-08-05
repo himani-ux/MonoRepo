@@ -6,6 +6,9 @@
 
 import { z } from 'zod';
 
+export const MAX_FOLLOW_UP_REPORT_FILES = 3;
+export const MAX_FOLLOW_UP_REPORT_FILE_SIZE = 5 * 1024 * 1024;
+
 // ============================================================================
 // Deficiency Update Schema (Step 3)
 // ============================================================================
@@ -49,19 +52,39 @@ export type FollowUpStep3Data = z.infer<typeof followUpStep3Schema>;
 // Step 4 — Optional Report Upload
 // ============================================================================
 
+const followUpPdfFileSchema = z
+  .instanceof(File)
+  .refine(
+    (file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'),
+    'Only PDF files can be attached',
+  )
+  .refine(
+    (file) => file.size <= MAX_FOLLOW_UP_REPORT_FILE_SIZE,
+    'Each PDF must be 5MB or smaller',
+  );
+
 export const followUpStep4Schema = z
   .object({
-    report_file: z.instanceof(File).nullable().optional(),
+    report_files: z
+      .array(followUpPdfFileSchema)
+      .max(
+        MAX_FOLLOW_UP_REPORT_FILES,
+        `You can attach up to ${MAX_FOLLOW_UP_REPORT_FILES} PDFs`,
+      )
+      .optional()
+      .default([]),
+    report_file: followUpPdfFileSchema.nullable().optional(),
     report_description: z.string().optional().default(''),
   })
   .refine(
     (data) => {
-      if (data.report_file && !data.report_description?.trim()) {
+      const fileCount = (data.report_files?.length || 0) + (data.report_file ? 1 : 0);
+      if (fileCount > 0 && !data.report_description?.trim()) {
         return false;
       }
       return true;
     },
-    { message: 'Description is required when uploading a report', path: ['report_description'] },
+    { message: 'Description is required when uploading reports', path: ['report_description'] },
   );
 
 export type FollowUpStep4Data = z.infer<typeof followUpStep4Schema>;
@@ -74,6 +97,7 @@ export interface FollowUpFormData {
   reinspection_date: string;
   notes: string;
   deficiency_updates: DeficiencyUpdateFormData[];
+  report_files?: File[];
   report_file?: File | null;
   report_description?: string;
 }

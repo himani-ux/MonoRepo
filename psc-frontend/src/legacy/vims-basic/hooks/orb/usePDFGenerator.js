@@ -1,4 +1,4 @@
-﻿// // src/hooks/usePDFGenerator.js
+// // src/hooks/usePDFGenerator.js
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatDate } from "../../utils/orb/orbUtils";
@@ -92,7 +92,7 @@ export const usePDFGenerator = () => {
       return;
     }
 
-    console.log(`âœ… Print initiated by Master (${userRank}). Proceeding with print.`);
+    console.log(`✅ Print initiated by Master (${userRank}). Proceeding with print.`);
 
     if (!vesselId) {
       alert("Vessel not selected. Cannot generate PDF.");
@@ -111,7 +111,7 @@ export const usePDFGenerator = () => {
         );
         const raw = await lastPageResponse.text();
 
-        console.log("ðŸ“¡ RAW get_last_page_number response:", raw);
+        console.log("📡 RAW get_last_page_number response:", raw);
 
         const lastPageData = JSON.parse(raw);
         lastPageNumber = lastPageData.last_page || 0;
@@ -262,7 +262,7 @@ export const usePDFGenerator = () => {
 
           await updatePrintStatus(updateData).unwrap();
 
-          console.log("ðŸ§¹ Clearing exportedApprovedIds after PDF generation...");
+          console.log("🧹 Clearing exportedApprovedIds after PDF generation...");
           localStorage.setItem("exportedApprovedIds", JSON.stringify([]));
           if (onSuccess) {
             onSuccess();
@@ -325,7 +325,7 @@ export const usePDFGenerator = () => {
 //     const { vesselName, imoNumber } = vessel;
 
 //     try {
-//       // âœ… IMPORTANT â€” USE PROXY URL (OLD WORKING WAY)
+//       // ✅ IMPORTANT — USE PROXY URL (OLD WORKING WAY)
 //       let lastPageNumber = 0;
 //       try {
 //         const res = await fetch(`http://localhost:8000/api/orb/api/get_last_page_number/?vessel_id=${vesselId}`);
@@ -367,7 +367,7 @@ export const usePDFGenerator = () => {
 //           switch (entry.code) {
 //             case "A":
 //               if (line.startsWith("TANK(S) BALLASTED")) itemNo = "1";
-//               else if (line.includes("TANK CLEANED SINCE") || line.includes("NOT CLEANED â€“ PREVIOUS OIL")) itemNo = "2";
+//               else if (line.includes("TANK CLEANED SINCE") || line.includes("NOT CLEANED – PREVIOUS OIL")) itemNo = "2";
 //               else if (line.startsWith("START BALLAST")) itemNo = "4.1";
 //               else if (line.includes("START") && line.includes("HRS")) itemNo = "3.1";
 //               else if (line.includes("RINSING") || line.includes("STEAMING") || line.includes("CHEMICAL")) itemNo = "3.2";

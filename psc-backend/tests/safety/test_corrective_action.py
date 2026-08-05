@@ -107,6 +107,29 @@ class CorrectiveActionApiTests(unittest.TestCase):
         self.assertEqual(response.data["purchase_req_id"], 9101)
         self.assertEqual(response.data["aging_bucket"], "0-15")
 
+    def test_master_can_create_corrective_action_without_process_permission(self) -> None:
+        request = self.factory.post(
+            "/api/safety/corrective-actions/",
+            {
+                "source_table": "vims_safety_incident",
+                "source_id": self.incident.pk,
+                "recommendation_id": self.recommendation.pk,
+                "title": "Master-created corrective action",
+                "description": "Master adds the immediate action for vessel follow-up.",
+                "assigned_crew_id": "CO",
+                "verifier_user_id": "MASTER",
+                "due_date": "2026-05-30",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user(process_ids=[], user_id="master-7", role_name="MASTER"))
+
+        response = self.list_view(request)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["title"], "Master-created corrective action")
+        self.assertEqual(response.data["status"], CorrectiveAction.Status.OPEN)
+
     def test_detail_endpoint_rejects_corrective_action_for_unassigned_vessel(self) -> None:
         other_incident = Incident.objects.create(
             incident_number="ABC/2026/CA-OTHER",
@@ -147,6 +170,56 @@ class CorrectiveActionApiTests(unittest.TestCase):
         response = self.detail_view(request, id=action.pk)
 
         self.assertEqual(response.status_code, 404)
+
+    def test_list_endpoint_filters_incident_actions_from_source_or_recommendation_link(self) -> None:
+        other_incident = Incident.objects.create(
+            incident_number="ABC/2026/CA-LIST-OTHER",
+            vessel_id="7",
+            state="UNDER_REVIEW",
+            current_phase=6,
+            risk_band=Incident.RiskBand.YELLOW,
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+        CorrectiveAction.objects.create(
+            source_table="legacy_source_name",
+            source_id=self.incident.pk,
+            recommendation=None,
+            title="Source linked action",
+            description="Linked directly to incident source.",
+            verifier_user_id="dpa-1",
+            due_date="2026-05-30",
+            status=CorrectiveAction.Status.OPEN,
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+        CorrectiveAction.objects.create(
+            source_table="legacy_source_name",
+            source_id=other_incident.pk,
+            recommendation=self.recommendation,
+            title="Recommendation linked action",
+            description="Linked through recommendation.",
+            verifier_user_id="dpa-1",
+            due_date="2026-05-30",
+            status=CorrectiveAction.Status.CLOSED,
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+
+        request = self.factory.get(f"/api/safety/corrective-actions/?incident_id={self.incident.pk}")
+        force_authenticate(request, user=build_user(process_ids=[], role_name="DPA"))
+
+        response = self.list_view(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(
+            {row["title"] for row in response.data},
+            {"Source linked action", "Recommendation linked action"},
+        )
 
     def test_link_endpoint_rejects_archived_requisition(self) -> None:
         action = CorrectiveAction.objects.create(
@@ -231,3 +304,101 @@ class CorrectiveActionApiTests(unittest.TestCase):
         self.assertTrue(action.physical_verification_done)
         self.assertIsNotNone(action.closed_at)
         self.assertEqual(action.closed_by, "dpa-1")
+
+    def test_assigned_role_can_start_work_without_process_permission(self) -> None:
+        action = CorrectiveAction.objects.create(
+            source_table="vims_safety_incident",
+            source_id=self.incident.pk,
+            recommendation=self.recommendation,
+            title="Replace failed guard",
+            description="Immediate vessel corrective action.",
+            assigned_crew_id="CO",
+            verifier_user_id="MTR",
+            due_date="2026-05-30",
+            status=CorrectiveAction.Status.OPEN,
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+
+        request = self.factory.post(
+            f"/api/safety/corrective-actions/{action.pk}/transition/",
+            {"status": CorrectiveAction.Status.IN_PROGRESS, "note": "Work started by assigned officer."},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(process_ids=[], user_id="co-1", role_name="CO"))
+
+        response = self.transition_view(request, id=action.pk)
+
+        self.assertEqual(response.status_code, 200)
+        action.refresh_from_db()
+        self.assertEqual(action.status, CorrectiveAction.Status.IN_PROGRESS)
+
+    def test_ship_side_user_with_vessel_scope_can_start_work_without_process_permission(self) -> None:
+        action = CorrectiveAction.objects.create(
+            source_table="vims_safety_incident",
+            source_id=self.incident.pk,
+            recommendation=self.recommendation,
+            title="Replace failed guard",
+            description="Immediate vessel corrective action.",
+            assigned_crew_id="CO",
+            verifier_user_id="MTR",
+            due_date="2026-05-30",
+            status=CorrectiveAction.Status.OPEN,
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+
+        request = self.factory.post(
+            f"/api/safety/corrective-actions/{action.pk}/transition/",
+            {"status": CorrectiveAction.Status.IN_PROGRESS, "note": "Ship started the corrective action."},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(process_ids=[], user_id="ship-user-1", role_name="AB"))
+
+        response = self.transition_view(request, id=action.pk)
+
+        self.assertEqual(response.status_code, 200)
+        action.refresh_from_db()
+        self.assertEqual(action.status, CorrectiveAction.Status.IN_PROGRESS)
+
+    def test_office_role_can_transition_and_physically_verify_without_process_permission(self) -> None:
+        action = CorrectiveAction.objects.create(
+            source_table="vims_safety_incident",
+            source_id=self.incident.pk,
+            recommendation=self.recommendation,
+            title="Replace failed guard",
+            description="Immediate vessel corrective action.",
+            assigned_crew_id="CO",
+            verifier_user_id="MTR",
+            due_date="2026-05-30",
+            status=CorrectiveAction.Status.OPEN,
+            created_by="dpa-1",
+            updated_by="dpa-1",
+            schema_version=1,
+        )
+
+        request = self.factory.post(
+            f"/api/safety/corrective-actions/{action.pk}/transition/",
+            {"status": CorrectiveAction.Status.IN_PROGRESS, "note": "Office started follow-up tracking."},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(process_ids=[], user_id="office-pic-1", role_name="OFFICE_PIC"))
+
+        response = self.transition_view(request, id=action.pk)
+
+        self.assertEqual(response.status_code, 200)
+
+        request = self.factory.post(
+            f"/api/safety/corrective-actions/{action.pk}/verify/",
+            {"note": "Office physical verification recorded."},
+            format="json",
+        )
+        force_authenticate(request, user=build_user(process_ids=[], user_id="office-pic-1", role_name="OFFICE_PIC"))
+
+        response = self.verify_view(request, id=action.pk)
+
+        self.assertEqual(response.status_code, 200)
+        action.refresh_from_db()
+        self.assertTrue(action.physical_verification_done)

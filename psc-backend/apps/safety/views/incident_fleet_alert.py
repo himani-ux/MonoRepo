@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rest_framework import generics, serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from apps.safety.serializers.incident_phase7 import build_phase7_preflight_payload
@@ -22,12 +23,16 @@ class IncidentFleetAlertIssueView(IncidentPhase7ViewMixin, generics.GenericAPIVi
     serializer_class = IncidentFleetAlertIssueSerializer
     service_class = IncidentFleetAlertService
 
+    def _require_office_review_available(self, incident) -> None:
+        if incident.current_phase < 6:
+            raise ValidationError("Incident Fleet Alert is available from Office Review.")
+
     def get_service(self) -> IncidentFleetAlertService:
         return self.service_class()
 
     def get(self, request, *args, **kwargs):
         incident = self.get_incident()
-        self._require_phase_seven(incident)
+        self._require_office_review_available(incident)
         self._enforce_office_review_actor(incident, action="fleet-alert")
         self._require_any_process_permission(OFFICE_REVIEW_ACCEPT_PROCESS_IDS)
         payload = self.get_service().build_workspace_payload(incident)
@@ -36,7 +41,7 @@ class IncidentFleetAlertIssueView(IncidentPhase7ViewMixin, generics.GenericAPIVi
 
     def post(self, request, *args, **kwargs):
         incident = self.get_incident()
-        self._require_phase_seven(incident)
+        self._require_office_review_available(incident)
         self._enforce_office_review_actor(incident, action="fleet-alert")
         self._require_any_process_permission(OFFICE_REVIEW_ACCEPT_PROCESS_IDS)
 

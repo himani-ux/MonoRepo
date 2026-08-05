@@ -33,12 +33,9 @@ def render_print_excel(
     worksheet = workbook.active
     worksheet.title = "SQE S 633"
     worksheet.append(["SQE S 633", "Certificates and Surveys"])
-    worksheet.append(["Print ID", print_id])
-    worksheet.append(["Scope", payload.get("scope")])
-    worksheet.append(["System state hash", system_state_hash])
     worksheet.append([])
     worksheet.append(PRINT_COLUMNS)
-    header_row = 6
+    header_row = 3
     for cell in worksheet[header_row]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="1F2937")

@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'apps.notifications',
     'apps.safety',
     'apps.certs',
+    'apps.help_assistant',
 ]
 
 MIDDLEWARE = [
@@ -302,14 +303,17 @@ AUTHENTICATION_BACKENDS = [
 #==============================================================================
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
 
-#  Choose ONE sender (recommended)
-EMAIL_HOST_USER = 'singhatulk2001@gmail.com'
-EMAIL_HOST_PASSWORD = 'qdoxcddvkqrdkcmp'
-DEFAULT_FROM_EMAIL = 'KSM Marine <singhatulk2001@gmail.com>'
+# Configure sender credentials through environment variables or psc-backend/.env.
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'pms@cymsol.co.in')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv(
+    'DEFAULT_FROM_EMAIL',
+    f"KSM Marine <{EMAIL_HOST_USER}>",
+)
 
 
 # =============================================================================

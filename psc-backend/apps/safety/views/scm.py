@@ -169,6 +169,19 @@ class SCMListCreateView(SCMViewMixin, generics.ListCreateAPIView):
             )
         actor_id = _resolve_actor_id(request.user)
         meeting_date = serializer.validated_data.get("meeting_date")
+        wrh_readiness = self.get_scm_repository().build_wrh_host_readiness(
+            vessel_id=vessel_id,
+            meeting_date=meeting_date,
+            attendance_rows=serializer.validated_data.get("attendance_rows"),
+        )
+        if not wrh_readiness["ready"]:
+            return Response(
+                {
+                    "detail": "SCM meeting cannot be hosted until all WRH warnings are cleared.",
+                    "wrh_host_readiness": wrh_readiness,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if meeting_type == SCMMeeting.MeetingType.AD_HOC:
             chair_crew_id = actor_id
             prepared_by_crew_id = actor_id
@@ -311,6 +324,7 @@ class SCMCreateRegularView(SCMViewMixin, generics.GenericAPIView):
 
         payload = self.get_scm_repository().build_form_config(
             vessel_id=str(vessel_id),
+            meeting_date=request.query_params.get("meeting_date"),
             actor_id=_resolve_actor_id(request.user),
             user=request.user,
             include_feeds=True,

@@ -30,6 +30,18 @@ const emptyDraft: FactDraft = {
 
 const confidenceOptions: SafetyIncidentFact["confidence"][] = ["LOW", "MEDIUM", "HIGH"];
 
+interface SafetyIncidentFactsPanelProps {
+  backHref?: string;
+  backLabel?: string;
+  continueLabel?: string;
+  description?: string;
+  extraBlockers?: string[];
+  showBackLink?: boolean;
+  showHeader?: boolean;
+  title?: string;
+  onContinue?: (gate: SafetyIncidentPhase4Gate | null) => Promise<void>;
+}
+
 function factRowsFromPayload(payload: unknown): unknown[] {
   if (Array.isArray(payload)) {
     return payload;
@@ -155,8 +167,7 @@ function FactForm({
           </select>
           {evidenceSources.length === 0 ? (
             <span className="mt-2 block text-xs leading-5 text-amber-700">
-              Add Phase 3 evidence, matrix rows, interviews, or chain-of-custody items before
-              creating facts.
+              Add evidence checks or interviews before creating facts.
             </span>
           ) : null}
         </label>
@@ -191,7 +202,7 @@ function FactForm({
           />
         </label>
         <label className="block text-sm font-medium text-slate-700">
-          Hindsight override reason
+          Review reason
           <input
             className="mt-2 w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
             disabled={disabled}
@@ -213,7 +224,17 @@ function FactForm({
   );
 }
 
-export function SafetyIncidentPhase4() {
+export function SafetyIncidentFactsPanel({
+  backHref = "/safety/incidents",
+  backLabel = "Back to incidents",
+  continueLabel = "Continue to Root Cause",
+  description = "Record the confirmed facts from the evidence, place them in order, and continue when the investigation details are complete.",
+  extraBlockers = [],
+  showBackLink = true,
+  showHeader = false,
+  title = "What happened",
+  onContinue,
+}: SafetyIncidentFactsPanelProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [facts, setFacts] = useState<SafetyIncidentFact[]>([]);
@@ -351,19 +372,27 @@ export function SafetyIncidentPhase4() {
     }
   }
 
-  async function continueToPhase5() {
+  async function continueToNextPhase() {
     if (!id) {
       return;
     }
     setPhaseAdvanceError(null);
+    if (extraBlockers.length > 0) {
+      setPhaseAdvanceError(extraBlockers.join(" "));
+      return;
+    }
     if (gate && !gate.can_continue) {
       setPhaseAdvanceError(gate.blockers.join(" "));
       return;
     }
     setIsMutating(true);
     try {
-      await safetyApi.transitionIncident(id, { target_phase: 5 });
-      navigate(`/safety/incidents/${id}/phase-5`);
+      if (onContinue) {
+        await onContinue(gate);
+      } else {
+        await safetyApi.transitionIncident(id, { target_phase: 5 });
+        navigate(`/safety/incidents/${id}/phase-3`);
+      }
     } catch (caught) {
       setPhaseAdvanceError(getErrorMessage(caught));
     } finally {
@@ -373,36 +402,15 @@ export function SafetyIncidentPhase4() {
 
   return (
     <section className="space-y-6">
-      <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-              Safety / Incident / Phase 4
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-              Phase 4 Facts and Sequence
-            </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Build the fact sequence from evidence, resolve contradictions, and keep hindsight
-              controls visible before causal analysis.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Incident
-              </div>
-              <div className="mt-1 font-semibold text-slate-900">#{id}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Facts
-              </div>
-              <div className="mt-1 font-semibold text-slate-900">{facts.length}</div>
-            </div>
-          </div>
-        </div>
-      </header>
+      {showHeader ? null : (
+        <section className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Investigation details
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-900">{title}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+        </section>
+      )}
 
       {error ? (
         <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
@@ -426,7 +434,7 @@ export function SafetyIncidentPhase4() {
 
           {isLoading ? (
             <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-              Loading phase 4 facts...
+              Loading investigation facts...
             </section>
           ) : sortedFacts.length === 0 ? (
             <section className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
@@ -454,7 +462,7 @@ export function SafetyIncidentPhase4() {
                         </span>
                         {fact.hindsight_guard_triggered ? (
                           <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium uppercase text-amber-800">
-                            Hindsight override
+                            Needs review
                           </span>
                         ) : null}
                       </div>
@@ -463,7 +471,7 @@ export function SafetyIncidentPhase4() {
                         <p>Evidence: {fact.evidence_summary}</p>
                         <p>Timestamp: {fact.fact_timestamp ?? "Not set"}</p>
                         <p>Source ID: {fact.source_evidence_id}</p>
-                        <p>Contradicts: {fact.contradicts_fact ?? "None"}</p>
+                        <p>Conflicts with: {fact.contradicts_fact ?? "None"}</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -524,7 +532,7 @@ export function SafetyIncidentPhase4() {
                   {fact.id && sortedFacts.length > 1 ? (
                     <div className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
                       <label className="block min-w-56 flex-1 text-sm font-medium text-slate-700">
-                        Contradicts fact
+                        Conflicts with fact
                         <select
                           className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                           disabled={isMutating}
@@ -552,7 +560,7 @@ export function SafetyIncidentPhase4() {
                         onClick={() => void markContradiction(fact.id as number)}
                         type="button"
                       >
-                        Mark contradiction
+                        Mark conflict
                       </button>
                     </div>
                   ) : null}
@@ -576,21 +584,26 @@ export function SafetyIncidentPhase4() {
           </section>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Phase Gate</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Continue</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Continue when the fact sequence is complete and every required evidence tab has
-              entries or an accepted not-applicable justification.
+              Continue when evidence is saved and at least one confirmed fact is added.
             </p>
             <button
               className="mt-4 inline-flex min-h-11 items-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-              disabled={isMutating || Boolean(gate && !gate.can_continue)}
-              onClick={continueToPhase5}
+              disabled={isMutating || extraBlockers.length > 0 || Boolean(gate && !gate.can_continue)}
+              onClick={continueToNextPhase}
               type="button"
             >
-              {isMutating ? "Checking phase gate..." : "Continue to Phase 5"}
+              {isMutating ? "Checking..." : continueLabel}
             </button>
             {phaseAdvanceError ? (
               <p className="mt-3 text-sm font-medium text-rose-700">{phaseAdvanceError}</p>
+            ) : extraBlockers.length > 0 ? (
+              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {extraBlockers.map((blocker) => (
+                  <p key={blocker}>{blocker}</p>
+                ))}
+              </div>
             ) : gate && !gate.can_continue ? (
               <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {gate.blockers.map((blocker) => (
@@ -600,16 +613,22 @@ export function SafetyIncidentPhase4() {
             ) : null}
           </section>
 
-          <Link
-            className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-            to="/safety/incidents"
-          >
-            Back to incidents
-          </Link>
+          {showBackLink ? (
+            <Link
+              className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+              to={backHref}
+            >
+              {backLabel}
+            </Link>
+          ) : null}
         </aside>
       </section>
     </section>
   );
+}
+
+export function SafetyIncidentPhase4() {
+  return <SafetyIncidentFactsPanel showHeader />;
 }
 
 export default SafetyIncidentPhase4;

@@ -70,7 +70,7 @@ src/
 │       ├── layout.tsx                                  ← SafetyModuleLayout (breadcrumbs, vessel dropdown slot)
 │       ├── incident/
 │       │   ├── index.tsx                               ← SafetyIncidentListPage
-│       │   ├── new.tsx                                 ← SafetyIncidentCreatePage (first-hour checklist)
+│       │   ├── new.tsx                                 ← SafetyIncidentCreatePage (Phase 1 intake)
 │       │   └── [id]/
 │       │       ├── index.tsx                           ← SafetyIncidentDetail (stepper shell)
 │       │       ├── phase-1.tsx                         ← Scene Control + intake
@@ -114,9 +114,8 @@ src/
 │       │   ├── chain-of-custody-tab.tsx                ← SafetyChainOfCustodyTab
 │       │   └── stepper.tsx                             ← SafetyPhaseStepper (9-phase, §4)
 │       ├── incident/
-│       │   ├── first-hour-checklist.tsx                ← SafetyFirstHourChecklist (D-GAP-R07)
 │       │   ├── step-timeline.tsx                       ← SafetyStepTimeline (Phase 4)
-│       │   ├── evidence-matrix.tsx                     ← SafetyEvidenceMatrix (Phase 3/5)
+│       │   ├── evidence-matrix.tsx                     ← SafetyEvidenceMatrix (legacy compatibility; not a Phase 4 route)
 │       │   ├── recommendation-form.tsx                 ← SafetyRecommendationForm (C/P/L tiers)
 │       │   └── fleet-circular-preview.tsx              ← SafetyFleetCircularPreview
 │       ├── near-miss/
@@ -154,7 +153,7 @@ src/
 │       └── safety-navigation-store.ts                  ← stepper state, last-visited phase
 ├── schemas/
 │   └── safety/                                         ← NEW — one Zod schema per form
-│       ├── incident-phase-1.ts                         ← intake + first-hour
+│       ├── incident-phase-1.ts                         ← intake
 │       ├── incident-phase-2.ts                         ← resources
 │       ├── incident-phase-3.ts                         ← evidence
 │       ├── incident-phase-4.ts                         ← STEP / facts
@@ -246,13 +245,6 @@ export const safetyIncidentPhase1Schema = z.object({
   vessel_id: z.string().uuid(),
   location_onboard: z.string().min(3),
   reporter_rank_code: z.string().min(1),
-  first_hour_checklist: z.object({
-    alarm_logs_frozen: z.boolean(),
-    damage_assessed: z.boolean(),
-    scene_secured: z.boolean(),
-    photographs_sketch_done: z.boolean(),
-    witnesses_recorded: z.boolean(),
-  }),                                       // D-GAP-R07
   narrative: z.string().min(120),           // VALIDATION_RULES §narrative_min_length
 });
 
@@ -286,10 +278,11 @@ The top-level shape of Safety UI — each node maps to a folder in §1.2.
         │       ├── <SafetyImoClassifierPill />          ← SMC/MC/MI (DESIGN_SYSTEM §3.2)
         │       ├── <SafetyStatePill />                  ← DRAFT/SUBMITTED/UNDER REVIEW/... (DESIGN_SYSTEM §4.1)
         │       └── per-phase screen:
-        │           ├── phase-1  → <SafetyFirstHourChecklist /> + intake form
+        │           ├── phase-1  → intake form
         │           ├── phase-2  → Resources Allocated form
-        │           ├── phase-3  → <SafetyChainOfCustodyTab /> + <SafetyEvidenceMatrix />
-        │           ├── phase-4  → <SafetyStepTimeline />
+        │           ├── phase-3  → Next Actions
+        │           ├── phase-4  → Documents evidence capture; no Evidence Check route; Witness Notes has only Witness name, What the witness said, Closing note
+        │           │              Saves show an inline acknowledgement and scroll to the saved documents / witness notes area
         │           ├── phase-5  → <SafetyCausalLayerTabs />
         │           │              ├── <SafetyMScatPicker />          ← 174-row picker
         │           │              ├── <SafetyMscatSubcodeDisplay />  ← read-only chips
@@ -379,7 +372,7 @@ The Incident module's state machine — locked by **D-DNV-05** (SSOT §6 L1407) 
 | # | Phase | UI route segment | State pill on entry | Gate before advance |
 |---|-------|------------------|---------------------|---------------------|
 | 0 | Draft | `/safety/incident/new` | `DRAFT` (neutral) | None — save to local + IndexedDB |
-| 1 | Scene Control | `phase-1` | `SUBMITTED` | First-hour checklist (D-GAP-R07) + narrative ≥120 chars |
+| 1 | Intake | `phase-1` | `SUBMITTED` | Narrative minimum, required reporter/risk/office fields, and timestamp sanity checks |
 | 2 | Resources Allocated | `phase-2` | `UNDER REVIEW` | Investigator assigned + investigation-depth chosen (D-GAP-R14) |
 | 3 | Evidence Collection | `phase-3` | `UNDER REVIEW` | ≥1 evidence entry OR "n/a — justified" per category (bias guard #1 Recency) |
 | 4 | Facts Systemized | `phase-4` | `UNDER REVIEW` | STEP timeline has ≥1 row |
@@ -932,6 +925,10 @@ On app load and on every network reconnect:
 ---
 
 ## 8. Form Patterns
+
+### 8.0 Save Acknowledgement and Saved-Content Focus
+
+Incident forms that append visible saved records must not silently save. Phase 2 RCA cause saves, Phase 3 Next Actions saves, and Phase 4 Evidence document/witness/checklist saves show a `role="status"` success message after the server responds and call `scrollIntoView({ behavior: "smooth", block: "start" })` on the saved-content area so the user can immediately review what was saved. This is confirmation/focus behavior only; it must not change API payloads, validation, or workflow transitions.
 
 ### 8.1 React Hook Form + Zod — Inherited
 

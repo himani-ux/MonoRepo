@@ -106,12 +106,6 @@ describe('SafetyIncidentPhase6', () => {
     fireEvent.change(screen.getByLabelText('Description'), {
       target: { value: 'Update toolbox talk before this activity.' },
     });
-    fireEvent.change(screen.getByLabelText('Due date'), {
-      target: { value: '2026-07-20' },
-    });
-    fireEvent.change(screen.getByLabelText('How much will this reduce risk?'), {
-      target: { value: 'LOW' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Save action' }));
 
     await waitFor(() => {
@@ -119,13 +113,9 @@ describe('SafetyIncidentPhase6', () => {
         'incident-1',
         {
           alarp_attested: true,
-          corrective_action: {
-            due_date: '2026-07-20',
-            verifier_user_id: 'current-user',
-          },
           description: 'Update toolbox talk before this activity.',
           estimated_effort: null,
-          estimated_likelihood_reduction: 'LOW',
+          estimated_likelihood_reduction: null,
           residual_risk_statement: 'Update toolbox talk before this activity.',
           theme_code: null,
           tier: 'PREVENTIVE',
@@ -159,10 +149,75 @@ describe('SafetyIncidentPhase6', () => {
 
     render(<SafetyIncidentPhase6 />);
 
-    await screen.findByText('Replace damaged safety guard.');
+    expect(await screen.findAllByText('Replace damaged safety guard.')).toHaveLength(1);
 
     expect(screen.queryByText('1 row')).toBeNull();
     expect(screen.queryByText('0 rows')).toBeNull();
+  });
+
+  it('allows another corrective action from the combined action form', async () => {
+    phase6Mocks.getIncidentPhase6Workspace.mockResolvedValue({
+      ...buildWorkspace(),
+      corrective_actions: [
+        {
+          description: 'Replace damaged safety guard.',
+          due_date: '2026-07-15',
+          id: 'ca-1',
+          status: 'OPEN',
+          title: 'Replace damaged safety guard.',
+          verifier_user_id: 'current-user',
+        },
+      ],
+      recommendations: {
+        CORRECTIVE: [
+          {
+            alarp_attested: false,
+            corrective_actions: [
+              {
+                description: 'Replace damaged safety guard.',
+                due_date: '2026-07-15',
+                id: 'ca-1',
+                status: 'OPEN',
+                title: 'Replace damaged safety guard.',
+                verifier_user_id: 'current-user',
+              },
+            ],
+            description: 'Replace damaged safety guard.',
+            id: 'rec-1',
+            rationale: '',
+            tier: 'CORRECTIVE',
+            title: 'Replace damaged safety guard.',
+            tolerable_failure_filter: false,
+          },
+        ],
+        LESSONS_LEARNT: [],
+        PREVENTIVE: [],
+      },
+      tier_counts: { CORRECTIVE: 1, LESSONS_LEARNT: 0, PREVENTIVE: 0 },
+    });
+    phase6Mocks.createIncidentRecommendation.mockResolvedValue({});
+
+    render(<SafetyIncidentPhase6 />);
+
+    expect(await screen.findAllByText('Replace damaged safety guard.')).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: 'Inspect adjacent safety guards.' },
+    });
+    const saveButton = screen.getByRole('button', { name: 'Save action' });
+
+    expect(saveButton).not.toBeDisabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(phase6Mocks.createIncidentRecommendation).toHaveBeenCalledWith(
+        'incident-1',
+        {
+          description: 'Inspect adjacent safety guards.',
+          tier: 'CORRECTIVE',
+          title: 'Inspect adjacent safety guards.',
+        }
+      );
+    });
   });
 
   it('acknowledges saved preventive actions and scrolls to saved actions', async () => {
@@ -187,12 +242,6 @@ describe('SafetyIncidentPhase6', () => {
     fireEvent.change(screen.getByLabelText('Description'), {
       target: { value: 'Update toolbox talk before this activity.' },
     });
-    fireEvent.change(screen.getByLabelText('Due date'), {
-      target: { value: '2026-07-20' },
-    });
-    fireEvent.change(screen.getByLabelText('How much will this reduce risk?'), {
-      target: { value: 'MED' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Save action' }));
 
     await waitFor(() => {
@@ -200,13 +249,9 @@ describe('SafetyIncidentPhase6', () => {
         'incident-1',
         {
           alarp_attested: true,
-          corrective_action: {
-            due_date: '2026-07-20',
-            verifier_user_id: 'current-user',
-          },
           description: 'Update toolbox talk before this activity.',
           estimated_effort: null,
-          estimated_likelihood_reduction: 'MED',
+          estimated_likelihood_reduction: null,
           residual_risk_statement: 'Update toolbox talk before this activity.',
           theme_code: null,
           tier: 'PREVENTIVE',
@@ -225,7 +270,7 @@ describe('SafetyIncidentPhase6', () => {
     });
   });
 
-  it('keeps corrective action as a separate due-date-only phase', async () => {
+  it('keeps corrective action as a separate description-and-due-date phase', async () => {
     phase6Mocks.getIncidentPhase6Workspace.mockResolvedValue(buildWorkspace());
     phase6Mocks.createIncidentRecommendation.mockResolvedValue({});
 
@@ -237,12 +282,13 @@ describe('SafetyIncidentPhase6', () => {
     expect(screen.queryByText('Who Will Do and Check This?')).toBeNull();
     expect(screen.queryByLabelText('Crew assigned')).toBeNull();
     expect(screen.queryByLabelText('Checker')).toBeNull();
+    expect(screen.getByLabelText('Due date')).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Description'), {
       target: { value: 'Replace the damaged guard.' },
     });
     fireEvent.change(screen.getByLabelText('Due date'), {
-      target: { value: '2026-07-15' },
+      target: { value: '2026-07-18' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save corrective' }));
 
@@ -251,7 +297,7 @@ describe('SafetyIncidentPhase6', () => {
         'incident-1',
         {
           corrective_action: {
-            due_date: '2026-07-15',
+            due_date: '2026-07-18',
             verifier_user_id: 'current-user',
           },
           description: 'Replace the damaged guard.',
@@ -314,8 +360,12 @@ describe('SafetyIncidentPhase6', () => {
     expect(screen.getByLabelText('Description')).toHaveValue(
       'Replace damaged guard.'
     );
+    expect(screen.getByLabelText('Due date')).toHaveValue('2026-07-15');
     fireEvent.change(screen.getByLabelText('Description'), {
       target: { value: 'Replace damaged guard and inspect mounting.' },
+    });
+    fireEvent.change(screen.getByLabelText('Due date'), {
+      target: { value: '2026-07-19' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Update corrective' }));
 
@@ -325,7 +375,7 @@ describe('SafetyIncidentPhase6', () => {
         'rec-1',
         {
           corrective_action: {
-            due_date: '2026-07-15',
+            due_date: '2026-07-19',
             verifier_user_id: 'current-user',
           },
           description: 'Replace damaged guard and inspect mounting.',
@@ -338,6 +388,71 @@ describe('SafetyIncidentPhase6', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Corrective updated. Review it under saved actions.'
     );
+  });
+
+  it('keeps fixed corrective save enabled when a corrective action already exists', async () => {
+    phase6Mocks.getIncidentPhase6Workspace.mockResolvedValue({
+      ...buildWorkspace(),
+      corrective_actions: [
+        {
+          description: 'Replace damaged guard.',
+          due_date: '2026-07-15',
+          id: 'ca-1',
+          status: 'OPEN',
+          title: 'Replace damaged guard.',
+          verifier_user_id: 'current-user',
+        },
+      ],
+      recommendations: {
+        CORRECTIVE: [
+          {
+            alarp_attested: false,
+            corrective_actions: [
+              {
+                description: 'Replace damaged guard.',
+                due_date: '2026-07-15',
+                id: 'ca-1',
+                status: 'OPEN',
+                title: 'Replace damaged guard.',
+                verifier_user_id: 'current-user',
+              },
+            ],
+            description: 'Replace damaged guard.',
+            id: 'rec-1',
+            rationale: '',
+            tier: 'CORRECTIVE',
+            title: 'Replace damaged guard.',
+            tolerable_failure_filter: false,
+          },
+        ],
+        LESSONS_LEARNT: [],
+        PREVENTIVE: [],
+      },
+      tier_counts: { CORRECTIVE: 1, LESSONS_LEARNT: 0, PREVENTIVE: 0 },
+    });
+    phase6Mocks.createIncidentRecommendation.mockResolvedValue({});
+
+    render(<SafetyIncidentPhase6 fixedTier="CORRECTIVE" />);
+
+    expect(await screen.findAllByText('Replace damaged guard.')).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: 'Inspect all guards after replacement.' },
+    });
+    const saveButton = screen.getByRole('button', { name: 'Save corrective' });
+
+    expect(saveButton).not.toBeDisabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(phase6Mocks.createIncidentRecommendation).toHaveBeenCalledWith(
+        'incident-1',
+        {
+          description: 'Inspect all guards after replacement.',
+          tier: 'CORRECTIVE',
+          title: 'Inspect all guards after replacement.',
+        }
+      );
+    });
   });
 
   it('keeps preventive action separate without remaining-risk or confirmation fields', async () => {
@@ -357,15 +472,14 @@ describe('SafetyIncidentPhase6', () => {
     expect(screen.queryByText('Prevent It Happening Again')).toBeNull();
     expect(screen.queryByLabelText('Theme')).toBeNull();
     expect(screen.queryByLabelText('Work needed')).toBeNull();
+    expect(screen.getByLabelText('Due date')).toBeTruthy();
+    expect(screen.queryByLabelText('How much will this reduce risk?')).toBeNull();
 
     fireEvent.change(screen.getByLabelText('Description'), {
       target: { value: 'Add a toolbox talk before the task.' },
     });
     fireEvent.change(screen.getByLabelText('Due date'), {
-      target: { value: '2026-07-21' },
-    });
-    fireEvent.change(screen.getByLabelText('How much will this reduce risk?'), {
-      target: { value: 'HIGH' },
+      target: { value: '2026-07-20' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save preventive' }));
 
@@ -375,12 +489,12 @@ describe('SafetyIncidentPhase6', () => {
         {
           alarp_attested: true,
           corrective_action: {
-            due_date: '2026-07-21',
+            due_date: '2026-07-20',
             verifier_user_id: 'current-user',
           },
           description: 'Add a toolbox talk before the task.',
           estimated_effort: null,
-          estimated_likelihood_reduction: 'HIGH',
+          estimated_likelihood_reduction: null,
           residual_risk_statement: 'Add a toolbox talk before the task.',
           theme_code: null,
           tier: 'PREVENTIVE',
@@ -390,7 +504,7 @@ describe('SafetyIncidentPhase6', () => {
     });
   });
 
-  it('shows one shared risk-reduction answer for saved preventive actions', async () => {
+  it('does not show risk-reduction input for saved preventive actions', async () => {
     phase6Mocks.getIncidentPhase6Workspace.mockResolvedValue({
       ...buildWorkspace(),
       recommendations: {
@@ -444,12 +558,65 @@ describe('SafetyIncidentPhase6', () => {
 
     render(<SafetyIncidentPhase6 fixedTier="PREVENTIVE" />);
 
-    const riskReductionFields = await screen.findAllByLabelText(
-      'How much will this reduce risk?'
-    );
-
-    expect(riskReductionFields).toHaveLength(1);
-    expect(riskReductionFields[0]).toHaveValue('LOW');
+    await screen.findByText('Add toolbox talk.');
+    expect(screen.queryByLabelText('How much will this reduce risk?')).toBeNull();
     expect(screen.queryByText('Risk reduction:')).toBeNull();
+  });
+
+  it('keeps fixed preventive save enabled when a preventive action already exists', async () => {
+    phase6Mocks.getIncidentPhase6Workspace.mockResolvedValue({
+      ...buildWorkspace(),
+      recommendations: {
+        CORRECTIVE: [],
+        LESSONS_LEARNT: [],
+        PREVENTIVE: [
+          {
+            alarp_attested: true,
+            corrective_actions: [
+              {
+                description: 'Add toolbox talk.',
+                due_date: '2026-07-21',
+                id: 'ca-1',
+                status: 'OPEN',
+                title: 'Add toolbox talk.',
+                verifier_user_id: 'current-user',
+              },
+            ],
+            description: 'Add toolbox talk.',
+            estimated_likelihood_reduction: 'LOW',
+            id: 'rec-1',
+            rationale: '',
+            tier: 'PREVENTIVE',
+            title: 'Add toolbox talk.',
+            tolerable_failure_filter: false,
+          },
+        ],
+      },
+      tier_counts: { CORRECTIVE: 0, LESSONS_LEARNT: 0, PREVENTIVE: 1 },
+    });
+    phase6Mocks.createIncidentRecommendation.mockResolvedValue({});
+
+    render(<SafetyIncidentPhase6 fixedTier="PREVENTIVE" />);
+
+    await screen.findByText('Add toolbox talk.');
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: 'Revise the task briefing checklist.' },
+    });
+    const saveButton = screen.getByRole('button', { name: 'Save preventive' });
+
+    expect(saveButton).not.toBeDisabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(phase6Mocks.createIncidentRecommendation).toHaveBeenCalledWith(
+        'incident-1',
+        expect.objectContaining({
+          description: 'Revise the task briefing checklist.',
+          estimated_likelihood_reduction: null,
+          tier: 'PREVENTIVE',
+          title: 'Revise the task briefing checklist.',
+        })
+      );
+    });
   });
 });

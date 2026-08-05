@@ -44,6 +44,9 @@ const SafetyIncidentIndexRoute = lazy(() => import("./incident"));
 const SafetyIncidentCreateRoute = lazy(() => import("./incident/new"));
 const SafetyIncidentPhase1Route = lazy(() => import("./incident/[id]/phase-1"));
 const SafetyIncidentPhase2Route = lazy(() => import("./incident/[id]/phase-2"));
+const SafetyIncidentPhase3Route = lazy(() => import("./incident/[id]/phase-3"));
+const SafetyIncidentPreventiveActionRoute = lazy(() => import("./incident/[id]/phase-3/preventive"));
+const SafetyIncidentLessonsLearnedRoute = lazy(() => import("./incident/[id]/phase-3/lessons"));
 const SafetyIncidentPhase4Route = lazy(() => import("./incident/[id]/phase-4"));
 const SafetyIncidentPhase5Route = lazy(() => import("./incident/[id]/phase-5"));
 const SafetyIncidentPhase6Route = lazy(() => import("./incident/[id]/phase-6"));
@@ -94,14 +97,12 @@ const SafetySoiPdfRoute = lazy(() => import("./soi/[id]/pdf/index"));
 const SafetyIncidentCorrectiveActionsRoute = lazy(
   () => import("./incident/[id]/corrective-actions/index"),
 );
-const SafetyIncidentPhase3PeopleRoute = lazy(() => import("./incident/[id]/phase-3/people"));
-const SafetyIncidentPhase3PlacesRoute = lazy(() => import("./incident/[id]/phase-3/places"));
-const SafetyIncidentPhase3PartsRoute = lazy(() => import("./incident/[id]/phase-3/parts"));
-const SafetyIncidentPhase3PaperRoute = lazy(() => import("./incident/[id]/phase-3/paper"));
-const SafetyIncidentPhase3PhotosRoute = lazy(() => import("./incident/[id]/phase-3/photos"));
-const SafetyIncidentPhase3ChainOfCustodyRoute = lazy(() => import("./incident/[id]/phase-3/chain-of-custody"));
-const SafetyIncidentPhase3EvidenceMatrixRoute = lazy(() => import("./incident/[id]/phase-3/evidence-matrix"));
-const SafetyIncidentPhase3InterviewsRoute = lazy(() => import("./incident/[id]/phase-3/interviews"));
+const SafetyIncidentPhase4PeopleRoute = lazy(() => import("./incident/[id]/phase-4/people"));
+const SafetyIncidentPhase4PlacesRoute = lazy(() => import("./incident/[id]/phase-4/places"));
+const SafetyIncidentPhase4PartsRoute = lazy(() => import("./incident/[id]/phase-4/parts"));
+const SafetyIncidentPhase4PaperRoute = lazy(() => import("./incident/[id]/phase-4/paper"));
+const SafetyIncidentPhase4PhotosRoute = lazy(() => import("./incident/[id]/phase-4/photos"));
+const SafetyIncidentPhase4InterviewsRoute = lazy(() => import("./incident/[id]/phase-4/interviews"));
 
 export const safetyRoutePermissions = {
   auditorExport: "SAF_F_020",
@@ -173,7 +174,47 @@ export const safetyRoutes: RouteObject[] = [
             <SafetyIncidentPhase2Route />
           </PermissionGate>,
         ),
+        path: "incidents/:id/office-communication",
+      },
+      {
+        element: renderWithSuspense(
+          <PermissionGate formId={safetyRoutePermissions.incidents}>
+            <SafetyIncidentPhase2Route />
+          </PermissionGate>,
+        ),
+        path: "incidents/:id/resource-handoff",
+      },
+      {
+        element: renderWithSuspense(
+          <PermissionGate formId={safetyRoutePermissions.incidents}>
+            <SafetyIncidentPhase5Route />
+          </PermissionGate>,
+        ),
         path: "incidents/:id/phase-2",
+      },
+      {
+        element: renderWithSuspense(
+          <PermissionGate formId={safetyRoutePermissions.incidents}>
+            <SafetyIncidentPhase3Route />
+          </PermissionGate>,
+        ),
+        path: "incidents/:id/phase-3",
+      },
+      {
+        element: renderWithSuspense(
+          <PermissionGate formId={safetyRoutePermissions.incidents}>
+            <SafetyIncidentPreventiveActionRoute />
+          </PermissionGate>,
+        ),
+        path: "incidents/:id/phase-3/preventive",
+      },
+      {
+        element: renderWithSuspense(
+          <PermissionGate formId={safetyRoutePermissions.incidents}>
+            <SafetyIncidentLessonsLearnedRoute />
+          </PermissionGate>,
+        ),
+        path: "incidents/:id/phase-3/lessons",
       },
       {
         element: renderWithSuspense(
@@ -182,22 +223,6 @@ export const safetyRoutes: RouteObject[] = [
           </PermissionGate>,
         ),
         path: "incidents/:id/phase-4",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase5Route />
-          </PermissionGate>,
-        ),
-        path: "incidents/:id/phase-5",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase6Route />
-          </PermissionGate>,
-        ),
-        path: "incidents/:id/phase-6",
       },
       {
         element: renderWithSuspense(
@@ -213,7 +238,7 @@ export const safetyRoutes: RouteObject[] = [
             <SafetyIncidentPhase7Route />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-7",
+        path: "incidents/:id/phase-5",
       },
       {
         element: renderWithSuspense(
@@ -243,7 +268,7 @@ export const safetyRoutes: RouteObject[] = [
             <SafetyIncidentPhase8Route />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-8",
+        path: "incidents/:id/phase-6",
       },
       {
         element: renderWithSuspense(
@@ -251,7 +276,7 @@ export const safetyRoutes: RouteObject[] = [
             <SafetyIncidentPhase9Route />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-9",
+        path: "incidents/:id/phase-7",
       },
       {
         element: renderWithSuspense(
@@ -259,7 +284,7 @@ export const safetyRoutes: RouteObject[] = [
             <SafetyIncidentPhase8Route />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-7/verification",
+        path: "incidents/:id/phase-6/verification",
       },
       {
         element: renderWithSuspense(
@@ -288,74 +313,50 @@ export const safetyRoutes: RouteObject[] = [
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3PeopleRoute />
+            <SafetyIncidentPhase4PeopleRoute />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-3",
+        path: "incidents/:id/phase-4/people",
       },
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3PeopleRoute />
+            <SafetyIncidentPhase4PlacesRoute />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-3/people",
+        path: "incidents/:id/phase-4/places",
       },
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3PlacesRoute />
+            <SafetyIncidentPhase4PartsRoute />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-3/places",
+        path: "incidents/:id/phase-4/parts",
       },
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3PartsRoute />
+            <SafetyIncidentPhase4PaperRoute />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-3/parts",
+        path: "incidents/:id/phase-4/paper",
       },
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3PaperRoute />
+            <SafetyIncidentPhase4PhotosRoute />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-3/paper",
+        path: "incidents/:id/phase-4/photos",
       },
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3PhotosRoute />
+            <SafetyIncidentPhase4InterviewsRoute />
           </PermissionGate>,
         ),
-        path: "incidents/:id/phase-3/photos",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3ChainOfCustodyRoute />
-          </PermissionGate>,
-        ),
-        path: "incidents/:id/phase-3/chain-of-custody",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3EvidenceMatrixRoute />
-          </PermissionGate>,
-        ),
-        path: "incidents/:id/phase-3/evidence-matrix",
-      },
-      {
-        element: renderWithSuspense(
-          <PermissionGate formId={safetyRoutePermissions.incidents}>
-            <SafetyIncidentPhase3InterviewsRoute />
-          </PermissionGate>,
-        ),
-        path: "incidents/:id/phase-3/interviews",
+        path: "incidents/:id/phase-4/interviews",
       },
       {
         element: renderWithSuspense(

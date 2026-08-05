@@ -32,6 +32,7 @@ from .incident_phase3 import (
     IncidentPhase3ChainOfCustodyView,
     IncidentPhase3EvidenceMatrixView,
     IncidentPhase3EvidenceView,
+    IncidentPhase3InterviewDetailView,
     IncidentPhase3InterviewView,
 )
 from .incident_phase4 import IncidentPhase4EvidenceSourceListView
@@ -118,6 +119,7 @@ __all__ = [
     "IncidentPhase3ChainOfCustodyView",
     "IncidentPhase3EvidenceMatrixView",
     "IncidentPhase3EvidenceView",
+    "IncidentPhase3InterviewDetailView",
     "IncidentPhase3InterviewView",
     "IncidentPhase4EvidenceSourceListView",
     "IncidentPhase6WorkspaceView",

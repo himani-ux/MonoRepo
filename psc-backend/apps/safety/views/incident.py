@@ -23,6 +23,8 @@ from apps.safety.services import (
     capture_model_state,
     record_field_changes,
 )
+from apps.safety.services.incident_weather_schema_guard import ensure_incident_weather_runtime_schema
+from apps.safety.views.dashboard import _list_available_vessels
 
 
 ALLOWED_INCIDENT_MUTATION_ROLES = {
@@ -34,6 +36,12 @@ ALLOWED_INCIDENT_MUTATION_ROLES = {
     "CHIEF OFFICER",
     "CHIEF ENGINEER",
     "SECOND ENGINEER",
+}
+
+INCIDENT_OFFICE_APPROVAL_LOCK_STATES = {
+    Incident.State.APPROVED,
+    Incident.State.CLOSED,
+    Incident.State.SUPERSEDED,
 }
 
 
@@ -58,6 +66,10 @@ class IncidentViewMixin:
     process_permission_class = HasProcessPermission.requiring("SAF_P_001")
     phase_state_machine_class = PhaseStateMachine
     position_fetcher_class = Mscmepc3PositionFetcher
+
+    def initial(self, request, *args, **kwargs):
+        ensure_incident_weather_runtime_schema()
+        return super().initial(request, *args, **kwargs)
 
     def get_permissions(self):
         permissions = [self.form_permission_class()]
@@ -88,6 +100,15 @@ class IncidentViewMixin:
 
     def _enforce_mutation_role(self, *, record_type: str | None = None) -> None:
         self._enforce_incident_creation_role(record_type=record_type)
+
+    def _enforce_editable_until_office_approval(self, incident: Incident) -> None:
+        if incident.state in INCIDENT_OFFICE_APPROVAL_LOCK_STATES:
+            raise ValidationError("Incident phases cannot be edited after office approval.")
+
+    def _enforce_phase_reached_for_edit(self, incident: Incident, phase_number: int, phase_label: str) -> None:
+        self._enforce_editable_until_office_approval(incident)
+        if int(incident.current_phase or 0) < phase_number:
+            raise ValidationError(f"{phase_label} can be edited after Phase {phase_number} is reached.")
 
     def _apply_filters(self, queryset):
         request = self.request
@@ -137,6 +158,11 @@ class IncidentListCreateView(IncidentViewMixin, generics.ListCreateAPIView):
         self.get_phase_state_machine().log_creation(incident, self.request.user)
 
 
+class IncidentRegisterVesselListView(IncidentViewMixin, generics.GenericAPIView):
+    def get(self, request, *args, **kwargs):
+        return Response(_list_available_vessels(user=request.user), status=status.HTTP_200_OK)
+
+
 class IncidentDetailView(IncidentViewMixin, generics.RetrieveUpdateAPIView):
     lookup_url_kwarg = "id"
     queryset = Incident.objects.filter(is_deleted=False)
@@ -151,6 +177,7 @@ class IncidentDetailView(IncidentViewMixin, generics.RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        self._enforce_editable_until_office_approval(instance)
         tracked_fields = tuple(serializer.validated_data.keys())
         old_state = capture_model_state(instance, field_names=tracked_fields)
         incident = serializer.save(updated_by=_resolve_actor_id(self.request.user))
@@ -178,6 +205,13 @@ class IncidentTransitionView(IncidentViewMixin, generics.GenericAPIView):
         if not permission.has_permission(self.request, self):
             raise PermissionDenied("You do not have permission to perform this action.")
 
+    def _require_any_process_permission(self, process_ids: tuple[str, ...]) -> None:
+        for process_id in process_ids:
+            permission = HasProcessPermission.requiring(process_id)()
+            if permission.has_permission(self.request, self):
+                return
+        raise PermissionDenied("You do not have permission to perform this action.")
+
     def post(self, request, *args, **kwargs):
         incident = self.get_object()
 
@@ -186,8 +220,11 @@ class IncidentTransitionView(IncidentViewMixin, generics.GenericAPIView):
 
         target_phase = serializer.validated_data["target_phase"]
         loop_back_reason = serializer.validated_data.get("loop_back_reason")
-        required_process_id = "SAF_P_003" if target_phase < incident.current_phase else "SAF_P_002"
-        self._require_process_permission(required_process_id)
+        if incident.state == Incident.State.SENT_BACK and incident.current_phase == 6 and target_phase == 7:
+            self._require_any_process_permission(("SAF_P_002", "SAF_P_003", "SAF_P_004", "SAF_P_006"))
+        else:
+            required_process_id = "SAF_P_003" if target_phase < incident.current_phase else "SAF_P_002"
+            self._require_process_permission(required_process_id)
 
         try:
             result = self.get_phase_state_machine().transition(

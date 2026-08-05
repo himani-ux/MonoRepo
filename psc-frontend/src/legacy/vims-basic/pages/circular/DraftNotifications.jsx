@@ -1,4 +1,4 @@
-﻿// src/components/DraftNotifications.jsx
+// src/components/DraftNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
@@ -8,7 +8,7 @@ import { buildCircularAttachmentUrl } from '../../utils/circular/attachmentUrl';
 
 const DraftNotifications = ({ currentUser }) => {
 
-    
+
 
     const [draftNotifications, setDraftNotifications] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +30,7 @@ const DraftNotifications = ({ currentUser }) => {
     const [idToSecondSubCatMap, setIdToSecondSubCatMap] = useState({});
 
         // Get user data for header
-    
+
     const { user } = useAuth();
     const userName = user?.display_name || user?.employee_id || user?.crew_id;
 
@@ -165,7 +165,7 @@ const DraftNotifications = ({ currentUser }) => {
                     });
                 }
                 setSubCategories(subCatData);
-                setIdToSubCatMap(subCatIdToNameMap); // âœ… Populate idToSubCatMap here
+                setIdToSubCatMap(subCatIdToNameMap); // ✅ Populate idToSubCatMap here
 
                 // Fetch second sub-categories (example - adjust as needed)
                 const secondSubCatRes = await fetch('http://localhost:8000/api/circular/api/second-sub-categories/');
@@ -213,7 +213,7 @@ const DraftNotifications = ({ currentUser }) => {
     // --- NEW: Define handleEditClick INSIDE the component ---
 
     const handleEditClick = async (notificationId) => {
-        console.log("ðŸš€ handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
+        console.log("🚀 handleEditClick: Edit clicked for notification ID (SR No):", notificationId);
 
         try {
             const primaryDashboardPath = isAdmin ? '/circular/admin' : '/circular/office';
@@ -231,7 +231,7 @@ const DraftNotifications = ({ currentUser }) => {
 
     // --- Handle Delete Click ---
     const handleDeleteClick = async (draftId, srNo, displaySrNo) => {
-        console.log("ðŸš€ handleDeleteClick: Delete clicked for draft ID:", draftId, "SR No:", srNo, "Display SR No:", displaySrNo);
+        console.log("🚀 handleDeleteClick: Delete clicked for draft ID:", draftId, "SR No:", srNo, "Display SR No:", displaySrNo);
 
         const confirmed = window.confirm(`Are you sure you want to delete draft notification ${displaySrNo}?`);
         console.log("handleDeleteClick: User confirmed:", confirmed);
@@ -310,7 +310,7 @@ const DraftNotifications = ({ currentUser }) => {
     console.log("Current user:", currentUser?.employee_id);
 
     return (
-         
+
         <div className="max-w-7xl mx-auto p-4 bg-white rounded-xl shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">My Draft Notifications</h1>
@@ -395,7 +395,7 @@ const DraftNotifications = ({ currentUser }) => {
                                         title="Click to view full comment"
                                     >
                                         <div className="line-clamp-2">
-                                            {notification.publish_comment || 'â€”'}
+                                            {notification.publish_comment || '—'}
                                         </div>
                                     </td>
 
@@ -461,7 +461,7 @@ const DraftNotifications = ({ currentUser }) => {
                 </div>
             )}
         </div>
-        
+
     );
 };
 

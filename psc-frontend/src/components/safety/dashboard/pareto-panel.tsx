@@ -27,35 +27,34 @@ export default function SafetyParetoPanel({
   totalOccurrences,
 }: SafetyParetoPanelProps) {
   return (
-    <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Pareto Screening
+            Top causes
           </p>
           <h2 className="mt-2 text-xl font-semibold text-slate-900">
-            Top repeat failures over the rolling 12 months
+            Top repeat issues over the last 12 months
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Ranked by M-SCAT leaf and vessel so the tolerable-failure filter and
-            chronic-incident surfacing stay tied to the strongest repeat clusters.
+            Ranked by repeat count so the strongest problem areas are easier to review.
           </p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Top {topN} rows covering {totalOccurrences} repeat-coded events
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Top {topN} causes covering {totalOccurrences} repeat events
         </div>
       </div>
 
       {entries.length === 0 ? (
-        <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-          No Pareto rows are available for the current screening window.
+        <div className="mt-5 rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+          No repeat cause data is available for the current review window.
         </div>
       ) : (
         <div className="mt-5 space-y-3">
           {entries.map((entry) => (
             <article
               key={`${entry.vesselId}-${entry.subcodeId}`}
-              className={`rounded-2xl border px-4 py-4 shadow-sm ${
+              className={`rounded-md border px-4 py-4 shadow-sm ${
                 entry.within80Cutoff
                   ? "border-emerald-200 bg-emerald-50/60"
                   : "border-slate-200 bg-slate-50"
@@ -65,7 +64,6 @@ export default function SafetyParetoPanel({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     <span>#{entry.rank}</span>
-                    <span>{entry.subcodeId}</span>
                     <span>{formatVesselName({
                       vessel_code: entry.vesselCode,
                       vessel_display_name: entry.vesselDisplayName,
@@ -109,7 +107,7 @@ export default function SafetyParetoPanel({
                   />
                 </div>
                 <div className="rounded-full border border-slate-300 bg-white px-3 py-1 text-center text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                  {entry.within80Cutoff ? "Within 80%" : "Long tail"}
+                  {entry.within80Cutoff ? "Main issue" : "Other issue"}
                 </div>
               </div>
             </article>

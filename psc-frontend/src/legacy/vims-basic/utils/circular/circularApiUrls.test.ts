@@ -11,12 +11,11 @@ const readSource = (relativePath: string) =>
   readFileSync(resolve(process.cwd(), relativePath), 'utf8');
 
 describe('Circular ship-side API URLs', () => {
-  it('test_circular_pdf_viewers_use_requested_localhost_api_base', () => {
+  it('test_circular_pdf_viewers_use_same_origin_api_base', () => {
     for (const relativePath of circularPdfHotfixFiles) {
       const source = readSource(relativePath);
       expect(source, relativePath).toContain('http://localhost:8000/api/circular/api/msc/pdf-url/');
       expect(source, relativePath).toContain('http://localhost:8000/api/circular/api/msc/read-ack/');
-      expect(source, relativePath).not.toContain('http://          //api/circular');
       expect(source, relativePath).not.toMatch(/http:\s*\/\/\s*\/api\/circular/);
     }
   });

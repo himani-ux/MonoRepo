@@ -11,6 +11,13 @@ from apps.safety.services.self_report_guard import check_self_report_conflict
 
 
 PHASE_1_NARRATIVE_MIN_LENGTH = 200
+PHASE_1_TRI_STATE_FIELDS = (
+    "risk_assessment_carried_out",
+    "toolbox_meeting_carried_out",
+    "permit_issued",
+)
+PHASE_1_TRI_STATE_VALUES = {"YES", "NO", "NA"}
+VESSEL_LOCATION_DETAIL_VALUES = {"In Port", "At Anchorage"}
 
 
 def derive_investigation_depth(risk_band: str | None) -> str | None:
@@ -42,6 +49,33 @@ def validate_loss_type_selection(attrs, incident: Incident | None = None) -> Non
         raise serializers.ValidationError({"loss_type_other": "Specify the other type of loss."})
 
 
+def normalize_phase1_optional_fields(attrs, incident: Incident | None = None) -> dict[str, str]:
+    errors: dict[str, str] = {}
+    for field_name in PHASE_1_TRI_STATE_FIELDS:
+        if field_name not in attrs:
+            continue
+        value = attrs.get(field_name)
+        if value in (None, ""):
+            attrs[field_name] = None
+            continue
+        normalized = str(value).strip().upper()
+        if normalized not in PHASE_1_TRI_STATE_VALUES:
+            errors[field_name] = "Select Yes, No, or NA."
+            continue
+        attrs[field_name] = normalized
+
+    vessel_location = attrs.get("vessel_location", getattr(incident, "vessel_location", None))
+    if vessel_location in (None, ""):
+        attrs["vessel_location_detail"] = None
+    elif "vessel_location_detail" in attrs and vessel_location not in VESSEL_LOCATION_DETAIL_VALUES:
+        attrs["vessel_location_detail"] = None
+
+    for field_name in ("activity_type", "incident_type_other", "vessel_location_detail"):
+        if field_name in attrs and attrs[field_name] == "":
+            attrs[field_name] = None
+    return errors
+
+
 class IncidentPhase1Serializer(serializers.ModelSerializer):
     draft_reference = serializers.SerializerMethodField(read_only=True)
     external_party_injury = ExternalPartyInjurySerializer(required=False, allow_null=True)
@@ -71,6 +105,7 @@ class IncidentPhase1Serializer(serializers.ModelSerializer):
             "risk_band",
             "imo_classifier",
             "incident_type_id",
+            "incident_type_other",
             "loss_type_primary_id",
             "loss_type_secondary_id",
             "loss_type_tertiary_id",
@@ -82,6 +117,7 @@ class IncidentPhase1Serializer(serializers.ModelSerializer):
             "longitude",
             "shore_assistance_required",
             "vessel_location",
+            "vessel_location_detail",
             "onboard_location",
             "last_port",
             "departure_date",
@@ -100,6 +136,10 @@ class IncidentPhase1Serializer(serializers.ModelSerializer):
             "weather_ice_condition_onboard_id",
             "weather_ice_condition_at_sea_id",
             "weather_light_condition_id",
+            "risk_assessment_carried_out",
+            "toolbox_meeting_carried_out",
+            "permit_issued",
+            "activity_type",
             "narrative",
             "awaiting_daily_report_match",
             "external_party_injury",
@@ -195,6 +235,7 @@ class IncidentPhase1Serializer(serializers.ModelSerializer):
             attrs["investigation_depth"] = derive_investigation_depth(risk_band)
             attrs["imo_classifier"] = Incident.ImoClassifier.NOT_APPLICABLE
         validate_loss_type_selection(attrs, incident)
+        errors.update(normalize_phase1_optional_fields(attrs, incident))
         if errors:
             raise serializers.ValidationError(errors)
 

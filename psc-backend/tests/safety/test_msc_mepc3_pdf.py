@@ -151,7 +151,6 @@ class MscMepc3PdfTests(unittest.TestCase):
             reported_at=datetime.fromisoformat("2026-04-27T11:30:00+00:00"),
             position_source="AUTO_FROM_DAILY_REPORT",
             narrative="Contact with floating object during heavy-weather passage.",
-            first_hour_checklist_done=True,
             marine_docs_checklist_done=True,
             chain_of_custody_ok=True,
             cargo_evidence_applicable=True,
@@ -226,6 +225,7 @@ class MscMepc3PdfTests(unittest.TestCase):
         )
 
         self.assertTrue(result.content.startswith(b"%PDF"))
+        self.assertEqual(result.incident_id, incident.pk)
         self.assertEqual(
             result.appendix_titles,
             [
@@ -253,7 +253,8 @@ class MscMepc3PdfTests(unittest.TestCase):
         self.assertIn("Moderate swell and passing rain.", text)
         self.assertIn("Collision / Contact", text)
         self.assertIn("Environmental", text)
-        self.assertIn("Field 30 - Current strength", text)
+        self.assertNotIn("First-hour checklist", text)
+        self.assertIn("Field 29 - Current strength", text)
 
     def test_backend_export_is_dpa_only_even_with_export_permission(self) -> None:
         incident = self._create_exportable_incident()
@@ -317,7 +318,6 @@ class MscMepc3PdfTests(unittest.TestCase):
             occurred_at=datetime.fromisoformat("2026-04-27T10:15:00+00:00"),
             reported_at=datetime.fromisoformat("2026-04-27T11:30:00+00:00"),
             narrative="Regulatory export permission fixture.",
-            first_hour_checklist_done=True,
             marine_docs_checklist_done=True,
             chain_of_custody_ok=True,
             causal_layering_complete=True,

@@ -9,7 +9,7 @@ from tests.safety.support import bootstrap_django, recreate_incident_table
 
 bootstrap_django()
 
-from apps.safety.models import Incident, IncidentEvidence, IncidentPhaseLog
+from apps.safety.models import Incident, IncidentCauseTag, IncidentEvidence, IncidentFact, IncidentPhaseLog
 from apps.safety.repositories.exceptions import PhaseTransitionError
 from apps.safety.services.phase_state_machine import PhaseStateMachine
 
@@ -71,6 +71,50 @@ class PhaseStateMachineTests(unittest.TestCase):
             self.machine.transition(incident.id, 5, build_user("MASTER", "master-7"))
 
         self.assertEqual(IncidentPhaseLog.objects.count(), 0)
+
+    def test_phase_three_can_continue_to_current_next_actions_when_rca_is_complete(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="DRAFT-ABC/2026/T001",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=3,
+            created_by="master-7",
+            schema_version=1,
+        )
+        fact = IncidentFact.objects.create(
+            incident=incident,
+            sequence_index=1,
+            fact_text="Evidence shows the immediate and underlying causes.",
+            source_evidence_id=1,
+            confidence=IncidentFact.Confidence.HIGH,
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+        for layer in (
+            IncidentCauseTag.CausalLayer.IMMEDIATE,
+            IncidentCauseTag.CausalLayer.ROOT,
+        ):
+            IncidentCauseTag.objects.create(
+                incident=incident,
+                source_fact=fact,
+                mscat_subcode_id="OTHER",
+                causal_layer=layer,
+                analysis_tool=IncidentCauseTag.AnalysisTool.FACT_TREE,
+                rationale=f"{layer} cause selected from RCA.",
+                created_by="master-7",
+                updated_by="master-7",
+                schema_version=1,
+            )
+
+        result = self.machine.transition(incident.id, 6, build_user("DPA"))
+
+        incident.refresh_from_db()
+        self.assertEqual(incident.current_phase, 6)
+        self.assertTrue(incident.causal_layering_complete)
+        self.assertEqual(result["transition_type"], IncidentPhaseLog.TransitionType.FORWARD)
+        self.assertEqual(result["phase_from"], 3)
+        self.assertEqual(result["phase_to"], 6)
 
     def test_phase_five_to_six_requires_root_cause_and_bias_guard_attestation(self) -> None:
         incident = Incident.objects.create(
@@ -139,7 +183,7 @@ class PhaseStateMachineTests(unittest.TestCase):
         self.assertEqual(incident.current_phase, 5)
         self.assertEqual(result["phase_to"], 5)
 
-    def test_phase_four_to_five_rejects_missing_evidence_tab_coverage(self) -> None:
+    def test_phase_four_to_five_allows_single_document_evidence_attachment(self) -> None:
         incident = Incident.objects.create(
             incident_number="DRAFT-ABC/2026/T001",
             vessel_id="7",
@@ -148,20 +192,44 @@ class PhaseStateMachineTests(unittest.TestCase):
             created_by="master-7",
             schema_version=1,
         )
-        for tab_code, _ in IncidentEvidence.TabCode.choices:
-            IncidentEvidence.objects.create(
-                incident=incident,
-                tab_code=tab_code,
-                summary="" if tab_code == IncidentEvidence.TabCode.ELECTRONIC else f"{tab_code} evidence captured",
-                entry_count=1 if tab_code != IncidentEvidence.TabCode.ELECTRONIC else 0,
-                na_justification="Unavailable offshore" if tab_code == IncidentEvidence.TabCode.PAPER else None,
-                created_by="master-7",
-                updated_by="master-7",
-                schema_version=1,
-            )
+        IncidentEvidence.objects.create(
+            incident=incident,
+            tab_code=IncidentEvidence.TabCode.PAPER,
+            entry_count=1,
+            structured_data={
+                "attachments": [
+                    {
+                        "attachment_path": "incidents/1/phase-3/paper/engine-log.pdf",
+                        "description": "Deck and engine log pages relevant to the incident.",
+                        "title": "Engine log extract",
+                    }
+                ]
+            },
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
 
-        with self.assertRaises(PhaseTransitionError):
+        result = self.machine.transition(incident.id, 5, build_user("DPA"))
+
+        incident.refresh_from_db()
+        self.assertEqual(incident.current_phase, 5)
+        self.assertEqual(result["phase_to"], 5)
+
+    def test_phase_four_to_five_rejects_when_no_evidence_is_recorded(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="DRAFT-ABC/2026/T001-NO-EVIDENCE",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=4,
+            created_by="master-7",
+            schema_version=1,
+        )
+
+        with self.assertRaises(PhaseTransitionError) as caught:
             self.machine.transition(incident.id, 5, build_user("DPA"))
+
+        self.assertIn("add at least one evidence", str(caught.exception))
 
     def test_phase_seven_to_eight_requires_dpa_acceptance_stamp(self) -> None:
         incident = Incident.objects.create(

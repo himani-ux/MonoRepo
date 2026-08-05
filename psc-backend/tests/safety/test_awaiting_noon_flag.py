@@ -170,4 +170,3 @@ class AwaitingDailyReportFlagTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["current_phase"], 2)
         self.assertTrue(response.data["awaiting_daily_report_match"])
-

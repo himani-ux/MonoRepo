@@ -1,4 +1,4 @@
-﻿// src/components/UserNotifications.jsx
+// src/components/UserNotifications.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../components/layout/PageLayout';
@@ -102,11 +102,11 @@ const UserNotifications = ({ currentUser }) => {
 
     // --- Handle Supersede Click (NEW) ---
     const handleSupersedeClick = (notificationId) => {
-        console.log("ðŸš€ Supersede clicked for notification ID:", notificationId);
+        console.log("🚀 Supersede clicked for notification ID:", notificationId);
 
         // 1. Store the notification ID in localStorage
         localStorage.setItem('supersedingNotificationId', notificationId);
-        console.log("âœ… Stored supersedingNotificationId in localStorage:", notificationId);
+        console.log("✅ Stored supersedingNotificationId in localStorage:", notificationId);
 
         // 2. Navigate to the main create page
         // This will reload the page and trigger the Officeuser/Admin component to check localStorage
@@ -129,13 +129,13 @@ const UserNotifications = ({ currentUser }) => {
     };
 
     return (
-          
+
         <div className="max-w-7xl mx-auto p-4 bg-white rounded-xl shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-800">My Notifications</h1>
             </div>
 
-            
+
 
             {/* --- Notifications List --- */}
             {isLoading ? (
@@ -209,7 +209,7 @@ const UserNotifications = ({ currentUser }) => {
                                             title={isDeleted ? "Notification deleted" : "Click to view full comment"}
                                         >
                                             <div className="line-clamp-2">
-                                                {notification.publish_comment || 'â€”'}
+                                                {notification.publish_comment || '—'}
                                             </div>
                                         </td>
 
@@ -277,7 +277,7 @@ const UserNotifications = ({ currentUser }) => {
                 </div>
             )}
         </div>
-      
+
     );
 };
 

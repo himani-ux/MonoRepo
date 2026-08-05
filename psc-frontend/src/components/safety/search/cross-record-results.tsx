@@ -98,8 +98,7 @@ export default function SafetyCrossRecordResults({
       <section className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-amber-950">Search terms need at least 3 characters</h2>
         <p className="mt-2 text-sm leading-6 text-amber-800">
-          The Step 8.8 full-text surface still holds the 3-character minimum so very short probes do not create
-          noisy fleet-wide matches.
+          Enter at least 3 characters so the search can return useful fleet-wide matches.
         </p>
       </section>
     );
@@ -131,8 +130,7 @@ export default function SafetyCrossRecordResults({
             </h2>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-slate-600">
-            Query <code>{response.query}</code> ran against the Step 8.8 full-text search surface across Incident, Near Miss,
-            SCM, and SOI findings
+            Showing matches for <code>{response.query}</code> across incidents, near misses, SCM records, and SOI findings
             {response.include_archived ? ", including the current archive window." : "."}
           </p>
         </div>

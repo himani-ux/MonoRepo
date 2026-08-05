@@ -46,7 +46,7 @@ class CausalLayeringTests(unittest.TestCase):
         )
         self.subcode = MasterMscatTaxonomy.objects.first()
 
-    def test_immediate_intermediate_and_root_layers_persist(self) -> None:
+    def test_immediate_and_root_layers_persist(self) -> None:
         IncidentCauseTag.objects.create(
             incident=self.incident,
             source_fact=self.fact,
@@ -54,17 +54,6 @@ class CausalLayeringTests(unittest.TestCase):
             causal_layer=IncidentCauseTag.CausalLayer.IMMEDIATE,
             analysis_tool=IncidentCauseTag.AnalysisTool.STEP,
             rationale="Immediate action captured from the fact base.",
-            created_by="master-7",
-            updated_by="master-7",
-            schema_version=1,
-        )
-        IncidentCauseTag.objects.create(
-            incident=self.incident,
-            source_fact=self.fact,
-            mscat_subcode_id=self.subcode.subcode_id,
-            causal_layer=IncidentCauseTag.CausalLayer.INTERMEDIATE,
-            analysis_tool=IncidentCauseTag.AnalysisTool.FACT_TREE,
-            rationale="Intermediate condition linked from the same fact.",
             created_by="master-7",
             updated_by="master-7",
             schema_version=1,
@@ -88,7 +77,6 @@ class CausalLayeringTests(unittest.TestCase):
             layers,
             [
                 IncidentCauseTag.CausalLayer.IMMEDIATE,
-                IncidentCauseTag.CausalLayer.INTERMEDIATE,
                 IncidentCauseTag.CausalLayer.ROOT,
             ],
         )

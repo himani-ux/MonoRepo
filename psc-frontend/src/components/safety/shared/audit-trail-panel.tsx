@@ -30,9 +30,6 @@ export function SafetyAuditTrailPanel({
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_55%,#dbeafe_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Audit Trail
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">
           Incident Audit Trail
         </h1>
@@ -47,7 +44,7 @@ export function SafetyAuditTrailPanel({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Phase Log</h2>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-              {phaseLog.length} rows
+              {phaseLog.length} entries
             </span>
           </div>
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
@@ -80,7 +77,7 @@ export function SafetyAuditTrailPanel({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Field History</h2>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-              {fieldHistory.length} rows
+              {fieldHistory.length} entries
             </span>
           </div>
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">

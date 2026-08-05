@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
-  SAFETY_NEAR_MISS_SCHEMA_VERSION,
-  SAFETY_NEAR_MISS_CATEGORY_TAGS,
-  SAFETY_NEAR_MISS_LOSS_OPTIONS,
+  SAFETY_NEAR_MISS_OTHER_CATEGORY,
+  SAFETY_NEAR_MISS_OTHER_MAX_LENGTH,
   SAFETY_NEAR_MISS_OTHER_PREFIX,
+  SAFETY_NEAR_MISS_SCHEMA_VERSION,
+  SAFETY_NEAR_MISS_CAUSE_FACTORS,
+  SAFETY_NEAR_MISS_LOSS_OPTIONS,
   SAFETY_NEAR_MISS_PLACES,
   type SafetyNearMissSubmitValues,
   type SafetyNearMissValues,
@@ -14,15 +16,46 @@ import { useAuth } from "../../../hooks/use-auth";
 import { toUtcIsoTimestamp } from "../../../hooks/safety/use-msc-mepc3-position";
 import {
   safetyApi,
+  type SafetyNearMissCategoryOption,
+  type SafetyNearMissCauseOption,
   type SafetyNearMissGuidancePrompt,
 } from "../../../lib/api/safety";
 import { getSafetyDeviceFingerprint } from "../../../lib/safety/digital-signature";
-import { SafetyMscatPicker } from "../shared/reference-pickers";
 
-const OTHER_CATEGORY_SELECT_VALUE = "__OTHER_CATEGORY__";
+const HIGH_SEVERITY_PHOTO_MAX_BYTES = 3 * 1024 * 1024;
+const HIGH_SEVERITY_PHOTO_ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const DEFAULT_LOSS_TYPE_ID = SAFETY_NEAR_MISS_LOSS_OPTIONS.find((option) => option.label === "Non-conformity")?.value
   ?? SAFETY_NEAR_MISS_LOSS_OPTIONS[0]?.value
   ?? 1;
+
+type NearMissCauseFactor = (typeof SAFETY_NEAR_MISS_CAUSE_FACTORS)[number]["value"];
+type NearMissFactorCauseRow = SafetyNearMissValues["near_miss_factor_causes"][number];
+
+function emptyFactorCauseRow(factor: NearMissCauseFactor): NearMissFactorCauseRow {
+  return {
+    factor,
+    immediate_option_id: "",
+    immediate_option_text: "",
+    immediate_other_text: "",
+    root_option_id: "",
+    root_option_text: "",
+    root_other_text: "",
+  };
+}
+
+function isOtherCauseOption(optionText?: string | null) {
+  return String(optionText ?? "").trim().toLowerCase() === "other";
+}
+
+function causeOptionsFor(
+  options: SafetyNearMissCauseOption[],
+  factor: NearMissCauseFactor,
+  causeStage: "IMMEDIATE" | "ROOT",
+) {
+  return options
+    .filter((option) => option.factor === factor && option.cause_stage === causeStage && option.active)
+    .sort((left, right) => left.display_order - right.display_order);
+}
 
 interface SafetyNearMissFormProps {
   description?: string;
@@ -31,7 +64,7 @@ interface SafetyNearMissFormProps {
   submitLabel?: string;
   title?: string;
   initialValues?: Partial<SafetyNearMissValues>;
-  onSubmit?: (values: SafetyNearMissSubmitValues) => void;
+  onSubmit?: (values: SafetyNearMissSubmitValues, highSeverityPhotoFile?: File | null) => void;
   afterFields?: ReactNode;
 }
 
@@ -46,6 +79,7 @@ const defaultValues: SafetyNearMissValues = {
   near_miss_mscat_category_id: null,
   near_miss_mscat_subcode_id: null,
   near_miss_mscat_subcode_ids: [],
+  near_miss_factor_causes: [],
   near_miss_severity: null,
   near_miss_shell_tag: null,
   near_miss_suggestion: "",
@@ -118,17 +152,19 @@ function primaryCategoryTag(tags: string[]) {
   if (!first) {
     return null;
   }
-  return first.startsWith(SAFETY_NEAR_MISS_OTHER_PREFIX) ? "Others" : first;
+  if (first.startsWith(SAFETY_NEAR_MISS_OTHER_PREFIX)) {
+    return SAFETY_NEAR_MISS_OTHER_CATEGORY;
+  }
+  return first;
 }
 
-function formatOtherValue(value: string) {
+function formatOtherCategory(value: string) {
   const cleaned = value.trim().replace(/\s+/g, " ");
   return cleaned ? `${SAFETY_NEAR_MISS_OTHER_PREFIX} ${cleaned}` : "";
 }
 
-function resolveLossOptionByLabel(label: string) {
-  const normalized = label.trim().toLowerCase();
-  return SAFETY_NEAR_MISS_LOSS_OPTIONS.find((option) => option.label.toLowerCase() === normalized);
+function isOtherCategoryTag(value: string) {
+  return value === SAFETY_NEAR_MISS_OTHER_CATEGORY || value.startsWith(SAFETY_NEAR_MISS_OTHER_PREFIX);
 }
 
 function removeValue<T>(values: T[], valueToRemove: T) {
@@ -183,17 +219,16 @@ export function SafetyNearMissForm({
     ...defaultValues,
     ...initialValues,
   });
+  const [causeOptions, setCauseOptions] = useState<SafetyNearMissCauseOption[]>([]);
+  const [nearMissCategories, setNearMissCategories] = useState<SafetyNearMissCategoryOption[]>([]);
   const [guidancePrompts, setGuidancePrompts] = useState<SafetyNearMissGuidancePrompt[]>([]);
-  const [otherCategoryText, setOtherCategoryText] = useState("");
+  const [highSeverityPhotoFile, setHighSeverityPhotoFile] = useState<File | null>(null);
+  const [highSeverityPhotoError, setHighSeverityPhotoError] = useState("");
   const [showOtherCategoryInput, setShowOtherCategoryInput] = useState(false);
-  const [showOtherImmediateCauseInput, setShowOtherImmediateCauseInput] = useState(false);
-  const [pendingImmediateCause, setPendingImmediateCause] = useState<{ categoryId: number | null; subcodeId: string | null }>({
-    categoryId: null,
-    subcodeId: null,
-  });
+  const [otherCategoryText, setOtherCategoryText] = useState("");
 
   const narrativeLength = values.narrative.trim().length;
-  const submitReady = safetyNearMissSubmitSchema.safeParse(values).success;
+  const baseSubmitReady = safetyNearMissSubmitSchema.safeParse(values).success;
   const vesselIdFromAuth = firstNonBlank(user?.vessel_id);
   const vesselCodeFromAuth = firstNonBlank(user?.vessel_code);
   const vesselDisplayName = firstNonBlank(user?.vessel_name, user?.vessel_code, values.vessel_code, user?.vessel_id, values.vessel_id);
@@ -220,12 +255,13 @@ export function SafetyNearMissForm({
     reporterUserIdFromAuth && reporterNameFromAuth && reporterRankFromAuth,
   );
   const isHighSeverity = values.near_miss_severity === "HIGH";
-  const categoryOptions = [
-    ...SAFETY_NEAR_MISS_CATEGORY_TAGS.filter((tag) => tag.trim().toLowerCase() !== "others"),
-    ...SAFETY_NEAR_MISS_LOSS_OPTIONS.map((option) => option.label),
-  ].filter((label, index, options) => (
-    options.findIndex((option) => option.toLowerCase() === label.toLowerCase()) === index
-  ));
+  const highSeverityPhotoRequired = showRateLimit && isHighSeverity;
+  const submitReady = baseSubmitReady && (!highSeverityPhotoRequired || Boolean(highSeverityPhotoFile));
+  const categoryOptions = nearMissCategories
+    .filter((category) => category.active)
+    .sort((left, right) => left.display_order - right.display_order)
+    .map((category) => category.category_name);
+  const hasOtherCategory = values.near_miss_category_tags.some(isOtherCategoryTag);
 
   useEffect(() => {
     setValues((current) => {
@@ -238,6 +274,60 @@ export function SafetyNearMissForm({
         reporter_device_fingerprint: getSafetyDeviceFingerprint(),
       };
     });
+  }, []);
+
+  useEffect(() => {
+    setValues((current) => {
+      if (current.near_miss_factor_causes.length > 0) {
+        return current;
+      }
+      return {
+        ...current,
+        near_miss_factor_causes: SAFETY_NEAR_MISS_CAUSE_FACTORS.map((factor) =>
+          emptyFactorCauseRow(factor.value),
+        ),
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    safetyApi
+      .getNearMissCauseOptions()
+      .then((options) => {
+        if (!cancelled) {
+          setCauseOptions(options);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCauseOptions([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    safetyApi
+      .getNearMissCategories()
+      .then((categories) => {
+        if (!cancelled) {
+          setNearMissCategories(categories);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNearMissCategories([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -359,6 +449,10 @@ export function SafetyNearMissForm({
     nextValue: SafetyNearMissValues[K],
   ) {
     setValues((current) => ({ ...current, [field]: nextValue }));
+    if (field === "near_miss_severity" && nextValue !== "HIGH") {
+      setHighSeverityPhotoFile(null);
+      setHighSeverityPhotoError("");
+    }
   }
 
   function updateCategoryTags(nextTags: string[]) {
@@ -370,19 +464,22 @@ export function SafetyNearMissForm({
   }
 
   function addCategoryValue(rawValue: string) {
-    if (rawValue === OTHER_CATEGORY_SELECT_VALUE) {
+    const cleaned = rawValue.trim();
+    if (!cleaned) {
+      return;
+    }
+    if (cleaned === SAFETY_NEAR_MISS_OTHER_CATEGORY) {
       setShowOtherCategoryInput(true);
       return;
     }
 
-    const lossOption = resolveLossOptionByLabel(rawValue);
-    const nextTags = addLimitedValue(values.near_miss_category_tags, rawValue);
+    const nextTags = addLimitedValue(values.near_miss_category_tags, cleaned);
     updateCategoryTags(nextTags);
-    updateField("loss_type_primary_id", lossOption?.value ?? values.loss_type_primary_id ?? DEFAULT_LOSS_TYPE_ID);
+    updateField("loss_type_primary_id", values.loss_type_primary_id ?? DEFAULT_LOSS_TYPE_ID);
   }
 
   function addOtherCategory() {
-    const formatted = formatOtherValue(otherCategoryText);
+    const formatted = formatOtherCategory(otherCategoryText);
     if (!formatted) {
       return;
     }
@@ -392,17 +489,39 @@ export function SafetyNearMissForm({
     updateField("loss_type_primary_id", values.loss_type_primary_id ?? DEFAULT_LOSS_TYPE_ID);
   }
 
-  function updateImmediateCauses(nextSubcodes: string[], categoryId?: number | null) {
+  function updateFactorCause(
+    factor: NearMissCauseFactor,
+    patch: Partial<NearMissFactorCauseRow>,
+  ) {
     setValues((current) => ({
       ...current,
-      near_miss_mscat_category_id: categoryId ?? current.near_miss_mscat_category_id,
-      near_miss_mscat_subcode_id: nextSubcodes[0] ?? null,
-      near_miss_mscat_subcode_ids: nextSubcodes,
+      near_miss_factor_causes: SAFETY_NEAR_MISS_CAUSE_FACTORS.map((factorMeta) => {
+        const existing = current.near_miss_factor_causes.find((row) => row.factor === factorMeta.value)
+          ?? emptyFactorCauseRow(factorMeta.value);
+        return factorMeta.value === factor ? { ...existing, ...patch, factor } : existing;
+      }),
     }));
+  }
+
+  function selectFactorCauseOption(
+    factor: NearMissCauseFactor,
+    stage: "immediate" | "root",
+    optionId: string,
+  ) {
+    const option = causeOptions.find((item) => item.id === optionId);
+    updateFactorCause(factor, {
+      [`${stage}_option_id`]: option?.id ?? "",
+      [`${stage}_option_text`]: option?.option_text ?? "",
+      [`${stage}_other_text`]: "",
+    } as Partial<NearMissFactorCauseRow>);
   }
 
   function handleSubmit() {
     if (submitDisabled) {
+      return;
+    }
+    if (highSeverityPhotoRequired && !highSeverityPhotoFile) {
+      setHighSeverityPhotoError("Image upload is required when severity is HIGH.");
       return;
     }
 
@@ -411,15 +530,12 @@ export function SafetyNearMissForm({
       return;
     }
 
-    onSubmit?.(result.data);
+    onSubmit?.(result.data, highSeverityPhotoRequired ? highSeverityPhotoFile : null);
   }
 
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_55%,#e0f2fe_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Near Miss
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">
           {title}
         </h1>
@@ -561,20 +677,21 @@ export function SafetyNearMissForm({
                 </option>
                 {categoryOptions
                   .filter((tag) => !values.near_miss_category_tags.includes(tag))
+                  .filter((tag) => tag !== SAFETY_NEAR_MISS_OTHER_CATEGORY || !hasOtherCategory)
                   .map((tag) => (
                     <option key={tag} value={tag}>
                       {tag}
                     </option>
                   ))}
-                <option value={OTHER_CATEGORY_SELECT_VALUE}>Other - Specify</option>
               </select>
               {showOtherCategoryInput ? (
                 <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:flex-row">
                   <input
                     aria-label="Specify other category"
                     className="min-h-[40px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                    maxLength={SAFETY_NEAR_MISS_OTHER_MAX_LENGTH}
                     onChange={(event) => setOtherCategoryText(event.target.value)}
-                    placeholder="Type category"
+                    placeholder="Specify category"
                     value={otherCategoryText}
                   />
                   <button
@@ -594,41 +711,82 @@ export function SafetyNearMissForm({
             </div>
           </section>
 
-          <section className="block space-y-2 text-sm text-slate-700">
-            <span className="font-medium">Immediate cause</span>
-            <SafetyMscatPicker
-              bottomOptionLabel="Other - Specify"
-              key={values.near_miss_mscat_subcode_ids.join("|")}
-              label="Immediate cause"
-              onChange={(nextValue) => {
-                setPendingImmediateCause(nextValue);
-                if (nextValue.subcodeId) {
-                  updateImmediateCauses(
-                    addLimitedValue(values.near_miss_mscat_subcode_ids, nextValue.subcodeId),
-                    nextValue.categoryId,
-                  );
-                  window.setTimeout(() => setPendingImmediateCause({ categoryId: null, subcodeId: null }), 0);
-                }
-              }}
-              onBottomOptionSelect={() => setShowOtherImmediateCauseInput(true)}
-              value={pendingImmediateCause}
-            />
-            {showOtherImmediateCauseInput ? (
-              <label className="block space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <span className="font-medium">Specify other immediate cause</span>
-                <textarea
-                  aria-label="Specify other immediate cause"
-                  className="min-h-[90px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 leading-6"
-                  onChange={(event) => updateField("near_miss_root_cause_detail", event.target.value)}
-                  placeholder="Type immediate cause"
-                  value={values.near_miss_root_cause_detail}
-                />
-              </label>
-            ) : null}
-            <SelectedValueChips
-              labels={values.near_miss_mscat_subcode_ids}
-              onRemove={(subcode) => updateImmediateCauses(removeValue(values.near_miss_mscat_subcode_ids, subcode))}
-            />
+          <section className="space-y-4 text-sm text-slate-700">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Cause factors</h2>
+            </div>
+            <div className="grid gap-4">
+              {SAFETY_NEAR_MISS_CAUSE_FACTORS.map((factor) => {
+                const row = values.near_miss_factor_causes.find((item) => item.factor === factor.value)
+                  ?? emptyFactorCauseRow(factor.value);
+                const immediateOptions = causeOptionsFor(causeOptions, factor.value, "IMMEDIATE");
+                const rootOptions = causeOptionsFor(causeOptions, factor.value, "ROOT");
+                return (
+                  <div
+                    className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
+                    key={factor.value}
+                  >
+                    <h3 className="text-base font-semibold text-slate-900">{factor.label}</h3>
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+                      <label className="space-y-2">
+                        <span className="font-medium">Immediate cause</span>
+                        <select
+                          aria-label={`${factor.label} immediate cause`}
+                          className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                          onChange={(event) => selectFactorCauseOption(factor.value, "immediate", event.target.value)}
+                          value={row.immediate_option_id}
+                        >
+                          <option value="">Select immediate cause</option>
+                          {immediateOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.option_text}
+                            </option>
+                          ))}
+                        </select>
+                        {isOtherCauseOption(row.immediate_option_text) ? (
+                          <textarea
+                            aria-label={`${factor.label} other immediate cause`}
+                            className="min-h-[80px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 leading-6"
+                            onChange={(event) =>
+                              updateFactorCause(factor.value, { immediate_other_text: event.target.value })
+                            }
+                            placeholder="Specify other immediate cause"
+                            value={row.immediate_other_text}
+                          />
+                        ) : null}
+                      </label>
+                      <label className="space-y-2">
+                        <span className="font-medium">Root cause</span>
+                        <select
+                          aria-label={`${factor.label} root cause`}
+                          className="min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                          onChange={(event) => selectFactorCauseOption(factor.value, "root", event.target.value)}
+                          value={row.root_option_id}
+                        >
+                          <option value="">Select root cause</option>
+                          {rootOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.option_text}
+                            </option>
+                          ))}
+                        </select>
+                        {isOtherCauseOption(row.root_option_text) ? (
+                          <textarea
+                            aria-label={`${factor.label} other root cause`}
+                            className="min-h-[80px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 leading-6"
+                            onChange={(event) =>
+                              updateFactorCause(factor.value, { root_other_text: event.target.value })
+                            }
+                            placeholder="Specify other root cause"
+                            value={row.root_other_text}
+                          />
+                        ) : null}
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
 
           <label className="block space-y-2 text-sm text-slate-700">
@@ -654,6 +812,50 @@ export function SafetyNearMissForm({
           {isHighSeverity ? (
             <section className="space-y-4 rounded-3xl border border-rose-100 bg-rose-50 p-5">
               <h2 className="text-lg font-semibold text-slate-900">High-risk details</h2>
+              {showRateLimit ? (
+                <label className="block space-y-2 text-sm text-slate-700">
+                  <span className="font-medium">Image upload</span>
+                  <input
+                    accept="image/jpeg,image/jpg,image/png"
+                    aria-label="High severity image upload"
+                    className="block min-h-[44px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                    onChange={(event) => {
+                      const nextFile = event.target.files?.[0] ?? null;
+                      if (!nextFile) {
+                        setHighSeverityPhotoFile(null);
+                        setHighSeverityPhotoError("Image upload is required when severity is HIGH.");
+                        return;
+                      }
+                      if (!HIGH_SEVERITY_PHOTO_ALLOWED_TYPES.has(nextFile.type)) {
+                        setHighSeverityPhotoFile(null);
+                        setHighSeverityPhotoError("Upload a JPG or PNG image.");
+                        event.currentTarget.value = "";
+                        return;
+                      }
+                      if (nextFile.size > HIGH_SEVERITY_PHOTO_MAX_BYTES) {
+                        setHighSeverityPhotoFile(null);
+                        setHighSeverityPhotoError("Image must be 3MB or smaller.");
+                        event.currentTarget.value = "";
+                        return;
+                      }
+                      setHighSeverityPhotoFile(nextFile);
+                      setHighSeverityPhotoError("");
+                    }}
+                    type="file"
+                  />
+                  <p className="text-xs leading-5 text-slate-600">
+                    Required for HIGH severity. JPG or PNG only, maximum 3MB.
+                  </p>
+                  {highSeverityPhotoFile ? (
+                    <p className="text-xs font-medium text-emerald-700">
+                      Selected: {highSeverityPhotoFile.name}
+                    </p>
+                  ) : null}
+                  {highSeverityPhotoError ? (
+                    <p className="text-xs font-medium text-rose-700">{highSeverityPhotoError}</p>
+                  ) : null}
+                </label>
+              ) : null}
               <label className="block space-y-2 text-sm text-slate-700">
                 <span className="font-medium">Root cause detail</span>
                 <textarea

@@ -25,6 +25,13 @@ MANUAL_ENTRY_REQUIRED = "manual_entry_required"
 OFFICE_AUTO_ACCEPT_THRESHOLD = 0.80
 VESSEL_AUTO_ACCEPT_THRESHOLD = 0.85
 MANUAL_ENTRY_THRESHOLD = 0.60
+CERTIFICATE_OCR_MAX_PDF_PAGES = 2
+CERTIFICATE_OCR_PDF_RENDER_SCALE = 1.5
+CERTIFICATE_OCR_TEXT_DET_LIMIT_SIDE_LEN = 960
+CERTIFICATE_OCR_TEXT_RECOGNITION_BATCH_SIZE = 64
+CERTIFICATE_OCR_TEXT_DETECTION_MODEL_NAME = "PP-OCRv4_mobile_det"
+CERTIFICATE_OCR_TEXT_RECOGNITION_MODEL_NAME = "en_PP-OCRv4_mobile_rec"
+_DEFAULT_CERTIFICATE_OCR_ENGINE: OcrEngine | None = None
 
 REQUIRED_FIELDS = (
     "certificate_type",
@@ -198,7 +205,7 @@ def process_cert_pdf(
     This does not write DB state. Phase 3 workers will persist this payload to
     vims_certs_pdf_blob.ocr_payload_json after blob storage is wired.
     """
-    selected_engine = engine or PaddleOcrEngine()
+    selected_engine = engine or default_certificate_ocr_engine()
     output = selected_engine.extract(source_path)
     detected_fields = dict(_parse_fields_from_text(output.raw_text, output.mean_confidence))
     detected_fields.update(output.fields)
@@ -273,6 +280,20 @@ def manual_entry_payload(
     }
 
 
+def default_certificate_ocr_engine() -> OcrEngine:
+    global _DEFAULT_CERTIFICATE_OCR_ENGINE
+    if _DEFAULT_CERTIFICATE_OCR_ENGINE is None:
+        _DEFAULT_CERTIFICATE_OCR_ENGINE = PaddleOcrEngine(
+            max_pdf_pages=CERTIFICATE_OCR_MAX_PDF_PAGES,
+            pdf_render_scale=CERTIFICATE_OCR_PDF_RENDER_SCALE,
+            text_detection_model_name=CERTIFICATE_OCR_TEXT_DETECTION_MODEL_NAME,
+            text_recognition_model_name=CERTIFICATE_OCR_TEXT_RECOGNITION_MODEL_NAME,
+            text_det_limit_side_len=CERTIFICATE_OCR_TEXT_DET_LIMIT_SIDE_LEN,
+            text_recognition_batch_size=CERTIFICATE_OCR_TEXT_RECOGNITION_BATCH_SIZE,
+        )
+    return _DEFAULT_CERTIFICATE_OCR_ENGINE
+
+
 def _threshold_value(value: Any, fallback: float) -> float:
     if value in (None, ""):
         return fallback
@@ -295,6 +316,8 @@ class PaddleOcrEngine:
         max_pdf_pages: int | None = 5,
         pdf_render_scale: float = 2.4,
         ocr_version: str | None = None,
+        text_detection_model_name: str | None = None,
+        text_recognition_model_name: str | None = None,
         text_det_limit_side_len: int | None = None,
         text_recognition_batch_size: int | None = None,
     ) -> None:
@@ -302,6 +325,8 @@ class PaddleOcrEngine:
         self.max_pdf_pages = None if max_pdf_pages is None else max(1, int(max_pdf_pages))
         self.pdf_render_scale = max(1.0, float(pdf_render_scale))
         self.ocr_version = ocr_version
+        self.text_detection_model_name = text_detection_model_name
+        self.text_recognition_model_name = text_recognition_model_name
         self.text_det_limit_side_len = (
             None if text_det_limit_side_len is None else max(1, int(text_det_limit_side_len))
         )
@@ -371,6 +396,10 @@ class PaddleOcrEngine:
             kwargs["lang"] = self.language
         if self.ocr_version:
             kwargs["ocr_version"] = self.ocr_version
+        if self.text_detection_model_name:
+            kwargs["text_detection_model_name"] = self.text_detection_model_name
+        if self.text_recognition_model_name:
+            kwargs["text_recognition_model_name"] = self.text_recognition_model_name
         if self.text_det_limit_side_len is not None:
             kwargs["text_det_limit_side_len"] = self.text_det_limit_side_len
         if self.text_recognition_batch_size is not None:

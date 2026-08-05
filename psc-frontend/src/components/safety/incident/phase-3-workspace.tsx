@@ -1298,14 +1298,6 @@ function SafetyInterviewCreateForm({
           </label>
         ) : null}
         <label className="block text-sm font-medium text-slate-700">
-          Remark
-          <textarea
-            className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3"
-            onChange={(event) => setConclusionNotes(event.target.value)}
-            value={conclusionNotes}
-          />
-        </label>
-        <label className="block text-sm font-medium text-slate-700">
           Upload witness statement
           <input
             accept="image/*,.pdf"
@@ -1319,6 +1311,14 @@ function SafetyInterviewCreateForm({
             Witness statement selected: {signatureFileName}
           </p>
         ) : null}
+        <label className="block text-sm font-medium text-slate-700">
+          Remark
+          <textarea
+            className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3"
+            onChange={(event) => setConclusionNotes(event.target.value)}
+            value={conclusionNotes}
+          />
+        </label>
       </div>
       {error ? (
         <p className="mt-3 text-sm font-medium text-rose-700">{error}</p>

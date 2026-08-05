@@ -50,7 +50,7 @@ class NearMissConfigTests(unittest.TestCase):
             occurred_at=timezone.now(),
             reported_at=timezone.now(),
             narrative="Crew observed a near miss and gave enough detail for the safety office to classify the report.",
-            near_miss_shell_tag="Safety",
+            near_miss_shell_tag="PPE",
             created_by="crew-7",
             updated_by="crew-7",
             schema_version=1,
@@ -58,12 +58,12 @@ class NearMissConfigTests(unittest.TestCase):
 
     def test_guidance_prompt_endpoint_returns_active_prompts(self) -> None:
         NearMissGuidancePrompt.objects.create(
-            category_tag="Safety",
+            category_tag="PPE",
             prompt_text="Describe what almost happened.",
             display_order=1,
             created_by="test",
         )
-        request = self.factory.get("/api/safety/near-miss/guidance-prompts/?category_tag=Safety")
+        request = self.factory.get("/api/safety/near-miss/guidance-prompts/?category_tag=PPE")
         force_authenticate(request, user=dpa_user())
 
         response = NearMissGuidancePromptView.as_view()(request)
@@ -97,7 +97,7 @@ class NearMissConfigTests(unittest.TestCase):
         request = self.factory.patch(
             f"/api/safety/near-miss/{self.near_miss.pk}/reclassify/",
             {
-                "near_miss_shell_tag": "Operational",
+                "near_miss_shell_tag": "Maintenance",
                 "reason": "DPA corrected category after review.",
             },
             format="json",
@@ -108,7 +108,7 @@ class NearMissConfigTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.near_miss.refresh_from_db()
-        self.assertEqual(self.near_miss.near_miss_shell_tag, "Operational")
+        self.assertEqual(self.near_miss.near_miss_shell_tag, "Maintenance")
         self.assertTrue(
             SafetyFieldHistory.objects.filter(
                 parent_id=self.near_miss.pk,

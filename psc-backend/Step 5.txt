@@ -1,0 +1,141 @@
+STEP 5 — MAINTAIN MODE. This is the operating system for everything that happens AFTER the build ships. Steps 0–2 get the docs right once; Step 5 keeps them right forever. It exists because of a documented failure: after first build, changes stop being recorded, progress.txt and LESSONS.md go stale, and six months later the docs describe an app that no longer exists — which is worse than no docs, because agents execute stale docs confidently.
+
+Step 5 is not a single-run prompt. It is four parts:
+  PART A — ACTIVATION: a one-time procedure run the day the build ships.
+  PART B — THE MAINTAIN OPERATING PROMPT: governs every post-launch change, forever. Embed it in the project's CLAUDE.md/AGENTS.md or paste it at the start of any maintenance session.
+  PART C — THE DRIFT AUDITOR: a periodic audit prompt (run weekly, pre-release, or via /loop·/schedule) that catches whatever slipped through.
+  PART D — THE ENFORCEMENT HOOK: a git commit-msg script installed at activation. The gates are enforced by git, not by agent goodwill — this works identically whether the change was made by Claude, Codex, or a human.
+
+Works in Claude Code, Codex CLI, or any harness. Everything is plain markdown + shell.
+
+═══════════════════════════════════════════════════
+PART A — ACTIVATION (one-time, the day the build ships)
+═══════════════════════════════════════════════════
+
+Run these steps once, in order. Each is checkable; do not skip.
+
+1. Tag the baseline: `git tag kloss-build-complete` on the commit that ships v1. Everything after this tag is MAINTAIN territory.
+2. Flip the mode: append to progress.txt:
+   `== <date> == MODE: MAINTAIN (activated; baseline tag kloss-build-complete). All subsequent changes are Change Records.`
+3. Create the `crs/` directory with a `crs/CR-000-template.md` copy of the CR format from Part B.
+4. Install the enforcement hook: write Part D's script to `.git/hooks/commit-msg`, `chmod +x` it. For team repos, also commit it to `scripts/commit-msg` and add hook installation to the repo setup instructions (or use core.hooksPath) — hooks don't clone.
+5. Add the Part B prompt to the project's CLAUDE.md / AGENTS.md under a `## MAINTAIN MODE` heading, replacing any build-phase session instructions that no longer apply.
+6. Record the audit anchor: `git tag kloss-last-drift-audit` (the drift auditor moves this tag each run).
+7. Verify: progress.txt shows MODE: MAINTAIN · `crs/` exists · hook fires on a test commit (try committing a code change without a progress entry — it must be rejected) · then revert the test.
+
+═══════════════════════════════════════════════════
+PART B — THE MAINTAIN OPERATING PROMPT
+═══════════════════════════════════════════════════
+
+<role>
+You are the maintenance engineer for a shipped system governed by a canonical doc suite. The docs describe reality; your job is that they STILL describe reality after every change you make. You classify before you touch, cascade docs in the same commit as code, and record everything. An undocumented change is not "done quickly" — it is a lie the docs now tell the next agent.
+</role>
+
+<change_intake>
+EVERY incoming request — bug report, feature ask, tweak, dependency bump — gets classified BEFORE any code is read. Tiers are decided by objective triggers, not by how big the change feels:
+
+TIER 1 — fix/chore. NONE of the Tier 2/3 triggers apply. (Typos, copy changes, style fixes, bug fixes that restore documented behavior, dep patches.)
+  Ceremony: for bugs, run the Step 4 debug protocol (reproduce → blast radius → root cause → fix). Every bugfix carries a REGRESSION TEST: the reproduction becomes a failing test before the fix, and test + fix commit together. Record: one progress.txt entry line. Doc cascade ONLY if a doc described the broken behavior as correct (then the doc was wrong — fix it in the same commit and log it as an [X] finding).
+
+TIER 2 — small feature / behavior change. ANY of: new or changed DB column · new endpoint or changed contract · new screen or new screen-state · changed role permission · new dependency (non-patch) · changed validation rule · new analytics event.
+  Ceremony: open a CR file (format below) BEFORE coding. Run a MINI-INTERROGATION of only the affected Step 1 domains (the CR's "Domains touched" line decides which — e.g., a new column touches Domains 6+7: data layer + field map; a new screen touches Domain 2: all applicable states, no happy-path-only screens, ever). Propose-and-confirm defaults are allowed; tag accepted ones. Then code, cascade, record.
+
+TIER 3 — structural. ANY of: new table or migration touching existing data · auth/session model change · cross-module contract change · new external integration · anything that contradicts IMPLEMENTATION_PLAN or an existing canonical doc statement.
+  Ceremony: everything in Tier 2, PLUS an IMPLEMENTATION_PLAN AMENDMENT (the plan is append-only: original phases are never edited; add `## Amendment <n> — <date>` stating what changed, the triggering discovery, and which phases/steps it supersedes). If the change invalidates interrogation-level decisions, the affected SSOT decisions get superseding entries (D-XXX supersedes D-YYY — never edit or delete the old decision; the audit trail is the point).
+
+If mid-change you discover the tier was too low (the "small fix" needs a migration), STOP, reclassify, open the CR, then continue. Discovering scope is normal; concealing it is the failure.
+</change_intake>
+
+<cr_format>
+File: `crs/CR-###.md` (sequential). Sections:
+- **What & why** — one paragraph, plain language.
+- **Tier + triggers** — which objective triggers fired.
+- **Domains touched** — Step 1 domain numbers, drives the mini-interrogation and the cascade list.
+- **Decisions** — any new decision gets the project's next decision ID (same scheme the SSOT uses); supersessions named explicitly.
+- **Doc cascade** — every canonical doc updated, with one line each on what changed. Docs NOT updated that a reviewer might expect: list with "unchanged because…".
+- **Tests** — regression/new tests added.
+- **Fidelity check** — for Tier 2/3: re-read the mini-interrogation answers against the doc updates side by side and list anything missing or weakened (refuter framing — "find the gap", not "looks fine"). Empty list = explicitly state "no deltas".
+- **Exemptions** — any DOCS-EXEMPT / TEST-EXEMPT / STATES-EXEMPT used, with reason and repayment plan.
+</cr_format>
+
+<recording_rules>
+- progress.txt is APPEND-ONLY, one entry per change, schema:
+  `<date> | MAINTAIN | CR-### or T1 | <what changed, one line> | docs: <list or "none — reason"> | exemptions: <tags or "none">`
+- Doc cascade lands in the SAME COMMIT as the code change. A follow-up "docs commit later" is forbidden — later never comes; that is the decay this mode exists to stop.
+- AS-IS discipline: docs describe what IS after the change ships. Aspirations go in CR "future work" notes, never into canonical docs.
+- LESSONS.md triggers — append an entry when ANY of: a change is reverted · the user corrects your approach · a bug traces to a pattern an existing LESSONS entry should have prevented (then STRENGTHEN that entry, note the recurrence) · a Tier was misclassified. Entry = what happened / root cause / the rule that prevents recurrence.
+- Exemption tags are debt, not forgiveness: each carries a reason and shows up in every drift audit until repaid. Three unrepaid exemptions = stop and repay before new work.
+</recording_rules>
+
+<goal>
+If your harness supports a completion condition (/goal), set per change:
+"The change is committed with: tests passing including any required regression test; progress.txt entry appended; CR file complete (Tier 2/3) with empty or resolved fidelity-check deltas; all cascaded docs in the same commit; commit accepted by the commit-msg hook without exemption tags (or exemptions logged in the CR)."
+</goal>
+
+═══════════════════════════════════════════════════
+PART C — THE DRIFT AUDITOR (run weekly / pre-release / via /loop or /schedule)
+═══════════════════════════════════════════════════
+
+<drift_audit>
+You are auditing whether reality and records still agree. Read-only except for DRIFT_REPORT.md and proposed entries. Steps:
+
+1. RANGE: `git log kloss-last-drift-audit..HEAD --oneline --stat` — every commit since the last audit.
+2. LEDGER CHECK: for each commit touching code paths, find its progress.txt entry and (Tier 2/3) its CR file. Missing entry → DRIFT finding; draft the retroactive entry from the diff (mark `[RETRO]`) for human approval — never silently backfill.
+3. CASCADE CHECK: for each commit whose diff implies a doc (new column → FIELD_MAP+DATA_MODEL row? new endpoint → BACKEND_STRUCTURE? new screen → APP_FLOW states?), verify the doc changed in that commit. Code-without-doc → DRIFT finding with the specific missing doc line.
+4. REVERSE CHECK (sampled): pick 5 random claims from canonical docs (rows with concrete values: a column, an endpoint, a validation rule, a state, a permission) and verify each against current code at file:line. A doc claim the code contradicts → STALE-DOC finding [X].
+5. EXEMPTION DEBT: list every unrepaid exemption tag with age. Anything older than 2 audits → escalate to the top of the report.
+6. LESSONS CHECK: any reverted commits in range without a LESSONS entry → finding.
+7. EMIT `DRIFT_REPORT.md`: findings by severity (STALE-DOC worst — docs actively lying — then unrecorded changes, then debt), each with evidence and a proposed one-line fix. End with the verdict: CLEAN / DRIFTING (findings ≤3) / DECAYED (>3 or any STALE-DOC older than one audit cycle).
+8. On human approval of fixes: apply them, then `git tag -f kloss-last-drift-audit HEAD`.
+</drift_audit>
+
+═══════════════════════════════════════════════════
+PART D — THE ENFORCEMENT HOOK (.git/hooks/commit-msg)
+═══════════════════════════════════════════════════
+
+#!/bin/sh
+# KLOSS Step 5 gate — code changes carry their records, or say why not.
+# Installed at MAINTAIN activation. Bypass is visible: --no-verify exists,
+# which is why the drift auditor re-checks everything this hook checks.
+MSG_FILE="$1"
+MSG=$(cat "$MSG_FILE")
+# Adjust to the repo's real code roots:
+CODE_PATHS='^(src/|apps/|lib/|app/|backend/|frontend/)'
+STAGED=$(git diff --cached --name-only)
+
+echo "$STAGED" | grep -qE "$CODE_PATHS" || exit 0   # docs/chore-only commit: pass
+
+# Gate 1: code change must carry a progress.txt entry or an exemption tag
+if ! echo "$STAGED" | grep -q '^progress.txt$'; then
+  if ! echo "$MSG" | grep -q 'DOCS-EXEMPT:'; then
+    echo "KLOSS GATE: code changed but progress.txt is not in this commit."
+    echo "Append the progress entry (schema in CLAUDE.md MAINTAIN MODE) and stage it,"
+    echo "or add 'DOCS-EXEMPT: <reason>' to this commit message (logged as debt)."
+    exit 1
+  fi
+fi
+# Gate 2: bugfix commits carry a test change or an exemption tag
+if echo "$MSG" | grep -qiE '\bfix(es|ed)?\b|\bbug\b'; then
+  if ! echo "$STAGED" | grep -qiE '(test|spec)'; then
+    if ! echo "$MSG" | grep -q 'TEST-EXEMPT:'; then
+      echo "KLOSS GATE: commit message says fix/bug but no test file is staged."
+      echo "Stage the regression test, or add 'TEST-EXEMPT: <reason>' (logged as debt)."
+      exit 1
+    fi
+  fi
+fi
+exit 0
+
+# CI BACKSTOP (recommended): run the same two checks in CI on the PR diff.
+# Pre-commit/commit-msg hooks are bypassable with --no-verify; CI is not.
+# The drift auditor (Part C) is the final net behind both.
+
+═══════════════════════════════════════════════════
+WHEN TO HAND THIS TO THE TEAM
+═══════════════════════════════════════════════════
+
+- PART A: the day the build ships — done once, by whoever owns the repo.
+- PART B: from that day on, governs every maintenance session, human or agent, Claude or Codex.
+- PART C: schedule it the same day (weekly is the default; also run before any release).
+- PART D: installed during Part A; team members install the hook on clone (or core.hooksPath handles it).
+- Step 4 (debug) remains the protocol INSIDE any Tier 1 bugfix — Step 5 wraps it with classification, recording, and enforcement.

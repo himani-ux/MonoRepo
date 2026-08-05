@@ -167,7 +167,7 @@ class VesselDashboardRepository:
             cursor.execute(
                 """
                 SELECT TOP 1
-                    snapshot_id, class_society, uploaded_at, parse_status, reconciliation_run_id
+                    snapshot_id, class_society, uploaded_at, printed_on_date, parse_status, reconciliation_run_id
                 FROM dbo.vims_certs_class_status_snapshot
                 WHERE vessel_id = %s
                   AND superseded_user_error = 0
@@ -407,11 +407,13 @@ def _serialize_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any] | Non
     if snapshot is None:
         return None
     uploaded_at = snapshot.get("uploaded_at")
+    printed_on_date = snapshot.get("printed_on_date")
     return {
         "id": str(snapshot["snapshot_id"]),
         "classSociety": snapshot.get("class_society"),
         "uploadedAt": uploaded_at,
-        "daysAgo": _days_ago(uploaded_at),
+        "printedOnDate": printed_on_date,
+        "daysAgo": _days_ago(printed_on_date),
         "parseStatus": snapshot.get("parse_status"),
         "reconciliationRunId": str(snapshot["reconciliation_run_id"]) if snapshot.get("reconciliation_run_id") else None,
     }
@@ -457,7 +459,7 @@ def _serialize_sections(sections: list[dict[str, Any]], items: list[dict[str, An
 
 
 def _serialize_dashboard_item(row: dict[str, Any]) -> dict[str, Any]:
-    item = serialize_tracked_item(row)
+    item = serialize_tracked_item(row, include_display_names=False)
     item.update(
         {
             "sectionId": row.get("catalog_section_id"),

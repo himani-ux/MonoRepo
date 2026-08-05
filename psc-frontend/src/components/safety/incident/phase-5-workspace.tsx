@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { getErrorMessage } from "../../../lib/api/client";
-import { safetyApi, type SafetyOfficeWorkflowPayload } from "../../../lib/api/safety";
+import {
+  safetyApi,
+  type SafetyNearMissCauseOption,
+  type SafetyOfficeWorkflowPayload,
+} from "../../../lib/api/safety";
+import { SAFETY_NEAR_MISS_CAUSE_FACTORS } from "../../../schemas/safety/near-miss";
 import {
   safetyIncidentPhase5WorkspaceSchema,
   type SafetyBiasGuard,
   type SafetyIncidentAnalysisTool,
+  type SafetyIncidentCauseTag,
   type SafetyIncidentCauseLayer,
   type SafetyIncidentPhase5Workspace,
 } from "../../../schemas/safety/incident-phase5";
@@ -19,8 +25,11 @@ import SafetyPeopleProcessPlantInterrogatory from "./people-process-plant-interr
 import SafetySafeguardFailureInterrogatory from "./safeguard-failure-interrogatory";
 
 const ANALYSIS_TOOLS = ["STEP", "FACT_TREE", "ECF", "BARRIER", "CHANGE"] as const;
-const CAUSAL_LAYERS = ["IMMEDIATE", "INTERMEDIATE", "ROOT"] as const;
+type CurrentCauseLayer = Extract<SafetyIncidentCauseLayer, "IMMEDIATE" | "ROOT">;
+const CAUSAL_LAYERS = ["IMMEDIATE", "ROOT"] as const satisfies CurrentCauseLayer[];
 const BIAS_STATES = ["PASSED", "WARNED", "BLOCKED", "JUSTIFIED", "OVERRIDE", "SOFTWARN_OVERRIDE"] as const;
+const MAX_ROOT_CAUSES = 3;
+const OTHER_ROOT_CAUSE_SUBCODE = "OTHER";
 const SAFEGUARD_FIELDS = [
   ["design_mscat_subcode_id", "Design"],
   ["installation_mscat_subcode_id", "Installation"],
@@ -68,6 +77,7 @@ const TOOL_WORKSPACE_FIELDS = {
     ["change_control_gaps", "Change-control gaps"],
   ],
 } as const satisfies Record<SafetyIncidentAnalysisTool, ReadonlyArray<readonly [string, string]>>;
+const showTechnicalAnalysisPanels = false;
 
 type SafeguardDraft = Record<(typeof SAFEGUARD_FIELDS)[number][0], string> & {
   notes: string;
@@ -80,6 +90,7 @@ type HumanFactorDomainDraft = {
   notes: string;
 };
 type ToolWorkspaceDraft = Record<SafetyIncidentAnalysisTool, Record<string, string>>;
+type IncidentCauseFactor = (typeof SAFETY_NEAR_MISS_CAUSE_FACTORS)[number]["value"];
 
 const emptySafeguardDraft: SafeguardDraft = {
   design_mscat_subcode_id: "",
@@ -130,6 +141,35 @@ function toolLabel(tool: string) {
   return tool === "FACT_TREE" ? "Fact Tree" : tool;
 }
 
+function causeLayerLabel(layer: CurrentCauseLayer) {
+  if (layer === "IMMEDIATE") {
+    return "Immediate Cause";
+  }
+  return "Root Cause";
+}
+
+function causeStageForLayer(layer: CurrentCauseLayer): SafetyNearMissCauseOption["cause_stage"] {
+  return layer === "IMMEDIATE" ? "IMMEDIATE" : "ROOT";
+}
+
+function currentCauseLayer(cause: SafetyIncidentCauseTag): CurrentCauseLayer {
+  return cause.causal_layer === "IMMEDIATE" ? "IMMEDIATE" : "ROOT";
+}
+
+function causeOptionsFor(
+  options: SafetyNearMissCauseOption[],
+  factor: IncidentCauseFactor,
+  causeStage: SafetyNearMissCauseOption["cause_stage"],
+) {
+  return options
+    .filter((option) => option.factor === factor && option.cause_stage === causeStage && option.active)
+    .sort((left, right) => left.display_order - right.display_order);
+}
+
+function isOtherCauseOption(option?: SafetyNearMissCauseOption | null) {
+  return String(option?.option_text ?? "").trim().toLowerCase() === "other";
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -173,9 +213,12 @@ export function SafetyIncidentPhase5() {
   const navigate = useNavigate();
   const [workspace, setWorkspace] = useState<SafetyIncidentPhase5Workspace>(emptyWorkspace());
   const [error, setError] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [phaseAdvanceError, setPhaseAdvanceError] = useState<string | null>(null);
+  const savedCausesRef = useRef<HTMLDivElement>(null);
+  const causeFormRef = useRef<HTMLFormElement>(null);
 
   const [peopleText, setPeopleText] = useState("");
   const [processText, setProcessText] = useState("");
@@ -189,11 +232,14 @@ export function SafetyIncidentPhase5() {
   const [monocausalJustification, setMonocausalJustification] = useState("");
   const [confirmationOverrideReason, setConfirmationOverrideReason] = useState("");
 
-  const [sourceFactId, setSourceFactId] = useState("");
-  const [causeSubcode, setCauseSubcode] = useState<string | null>(null);
-  const [causeLayer, setCauseLayer] = useState<SafetyIncidentCauseLayer>("ROOT");
+  const [causeOptions, setCauseOptions] = useState<SafetyNearMissCauseOption[]>([]);
+  const [causeFactor, setCauseFactor] = useState<IncidentCauseFactor>("HUMAN");
+  const [causeOptionId, setCauseOptionId] = useState("");
+  const [otherCauseText, setOtherCauseText] = useState("");
+  const [causeLayer, setCauseLayer] = useState<CurrentCauseLayer>("ROOT");
   const [causeTool, setCauseTool] = useState<SafetyIncidentAnalysisTool>("FACT_TREE");
   const [causeRationale, setCauseRationale] = useState("");
+  const [editingCauseId, setEditingCauseId] = useState<string | null>(null);
 
   const [safeguardDraft, setSafeguardDraft] = useState<SafeguardDraft>(emptySafeguardDraft);
   const [biasDraft, setBiasDraft] = useState<Record<string, SafetyBiasGuard>>({});
@@ -224,66 +270,119 @@ export function SafetyIncidentPhase5() {
       setMonocausalJustification(parsed.assessment?.monocausal_justification ?? "");
       setConfirmationOverrideReason(parsed.assessment?.confirmation_override_reason ?? "");
       setBiasDraft(Object.fromEntries(parsed.bias_guards.map((guard) => [guard.guard_code, guard])));
-      setSourceFactId(parsed.facts[0]?.id ? String(parsed.facts[0].id) : "");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      const message = getErrorMessage(caught);
+      if (message.includes("Submit resource handoff") || message.includes("Submit office communication")) {
+        navigate(`/safety/incidents/${id}/office-communication`, {
+          replace: true,
+          state: {
+            workflowMessage: "Confirm office communication first. Root cause can be added after that.",
+          },
+        });
+        return;
+      }
+      setError(message);
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    let cancelled = false;
+    safetyApi
+      .getNearMissCauseOptions()
+      .then((options) => {
+        if (!cancelled) {
+          setCauseOptions(options);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCauseOptions([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const rootCauseCount = useMemo(
     () => workspace.causes.filter((cause) => cause.causal_layer === "ROOT").length,
     [workspace.causes],
   );
+  const causeLayerCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        CAUSAL_LAYERS.map((layer) => [
+          layer,
+          workspace.causes.filter((cause) => cause.causal_layer === layer).length,
+        ]),
+      ) as Record<CurrentCauseLayer, number>,
+    [workspace.causes],
+  );
   const phase5GateHints = useMemo(() => {
     const hints: string[] = [];
-    if (rootCauseCount < 1) {
-      hints.push("Add at least one Root cause.");
-    }
-    if (rootCauseCount === 1 && monocausalJustification.trim().length < 80) {
-      hints.push("Add an 80+ character monocausal justification, or add another Root cause.");
-    }
-    [
-      ["People", peopleText],
-      ["Process", processText],
-      ["Plant", plantText],
-    ].forEach(([label, value]) => {
-      if (value.trim().length < 50) {
-        hints.push(`${label} analysis must be at least 50 characters.`);
+    CAUSAL_LAYERS.forEach((layer) => {
+      if ((causeLayerCounts[layer] ?? 0) < 1) {
+        hints.push(`Add at least one ${causeLayerLabel(layer)}.`);
       }
     });
-    if (selectedTools.length < workspace.minimum_tools_required) {
-      hints.push(`Select at least ${workspace.minimum_tools_required} analysis tool(s).`);
-    }
-    const riskChange = humanFactorDomains.risk_change;
-    if (!riskChange.considered && !riskChange.not_applicable && !riskChange.notes.trim()) {
-      hints.push("Complete Human Factors / risk change.");
-    }
-    if (workspace.safeguards.length < 1) {
-      hints.push("Add at least one safeguard failure with all six dimensions.");
-    }
-    const acknowledged = workspace.bias_guards.filter((guard) => guard.acknowledged).length;
-    if (acknowledged < workspace.bias_guards.length) {
-      hints.push("Acknowledge all active review checks.");
-    }
     return hints;
-  }, [
-    monocausalJustification,
-    peopleText,
-    plantText,
-    processText,
-    humanFactorDomains,
-    rootCauseCount,
-    selectedTools.length,
-    workspace.bias_guards,
-    workspace.minimum_tools_required,
-    workspace.safeguards.length,
-  ]);
+  }, [causeLayerCounts]);
+  const availableCauseOptions = useMemo(
+    () => causeOptionsFor(causeOptions, causeFactor, causeStageForLayer(causeLayer)),
+    [causeFactor, causeLayer, causeOptions],
+  );
+  const selectedCauseOption = useMemo(
+    () => availableCauseOptions.find((option) => option.id === causeOptionId) ?? null,
+    [availableCauseOptions, causeOptionId],
+  );
+  const selectedCauseIsOther = isOtherCauseOption(selectedCauseOption);
+  const editingCause = useMemo(
+    () => workspace.causes.find((cause) => cause.id === editingCauseId) ?? null,
+    [editingCauseId, workspace.causes],
+  );
+  const rootCauseCountExcludingEdit = useMemo(() => {
+    if (!editingCause || currentCauseLayer(editingCause) !== "ROOT") {
+      return rootCauseCount;
+    }
+    return Math.max(0, rootCauseCount - 1);
+  }, [editingCause, rootCauseCount]);
+  const rootCauseLimitReached = causeLayer === "ROOT" && rootCauseCountExcludingEdit >= MAX_ROOT_CAUSES;
+
+  function showSaveNotice(message: string, targetRef?: RefObject<HTMLDivElement>) {
+    setSaveNotice(message);
+    window.setTimeout(() => {
+      targetRef?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
+
+  function resetCauseForm() {
+    setEditingCauseId(null);
+    setCauseOptionId("");
+    setOtherCauseText("");
+    setCauseRationale("");
+  }
+
+  function startEditingCause(cause: SafetyIncidentCauseTag) {
+    setError(null);
+    setSaveNotice(null);
+    setEditingCauseId(cause.id ?? null);
+    setCauseLayer(currentCauseLayer(cause));
+    setCauseFactor((cause.cause_factor ?? "HUMAN") as IncidentCauseFactor);
+    setCauseOptionId(cause.cause_option_id ?? "");
+    setOtherCauseText(cause.cause_other_text ?? "");
+    setCauseTool(cause.analysis_tool);
+    setCauseRationale(cause.rationale);
+    window.setTimeout(() => {
+      causeFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
 
   async function saveAssessment(event: FormEvent) {
     event.preventDefault();
@@ -343,24 +442,54 @@ export function SafetyIncidentPhase5() {
     }));
   }
 
-  async function createCause(event: FormEvent) {
+  async function saveCause(event: FormEvent) {
     event.preventDefault();
-    if (!id || !causeSubcode) {
-      setError("Select a source fact and M-SCAT code before adding a cause.");
+    const selectedOption = causeOptions.find((option) => option.id === causeOptionId) ?? null;
+    const isOtherCause = isOtherCauseOption(selectedOption);
+    const cleanedOtherCause = otherCauseText.trim();
+    const cleanedRationale = causeRationale.trim();
+    if (!id) {
       return;
     }
+    if (rootCauseLimitReached) {
+      setError("Maximum three root causes are allowed.");
+      return;
+    }
+    if (!selectedOption) {
+      setError(`Select a cause before adding ${causeLayerLabel(causeLayer)}.`);
+      return;
+    }
+    if (isOtherCause && !cleanedOtherCause) {
+      setError(`Please specify the other ${causeLayerLabel(causeLayer)}.`);
+      return;
+    }
+    if (!cleanedRationale) {
+      setError(`Write why this is the ${causeLayerLabel(causeLayer)}.`);
+      return;
+    }
+    setError(null);
+    setSaveNotice(null);
     setIsMutating(true);
     try {
-      await safetyApi.createIncidentPhase5Cause(id, {
+      const savedCauseLayer = causeLayer;
+      const payload: SafetyOfficeWorkflowPayload = {
         analysis_tool: causeTool,
-        causal_layer: causeLayer,
-        mscat_subcode_id: causeSubcode,
-        rationale: causeRationale,
-        source_fact_id: sourceFactId,
-      });
-      setCauseRationale("");
-      setCauseSubcode(null);
+        causal_layer: savedCauseLayer,
+        cause_factor: causeFactor,
+        cause_option_id: selectedOption.id,
+        cause_other_text: isOtherCause ? cleanedOtherCause : "",
+        mscat_subcode_id: OTHER_ROOT_CAUSE_SUBCODE,
+        rationale: cleanedRationale,
+      };
+      if (editingCauseId) {
+        await safetyApi.updateIncidentPhase5Cause(id, editingCauseId, payload);
+      } else {
+        await safetyApi.createIncidentPhase5Cause(id, payload);
+      }
+      const savedMode = editingCauseId ? "updated" : "saved";
+      resetCauseForm();
       await reload();
+      showSaveNotice(`${causeLayerLabel(savedCauseLayer)} ${savedMode}. Review it under Causal Layers.`, savedCausesRef);
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -407,15 +536,19 @@ export function SafetyIncidentPhase5() {
     }
   }
 
-  async function continueToPhase6() {
+  async function continueToNextActions() {
     if (!id) {
       return;
     }
     setPhaseAdvanceError(null);
+    if (phase5GateHints.length > 0) {
+      setPhaseAdvanceError(phase5GateHints.join(" "));
+      return;
+    }
     setIsMutating(true);
     try {
       await safetyApi.transitionIncident(id, { target_phase: 6 });
-      navigate(`/safety/incidents/${id}/phase-6`);
+      navigate(`/safety/incidents/${id}/phase-3`);
     } catch (caught) {
       setPhaseAdvanceError(getErrorMessage(caught));
     } finally {
@@ -425,88 +558,151 @@ export function SafetyIncidentPhase5() {
 
   return (
     <section className="space-y-6">
-      <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Incident / Phase 5
-        </p>
-        <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Causal Analysis</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Build cause tags from facts, complete People / Process / Plant analysis, map safeguards, and close the review checks.
-            </p>
+      <section className="grid grid-cols-2 gap-3 text-sm">
+        {CAUSAL_LAYERS.map((layer) => (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm" key={layer}>
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{causeLayerLabel(layer)}</div>
+            <div className="mt-1 font-semibold text-slate-900">{causeLayerCounts[layer] ?? 0}</div>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Root</div>
-              <div className="mt-1 font-semibold text-slate-900">{rootCauseCount}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Tools</div>
-              <div className="mt-1 font-semibold text-slate-900">{selectedTools.length}/{workspace.minimum_tools_required}</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Guards</div>
-              <div className="mt-1 font-semibold text-slate-900">
-                {workspace.bias_guards.filter((guard) => guard.acknowledged).length}/{workspace.bias_guards.length}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+        ))}
+      </section>
 
       {error ? <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{error}</section> : null}
+      {saveNotice ? (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900" role="status">
+          {saveNotice}
+        </section>
+      ) : null}
 
       {isLoading ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading Phase 5...</section>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading Phase 2...</section>
       ) : (
         <>
-          <SafetyCausalLayerTabs causes={workspace.causes} />
+          <div className="scroll-mt-24 outline-none" ref={savedCausesRef} tabIndex={-1}>
+            <SafetyCausalLayerTabs causes={workspace.causes} onEditCause={startEditingCause} />
+          </div>
 
-          <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={createCause}>
-            <h2 className="text-xl font-semibold text-slate-900">Add M-SCAT Cause</h2>
+          <form className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={saveCause} ref={causeFormRef}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">{editingCauseId ? "Edit Cause" : "Add a Cause"}</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Choose the cause type, select the best matching cause from the list, and write why you selected it.
+                </p>
+              </div>
+              {editingCauseId ? (
+                <button
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                  onClick={resetCauseForm}
+                  type="button"
+                >
+                  Cancel edit
+                </button>
+              ) : null}
+            </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
-                Source fact
-                <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3 py-2" onChange={(event) => setSourceFactId(event.target.value)} value={sourceFactId}>
-                  <option value="">Select fact</option>
-                  {workspace.facts.map((fact) => (
-                    <option key={fact.id} value={fact.id}>
-                      #{fact.sequence_index} {fact.fact_text}
+                Type of cause
+                <select
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3 py-2"
+                  onChange={(event) => {
+                    setCauseLayer(event.target.value as CurrentCauseLayer);
+                    setCauseOptionId("");
+                    setOtherCauseText("");
+                  }}
+                  value={causeLayer}
+                >
+                  {CAUSAL_LAYERS.map((layer) => (
+                    <option key={layer} value={layer}>
+                      {causeLayerLabel(layer)}
                     </option>
                   ))}
                 </select>
               </label>
-              <SafetyMscatPicker onChange={(value) => setCauseSubcode(value.subcodeId)} value={{ subcodeId: causeSubcode }} />
               <label className="block text-sm font-medium text-slate-700">
-                Causal layer
-                <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3 py-2" onChange={(event) => setCauseLayer(event.target.value as SafetyIncidentCauseLayer)} value={causeLayer}>
-                  {CAUSAL_LAYERS.map((layer) => <option key={layer} value={layer}>{layer}</option>)}
+                Cause factor
+                <select
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3 py-2"
+                  onChange={(event) => {
+                    setCauseFactor(event.target.value as IncidentCauseFactor);
+                    setCauseOptionId("");
+                    setOtherCauseText("");
+                  }}
+                  value={causeFactor}
+                >
+                  {SAFETY_NEAR_MISS_CAUSE_FACTORS.map((factor) => (
+                    <option key={factor.value} value={factor.value}>
+                      {factor.label}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="block text-sm font-medium text-slate-700">
-                Analysis tool
-                <select className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3 py-2" onChange={(event) => setCauseTool(event.target.value as SafetyIncidentAnalysisTool)} value={causeTool}>
-                  {ANALYSIS_TOOLS.map((tool) => <option key={tool} value={tool}>{toolLabel(tool)}</option>)}
+                Select cause
+                <select
+                  className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3 py-2"
+                  onChange={(event) => {
+                    setCauseOptionId(event.target.value);
+                    setOtherCauseText("");
+                  }}
+                  value={causeOptionId}
+                >
+                  <option value="">
+                    {availableCauseOptions.length ? "Select cause" : "No cause options added"}
+                  </option>
+                  {availableCauseOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.option_text}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
+            {selectedCauseIsOther ? (
+              <label className="mt-4 block space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <span className="font-medium">Type other {causeLayerLabel(causeLayer)}</span>
+                <textarea
+                  aria-label={`Specify other ${causeLayerLabel(causeLayer)}`}
+                  className="min-h-[90px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 leading-6"
+                  onChange={(event) => setOtherCauseText(event.target.value)}
+                  placeholder={`Type ${causeLayerLabel(causeLayer)}`}
+                  value={otherCauseText}
+                />
+              </label>
+            ) : null}
             <label className="mt-4 block text-sm font-medium text-slate-700">
-              Rationale
+              Why did you select this?
               <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setCauseRationale(event.target.value)} value={causeRationale} />
             </label>
-            <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !sourceFactId || !causeSubcode || !causeRationale.trim()} type="submit">
-              Add cause
+            {rootCauseLimitReached ? (
+              <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Three root causes are already added. Remove or edit one if you need to change it.
+              </p>
+            ) : null}
+            <button
+              className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400"
+              disabled={
+                isMutating ||
+                rootCauseLimitReached ||
+                !causeRationale.trim() ||
+                !selectedCauseOption ||
+                (selectedCauseIsOther && !otherCauseText.trim())
+              }
+              type="submit"
+            >
+              {editingCauseId ? "Update" : "Add"} {causeLayerLabel(causeLayer)}
             </button>
           </form>
 
+          {showTechnicalAnalysisPanels ? (
+            <>
           <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={saveAssessment}>
-            <h2 className="text-xl font-semibold text-slate-900">Analysis Assessment</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Extra Review Notes</h2>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
               {[
                 ["People", peopleText, setPeopleText],
-                ["Process", processText, setProcessText],
-                ["Plant", plantText, setPlantText],
+                ["Work process", processText, setProcessText],
+                ["Equipment", plantText, setPlantText],
               ].map(([label, value, setter]) => (
                 <label className="block text-sm font-medium text-slate-700" key={label as string}>
                   {label as string}
@@ -556,11 +752,11 @@ export function SafetyIncidentPhase5() {
               ))}
             </div>
             <label className="mt-4 block text-sm font-medium text-slate-700">
-              Human factors notes
+              People and condition notes
               <textarea className="mt-2 min-h-20 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setHfNotes(event.target.value)} value={hfNotes} />
             </label>
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-900">SHELL tag</p>
+              <p className="text-sm font-semibold text-slate-900">Human factor type</p>
               <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {SHELL_OPTIONS.map(([value, label, description]) => (
                   <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-700" key={value}>
@@ -578,7 +774,7 @@ export function SafetyIncidentPhase5() {
                 ))}
               </div>
               <label className="mt-3 block text-sm font-medium text-slate-700">
-                SHELL notes
+                Human factor notes
                 <textarea className="mt-2 min-h-20 w-full rounded-2xl border border-slate-300 bg-white p-3" onChange={(event) => setShellNotes(event.target.value)} value={shellNotes} />
               </label>
             </div>
@@ -599,7 +795,7 @@ export function SafetyIncidentPhase5() {
                             onChange={(event) => updateHumanFactorDomain(key, { considered: event.target.checked })}
                             type="checkbox"
                           />
-                          Considered
+                          Checked
                         </label>
                         <label className="inline-flex items-center gap-2">
                           <input
@@ -614,7 +810,7 @@ export function SafetyIncidentPhase5() {
                     <textarea
                       className="mt-3 min-h-20 w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm"
                       onChange={(event) => updateHumanFactorDomain(key, { notes: event.target.value })}
-                      placeholder="Notes / rationale"
+                      placeholder="Notes"
                       value={domain.notes}
                     />
                   </section>
@@ -623,17 +819,17 @@ export function SafetyIncidentPhase5() {
             </div>
             {rootCauseCount === 1 ? (
               <label className="mt-4 block text-sm font-medium text-slate-700">
-                Monocausal justification
+                Why is there only one root cause?
                 <textarea className="mt-2 min-h-24 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setMonocausalJustification(event.target.value)} value={monocausalJustification} />
                 <span className="mt-1 block text-xs text-slate-500">{monocausalJustification.trim().length}/80 characters</span>
               </label>
             ) : null}
             <label className="mt-4 block text-sm font-medium text-slate-700">
-              Confirmation-bias override reason
+              Why is there no opposite evidence?
               <textarea className="mt-2 min-h-20 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setConfirmationOverrideReason(event.target.value)} value={confirmationOverrideReason} />
             </label>
             <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating} type="submit">
-              Save assessment
+              Save notes
             </button>
           </form>
 
@@ -649,9 +845,9 @@ export function SafetyIncidentPhase5() {
           </div>
 
           <form className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={createSafeguard}>
-            <h2 className="text-xl font-semibold text-slate-900">Add Safeguard Failure</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Add Failed Safety Control</h2>
             <label className="mt-4 block text-sm font-medium text-slate-700">
-              Safeguard name
+              Safety control name
               <input className="mt-2 min-h-11 w-full rounded-2xl border border-slate-300 px-3" onChange={(event) => setSafeguardDraft((current) => ({ ...current, safeguard_name: event.target.value }))} value={safeguardDraft.safeguard_name} />
             </label>
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -659,7 +855,7 @@ export function SafetyIncidentPhase5() {
                 <div key={field}>
                   <p className="mb-2 text-sm font-medium text-slate-700">{label}</p>
                   <SafetyMscatPicker
-                    label={`${label} M-SCAT code`}
+                    label={`${label} cause code`}
                     onChange={(value) => setSafeguardDraft((current) => ({ ...current, [field]: value.subcodeId ?? "" }))}
                     value={{ subcodeId: safeguardDraft[field] }}
                   />
@@ -671,13 +867,13 @@ export function SafetyIncidentPhase5() {
               <textarea className="mt-2 min-h-20 w-full rounded-2xl border border-slate-300 p-3" onChange={(event) => setSafeguardDraft((current) => ({ ...current, notes: event.target.value }))} value={safeguardDraft.notes} />
             </label>
             <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || !safeguardDraft.safeguard_name.trim()} type="submit">
-              Add safeguard
+              Add safety control
             </button>
           </form>
 
           <SafetyBiasGuardChecklist guards={workspace.bias_guards} />
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-900">Complete Review Checks</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Complete Final Checks</h2>
             <div className="mt-4 grid gap-3">
               {workspace.bias_guards.map((guard) => {
                 const draft = biasDraft[guard.guard_code] ?? guard;
@@ -693,29 +889,26 @@ export function SafetyIncidentPhase5() {
                       </select>
                       <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
                         <input checked={draft.acknowledged} onChange={(event) => setBiasDraft((current) => ({ ...current, [guard.guard_code]: { ...draft, acknowledged: event.target.checked } }))} type="checkbox" />
-                        Acknowledge
+                        Confirm
                       </label>
                     </div>
-                    <textarea className="mt-3 min-h-16 w-full rounded-2xl border border-slate-300 p-3 text-sm" onChange={(event) => setBiasDraft((current) => ({ ...current, [guard.guard_code]: { ...draft, justification: event.target.value } }))} placeholder="Justification / override note" value={draft.justification ?? ""} />
+                    <textarea className="mt-3 min-h-16 w-full rounded-2xl border border-slate-300 p-3 text-sm" onChange={(event) => setBiasDraft((current) => ({ ...current, [guard.guard_code]: { ...draft, justification: event.target.value } }))} placeholder="Notes" value={draft.justification ?? ""} />
                   </article>
                 );
               })}
             </div>
             <button className="mt-4 min-h-11 rounded-full bg-slate-900 px-5 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating} onClick={() => void saveBiasGuards()} type="button">
-              Save review checks
+              Save final checks
             </button>
           </section>
+            </>
+          ) : null}
         </>
       )}
 
-      {workspace.blame_evaluation.blocked ? (
-        <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-          Analysis review is blocking Phase 6. Words to review: {workspace.blame_evaluation.trigger_terms.join(", ") || "review required"}.
-        </section>
-      ) : null}
       {phase5GateHints.length > 0 ? (
         <section className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">Phase 6 gate still needs:</p>
+          <p className="font-semibold">Still needed:</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {phase5GateHints.map((hint) => (
               <li key={hint}>{hint}</li>
@@ -726,11 +919,11 @@ export function SafetyIncidentPhase5() {
       {phaseAdvanceError ? <section className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{phaseAdvanceError}</section> : null}
 
       <div className="flex flex-wrap gap-3">
-        <Link className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700" to={`/safety/incidents/${id}/phase-4`}>
-          Back to Phase 4
+        <Link className="inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700" to={`/safety/incidents/${id}/office-communication`}>
+          Back to Phase 1 Details
         </Link>
-        <button className="inline-flex min-h-11 items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating} onClick={continueToPhase6} type="button">
-          {isMutating ? "Checking gate..." : "Continue to Phase 6"}
+        <button className="inline-flex min-h-11 items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-400" disabled={isMutating || phase5GateHints.length > 0} onClick={continueToNextActions} type="button">
+          {isMutating ? "Checking..." : "Continue to Corrective Action"}
         </button>
       </div>
     </section>

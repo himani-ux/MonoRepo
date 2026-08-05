@@ -376,7 +376,20 @@ export function SafetyScmTenSectionForm({
     ...(validationResult.success ? [] : validationResult.error.issues.map((issue) => issue.message)),
     ...attendanceErrors,
   ];
-  const submitReady = validationResult.success && attendanceErrors.length === 0;
+  const wrhHostReadiness = config.wrh_host_readiness ?? {
+    blocking_crew: [],
+    checked_crew_count: values.attendance_rows.length,
+    message: "WRH readiness will be checked when the SCM meeting is created.",
+    missing_ship_time: false,
+    ready: true,
+    warnings: [],
+  };
+  const wrhReadinessMatchesSelectedDate = values.meeting_date === config.meeting_date_default;
+  const wrhReadinessClear = wrhHostReadiness.ready || !wrhReadinessMatchesSelectedDate;
+  const wrhHostBlocked = formMode === "create" && wrhReadinessMatchesSelectedDate && !wrhHostReadiness.ready;
+  const wrhReadinessMessage = wrhReadinessMatchesSelectedDate
+    ? wrhHostReadiness.message
+    : "WRH readiness will be rechecked by the server for the selected meeting date when you submit.";
 
   function updateField<K extends keyof SafetyScmDraftValues>(
     field: K,
@@ -476,6 +489,10 @@ export function SafetyScmTenSectionForm({
       return;
     }
 
+    if (wrhHostBlocked) {
+      return;
+    }
+
     onSubmit?.({
       ...validationResult.data,
       latitude: nullableCoordinate(validationResult.data.latitude),
@@ -513,12 +530,43 @@ export function SafetyScmTenSectionForm({
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_55%,#dcfce7_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / SCM
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">{title}</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{summary}</p>
       </header>
+
+      {formMode === "create" ? (
+        <section
+          className={`rounded-3xl border p-5 shadow-sm ${
+            wrhReadinessClear
+              ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+              : "border-rose-200 bg-rose-50 text-rose-950"
+          }`}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-75">
+                WRH readiness
+              </p>
+              <h2 className="mt-1 text-lg font-semibold">
+                {wrhReadinessClear ? "SCM can be hosted" : "SCM hosting is blocked"}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6">
+                {wrhReadinessMessage}
+              </p>
+            </div>
+            <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold">
+              {wrhHostReadiness.checked_crew_count} crew checked
+            </span>
+          </div>
+          {wrhReadinessMatchesSelectedDate && wrhHostReadiness.warnings.length > 0 ? (
+            <ul className="mt-4 list-disc space-y-1 pl-5 text-sm leading-6">
+              {wrhHostReadiness.warnings.map((warning, index) => (
+                <li key={`${warning}-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-4">
         <DetailCard label="Vessel" value={`${config.vessel.vessel_code} - ${config.vessel.vessel_name}`} />
@@ -1054,12 +1102,15 @@ export function SafetyScmTenSectionForm({
             <p className="text-sm leading-6 text-slate-600">
               Vessel details, SCM type, preparer, chair, crew roster, WRH flags, previous closeout summary, SOI findings, and carried-forward actions are filled from current records. Complete attendance, discussion notes, decisions, actions, and remarks before finalizing.
             </p>
-            {submitAttempted && validationMessages.length > 0 ? (
+            {submitAttempted && (validationMessages.length > 0 || wrhHostBlocked) ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p className="font-semibold">
                   Complete these items before {formMode === "edit" ? "updating" : "creating"} the meeting:
                 </p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {wrhHostBlocked ? (
+                    <li>Clear WRH readiness warnings before hosting the SCM meeting.</li>
+                  ) : null}
                   {validationMessages.map((message, index) => (
                     <li key={`${message}-${index}`}>{message}</li>
                   ))}
@@ -1069,7 +1120,7 @@ export function SafetyScmTenSectionForm({
           </div>
           <button
             className="min-h-[44px] shrink-0 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={isSubmitting}
+            disabled={isSubmitting || wrhHostBlocked}
             onClick={handleSubmit}
             type="button"
           >

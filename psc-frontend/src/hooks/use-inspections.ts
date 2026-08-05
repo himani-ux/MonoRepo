@@ -322,6 +322,7 @@ export function useCreateDeficiency(inspectionId: number | string) {
  * const formData = new FormData();
  * formData.append('deficiency_updates', JSON.stringify(updates));
  * formData.append('reinspection_date', '2026-01-20');
+ * formData.append('report_files', pdfFile);
  * followUpMutation.mutate(formData);
  * ```
  */

@@ -35,7 +35,7 @@ export function SafetyReopenIncidentModal({
               Re-open Closed Incident
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Re-open sends the incident back to Phase 5 so new evidence can be
+              Re-open sends the incident back to Phase 4 so new evidence can be
               analysed without losing the closure audit trail.
             </p>
           </div>
@@ -62,7 +62,7 @@ export function SafetyReopenIncidentModal({
             onClick={() => onConfirm?.(reason.trim())}
             type="button"
           >
-            Re-open to Phase 5
+            Re-open to Phase 4
           </button>
         </div>
       </section>

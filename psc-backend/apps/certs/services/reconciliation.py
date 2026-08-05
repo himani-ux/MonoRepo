@@ -70,6 +70,17 @@ def build_reconciliation_flags(
     mapped_catalog_ids: set[str] = set()
 
     for class_row in _payload_rows(parsed_payload):
+        if _is_non_class_condition_row(class_row):
+            continue
+        if _is_condition_of_class(class_row):
+            flags.append(
+                _flag(
+                    "conditions_of_class",
+                    class_row=class_row,
+                    diff={"condition": {"class": class_row.get("raw_text") or class_row.get("text")}},
+                )
+            )
+            continue
         class_code = _class_code(class_row)
         confidence = _confidence(class_row)
         mapping = mapping_by_code.get(_normal_key(class_code))
@@ -400,6 +411,30 @@ def _is_conditional(class_row: dict[str, Any]) -> bool:
     return bool(class_row.get("conditional")) or "CONDITIONAL" in text or "SHORT" in text or "STC" in text
 
 
+def _is_condition_of_class(class_row: dict[str, Any]) -> bool:
+    section = str(class_row.get("source_section") or class_row.get("sourceSection") or "").lower()
+    if _is_non_class_condition_row(class_row):
+        return False
+    return bool(re.search(r"\bconditions?\s+of\s+class\b", section))
+
+
+def _is_non_class_condition_row(class_row: dict[str, Any]) -> bool:
+    section = str(class_row.get("source_section") or class_row.get("sourceSection") or "").lower()
+    kind = str(class_row.get("kind") or "").strip().lower()
+    class_code = str(class_row.get("class_code_or_name") or class_row.get("classCodeOrName") or "").lower()
+    text = " ".join((section, kind, class_code))
+    non_coc_tokens = (
+        "memoranda",
+        "memorandum",
+        "actionable note",
+        "actionable_note",
+        "condition of installation",
+        "condition of statutory",
+        "statutory condition",
+    )
+    return any(token in text for token in non_coc_tokens)
+
+
 def _is_extended_or_postponed(class_row: dict[str, Any]) -> bool:
     text = " ".join(str(class_row.get(key) or "") for key in ("status", "remarks")).upper()
     return bool(class_row.get("extension_of") or class_row.get("postponed_until")) or "EXTENDED" in text or "POSTPONED" in text
@@ -545,7 +580,7 @@ class ReconciliationRepository:
                     r.matches_count, r.mismatches_count, r.missing_in_catalog_count,
                     r.missing_in_class_count, r.conditional_stc_detected_count,
                     r.extended_postponed_detected_count, r.unmapped_low_confidence_count,
-                    r.flags_json, r.notifications_sent_json, r.mapping_version_used,
+                    r.notifications_sent_json, r.mapping_version_used,
                     r.anomaly_breaches_json
                 FROM dbo.vims_certs_reconciliation_run r
                 INNER JOIN dbo.vims_certs_class_status_snapshot s ON s.snapshot_id = r.snapshot_id

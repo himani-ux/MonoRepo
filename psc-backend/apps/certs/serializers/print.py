@@ -54,8 +54,8 @@ class ShareBundleRequestSerializer(PrintArtifactRequestSerializer):
         attrs = super().validate(attrs)
         if not attrs.get("vesselIds"):
             raise serializers.ValidationError({"vesselIds": "Select a vessel for the share bundle."})
-        if not attrs.get("customCertIds"):
-            raise serializers.ValidationError({"customCertIds": "Select at least one certificate for the share bundle."})
+        if not attrs.get("sections") and not attrs.get("customCertIds"):
+            raise serializers.ValidationError({"sections": "Select at least one certificate section for the share bundle."})
         return attrs
 
 

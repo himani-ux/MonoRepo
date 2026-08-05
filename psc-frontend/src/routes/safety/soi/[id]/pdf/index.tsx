@@ -17,12 +17,12 @@ function saveBlob(blob: Blob, fileName: string) {
 }
 
 const sectionItems = [
-  "Cover metadata + closure chain",
-  "Stamped areas with Last Inspected dates",
-  "Findings table (M-SCAT, SHELL, priority, assignee, status)",
+  "Cover details and closure signatures",
+  "Inspection areas and last-inspected dates",
+  "Findings table with priority, assignee, and status",
   "Trainees",
-  "Signature block",
-  "Audit-trail footer",
+  "Signatures",
+  "Change history footer",
 ];
 
 export default function SafetySoiPdfRoute() {

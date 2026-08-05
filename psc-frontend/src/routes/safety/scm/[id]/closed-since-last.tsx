@@ -37,9 +37,6 @@ export default function SafetyScmClosedSinceLastRoute() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_55%,#fef3c7_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / SCM
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">
           Closed-Since-Last SCM
         </h1>

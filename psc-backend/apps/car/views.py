@@ -26,10 +26,15 @@ import uuid
 import logging
 from datetime import date
 import uuid
-from core.vessel_access import apply_office_vessel_filter
+from core.vessel_access import (
+    apply_office_vessel_filter,
+    get_office_user_identifiers,
+    get_office_user_vessel_ids,
+    has_global_office_vessel_access,
+)
 from django.conf import settings
-from django.db import DatabaseError, OperationalError, ProgrammingError
-from django.db.models import Count, Prefetch, Q
+from django.db import connection, DatabaseError, OperationalError, ProgrammingError
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.http import FileResponse
 from rest_framework import generics, status
@@ -237,27 +242,71 @@ class CARListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = CARListSerializer
 
+    def _attach_vessel_metadata(self, rows):
+        vessel_ids = []
+        seen = set()
+        for row in rows:
+            raw_vessel_id = row.get('vessel_id')
+            if not raw_vessel_id:
+                continue
+            try:
+                vessel_uuid = uuid.UUID(str(raw_vessel_id))
+            except (TypeError, ValueError):
+                continue
+            if vessel_uuid in seen:
+                continue
+            seen.add(vessel_uuid)
+            vessel_ids.append(vessel_uuid)
+
+        if not vessel_ids:
+            return rows
+
+        placeholders = ', '.join(['%s'] * len(vessel_ids))
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT id, vesselName, vesselCode
+                    FROM VesselData
+                    WHERE id IN ({placeholders})
+                      AND is_active = 1
+                      AND is_deleted = 0
+                    """,
+                    [str(vessel_id) for vessel_id in vessel_ids],
+                )
+                vessel_rows = cursor.fetchall()
+        except (DatabaseError, OperationalError, ProgrammingError):
+            return rows
+
+        lookup = {
+            str(vessel_id).lower(): {
+                'vessel_name': str(vessel_name or '').strip(),
+                'vessel_code': str(vessel_code or '').strip(),
+            }
+            for vessel_id, vessel_name, vessel_code in vessel_rows
+        }
+        for row in rows:
+            key = str(row.get('vessel_id') or '').lower()
+            vessel = lookup.get(key)
+            if not vessel:
+                continue
+            if vessel['vessel_name']:
+                row['vessel_name'] = vessel['vessel_name']
+            if vessel['vessel_code']:
+                row['vessel_code'] = vessel['vessel_code']
+        return rows
+
     def get_queryset(self):
         """
         Get CARs filtered by user access and query params.
         Returns base queryset WITHOUT RawSQL annotations (safe for count).
         """
-        print("=== ✅ FIXED get_queryset CALLED ===")
-        print(f"user.user_type: {self.request.user.user_type}")
-        print(f"user.vessel_id: {self.request.user.vessel_id}")
-        print(f"user.vessel_code: {self.request.user.vessel_code}")
-        print(f"user.crew_id: {self.request.user.crew_id}")
-        print(f"vessel_id param: {self.request.query_params.get('vessel_id')}")
         queryset = CAR.objects.filter(is_deleted=False)
-        
-        # Prefetch related data
-        queryset = queryset.select_related('deficiency__inspection')
         
         user = self.request.user
         
         # Filter by vessel access
         # Crew users (most specific) FIRST
-        print("Filtering by crew:", user.crew_id)
         if user.role == RoleCodes.VESSEL_CREW:
             from apps.inspection.deficiency_models import Deficiency
             from django.db.models import Q
@@ -277,8 +326,6 @@ class CARListView(generics.ListAPIView):
                 Q(reviewer_crew_id=user_id_compact)
             )
 
-            print("Total matching deficiencies:", matching_defs.count())
-            print("CAR linked count:", matching_defs.filter(car__isnull=False).count())
 
             queryset = queryset.filter(
                 deficiency__in=matching_defs
@@ -291,17 +338,21 @@ class CARListView(generics.ListAPIView):
 
         else:
             if user.user_type == 'OFFICE' and user.role in RoleCodes.PIC_REVIEWERS:
-                # Keep existing vessel-scoped access, but always include PIC inbox items
-                # so role-forwarded CARs are visible even when vessel assignment differs.
-                scoped_queryset = apply_office_vessel_filter(
-                    queryset,
-                    user,
-                    'deficiency__inspection__vessel_id'
-                )
-                pic_inbox_queryset = queryset.filter(
-                    status__in=[CARStatus.SUBMITTED_TO_PIC, CARStatus.PIC_REVIEW]
-                )
-                queryset = (scoped_queryset | pic_inbox_queryset).distinct()
+                # Keep assigned-vessel access, but always include PIC inbox items
+                # without forcing a broad DISTINCT count on SQL Server.
+                user_identifiers = get_office_user_identifiers(user)
+                if not has_global_office_vessel_access(user, user_identifiers=user_identifiers):
+                    vessel_ids = get_office_user_vessel_ids(user_identifiers)
+                    pic_inbox_filter = Q(status__in=[CARStatus.SUBMITTED_TO_PIC, CARStatus.PIC_REVIEW])
+                    if vessel_ids is None:
+                        pass
+                    elif vessel_ids:
+                        queryset = queryset.filter(
+                            Q(deficiency__inspection__vessel_id__in=vessel_ids) |
+                            pic_inbox_filter
+                        )
+                    else:
+                        queryset = queryset.filter(pic_inbox_filter)
             elif user.user_type == 'OFFICE' and user.role == RoleCodes.DPA:
                 # DPA inbox starts only after PIC submits to DPA.
                 queryset = queryset.filter(
@@ -393,29 +444,24 @@ class CARListView(generics.ListAPIView):
         page_size = min(int(request.query_params.get('page_size', 20)), 100)
         is_pv_due_probe = _is_true_query_param(request.query_params.get('pv_due'))
 
-        try:
-            total_count = queryset.count()
-        except (DatabaseError, OperationalError, ProgrammingError):
-            if is_pv_due_probe:
-                logger.exception("CAR pv_due list count failed; returning empty PV due result.")
-                return _empty_car_list_response(page, page_size)
-            raise
-        total_pages = (total_count + page_size - 1) // page_size
-
         start = (page - 1) * page_size
-        end = start + page_size
+        end = start + page_size + 1
 
         # Annotate with vessel name/code and counts AFTER slicing.
         # All annotations use scalar RawSQL subqueries to avoid SQL Server
         # GROUP BY conflicts (SQL Server can't have subqueries in GROUP BY).
         try:
-            paginated_queryset = queryset[start:end]
-            annotated_ids = [obj.id for obj in paginated_queryset]
+            paginated_objects = list(queryset[start:end])
+            has_more = len(paginated_objects) > page_size
+            page_objects = paginated_objects[:page_size]
+            annotated_ids = [obj.id for obj in page_objects]
         except (DatabaseError, OperationalError, ProgrammingError):
             if is_pv_due_probe:
                 logger.exception("CAR pv_due list page fetch failed; returning empty PV due result.")
                 return _empty_car_list_response(page, page_size)
             raise
+        total_count = start + len(page_objects) + (1 if has_more else 0)
+        total_pages = page + 1 if has_more else (page if total_count else 0)
         if not annotated_ids:
             return Response({
                 'data': [],
@@ -426,54 +472,55 @@ class CARListView(generics.ListAPIView):
                     'total_pages': total_pages,
                 }
             })
-        annotated_queryset = CAR.objects.filter(
-            id__in=annotated_ids
-        ).select_related(
-            'deficiency__inspection'
-        ).prefetch_related(
-            Prefetch(
-                'physical_verifications',
-                queryset=PhysicalVerification.objects.filter(
-                    status=PVStatus.OPEN,
-                    is_deleted=False,
-                ),
-                to_attr='prefetched_open_physical_verifications',
+        deficiency_map = {
+            str(deficiency.car_id): deficiency
+            for deficiency in Deficiency.objects.filter(
+                car_id__in=annotated_ids,
+                is_deleted=False,
+            ).select_related('inspection')
+        }
+        action_counts = {
+            str(row['car_id']): row
+            for row in CorrectiveAction.objects.filter(
+                car_id__in=annotated_ids,
+                is_deleted=False,
+            ).order_by().values('car_id').annotate(
+                action_count=Count('id'),
+                completed_action_count=Count('id', filter=Q(is_completed=True)),
             )
-        ).annotate(
-            action_count=Count(
-                'corrective_actions',
-                filter=Q(corrective_actions__is_deleted=False),
-                distinct=True,
-            ),
-            completed_action_count=Count(
-                'corrective_actions',
-                filter=Q(
-                    corrective_actions__is_deleted=False,
-                    corrective_actions__is_completed=True,
-                ),
-                distinct=True,
-            ),
-            before_evidence_count=Count(
-                'evidence',
-                filter=Q(
-                    evidence__is_deleted=False,
-                    evidence__evidence_type=EvidenceType.BEFORE,
-                ),
-                distinct=True,
-            ),
-            after_evidence_count=Count(
-                'evidence',
-                filter=Q(
-                    evidence__is_deleted=False,
-                    evidence__evidence_type=EvidenceType.AFTER,
-                ),
-                distinct=True,
-            ),
-        ).order_by('-created_date')
+        }
+        evidence_counts = {
+            str(row['car_id']): row
+            for row in Evidence.objects.filter(
+                car_id__in=annotated_ids,
+                is_deleted=False,
+            ).order_by().values('car_id').annotate(
+                before_evidence_count=Count('id', filter=Q(evidence_type=EvidenceType.BEFORE)),
+                after_evidence_count=Count('id', filter=Q(evidence_type=EvidenceType.AFTER)),
+            )
+        }
+        open_pv_car_ids = {
+            str(car_id)
+            for car_id in PhysicalVerification.objects.filter(
+                car_id__in=annotated_ids,
+                status=PVStatus.OPEN,
+                is_deleted=False,
+            ).values_list('car_id', flat=True)
+        }
+
+        for car in page_objects:
+            car_id = str(car.id)
+            car._cached_deficiency = deficiency_map.get(car_id)
+            car.action_count = int((action_counts.get(car_id) or {}).get('action_count') or 0)
+            car.completed_action_count = int((action_counts.get(car_id) or {}).get('completed_action_count') or 0)
+            car.before_evidence_count = int((evidence_counts.get(car_id) or {}).get('before_evidence_count') or 0)
+            car.after_evidence_count = int((evidence_counts.get(car_id) or {}).get('after_evidence_count') or 0)
+            car.prefetched_open_physical_verifications = [True] if car_id in open_pv_car_ids else []
 
         try:
-            serializer = self.get_serializer(annotated_queryset, many=True)
+            serializer = self.get_serializer(page_objects, many=True)
             response_data = serializer.data
+            response_data = self._attach_vessel_metadata(response_data)
         except (DatabaseError, OperationalError, ProgrammingError):
             if is_pv_due_probe:
                 logger.exception("CAR pv_due list serialization failed; returning empty PV due result.")
@@ -1228,7 +1275,6 @@ class EvidenceUploadView(APIView):
 
         # Full path for storage
         upload_base = getattr(settings, 'UPLOAD_BASE_PATH', 'uploads')
-        print(f"upload_base:{upload_base}")
         full_path = os.path.join(upload_base, relative_path)
 
         # Ensure directory exists

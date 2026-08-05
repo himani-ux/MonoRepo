@@ -1,9 +1,9 @@
 # VIMS Certificates Module — Validation Rules
 
-> **Version:** 1.0
-> **Last Updated:** 2026-05-13
+> **Version:** 1.1
+> **Last Updated:** 2026-07-29
 > **Status:** Locked
-> **Source:** D-CERT-105, D-CERT-106, D-CERT-116, D-CERT-117, D-CERT-118, D-CERT-119, D-CERT-143, D-CERT-159, D-CERT-168, D-CERT-174, D-CERT-179, D-CERT-180.
+> **Source:** D-CERT-105, D-CERT-106, D-CERT-116, D-CERT-117, D-CERT-118, D-CERT-119, D-CERT-143, D-CERT-159, D-CERT-168, D-CERT-174, D-CERT-179, D-CERT-180, D-CERT-205, D-CERT-210.
 
 ---
 
@@ -22,6 +22,17 @@
 | Reconciliation auto-inclusion | < 95% | `flagged_low_confidence[]` for Marine Sup'tt review | D-CERT-053 |
 
 All thresholds tunable post-launch via Settings (FEAT-CERT-OCR-012); defaults shipped in `vims_certs_alert_config`.
+
+---
+
+## 1.1 Class Snapshot Report Date
+
+- Class Status / Vessel Status PDF uploads must parse the report's printed/generated date from the PDF itself.
+- KR reads `Printed on`, NK reads `Printed on`, and BV reads `Generated on`.
+- D-CERT-205: upload time is never a valid substitute for the report date.
+- If the parser cannot read the date, the snapshot is stored with parser failure and no reconciliation run is created until the uploader enters the Printed on / Generated on date shown in the PDF and uploads again.
+- A user-entered date is valid only as a fallback copied from the PDF when parser date extraction is empty; if parser extraction succeeds, the parser-read date remains authoritative.
+- The three-month class status freshness rule uses the stored report date, whether parser-read or manually entered from the PDF under D-CERT-205.
 
 ---
 
@@ -215,6 +226,13 @@ Hard block deliberately excluded — legitimate burst scenarios (fleet audit pre
 
 ---
 
+## 12.1 Print/Share Section Selection (D-CERT-210)
+
+- Print certs status uses the current vessel context and accepts either no `sections` value for All sections or exactly one selected certificate section for section-wise print.
+- Share Bundle requires at least one selected certificate section from the normal UI. Backend-compatible `customCertIds` remain accepted for integrations/history, but the normal share screen does not list individual certificates.
+- Empty Share Bundle selections are rejected before generation.
+
+---
 ## 13. Email Delivery + Bouncing (D-CERT-159)
 
 - Per-email send: 3 retries with exponential backoff (1 min → 5 min → 30 min).

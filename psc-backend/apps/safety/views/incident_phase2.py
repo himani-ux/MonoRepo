@@ -75,8 +75,7 @@ class IncidentPhase2UpdateView(IncidentPhase2ViewMixin, generics.RetrieveUpdateA
 
     def get_object(self):
         incident = super().get_object()
-        if incident.current_phase != 2:
-            raise ValidationError("Phase 2 resources can only be edited while current_phase = 2.")
+        self._enforce_phase_reached_for_edit(incident, 2, "Phase 2 resources")
         return incident
 
     def perform_update(self, serializer):
@@ -123,6 +122,8 @@ class IncidentPhase2SubmitView(IncidentPhase2ViewMixin, generics.GenericAPIView)
                 "state",
                 "pic_user_id",
                 "resources_allocated",
+                "office_notified",
+                "office_notification_mode",
                 "dpa_notified_at",
                 "fm_notified_at",
                 "office_notified_at",
@@ -140,6 +141,8 @@ class IncidentPhase2SubmitView(IncidentPhase2ViewMixin, generics.GenericAPIView)
                 "pic_user_id": incident.pic_user_id,
                 "closure_authority_role": self._resolve_closure_authority(incident),
                 "advisory_band": advisory.band,
+                "office_notified": incident.office_notified,
+                "office_notification_mode": incident.office_notification_mode,
             },
             sort_keys=True,
         )
@@ -154,7 +157,7 @@ class IncidentPhase2SubmitView(IncidentPhase2ViewMixin, generics.GenericAPIView)
             recipients=recipients,
             kind="INCIDENT_PHASE_2_SUBMITTED",
             title="Incident submitted to office",
-            message=f"Incident {incident.incident_number} has entered Phase 3.",
+            message=f"Incident {incident.incident_number} is ready for root-cause entry.",
             payload={
                 "incident_id": incident.pk,
                 "incident_number": incident.incident_number,
@@ -166,7 +169,7 @@ class IncidentPhase2SubmitView(IncidentPhase2ViewMixin, generics.GenericAPIView)
         )
         notification_rows = notification_dispatch.notification_rows
         incident.notification_channel_count = len(notification_rows)
-        if notification_rows:
+        if notification_dispatch.slack_delivered:
             incident.slack_notified_at = submitted_at
         incident.state = "IN_PROGRESS"
         incident.updated_by = _resolve_actor_id(request.user)
@@ -176,6 +179,8 @@ class IncidentPhase2SubmitView(IncidentPhase2ViewMixin, generics.GenericAPIView)
                 "incident_number",
                 "pic_user_id",
                 "resources_allocated",
+                "office_notified",
+                "office_notification_mode",
                 "office_notified_at",
                 "dpa_notified_at",
                 "fm_notified_at",

@@ -2,7 +2,7 @@
 PSC Follow-up serializers — same-inspection follow-up wizard.
 
 The follow-up wizard updates deficiency action codes on the SAME inspection
-(no new inspection record is created). Optionally uploads a follow-up report.
+(no new inspection record is created). Optionally uploads follow-up report PDFs.
 """
 
 from rest_framework import serializers

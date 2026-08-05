@@ -22,6 +22,7 @@ from apps.safety.views.incident import (
     IncidentDetailView,
     IncidentListCreateView,
     IncidentPositionPrefillView,
+    IncidentRegisterVesselListView,
     IncidentTransitionView,
 )
 from apps.safety.views.incident_closure import IncidentClosureView
@@ -43,6 +44,8 @@ from apps.safety.views.incident_phase3 import (
     IncidentPhase3DeadlineTaskView,
     IncidentPhase3EvidenceMatrixView,
     IncidentPhase3EvidenceView,
+    IncidentPhase3InterviewAttachmentView,
+    IncidentPhase3InterviewDetailView,
     IncidentPhase3InterviewView,
 )
 from apps.safety.views.incident_phase4 import (
@@ -101,6 +104,8 @@ from apps.safety.views.near_miss_analysis import (
 from apps.safety.views.near_miss_closure import NearMissAuditView, NearMissClosureView
 from apps.safety.views.near_miss_config import (
     NearMissCategoryReclassifyView,
+    NearMissCategoryView,
+    NearMissCauseOptionView,
     NearMissGuidancePromptView,
     NearMissKpiTargetView,
 )
@@ -141,6 +146,8 @@ from apps.safety.views.taxonomy_admin import (
     ReferenceImmediateCauseListView,
     ReferenceIncidentTypeDetailView,
     ReferenceIncidentTypeListView,
+    ReferenceIncidentWeatherOptionListView,
+    ReferenceInjuryDropdownOptionListView,
     ReferenceLossTypeDetailView,
     ReferenceLossTypeListView,
     ReferenceMscatDetailView,
@@ -210,6 +217,16 @@ urlpatterns = [
         name="reference-incident-types-detail",
     ),
     path(
+        "reference/incident-weather-options/",
+        ReferenceIncidentWeatherOptionListView.as_view(),
+        name="reference-incident-weather-options-list",
+    ),
+    path(
+        "reference/injury-dropdown-options/",
+        ReferenceInjuryDropdownOptionListView.as_view(),
+        name="reference-injury-dropdown-options-list",
+    ),
+    path(
         "reference/case-studies/",
         ReferenceCaseStudyListCreateView.as_view(),
         name="reference-case-studies-list",
@@ -219,6 +236,7 @@ urlpatterns = [
         ReferenceCaseStudyDetailView.as_view(),
         name="reference-case-studies-detail",
     ),
+    path("incidents/vessels/", IncidentRegisterVesselListView.as_view(), name="incident-register-vessels"),
     path("incidents/", IncidentListCreateView.as_view(), name="incident-list"),
     path("scm/", SCMListCreateView.as_view(), name="scm-list"),
     path("scm/closed-since-last/", SCMClosedSinceLastVesselView.as_view(), name="scm-closed-since-last-vessel"),
@@ -283,6 +301,8 @@ urlpatterns = [
     path("soi/<str:id>/pdf/summary/", SOISummaryPDFDownloadView.as_view(), name="soi-pdf-summary"),
     path("soi/<str:id>/trainees/", SOITraineeView.as_view(), name="soi-trainees"),
     path("near-miss/", NearMissListCreateView.as_view(), name="near-miss-list"),
+    path("near-miss/categories/", NearMissCategoryView.as_view(), name="near-miss-categories"),
+    path("near-miss/cause-options/", NearMissCauseOptionView.as_view(), name="near-miss-cause-options"),
     path("near-miss/guidance-prompts/", NearMissGuidancePromptView.as_view(), name="near-miss-guidance-prompts"),
     path("near-miss/kpi-target/", NearMissKpiTargetView.as_view(), name="near-miss-kpi-target"),
     path("near-miss/rate-limit/", NearMissRateLimitView.as_view(), name="near-miss-rate-limit"),
@@ -359,6 +379,371 @@ urlpatterns = [
         IncidentExternalPartyInjuryView.as_view(),
         name="incident-external-party",
     ),
+    path(
+        "incidents/<str:id>/resource-handoff/",
+        IncidentPhase2UpdateView.as_view(),
+        name="incident-resource-handoff",
+    ),
+    path(
+        "incidents/<str:id>/resource-handoff/submit/",
+        IncidentPhase2SubmitView.as_view(),
+        name="incident-resource-handoff-submit",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/analysis/",
+        IncidentPhase5WorkspaceView.as_view(),
+        name="incident-public-phase-2-analysis",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/analysis/mscat/",
+        IncidentMscatSearchView.as_view(),
+        name="incident-public-phase-2-mscat",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/analysis/causes/",
+        IncidentPhase5CauseListCreateView.as_view(),
+        name="incident-public-phase-2-causes",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/analysis/causes/<str:cause_id>/",
+        IncidentPhase5CauseDetailView.as_view(),
+        name="incident-public-phase-2-cause-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/analysis/safeguards/",
+        IncidentPhase5SafeguardListCreateView.as_view(),
+        name="incident-public-phase-2-safeguards",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/analysis/safeguards/<str:safeguard_id>/",
+        IncidentPhase5SafeguardDetailView.as_view(),
+        name="incident-public-phase-2-safeguard-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/bias-guards/",
+        IncidentBiasGuardChecklistView.as_view(),
+        name="incident-public-phase-2-bias-guards",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/override-blame/",
+        IncidentBlameOverrideView.as_view(),
+        name="incident-public-phase-2-override-blame",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/",
+        IncidentPhase6WorkspaceView.as_view(),
+        name="incident-public-phase-3-workspace",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/recommendations/",
+        IncidentRecommendationListCreateView.as_view(),
+        name="incident-public-phase-3-recommendations",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/recommendations/<str:recommendation_id>/",
+        IncidentRecommendationDetailView.as_view(),
+        name="incident-public-phase-3-recommendation-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/evidence/",
+        IncidentPhase3EvidenceView.as_view(),
+        name="incident-public-phase-3-evidence",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/evidence/attachments/",
+        IncidentPhase3AttachmentUploadView.as_view(),
+        name="incident-public-phase-3-attachment-upload",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/chain-of-custody/",
+        IncidentPhase3ChainOfCustodyView.as_view(),
+        name="incident-public-phase-3-chain-of-custody",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/evidence-matrix/",
+        IncidentPhase3EvidenceMatrixView.as_view(),
+        name="incident-public-phase-3-evidence-matrix",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/interviews/",
+        IncidentPhase3InterviewView.as_view(),
+        name="incident-public-phase-3-interviews",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/interviews/<str:interview_id>/",
+        IncidentPhase3InterviewDetailView.as_view(),
+        name="incident-public-phase-3-interview-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/evidence/deadline-tasks/<str:task_id>/",
+        IncidentPhase3DeadlineTaskView.as_view(),
+        name="incident-public-phase-3-deadline-task",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/facts/",
+        IncidentPhase4FactListCreateView.as_view(),
+        name="incident-public-phase-3-facts",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/facts/sources/",
+        IncidentPhase4EvidenceSourceListView.as_view(),
+        name="incident-public-phase-3-fact-sources",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/facts/gate/",
+        IncidentPhase4GateView.as_view(),
+        name="incident-public-phase-3-fact-gate",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/facts/<str:fact_id>/",
+        IncidentPhase4FactDetailView.as_view(),
+        name="incident-public-phase-3-fact-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/facts/reorder/",
+        IncidentPhase4FactReorderView.as_view(),
+        name="incident-public-phase-3-fact-reorder",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/facts/contradictions/",
+        IncidentPhase4FactContradictionView.as_view(),
+        name="incident-public-phase-3-fact-contradiction",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/evidence/",
+        IncidentPhase3EvidenceView.as_view(),
+        name="incident-public-phase-2-evidence",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/evidence/attachments/",
+        IncidentPhase3AttachmentUploadView.as_view(),
+        name="incident-public-phase-2-attachment-upload",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/chain-of-custody/",
+        IncidentPhase3ChainOfCustodyView.as_view(),
+        name="incident-public-phase-2-chain-of-custody",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/evidence-matrix/",
+        IncidentPhase3EvidenceMatrixView.as_view(),
+        name="incident-public-phase-2-evidence-matrix",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/interviews/",
+        IncidentPhase3InterviewView.as_view(),
+        name="incident-public-phase-2-interviews",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/interviews/<str:interview_id>/",
+        IncidentPhase3InterviewDetailView.as_view(),
+        name="incident-public-phase-2-interview-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/evidence/deadline-tasks/<str:task_id>/",
+        IncidentPhase3DeadlineTaskView.as_view(),
+        name="incident-public-phase-2-deadline-task",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/facts/",
+        IncidentPhase4FactListCreateView.as_view(),
+        name="incident-public-phase-2-facts",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/facts/sources/",
+        IncidentPhase4EvidenceSourceListView.as_view(),
+        name="incident-public-phase-2-fact-sources",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/facts/gate/",
+        IncidentPhase4GateView.as_view(),
+        name="incident-public-phase-2-fact-gate",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/facts/<str:fact_id>/",
+        IncidentPhase4FactDetailView.as_view(),
+        name="incident-public-phase-2-fact-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/facts/reorder/",
+        IncidentPhase4FactReorderView.as_view(),
+        name="incident-public-phase-2-fact-reorder",
+    ),
+    path(
+        "incidents/<str:id>/phase-2/facts/contradictions/",
+        IncidentPhase4FactContradictionView.as_view(),
+        name="incident-public-phase-2-fact-contradiction",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/analysis/",
+        IncidentPhase5WorkspaceView.as_view(),
+        name="incident-public-phase-3-analysis",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/analysis/mscat/",
+        IncidentMscatSearchView.as_view(),
+        name="incident-public-phase-3-mscat",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/analysis/causes/",
+        IncidentPhase5CauseListCreateView.as_view(),
+        name="incident-public-phase-3-causes",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/analysis/causes/<str:cause_id>/",
+        IncidentPhase5CauseDetailView.as_view(),
+        name="incident-public-phase-3-cause-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/analysis/safeguards/",
+        IncidentPhase5SafeguardListCreateView.as_view(),
+        name="incident-public-phase-3-safeguards",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/analysis/safeguards/<str:safeguard_id>/",
+        IncidentPhase5SafeguardDetailView.as_view(),
+        name="incident-public-phase-3-safeguard-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/bias-guards/",
+        IncidentBiasGuardChecklistView.as_view(),
+        name="incident-public-phase-3-bias-guards",
+    ),
+    path(
+        "incidents/<str:id>/phase-3/override-blame/",
+        IncidentBlameOverrideView.as_view(),
+        name="incident-public-phase-3-override-blame",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/evidence/",
+        IncidentPhase3EvidenceView.as_view(),
+        name="incident-public-phase-4-evidence",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/evidence/attachments/",
+        IncidentPhase3AttachmentUploadView.as_view(),
+        name="incident-public-phase-4-attachment-upload",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/chain-of-custody/",
+        IncidentPhase3ChainOfCustodyView.as_view(),
+        name="incident-public-phase-4-chain-of-custody",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/evidence-matrix/",
+        IncidentPhase3EvidenceMatrixView.as_view(),
+        name="incident-public-phase-4-evidence-matrix",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/interviews/",
+        IncidentPhase3InterviewView.as_view(),
+        name="incident-public-phase-4-interviews",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/interviews/<str:interview_id>/",
+        IncidentPhase3InterviewDetailView.as_view(),
+        name="incident-public-phase-4-interview-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/interviews/<str:interview_id>/statement-attachment/",
+        IncidentPhase3InterviewAttachmentView.as_view(),
+        name="incident-public-phase-4-interview-statement-attachment",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/evidence/deadline-tasks/<str:task_id>/",
+        IncidentPhase3DeadlineTaskView.as_view(),
+        name="incident-public-phase-4-deadline-task",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/facts/",
+        IncidentPhase4FactListCreateView.as_view(),
+        name="incident-public-phase-4-facts",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/facts/sources/",
+        IncidentPhase4EvidenceSourceListView.as_view(),
+        name="incident-public-phase-4-fact-sources",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/facts/gate/",
+        IncidentPhase4GateView.as_view(),
+        name="incident-public-phase-4-fact-gate",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/facts/reorder/",
+        IncidentPhase4FactReorderView.as_view(),
+        name="incident-public-phase-4-fact-reorder",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/facts/contradictions/",
+        IncidentPhase4FactContradictionView.as_view(),
+        name="incident-public-phase-4-fact-contradiction",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/facts/<str:fact_id>/",
+        IncidentPhase4FactDetailView.as_view(),
+        name="incident-public-phase-4-fact-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/",
+        IncidentPhase6WorkspaceView.as_view(),
+        name="incident-public-phase-4-workspace",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/recommendations/",
+        IncidentRecommendationListCreateView.as_view(),
+        name="incident-public-phase-4-recommendations",
+    ),
+    path(
+        "incidents/<str:id>/phase-4/recommendations/<str:recommendation_id>/",
+        IncidentRecommendationDetailView.as_view(),
+        name="incident-public-phase-4-recommendation-detail",
+    ),
+    path(
+        "incidents/<str:id>/phase-5/preflight/",
+        IncidentPhase7PreflightView.as_view(),
+        name="incident-public-phase-5-preflight",
+    ),
+    path(
+        "incidents/<str:id>/phase-5/accept/",
+        IncidentPhase7AcceptView.as_view(),
+        name="incident-public-phase-5-accept",
+    ),
+    path(
+        "incidents/<str:id>/phase-5/hod-signature/",
+        IncidentPhase7HodSignatureView.as_view(),
+        name="incident-public-phase-5-hod-signature",
+    ),
+    path(
+        "incidents/<str:id>/phase-5/approve-red/",
+        IncidentPhase7ApproveRedView.as_view(),
+        name="incident-public-phase-5-approve-red",
+    ),
+    path(
+        "incidents/<str:id>/phase-5/send-back/",
+        IncidentPhase7SendBackView.as_view(),
+        name="incident-public-phase-5-send-back",
+    ),
+    path(
+        "incidents/<str:id>/phase-6/",
+        IncidentPhase8WorkspaceView.as_view(),
+        name="incident-public-phase-6-workspace",
+    ),
+    path(
+        "incidents/<str:id>/phase-6/verify/",
+        IncidentPhase8VerifyView.as_view(),
+        name="incident-public-phase-6-verify",
+    ),
+    path(
+        "incidents/<str:id>/phase-6/close/",
+        IncidentPhase8CloseView.as_view(),
+        name="incident-public-phase-6-close",
+    ),
+    path(
+        "incidents/<str:id>/phase-7/closure/",
+        IncidentClosureView.as_view(),
+        name="incident-public-phase-7-closure",
+    ),
     path("incidents/<str:id>/phase-2/", IncidentPhase2UpdateView.as_view(), name="incident-phase-2-update"),
     path("incidents/<str:id>/phase-2/submit/", IncidentPhase2SubmitView.as_view(), name="incident-phase-2-submit"),
     path("incidents/<str:id>/draft/", IncidentDraftSaveView.as_view(), name="incident-draft-save"),
@@ -379,6 +764,11 @@ urlpatterns = [
         name="incident-phase-3-evidence-matrix",
     ),
     path("incidents/<str:id>/interviews/", IncidentPhase3InterviewView.as_view(), name="incident-phase-3-interviews"),
+    path(
+        "incidents/<str:id>/interviews/<str:interview_id>/",
+        IncidentPhase3InterviewDetailView.as_view(),
+        name="incident-phase-3-interview-detail",
+    ),
     path(
         "incidents/<str:id>/evidence/deadline-tasks/<str:task_id>/",
         IncidentPhase3DeadlineTaskView.as_view(),

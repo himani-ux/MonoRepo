@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import datetime
+import json
 
 from django.db.models import Count
 from django.utils import timezone
@@ -9,13 +10,15 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 
-from apps.safety.authentication.permissions import HasAnyProcessPermission, HasFormPermission
+from apps.safety.authentication.permissions import HasAnyFormPermission, HasAnyProcessPermission, HasFormPermission
 from apps.safety.authentication.roles import normalized_authority_role
 from apps.safety.authentication.vessel_scope import filter_by_vessel_scope, user_has_vessel_access
 from apps.safety.identifiers import get_by_id_or_pk
-from apps.safety.models import Incident, NearMissGuidancePrompt, NearMissKpiTarget
+from apps.safety.models import Incident, NearMissCategory, NearMissCauseOption, NearMissGuidancePrompt, NearMissKpiTarget
 from apps.safety.serializers import (
     NearMissCategoryReclassifySerializer,
+    NearMissCategorySerializer,
+    NearMissCauseOptionSerializer,
     NearMissGuidancePromptSerializer,
     NearMissKpiTargetSerializer,
     NearMissSerializer,
@@ -54,6 +57,34 @@ class NearMissGuidancePromptView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         actor_id = _resolve_actor_id(self.request.user)
         serializer.save(created_by=actor_id, updated_by=actor_id, updated_date=timezone.now())
+
+
+class NearMissCategoryView(generics.ListAPIView):
+    queryset = NearMissCategory.objects.filter(active=True)
+    serializer_class = NearMissCategorySerializer
+    pagination_class = None
+    form_permission_class = HasFormPermission.requiring("SAF_F_002")
+
+    def get_permissions(self):
+        return [self.form_permission_class()]
+
+
+class NearMissCauseOptionView(generics.ListAPIView):
+    queryset = NearMissCauseOption.objects.filter(active=True)
+    serializer_class = NearMissCauseOptionSerializer
+    pagination_class = None
+    form_permission_class = HasAnyFormPermission.requiring_any("SAF_F_001", "SAF_F_002")
+
+    def get_permissions(self):
+        return [self.form_permission_class()]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if factor := self.request.query_params.get("factor"):
+            queryset = queryset.filter(factor=str(factor).strip().upper())
+        if cause_stage := self.request.query_params.get("cause_stage"):
+            queryset = queryset.filter(cause_stage=str(cause_stage).strip().upper())
+        return queryset
 
 
 class NearMissKpiTargetView(generics.GenericAPIView):
@@ -170,10 +201,20 @@ class NearMissCategoryReclassifyView(NearMissViewMixin, generics.GenericAPIView)
 
         old_state = capture_model_state(
             near_miss,
-            field_names=("near_miss_shell_tag", "near_miss_mscat_category_id", "near_miss_mscat_subcode_id", "updated_by", "updated_date"),
+            field_names=(
+                "near_miss_shell_tag",
+                "near_miss_category_tags",
+                "near_miss_mscat_category_id",
+                "near_miss_mscat_subcode_id",
+                "updated_by",
+                "updated_date",
+            ),
         )
         if "near_miss_shell_tag" in serializer.validated_data:
             near_miss.near_miss_shell_tag = serializer.validated_data["near_miss_shell_tag"]
+            near_miss.near_miss_category_tags = json.dumps([
+                serializer.validated_data.get("near_miss_category_tag") or serializer.validated_data["near_miss_shell_tag"]
+            ])
         if "near_miss_mscat_subcode_id" in serializer.validated_data:
             near_miss.near_miss_mscat_subcode_id = serializer.validated_data["near_miss_mscat_subcode_id"]
             near_miss.near_miss_mscat_category_id = serializer.validated_data["near_miss_mscat_category_id"]
@@ -182,6 +223,7 @@ class NearMissCategoryReclassifyView(NearMissViewMixin, generics.GenericAPIView)
         near_miss.save(
             update_fields=(
                 "near_miss_shell_tag",
+                "near_miss_category_tags",
                 "near_miss_mscat_category_id",
                 "near_miss_mscat_subcode_id",
                 "updated_by",
@@ -192,7 +234,14 @@ class NearMissCategoryReclassifyView(NearMissViewMixin, generics.GenericAPIView)
             near_miss,
             old_state,
             user=request.user,
-            field_names=("near_miss_shell_tag", "near_miss_mscat_category_id", "near_miss_mscat_subcode_id", "updated_by", "updated_date"),
+            field_names=(
+                "near_miss_shell_tag",
+                "near_miss_category_tags",
+                "near_miss_mscat_category_id",
+                "near_miss_mscat_subcode_id",
+                "updated_by",
+                "updated_date",
+            ),
             change_reason=serializer.validated_data["reason"],
         )
         return Response(NearMissSerializer(near_miss, context=self.get_serializer_context()).data)

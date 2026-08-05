@@ -34,7 +34,7 @@
 **Project:** VIMS Safety Module — migration of the legacy eMarineSoft safety management surface (incidents, near misses, safety meetings) to the VIMS platform, expanded with Safety Officer Inspection (SOI) as the 4th V1 sub-feature and the DNV M-SCAT investigation framework as the canonical RCA taxonomy.
 
 **V1 scope (4 sub-features):**
-- **Incident Reporting** — current 7-visible-phase workflow (Report Incident → RCA → Corrective Action → Preventive Action → Add Evidence → Office Review → Loss Evaluation), IMO SMC/MC/MI compatibility, internal risk band GREEN/YELLOW/RED, causal layering Immediate/Root, evidence documents, office review comments, final loss/cost evaluation, and configurable PDF. The read-only Final Record route is retained only for direct audit/legacy access and is not a visible workflow phase tab.
+- **Incident Reporting** — current 7-visible-phase workflow (Report Incident → RCA → Corrective Action → Preventive Action → Add Evidence → Office Review → Loss Evaluation), IMO SMC/MC/MI compatibility, internal risk band GREEN/YELLOW/RED, Phase 1 operational context fields for risk assessment/toolbox/permit/activity/location details, causal layering Immediate/Root, evidence documents, office review comments, final loss/cost evaluation, selected-ship Fleet Alert with HSSEQ CC, and phase-ordered PDF with optional Loss Evaluation. The read-only Final Record route is retained only for direct audit/legacy access and is not a visible workflow phase tab.
 - **Near Miss Reporting** — reporter details visible to Master and authorized users (D-GAP-J1 revised), Office Comments priority decision (LOW/MEDIUM by PIC, HIGH by DPA), no anonymous reporting concept.
 - **Safety Committee Meeting (SCM)** — Regular monthly + Ad-Hoc meetings, same form, Master/CO host authority with `meeting_type` selection, aligned with KSM SSQE Manual Rev 01 Feb 2026 §9.
 - **Safety Officer Inspection (SOI)** — 13 areas × 329 items (12 physical + Section 12 Cross-cutting Safety & Culture + Compressor House), paper-first no-scan (D-GAP-E4), unique-ID linkage, state pill "SOI Compliance %" (D-GAP-DESIGN-01).
@@ -113,7 +113,7 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 | FEAT-SAF-INC-025 | Blame-Fixation Hard Block + Override | INC | V1 | D-DNV-11 #5, D-RBAC-07 |
 | FEAT-SAF-INC-026 | Human Factors — SHELL + IMO A.884(21) + Risk/Change Domain | INC | V1 | §2B.10, D-DNV-09, D-GAP-R21 |
 | FEAT-SAF-INC-027 | Split Action Phases (Corrective / Preventive) | INC | V1 | §2B.7, D-DNV-06, D-GAP-R13, D-MAINT-CR038, D-MAINT-CR042 |
-| FEAT-SAF-INC-028 | Preventive Action compatibility risk fields | INC | Compatibility | D-GAP-R02, D-MAINT-CR038, D-MAINT-CR052 |
+| FEAT-SAF-INC-028 | Preventive Action description-only compatibility storage | INC | Compatibility | D-GAP-R02, D-MAINT-CR038, D-MAINT-CR052, D-MAINT-CR065 |
 | FEAT-SAF-INC-029 | Tolerable-Failure Filter (GREEN only) | INC | V1.1 | D-GAP-R11 |
 | FEAT-SAF-INC-030 | Phase 6 Office Review / Report Issued | INC | V1 | §2B.6, D-PDF-01 |
 | FEAT-SAF-INC-031 | Phase 7 Loss Evaluation | INC | V1 | D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053 |
@@ -225,6 +225,8 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 | Legacy redirect | Removed Lessons Learned | `/phase-3/lessons/` redirects to Office Review |
 | Direct read-only | Final Record | Legacy/audit route, hidden from workflow tabs |
 
+The current Safety Incidents register provides Vessel, `risk_band`, and Status filters above the list. Vessel options come from active `VesselData` rows within the user's safety scope, with global office users able to select any active ship. The register table uses `risk_band` for the risk-band column and Status for the lifecycle state column.
+
 ### FEAT-SAF-INC-001 — Phase 1 Intake
 
 **Priority:** V1
@@ -236,11 +238,11 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 - Vessel and Vessel code are system-derived identity fields: ship/single-vessel users see them auto-filled and disabled, saved incidents keep them disabled, and Phase 1 GET returns resolved `vessel_code` for display.
 - Report time and Shore Assistance Required are visible together on one Phase 1 row.
 - Latitude and Longitude fields are visible together on their own Phase 1 row and save to the existing incident-level coordinate columns. These coordinates support both incident and injury reporting; no separate injury coordinate table/columns are introduced.
-- The main Phase 1 Incident Report section captures Shore Assistance Required, Location of Vessel, Location on Board, Departure Date, and Vessel Condition as incident-level context fields shared by incident and injury reporting. Last Port remains legacy storage only and is not shown by the current Phase 1 frontend.
+- The main Phase 1 Incident Report section captures Shore Assistance Required, Location of Vessel, Location of Vessel detail, Location on Board, Departure Date, Vessel Condition, Risk Assessment carried out, Toolbox Meeting carried out, Permit Issue, and Type of Activity as incident-level context fields shared by incident and injury reporting. Location of Vessel uses At Sea (Open sea condition), At Sea (Coastal passage), In Port, and At Anchorage; detail is retained for In Port / At Anchorage. Last Port remains legacy storage only and is not shown by the current Phase 1 frontend or printed in the current Incident PDF.
 - Office communication wording uses "Was office informed?" and "How was office informed?". The current mode dropdown offers On call and On email; WhatsApp is not offered for new selection.
 - Weather Condition excludes Ice condition on-board and Ice condition at sea from the current UI.
 - Incident type (32-option picklist from `master_safety_incident_type`; retired earlier options, including `Missing vessel`, are not offered under D-MAINT-CR031) mandatory.
-- Free-text narrative minimum 150 characters (configurable per validation layer).
+- Free-text narrative minimum 200 characters.
 **Dependencies:** FEAT-SAF-AUDIT-006 (auto-save), FEAT-SAF-XMOD-001 (position auto-fill), FEAT-SAF-INC-040 (numbering), FEAT-SAF-AUDIT-002 (field history).
 **Decisions:** D-MAINT-CR018, D-MAINT-CR024, D-MAINT-CR054, D-GAP-C1, D-GAP-F1, D-GAP-M09.
 **SSOT refs:** see SSOT §2B.6 Phase 1; §3.1.
@@ -295,7 +297,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - Current user-facing evidence capture shows Documents as the primary evidence entry surface. Legacy People / Position / Parts / Electronic evidence types remain backend-compatible for older records and routes.
 - Documents capture uses Attachment, Title, and Description; saved document cards expose **Edit** for Title/Description metadata without replacing the uploaded file.
-- Witness Statement can be opened when needed and shows crew/Other witness selection, Remark, and Upload witness statement. Saved Witness Statement cards expose **Edit** and update the existing witness row. Evidence Check / Evidence Matrix is not part of the current Phase 4 user interface.
+- Witness Statement can be opened when needed and shows crew/Other witness selection, Upload witness statement, and Remark below the upload. Saved Witness Statement cards expose **Edit** and update the existing witness row. Evidence Check / Evidence Matrix is not part of the current Phase 4 user interface.
 - Position: legacy compatibility only in current user-facing evidence capture.
 - People: legacy witness/interview records remain readable for compatibility; the current user-facing evidence capture is Documents plus simplified Witness Statement.
 - Parts: damaged equipment ID, samples, wear/tear notes; equipment history reference is **manual** (PMS decoupled per D-GAP-I1).
@@ -385,7 +387,7 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Priority:** V1
 **User story:** As an investigator, I need a short Witness Statement form so I can record a witness account without navigating formal interview protocol fields.
 **Acceptance criteria:**
-- Current Phase 4 Witness Statement shows vessel crew/Other witness selection, Remark, and Upload witness statement.
+- Current Phase 4 Witness Statement shows vessel crew/Other witness selection, Upload witness statement, and Remark below the upload.
 - Saved witness statements display the same user-facing values.
 - The frontend submits a legacy-compatible informal interview payload with a system reason and stores the uploaded witness statement in the existing witness-signature storage field; users do not choose formal/informal mode in the current UI.
 **Dependencies:** FEAT-SAF-INC-005.
@@ -590,25 +592,26 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **User story:** As an incident investigator, I need Corrective Action and Preventive Action on separate screens so I can complete each action category without mixing action types.
 **Acceptance criteria:**
 - The visible phase tabs split action capture into **Corrective Action** (`/phase-3/`) and **Preventive Action** (`/phase-3/preventive/`).
-- Corrective Action shows Description and Due date only; the previous "Who Will Do and Check This?" owner/checker card is not shown.
-- Preventive Action shows Description, Due date, and one shared **How much will this reduce risk?** answer for the screen; it does not show Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording, and saved preventive cards do not repeat risk reduction per row.
+- Corrective Action shows Description only; due date, status/open-close, and the previous "Who Will Do and Check This?" owner/checker card are not shown.
+- Preventive Action shows Description only; it does not show due date, status/open-close, risk reduction, Remaining risk, the "I confirm this will reduce risk" checkbox, theme, effort, or "Prevent It Happening Again" wording.
+- Multiple Corrective and Preventive action rows can be saved for the same incident; there is no one-row-per-tier cap.
 - The former **Lessons Learned** screen is not shown in current workflow tabs; `/phase-3/lessons/` is a legacy redirect to Office Review.
 - The action screens do not expose Type, Title, or "Why is this needed?" as separate user inputs.
 - Save acknowledgement appears after each action save and the page scrolls to the saved item.
-- Saved Corrective Action and Preventive Action cards expose **Edit**. Editing loads the saved values into the same form and updates the existing row instead of creating a duplicate.
+- Saved Corrective Action and Preventive Action cards expose **Edit**. Editing loads the saved values into the same form and updates the selected existing row.
 - Existing backend recommendation/corrective-action storage remains compatible; legacy `LESSONS_LEARNT` rows remain readable for old records but are not a current screen.
 **Dependencies:** FEAT-SAF-INC-028, FEAT-SAF-XMOD-004.
 **Decisions:** D-DNV-06, D-GAP-R13, D-MAINT-CR038, D-MAINT-CR041, D-MAINT-CR049.
 **SSOT refs:** see SSOT §2B.7; §6 D-GAP-R13.
 
-### FEAT-SAF-INC-028 — Preventive Action Compatibility Risk Fields
+### FEAT-SAF-INC-028 — Preventive Action Description-Only Compatibility Storage
 
 **Priority:** V1
-**User story:** As an investigator, I need the Preventive Action screen to stay simple and avoid extra risk-confirmation wording while preserving stored compatibility values needed by existing backend checks.
+**User story:** As an investigator, I need the Preventive Action screen to record the action description without extra risk, due-date, or status wording while preserving nullable compatibility storage for old records and direct API clients.
 **Acceptance criteria:**
-- Current Preventive Action UI does not show Remaining risk, theme, effort, or "Prevent It Happening Again" wording.
+- Current Preventive Action UI does not show due date, status/open-close, risk reduction, Remaining risk, theme, effort, or "Prevent It Happening Again" wording.
 - Current Preventive Action UI does not show the "I confirm this will reduce risk" checkbox.
-- Frontend supplies the due date through the existing linked-action storage, sends the shared screen-level risk-reduction answer as the compatibility `estimated_likelihood_reduction` value for preventive saves, and preserves other legacy recommendation compatibility fields as nullable data.
+- Preventive Action saves require Description only and preserve other legacy recommendation compatibility fields as nullable data.
 - Incident PDF does not print hidden compatibility risk-confirmation fields as separate user-entered content.
 **Dependencies:** FEAT-SAF-INC-027.
 **Decisions:** D-GAP-R02, D-MAINT-CR038, D-MAINT-CR049.
@@ -633,14 +636,14 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **User story:** As DPA, I need an Office Review acceptance gate that validates the required actions, bias guards, and causal-layer completeness before issuing the formal report.
 **Acceptance criteria:**
 - Pre-flight validations: bias guards resolved, ≥1 Immediate Cause and ≥1 Root Cause coded, all three recommendation tiers filled (for YELLOW/RED), ALARP fields populated.
-- On accept: generates the selected-section PDF (FEAT-SAF-PDF-001) and keeps the record compatible with visible Phase 7 Loss Evaluation; Loss Evaluation may already have been saved by an authorized ship-side or office-side user.
-- Manual selected-section PDF preview/download is available for incident records before Phase 7 acceptance; the screen must not display Phase 7 acceptance-only PDF warning text.
+- On Accept / Close: generates the required-section PDF (FEAT-SAF-PDF-001), closes the incident from Phase 6 Office Review, and keeps the record compatible with visible Phase 7 Loss Evaluation; Loss Evaluation may already have been saved by an authorized ship-side or office-side user.
+- Manual PDF download is available for incident records before Phase 7 acceptance; the only visible PDF content option is **Print Loss Evaluation**, and the screen must not display Phase 7 acceptance-only PDF warning text.
 - Ship-side users see the Office Comments/lesson learnt card; when office has not added a note, it displays "Office comment is not added yet."
-- PIC or DPA can accept, close, send rework, or issue Fleet Alert for every incident risk band.
-- Fleet Alert is shown below Accept / Close for office-side users; it requires one or more selected active `VesselData` ships and sends in-app plus email alerts only to those selected ships.
+- PIC or DPA can accept, close, send rework, or issue Fleet Alert for every incident risk band. Send for rework uses one comment textbox with no target-phase picker and is not blocked solely because the incident has not yet reached internal `current_phase = 7`; while the incident remains sent back, Office Review shows that typed comment as the latest Rework summary highlighted in red. Ship-side and office-side users can click **Rework Done** to move the incident from `SENT_BACK` back to Office Review/`UNDER_REVIEW`.
+- Fleet Alert is shown below Accept / Close for office-side users; clicking it opens a vessel-selection popup populated from active `VesselData` ships. It requires one or more selected ships and sends in-app plus email alerts only to those selected ships after Confirm. DPA/PIC can still send Fleet Alert from Office Review after Accept / Close has advanced the incident to the final backend phase.
 - Re-open authority mirrors closer authority (D-EDGE-03).
 **Dependencies:** FEAT-SAF-INC-027, FEAT-SAF-PDF-001, FEAT-SAF-RBAC-001.
-**Decisions:** D-PDF-01, D-RBAC-01, D-EDGE-03, D-MAINT-CR044, D-MAINT-CR051.
+**Decisions:** D-PDF-01, D-RBAC-01, D-EDGE-03, D-MAINT-CR044, D-MAINT-CR051, D-MAINT-CR058, D-MAINT-CR061, D-MAINT-CR062, D-MAINT-CR074, D-MAINT-CR075, D-MAINT-CR079.
 **SSOT refs:** see SSOT §2B.6; §6 D-PDF-01.
 
 ### FEAT-SAF-INC-031 — Phase 7 Loss Evaluation
@@ -650,14 +653,15 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 **Acceptance criteria:**
 - Risk Assessment shows Consequence, Likelihood, and Risk level dropdowns using the fixed values requested in CR-047.
 - The screen first asks the user to choose whether the Loss Evaluation is for an Incident Report or Injury Report before showing report-specific fields.
+- Name of master and Name of Chief Engineer auto-fill from the incident vessel's current active onboard crew when the saved Loss Evaluation values are blank; saved user-entered names remain authoritative.
 - Incident Report selection shows master/chief engineer, repair type, repair details, last overhaul/maintenance/survey details, delay/material/deviation/off-hire fields, and incident estimated-cost fields.
 - Injury Report selection shows master/chief engineer, a seeded Code of Safe Working Practices dropdown, man-hour/rest fields, delay/man-hour/repatriation/hospitalization/deviation/evacuation fields, and injury estimated-cost fields.
 - Loss Evaluation saves as one editable row per incident in `vims_safety_incident_loss_evaluation`, including nullable `report_type`; existing rows without `report_type` keep the prior injury-record fallback.
 - Authorized ship-side and office-side users with incident form access and vessel scope can open and save Loss Evaluation before Office Review approval/backend `current_phase` 8.
-- Incident closure requires a saved Loss Evaluation row and a closure note; PIC or DPA can perform this for any risk band.
+- Incident closure is handled by Phase 6 Office Review Accept / Close; Phase 7 Loss Evaluation is save-only additional data entry and does not show closing controls.
 - The existing `/phase-6/verify/` endpoint remains compatibility-only and is not the current visible Phase 7 UI.
 **Dependencies:** FEAT-SAF-INC-030, FEAT-SAF-XMOD-004.
-**Decisions:** D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053.
+**Decisions:** D-MAINT-CR047, D-MAINT-CR052, D-MAINT-CR053, D-MAINT-CR063.
 **SSOT refs:** see SSOT §3.0 D-MAINT-CR047.
 
 ### FEAT-SAF-INC-032 — Multi-Vessel Incident Linking + Duplicate Detection
@@ -697,9 +701,9 @@ The incident module is the largest V1 surface. Current visible workflow uses sev
 - Crew injury captures investigation narrative, nature/source/body areas, first-aid details, underlying cause analysis, regulation/procedure breach, risk-assessment and toolbox-meeting yes/no/NA, and prevention action.
 - Type of Activity plus nature of injury, source of injury, and affected body area are dropdowns loaded from `vims_safety_injury_dropdown_option`; each includes `Others(Specify)` so the typed value is saved when the list is not enough.
 - Crew injury captures OCIMF yes/no flags for fatality, permanent total disability, permanent partial disability, lost workday, restricted workday, medical treatment, and first aid.
-- Crew injury asks whether estimated cost details should be added. If the user selects Yes, the form shows optional estimated cost fields for medicines, doctor visits, repatriation, evacuation, off hire, vessel delays, man hours lost, deviation, miscellaneous expenses, miscellaneous reason, and total estimated cost. If the user selects No, those fields remain hidden and do not block continuation.
+- Phase 1 injury capture does not show or submit estimated-cost fields. Current estimated-cost entry is handled in Phase 7 Loss Evaluation for Incident Report or Injury Report records.
 **Dependencies:** FEAT-SAF-INC-001.
-**Decisions:** D-EDGE-02.
+**Decisions:** D-EDGE-02, superseded by D-MAINT-CR055 for current visible estimated-cost entry.
 **SSOT refs:** see SSOT §6 D-EDGE-02.
 
 ### FEAT-SAF-INC-035 — Re-open Closed Incident (Band-Gated)
@@ -875,11 +879,12 @@ Near miss is the reporting-culture pillar. The module uses the same underlying `
 - On HIGH classification: auto-drafts an anonymised fleet-alert title/body from the Near Miss record.
 - DPA can use `[Issue Circular/Alert]` to open the existing VIMS Circular create page with only title/body prefilled.
 - DPA completes all remaining Circular fields manually and publishes through the existing Circular module workflow; Safety does not direct-create or direct-publish the Circular record.
+- DPA can use `[Issue fleet alert]` to record the Safety alert step and dispatch selected-vessel in-app notifications plus one email batch using `VesselData.Email`, with `HSSEQ@kaizenship.net` in CC.
 - Dashboard counter: "High-priority near-miss alerts due this week".
 - If not issued within 7 days: flag on DPA dashboard (no hard block; PIC borrows lessons per D-RBAC-08).
 - Vessel + crew names anonymised per D-GAP-M08 before inclusion in circular.
 **Dependencies:** FEAT-SAF-NM-003, FEAT-SAF-RBAC-006.
-**Decisions:** D-GAP-R22, D-CFG-04, D-GAP-M08.
+**Decisions:** D-GAP-R22, D-CFG-04, D-GAP-M08, D-MAINT-CR083.
 **SSOT refs:** see SSOT §6 D-GAP-R22; D-CFG-04.
 
 ---
@@ -1368,7 +1373,7 @@ Same-DB (`ksm_marine_live`) live joins per D-GAP-I2 — no ETL, no staleness. Al
 **User story:** As Master, CO, or office reviewer viewing an SCM, WRH rest-hour compliance per attendee is surfaced (warn-don't-block); as an investigator on a personal-injury incident, WRH 96-hour lookback per FEAT-SAF-INC-010 uses same live join.
 **Acceptance criteria:**
 - Live join to `vims_wrh_*` tables; no ETL.
-- SCM creation: block hosting until WRH host readiness is clear (D-MAINT-CR014). Existing SCM attendance: warn-only on missing / non-compliant WRH for PDF export and Office Comment closure (D-GAP-M11).
+- SCM creation: block hosting until WRH host readiness is clear for CMS roster crew whose `Crew_Onboarding_History.CrewStatus` master value is `On Board` (D-MAINT-CR014, D-MAINT-CR128). Existing SCM attendance: warn-only on missing / non-compliant WRH for PDF export and Office Comment closure (D-GAP-M11).
 - Timezone: UTC in DB; vessel-local resolved via `wrh_ship_time_config` (D-GAP-M26).
 - Build-time deferral: WRH lookback window / query timeout settings.
 **Dependencies:** FEAT-SAF-SCM-005, FEAT-SAF-INC-010.
@@ -1380,7 +1385,7 @@ Same-DB (`ksm_marine_live`) live joins per D-GAP-I2 — no ETL, no staleness. Al
 **Priority:** V1
 **User story:** As Safety Officer, the Assistant picker and trainee picker pull from CMS via live join; as an investigator, crew assignment / qualifications pull from the same join.
 **Acceptance criteria:**
-- Live join to `Crew_Onboarding_History` + `Final_crew_list` (platform CMS tables).
+- Live join to `Crew_Onboarding_History` + `CrewStatus` + `Final_crew_list` (platform CMS tables); SCM attendance and host-readiness rosters include only CMS crew whose status name is `On Board`.
 - No staleness (D-GAP-I2 same-DB).
 - Department field canonical from CMS (not free text) for FEAT-SAF-SOI-009 cross-functional rule.
 - New joiner onboard but not in CMS: Master defers or picks different assistant (no manual override).
@@ -1435,7 +1440,7 @@ Same-DB (`ksm_marine_live`) live joins per D-GAP-I2 — no ETL, no staleness. Al
 ### FEAT-SAF-PDF-001 — 10-Section Incident PDF (Formal Report)
 
 **Priority:** V1
-**User story:** As DPA, at Office Review acceptance the system generates the selected-section incident report PDF with the standard template so DPA filing, management review, and flag-state hand-off have a single document.
+**User story:** As DPA, at Office Review acceptance the system generates the incident report PDF with the standard template so DPA filing, management review, and flag-state hand-off have a single document.
 **Acceptance criteria:**
 Ten sections per D-GAP-R09 refinement of D-PDF-01:
 1. Cover + classification (SMC/MC/MI per FEAT-SAF-INC-002) + risk band (GREEN/YELLOW/RED).
@@ -1443,23 +1448,25 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 3. Evidence collected (summary table, cross-ref Chain-of-Custody per FEAT-SAF-INC-007).
 4. Root-cause analysis (with Immediate/Root labels per FEAT-SAF-INC-018 and D-MAINT-CR033).
 5. 7-point causal-factor enumeration (per KAIZEN §11.5.6.1).
-6. Corrective + Preventive actions with timeline (Corrective/Preventive current taxonomy; legacy Lessons rows remain readable).
+6. Corrective Actions and Preventive Actions as separate PDF blocks (current taxonomy; legacy Lessons rows remain readable).
 7. Legacy lessons / fleet-learning data only when present in old records or explicitly requested through legacy export defaults.
 8. Fleet notification plan.
-9. Signatures per D-PDF-01: Master + DPA + [FM for RED] + page numbering + confidentiality header/footer.
+9. Signatures per current Office Review output: Reporter signature + PIC / DPA office signature + page numbering + confidentiality header/footer.
 10. Appendices — attachments list.
 - Executive summary is generated from the current incident summary/root-cause/action content; legacy Lessons text may contribute only for old records where present.
 - Cover classification aligns with IMO Casualty Investigation Code (Resolution MSC.255(84)).
 - Visible title prints as `Injury Report` when the incident has a saved Phase 1 injury record; otherwise it prints as `Incident Report`.
-- Closure reason is excluded from Summary and prints in a Closure block immediately before Signature when present.
-- Action descriptions print once in their detail box and are not duplicated above the box.
-- Action PDF blocks do not print recommendation rationale / "Why is this needed?" text.
-- Office Review comments and closure reason print in the final Office Review / Closure area before Signature, not in Summary.
-- Evidence (Documents) prints each attachment as a separate document block with Description and File rows, and does not use numbered labels such as `Attachment 1` or `Attachment 2`.
-- Evidence (Documents) does not print legacy evidence-note-only rows; witness statements remain printable with Remark wording.
+- Stored closure reason is not printed in the current Incident PDF. Office Review comments print as one undivided full-width Closure block titled **Office comments/ lesson learnt** immediately before Signature when present. The stored comment is passed through as one text block with typed line breaks and repeated spaces preserved; a separate Comment row, filler labels, and artificial chunk rows are not printed.
+- Action descriptions print once in their category detail box and are not duplicated above the box.
+- Action PDF blocks keep Corrective Actions and Preventive Actions as separate headings. Each saved action renders as one full-width bordered row/box with no left-side `Description` label column, the description on the first line, and any saved linked due date on the second line as `Due Date: YYYY-MM-DD`. They do not print recommendation rationale / "Why is this needed?", status, physical verification note, closed-at, or recommendation verification rows.
+- Corrective and Preventive actions are separated into distinct PDF blocks.
+- Location of Vessel prints once; any In Port / At Anchorage detail is appended in the same value, such as `In Port - Singapore`, and no separate Specific vessel location row is printed. Witness Statement blocks show a clickable uploaded-statement link when a downloadable statement is stored and do not print the old free-text witness statement value; **Describe What happened?** prints immediately before the **Root Cause Analysis** section and is the only current narrative printed for injury reports, so legacy injury-row `what_happened_narrative` is not printed; Immediate Cause and Root Cause print once per layer with cause factor on the left and cause/reason on the right.
+- Evidence (Documents) prints after Corrective Actions and Preventive Actions. Each attachment prints as a separate document block with Description and File rows, and does not use numbered labels such as `Attachment 1` or `Attachment 2`.
+- Evidence (Documents) does not print legacy evidence-note-only rows; witness statements print as separate witness blocks named `Witness Statement - <witness display>` where a witness display exists, without repeating a separate Witness name row or printing `What the witness said`.
 - Incident PDF preview/download and MSC-MEPC.3/Circ.4 export are not blocked solely by pending Phase 7 acceptance. Record-type and MSC-MEPC.3/Circ.4 classifier applicability checks remain.
+- Phase 6 Office Review always includes the normal report sections in the PDF download request. The only visible PDF content option is **Print Loss Evaluation**, which includes the Loss Evaluation blocks through the existing `estimated_cost` section key.
 **Dependencies:** FEAT-SAF-INC-002, FEAT-SAF-INC-007, FEAT-SAF-INC-018, FEAT-SAF-INC-027, FEAT-SAF-AUDIT-003.
-**Decisions:** D-PDF-01, D-GAP-R09.
+**Decisions:** D-PDF-01, D-GAP-R09, D-MAINT-CR059, D-MAINT-CR060, D-MAINT-CR065, D-MAINT-CR066, D-MAINT-CR067, D-MAINT-CR073.
 **SSOT refs:** see SSOT §6 D-PDF-01; D-GAP-R09.
 
 ### FEAT-SAF-PDF-002 — MSC-MEPC.3/Circ.4 Regulatory Export PDF
@@ -1527,7 +1534,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 **Priority:** V1
 **User story:** As Master preparing for vetting / PSC inspection, I configure an export scope (record types + date range) and download a ZIP with PDFs + attachments for leave-behind.
 **Acceptance criteria:**
-- Export scope: record types (Incidents / Near Misses / Safety Meetings / SOI) + date range.
+- Export scope: record types (Incidents / Near Misses / Safety Meetings / SOI), date range, and optional Vessel filter selected from the active vessel dropdown.
 - ZIP contents: PDFs + `attachments/` subfolder with all linked attachments.
 - No crew-name redaction — full context preserved (D-GAP-M37).
 - Vetting access: Master drives on-screen + PDF export for auditor (D-RBAC-10).
@@ -1642,10 +1649,10 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 ### FEAT-SAF-DASH-001 — Safety Intelligence Dashboard (Composite Score)
 
 **Priority:** V1
-**User story:** As DPA / FM, I see a composite Safety Health Score + drill-down panels (Heinrich ratio, Pareto, repeat-root-cause, SOI compliance %) on a single fleet dashboard.
+**User story:** As DPA / FM, I see a simplified Safety Dashboard with the key score, current view context, filters, and export controls first, with detailed analytics available only when I open them.
 **Acceptance criteria:**
 - Single landing page at `/safety/dashboard`.
-- Panels: Heinrich ratio (FEAT-SAF-DASH-002), repeat-root-cause radar (FEAT-SAF-DASH-003), Pareto screening (FEAT-SAF-DASH-004), SOI compliance % (FEAT-SAF-DASH-005), CA aging (FEAT-SAF-DASH-006).
+- Default panels: Safety score, current view context, time-period controls, vessel controls when available, and DPA export controls. Repeat-root-cause radar (FEAT-SAF-DASH-003), Pareto screening (FEAT-SAF-DASH-004), CA aging (FEAT-SAF-DASH-006), Heinrich ratio (FEAT-SAF-DASH-002), and SOI Compliance % (FEAT-SAF-DASH-005) remain available behind **Show dashboard details**.
 - Period persistence per user session (build-time deferral).
 - DPA-only export rights (FEAT-SAF-DASH-007).
 **Dependencies:** FEAT-SAF-DASH-002, FEAT-SAF-DASH-003, FEAT-SAF-DASH-004, FEAT-SAF-DASH-005, FEAT-SAF-DASH-006, FEAT-SAF-DASH-007.
@@ -1693,7 +1700,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 ### FEAT-SAF-DASH-005 — SOI Compliance % (Renamed Metric)
 
 **Priority:** V1
-**User story:** As DPA, I see "SOI Compliance %" (NOT "Inspection Compliance %") on the Safety dashboard so there is no clash with the existing PSC Inspection-module metric.
+**User story:** As DPA, I can open the optional SOI check status card and see "SOI Compliance %" (NOT "Inspection Compliance %") so there is no clash with the existing PSC Inspection-module metric.
 **Acceptance criteria:**
 - Label is **"SOI Compliance %"** in all UI + exports.
 - Formula: (applicable areas inspected within last 90 days) / (total applicable areas) × 100.
@@ -1907,8 +1914,8 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 
 ### Action Phases
 - Corrective Action and Preventive Action are separate visible screens.
-- Corrective Action shows Description and Due date only; owner/checker fields are not user-facing.
-- Preventive Action shows Description, Due date, and one shared risk-reduction answer for the screen while preserving backend compatibility storage.
+- Corrective Action shows Description only; due date, status/open-close, and owner/checker fields are not user-facing.
+- Preventive Action shows Description only while preserving nullable backend compatibility storage for old/direct API rows.
 - The former Lessons Learned route is legacy-only and redirects to Office Review; legacy `LESSONS_LEARNT` rows remain readable for old records/API compatibility.
 
 ### Paper-first SOI

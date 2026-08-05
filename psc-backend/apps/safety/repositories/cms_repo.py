@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime
 import re
 
 from django.utils import timezone
@@ -94,11 +94,12 @@ class CMSRepository(BaseRepository):
             "LEFT JOIN Final_crew_list AS fcl\n"
             "    ON fcl.CrewID = coh.CrewID\n"
             "   AND COALESCE(fcl.is_delete, 0) = 0\n"
+            "INNER JOIN CrewStatus AS cs\n"
+            "    ON cs.id = coh.CrewStatus\n"
             "WHERE coh.Vessel = %s\n"
             "  AND COALESCE(coh.is_deleted, 0) = 0\n"
             "  AND COALESCE(coh.is_active, 1) = 1\n"
-            "  AND (coh.SignOnDate IS NULL OR coh.SignOnDate <= %s)\n"
-            "  AND (coh.SignOffDate IS NULL OR coh.SignOffDate >= %s)\n"
+            "  AND UPPER(LTRIM(RTRIM(COALESCE(cs.CrewStatusName, '')))) = 'ON BOARD'\n"
             f"{crew_filter}"
             "ORDER BY coh.SignOnDate DESC, coh.id DESC"
         )
@@ -110,9 +111,7 @@ class CMSRepository(BaseRepository):
         crew_id: str | None,
         active_on: date,
     ) -> list[object]:
-        start_of_day = datetime.combine(active_on, time.min)
-        end_of_day = datetime.combine(active_on, time.max)
-        params: list[object] = [vessel_id, end_of_day, start_of_day]
+        params: list[object] = [vessel_id]
         if crew_id is not None:
             params.append(crew_id)
         return params
@@ -213,7 +212,10 @@ class CMSRepository(BaseRepository):
     def _uses_live_schema(self) -> bool:
         return self._table_has_columns(
             "Crew_Onboarding_History",
-            {"CrewID", "Vessel", "SignOnDate", "SignOffDate"},
+            {"CrewID", "Vessel", "CrewStatus", "SignOnDate", "SignOffDate"},
+        ) and self._table_has_columns(
+            "CrewStatus",
+            {"id", "CrewStatusName"},
         )
 
     def _table_has_columns(self, table_name: str, expected_columns: set[str]) -> bool:

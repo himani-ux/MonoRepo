@@ -1,130 +1,114 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SafetyIncidentPhase1Form } from "../../../src/components/safety/incident/phase1-form";
 
-const useMscmepc3PositionMock = vi.fn();
+const phase1FormMocks = vi.hoisted(() => ({
+  getIncidentWeatherOptions: vi.fn(),
+  getInjuryDropdownOptions: vi.fn(),
+  getReferenceIncidentTypes: vi.fn(),
+  getReferenceLossTypes: vi.fn(),
+  toast: vi.fn(),
+}));
+
+vi.mock("../../../src/hooks/use-auth", () => ({
+  useAuth: () => ({
+    isVessel: true,
+    user: {
+      crew_id: "master-7",
+      full_name: "Master Seven",
+      rank: "MASTER",
+      role: "VESSEL_MASTER",
+      vessel_code: "ARY",
+      vessel_id: "7",
+      vessel_name: "ARYA",
+      vessel_ids: ["7"],
+      vessel_names: ["ARYA"],
+    },
+  }),
+}));
+
+vi.mock("../../../src/hooks/use-toast", () => ({
+  useToast: () => ({ toast: phase1FormMocks.toast }),
+}));
+
+vi.mock("../../../src/hooks/safety/use-draft-autosave", () => ({
+  useDraftAutosave: () => ({
+    lastSavedAt: null,
+    saveDraftNow: vi.fn().mockResolvedValue({
+      updatedAt: "2026-06-23T00:00:00Z",
+    }),
+    status: "ready",
+  }),
+}));
 
 vi.mock("../../../src/hooks/safety/use-msc-mepc3-position", () => ({
   toUtcIsoTimestamp: (value: string | null | undefined) =>
     value ? "2026-04-20T10:00:00.000Z" : null,
-  useMscmepc3Position: () => useMscmepc3PositionMock(),
+}));
+
+vi.mock("../../../src/lib/safety/digital-signature", () => ({
+  getSafetyDeviceFingerprint: () => "test-device",
+}));
+
+vi.mock("../../../src/lib/api/safety", () => ({
+  safetyApi: {
+    getIncidentWeatherOptions: phase1FormMocks.getIncidentWeatherOptions,
+    getInjuryDropdownOptions: phase1FormMocks.getInjuryDropdownOptions,
+    getReferenceIncidentTypes: phase1FormMocks.getReferenceIncidentTypes,
+    getReferenceLossTypes: phase1FormMocks.getReferenceLossTypes,
+  },
 }));
 
 describe("SafetyIncidentPhase1Form", () => {
   beforeEach(() => {
-    useMscmepc3PositionMock.mockReturnValue({
-      data: null,
-      error: null,
-      refresh: vi.fn(),
-      status: "idle",
-    });
+    phase1FormMocks.getIncidentWeatherOptions.mockResolvedValue([]);
+    phase1FormMocks.getInjuryDropdownOptions.mockResolvedValue([]);
+    phase1FormMocks.getReferenceIncidentTypes.mockResolvedValue([]);
+    phase1FormMocks.getReferenceLossTypes.mockResolvedValue([]);
+    phase1FormMocks.toast.mockClear();
   });
 
-  it("renders the Phase 1 heading and keeps submit disabled until gate fields are complete", () => {
+  it("renders the current Phase 1 heading and submit action", async () => {
     render(<SafetyIncidentPhase1Form mode="create" />);
 
-    expect(
-      screen.getByRole("heading", { name: "Intake + Scene Control" }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Tell Us What Happened" }),
+      ).toBeInTheDocument();
+    });
 
     expect(
-      screen.getByRole("button", { name: "Continue to Phase 2" }),
-    ).toBeDisabled();
+      screen.getByRole("button", { name: "Submit report" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Intake + Scene Control" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("enables submit when the Phase 1 gate fields are filled", () => {
+  it("uses the current field labels and keeps retired labels hidden", async () => {
     render(<SafetyIncidentPhase1Form mode="create" />);
 
-    fireEvent.change(screen.getByLabelText("Vessel ID"), {
-      target: { value: "7" },
-    });
-    fireEvent.click(screen.getByLabelText("Checklist complete"));
-    fireEvent.change(screen.getByLabelText("Reporter user ID"), {
-      target: { value: "master-7" },
-    });
-    fireEvent.change(screen.getByLabelText("Reporter name"), {
-      target: { value: "Master Seven" },
-    });
-    fireEvent.change(screen.getByLabelText("Reporter rank"), {
-      target: { value: "MASTER" },
-    });
-    fireEvent.change(screen.getByLabelText("Narrative"), {
-      target: { value: `Narrative ${"details ".repeat(30)}` },
+    await waitFor(() => {
+      expect(screen.getByLabelText("Vessel")).toBeInTheDocument();
     });
 
-    const submitButton = screen.getByRole("button", {
-      name: "Continue to Phase 2",
-    });
-
-    expect(submitButton).toBeEnabled();
-  });
-
-  it("opens the self-report conflict modal when reporter and PIC candidate match", () => {
-    const onSubmitPhase = vi.fn();
-
-    render(
-      <SafetyIncidentPhase1Form
-        mode="create"
-        onSubmitPhase={onSubmitPhase}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText("Vessel ID"), {
-      target: { value: "7" },
-    });
-    fireEvent.click(screen.getByLabelText("Checklist complete"));
-    fireEvent.change(screen.getByLabelText("Reporter user ID"), {
-      target: { value: "master-7" },
-    });
-    fireEvent.change(screen.getByLabelText("Reporter name"), {
-      target: { value: "Master Seven" },
-    });
-    fireEvent.change(screen.getByLabelText("Reporter rank"), {
-      target: { value: "MASTER" },
-    });
-    fireEvent.change(screen.getByLabelText("PIC candidate"), {
-      target: { value: "master-7" },
-    });
-    fireEvent.change(screen.getByLabelText("Narrative"), {
-      target: { value: `Narrative ${"details ".repeat(30)}` },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Continue to Phase 2" }));
-
+    expect(screen.getByLabelText("What happened")).toBeInTheDocument();
+    expect(screen.getByLabelText("Person in charge")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Different approver required" }),
+      screen.getByRole("combobox", { name: "Was office informed?" }),
     ).toBeInTheDocument();
-    expect(onSubmitPhase).not.toHaveBeenCalled();
-  });
-
-  it("renders the Daily Report auto-fill banner when a suggested position is available", () => {
-    useMscmepc3PositionMock.mockReturnValue({
-      data: {
-        awaiting_daily_report_match: false,
-        delta_minutes: 180,
-        latitude: 9.216667,
-        longitude: 115.583333,
-        matched: true,
-        message:
-          "Position auto-filled from Daily Report NoonReport:11560. Edit if a more recent position is available.",
-        position_daily_report_id: "NoonReport:11560",
-        position_source: "AUTO_FROM_DAILY_REPORT",
-        report_date: "2026-04-27T09:00:00Z",
-        source_reference: "NoonReport:11560",
-        source_table: "NoonReport",
-      },
-      error: null,
-      refresh: vi.fn(),
-      status: "matched",
-    });
-
-    render(<SafetyIncidentPhase1Form mode="create" />);
-
+    expect(screen.getByLabelText("Report time")).toBeInTheDocument();
     expect(
-      screen.getByText(/Position auto-filled from Daily Report NoonReport:11560/i),
+      screen.getByRole("combobox", { name: "Shore Assistance Required" }),
     ).toBeInTheDocument();
-    expect(screen.getByDisplayValue("9.216667")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("115.583333")).toBeInTheDocument();
+    expect(screen.getByLabelText("Latitude")).toBeInTheDocument();
+    expect(screen.getByLabelText("Longitude")).toBeInTheDocument();
+
+    expect(screen.queryByLabelText("Vessel ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Checklist complete")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Narrative")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Was office told?")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Last Port")).not.toBeInTheDocument();
   });
 });

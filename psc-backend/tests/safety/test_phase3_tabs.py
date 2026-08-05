@@ -13,10 +13,12 @@ bootstrap_django()
 from rest_framework.test import APIRequestFactory, force_authenticate
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from apps.safety.models import EvidenceItem, Incident, IncidentEvidence
+from apps.safety.models import EvidenceItem, Incident, IncidentEvidence, WitnessInterview
 from apps.safety.views.incident_phase3 import (
     IncidentPhase3AttachmentUploadView,
     IncidentPhase3EvidenceView,
+    IncidentPhase3InterviewAttachmentView,
+    IncidentPhase3InterviewDetailView,
     IncidentPhase3InterviewView,
 )
 
@@ -52,13 +54,15 @@ class IncidentPhase3TabsTests(unittest.TestCase):
         self.view = IncidentPhase3EvidenceView.as_view()
         self.attachment_view = IncidentPhase3AttachmentUploadView.as_view()
         self.interview_view = IncidentPhase3InterviewView.as_view()
+        self.interview_attachment_view = IncidentPhase3InterviewAttachmentView.as_view()
+        self.interview_detail_view = IncidentPhase3InterviewDetailView.as_view()
 
     def test_phase3_tabs_accept_independent_writes_and_preserve_other_tabs(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/001",
             vessel_id="7",
             state="IN_PROGRESS",
-            current_phase=3,
+            current_phase=4,
             created_by="master-7",
             updated_by="master-7",
             schema_version=1,
@@ -143,12 +147,59 @@ class IncidentPhase3TabsTests(unittest.TestCase):
         )
         self.assertEqual(IncidentEvidence.objects.count(), 5)
 
+    def test_phase4_document_evidence_is_available_before_phase_four_is_reached(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/001-EARLY-EVIDENCE",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=2,
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+
+        get_request = self.factory.get(f"/api/safety/incidents/{incident.pk}/phase-4/evidence/")
+        force_authenticate(get_request, user=build_user())
+
+        get_response = self.view(get_request, id=incident.pk)
+
+        self.assertEqual(get_response.status_code, 200)
+        self.assertIn("paper", get_response.data)
+
+        with tempfile.TemporaryDirectory() as storage_root, patch.dict(
+            "os.environ",
+            {"SAFETY_EXPORT_ROOT": storage_root},
+        ):
+            document = SimpleUploadedFile(
+                "early-evidence.pdf",
+                b"%PDF-1.4\n%early\n",
+                content_type="application/pdf",
+            )
+            upload_request = self.factory.post(
+                f"/api/safety/incidents/{incident.pk}/phase-4/evidence/attachments/",
+                {
+                    "description": "Uploaded before root cause and next actions were completed.",
+                    "file": document,
+                    "tab_key": "paper",
+                    "title": "Early evidence upload",
+                },
+                format="multipart",
+            )
+            force_authenticate(upload_request, user=build_user())
+
+            upload_response = self.attachment_view(upload_request, id=incident.pk)
+
+        self.assertEqual(upload_response.status_code, 201)
+        self.assertEqual(upload_response.data["attachment"]["title"], "Early evidence upload")
+        tab = IncidentEvidence.objects.get(incident=incident, tab_code=IncidentEvidence.TabCode.PAPER)
+        self.assertEqual(tab.entry_count, 1)
+
     def test_phase3_photo_upload_stores_attachment_metadata_in_evidence_item(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/002",
             vessel_id="7",
             state="IN_PROGRESS",
-            current_phase=3,
+            current_phase=4,
             created_by="master-7",
             updated_by="master-7",
             schema_version=1,
@@ -187,12 +238,129 @@ class IncidentPhase3TabsTests(unittest.TestCase):
         item = EvidenceItem.objects.get(incident=incident, item_type=EvidenceItem.ItemType.PHYSICAL)
         self.assertEqual(item.metadata_json["attachment_path"], attachment_path)
 
+    def test_phase3_pdf_upload_stores_attachment_metadata_in_evidence_item(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/002-PDF",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=4,
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+
+        with tempfile.TemporaryDirectory() as storage_root, patch.dict(
+            "os.environ",
+            {"SAFETY_EXPORT_ROOT": storage_root},
+        ):
+            document = SimpleUploadedFile(
+                "engine-log.pdf",
+                b"%PDF-1.4\n%test\n",
+                content_type="application/pdf",
+            )
+            request = self.factory.post(
+                f"/api/safety/incidents/{incident.pk}/evidence/attachments/",
+                {
+                    "file": document,
+                    "description": "Deck and engine log pages relevant to the incident.",
+                    "tab_key": "paper",
+                    "title": "Engine log extract",
+                },
+                format="multipart",
+            )
+            force_authenticate(request, user=build_user())
+
+            response = self.attachment_view(request, id=incident.pk)
+
+        self.assertEqual(response.status_code, 201)
+        attachment = response.data["attachment"]
+        self.assertEqual(attachment["content_type"], "application/pdf")
+        self.assertEqual(attachment["description"], "Deck and engine log pages relevant to the incident.")
+        self.assertEqual(attachment["title"], "Engine log extract")
+        self.assertTrue(attachment["attachment_path"].endswith(".pdf"))
+
+        tab = IncidentEvidence.objects.get(incident=incident, tab_code=IncidentEvidence.TabCode.PAPER)
+        self.assertEqual(tab.entry_count, 1)
+        self.assertEqual(tab.structured_data["attachments"][0]["content_type"], "application/pdf")
+        self.assertEqual(tab.structured_data["attachments"][0]["description"], "Deck and engine log pages relevant to the incident.")
+        self.assertEqual(tab.structured_data["attachments"][0]["title"], "Engine log extract")
+
+        item = EvidenceItem.objects.get(incident=incident, item_type=EvidenceItem.ItemType.PHYSICAL)
+        self.assertEqual(item.metadata_json["attachment_path"], attachment["attachment_path"])
+        self.assertEqual(item.description, "Deck and engine log pages relevant to the incident.")
+        self.assertEqual(item.metadata_json["description"], "Deck and engine log pages relevant to the incident.")
+        self.assertEqual(item.metadata_json["title"], "Engine log extract")
+        self.assertEqual(item.title, "Engine log extract")
+
+    def test_phase4_document_metadata_patch_updates_existing_attachment(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/002-PDF-EDIT",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=4,
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+
+        with tempfile.TemporaryDirectory() as storage_root, patch.dict(
+            "os.environ",
+            {"SAFETY_EXPORT_ROOT": storage_root},
+        ):
+            document = SimpleUploadedFile(
+                "engine-log.pdf",
+                b"%PDF-1.4\n%test\n",
+                content_type="application/pdf",
+            )
+            upload_request = self.factory.post(
+                f"/api/safety/incidents/{incident.pk}/phase-4/evidence/attachments/",
+                {
+                    "file": document,
+                    "description": "Initial description.",
+                    "tab_key": "paper",
+                    "title": "Initial title",
+                },
+                format="multipart",
+            )
+            force_authenticate(upload_request, user=build_user())
+            upload_response = self.attachment_view(upload_request, id=incident.pk)
+
+            attachment_path = upload_response.data["attachment"]["attachment_path"]
+            patch_request = self.factory.patch(
+                f"/api/safety/incidents/{incident.pk}/phase-4/evidence/attachments/?path={attachment_path}",
+                {
+                    "description": "Updated description for the same file.",
+                    "title": "Updated engine log",
+                },
+                format="json",
+            )
+            force_authenticate(patch_request, user=build_user())
+            patch_response = self.attachment_view(patch_request, id=incident.pk)
+
+        self.assertEqual(patch_response.status_code, 200)
+        self.assertEqual(patch_response.data["attachment"]["attachment_path"], attachment_path)
+        self.assertEqual(patch_response.data["attachment"]["title"], "Updated engine log")
+
+        tab = IncidentEvidence.objects.get(incident=incident, tab_code=IncidentEvidence.TabCode.PAPER)
+        self.assertEqual(tab.entry_count, 1)
+        self.assertEqual(len(tab.structured_data["attachments"]), 1)
+        self.assertEqual(tab.structured_data["attachments"][0]["title"], "Updated engine log")
+        self.assertEqual(
+            tab.structured_data["attachments"][0]["description"],
+            "Updated description for the same file.",
+        )
+
+        item = EvidenceItem.objects.get(incident=incident, item_type=EvidenceItem.ItemType.PHYSICAL)
+        self.assertEqual(item.title, "Updated engine log")
+        self.assertEqual(item.description, "Updated description for the same file.")
+        self.assertEqual(item.metadata_json["attachment_path"], attachment_path)
+
     def test_phase3_interview_create_counts_people_evidence_tab(self) -> None:
         incident = Incident.objects.create(
             incident_number="ABC/2026/003",
             vessel_id="7",
             state="IN_PROGRESS",
-            current_phase=3,
+            current_phase=4,
             created_by="master-7",
             updated_by="master-7",
             schema_version=1,
@@ -215,3 +383,81 @@ class IncidentPhase3TabsTests(unittest.TestCase):
         tab = IncidentEvidence.objects.get(incident=incident, tab_code=IncidentEvidence.TabCode.PEOPLE)
         self.assertEqual(tab.entry_count, 1)
         self.assertIn("Witness", tab.summary)
+
+    def test_phase4_interview_patch_updates_existing_witness_statement(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/004",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=4,
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+        interview = WitnessInterview.objects.create(
+            incident=incident,
+            witness_name="AB Witness",
+            interview_type=WitnessInterview.InterviewType.INFORMAL,
+            reason_formal_impossible="Initial statement only.",
+            meeting_notes="Original statement.",
+            conclusion_notes="Original remark.",
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+
+        request = self.factory.patch(
+            f"/api/safety/incidents/{incident.pk}/phase-4/interviews/{interview.id}/",
+            {
+                "conclusion_notes": "Updated remark.",
+                "interview_type": "INFORMAL",
+                "meeting_notes": "Updated statement.",
+                "reason_formal_impossible": "Initial statement only.",
+                "witness_name": "AB Witness",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user())
+
+        response = self.interview_detail_view(request, id=incident.pk, interview_id=interview.id)
+
+        self.assertEqual(response.status_code, 200)
+        interview.refresh_from_db()
+        self.assertEqual(WitnessInterview.objects.filter(incident=incident).count(), 1)
+        self.assertEqual(interview.meeting_notes, "Updated statement.")
+        self.assertEqual(interview.conclusion_notes, "Updated remark.")
+
+    def test_phase4_interview_statement_attachment_downloads_data_url(self) -> None:
+        incident = Incident.objects.create(
+            incident_number="ABC/2026/004-STATEMENT-DOWNLOAD",
+            vessel_id="7",
+            state="IN_PROGRESS",
+            current_phase=4,
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+        interview = WitnessInterview.objects.create(
+            incident=incident,
+            witness_name="AB Witness",
+            interview_type=WitnessInterview.InterviewType.INFORMAL,
+            reason_formal_impossible="Statement uploaded from Phase 4.",
+            meeting_notes="Witness statement.",
+            conclusion_notes="Remark.",
+            witness_signature="data:application/pdf;base64,JVBERi0xLjQKJXdpdG5lc3MK",
+            created_by="master-7",
+            updated_by="master-7",
+            schema_version=1,
+        )
+
+        request = self.factory.get(
+            f"/api/safety/incidents/{incident.pk}/phase-4/interviews/{interview.id}/statement-attachment/"
+        )
+        force_authenticate(request, user=build_user())
+
+        response = self.interview_attachment_view(request, id=incident.pk, interview_id=interview.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("witness-statement-", response["Content-Disposition"])
+        self.assertEqual(response.content, b"%PDF-1.4\n%witness\n")

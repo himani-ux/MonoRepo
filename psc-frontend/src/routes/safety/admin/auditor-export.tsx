@@ -1,8 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { getErrorMessage } from "../../../lib/api/client";
-import { safetyApi, type SafetyAuditorBundleExportRequest } from "../../../lib/api/safety";
+import {
+  safetyApi,
+  type SafetyAuditorBundleExportRequest,
+  type SafetyDashboardVesselOption,
+} from "../../../lib/api/safety";
 
 const RECORD_TYPES = [
   { label: "Incidents", value: "INCIDENT" },
@@ -32,14 +36,55 @@ function downloadBlob({ blob, fileName }: { blob: Blob; fileName: string }) {
   URL.revokeObjectURL(url);
 }
 
+function buildVesselOptionLabel(vessel: SafetyDashboardVesselOption) {
+  const code = vessel.vessel_code.trim();
+  const name = vessel.vessel_name.trim();
+  if (code && name) {
+    return `${code} - ${name}`;
+  }
+  return name || code || vessel.id;
+}
+
 export default function SafetyAuditorExportRoute() {
   const [dateFrom, setDateFrom] = useState(defaultStartDate);
   const [dateTo, setDateTo] = useState(() => formatDate(new Date()));
   const [recordTypes, setRecordTypes] = useState<string[]>(() => RECORD_TYPES.map((item) => item.value));
   const [vesselId, setVesselId] = useState("");
+  const [vesselOptions, setVesselOptions] = useState<SafetyDashboardVesselOption[]>([]);
+  const [isLoadingVessels, setIsLoadingVessels] = useState(false);
+  const [vesselLoadError, setVesselLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [lastExportFile, setLastExportFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setIsLoadingVessels(true);
+    setVesselLoadError(null);
+
+    safetyApi
+      .getIncidentRegisterVessels()
+      .then((options) => {
+        if (isActive) {
+          setVesselOptions(options);
+        }
+      })
+      .catch((caught) => {
+        if (isActive) {
+          setVesselLoadError(getErrorMessage(caught));
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoadingVessels(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   function toggleRecordType(value: string) {
     setRecordTypes((current) =>
@@ -63,7 +108,7 @@ export default function SafetyAuditorExportRoute() {
       date_from: dateFrom,
       date_to: dateTo,
       record_types: recordTypes,
-      vessel_id: vesselId.trim() || null,
+      vessel_id: vesselId || null,
     };
 
     setIsExporting(true);
@@ -81,9 +126,6 @@ export default function SafetyAuditorExportRoute() {
   return (
     <section className="space-y-6">
       <header className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_58%,#fef3c7_100%)] p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-          Safety / Auditor Export
-        </p>
         <h1 className="mt-2 text-3xl font-semibold text-slate-900">Auditor Bundle Export</h1>
         <Link
           className="mt-5 inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
@@ -117,12 +159,28 @@ export default function SafetyAuditorExportRoute() {
           </label>
           <label className="grid gap-2 text-sm font-semibold text-slate-700">
             Vessel filter
-            <input
+            <select
+              aria-label="Vessel filter"
               className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-normal text-slate-900 outline-none focus:border-slate-500"
+              disabled={isLoadingVessels && vesselOptions.length === 0}
               onChange={(event) => setVesselId(event.target.value)}
-              placeholder="Optional"
               value={vesselId}
-            />
+            >
+              <option value="">All vessels</option>
+              {vesselOptions.map((vessel) => (
+                <option key={vessel.id} value={vessel.id}>
+                  {buildVesselOptionLabel(vessel)}
+                </option>
+              ))}
+            </select>
+            {isLoadingVessels ? (
+              <span className="text-xs font-normal text-slate-500">Loading vessels...</span>
+            ) : null}
+            {vesselLoadError ? (
+              <span className="text-xs font-normal text-rose-700">
+                Vessel list could not be loaded: {vesselLoadError}
+              </span>
+            ) : null}
           </label>
         </section>
 

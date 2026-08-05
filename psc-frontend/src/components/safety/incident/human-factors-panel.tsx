@@ -25,7 +25,7 @@ export function SafetyHumanFactorsPanel({
       </h2>
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-          SHELL
+          Selected factor
         </p>
         <p className="mt-2 text-sm font-semibold text-slate-900">
           {shell?.selected?.replaceAll("_", " ") || "Not selected"}
