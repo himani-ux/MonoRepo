@@ -1407,6 +1407,38 @@ Issued Description of Statutory Memoranda
 
         engine_class.assert_called_once()
 
+    def test_process_cert_pdf_reads_stacked_certificate_number_and_dates_layout(self):
+        output = OcrEngineOutput(
+            raw_text=(
+                "SMART BILGE Factory Calibration Certificate\n"
+                "Equipment Details\n"
+                "Certificate Number\n"
+                "Works Order Number\n"
+                "Product Description Conforms to IMO MEPC.107(49) Section 4.2.11\n"
+                "Valid for a MAXIMUM of FIVE (5) years from Date of Issue\n"
+                "3391264\n"
+                "7394\n"
+                "SMART BILGE Serial Number\n"
+                "109159-1067\n"
+                "Date of Issue\n"
+                "Date of Expiry\n"
+                "2022-07-16\n"
+                "2027-07-16\n"
+            ),
+            mean_confidence=0.95,
+            fields={},
+        )
+
+        payload = process_cert_pdf(
+            "certificate.png",
+            engine=_FakeOcrEngine(output),
+            thresholds=OcrThresholds(office_auto_accept=0.80, vessel_auto_accept=0.85, manual_floor=0.60),
+        )
+
+        self.assertEqual(payload["fields"]["certificate_number"]["value"], "3391264")
+        self.assertEqual(payload["fields"]["issue_date"]["value"], "2022-07-16")
+        self.assertEqual(payload["fields"]["expiry_date"]["value"], "2027-07-16")
+
     def test_paddleocr_v3_prediction_result_is_flattened_to_text_and_confidence(self):
         text, confidence = _paddle_prediction_to_text(
             [

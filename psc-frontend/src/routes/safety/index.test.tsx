@@ -38,6 +38,8 @@ const safetyQueryMocks = vi.hoisted(() => ({
   useSafetyScmOpenFindings: vi.fn(),
   useSafetySearch: vi.fn(),
   useSafetySoiCompliance: vi.fn(),
+  useSafetySoiFindings: vi.fn(),
+  useSafetySoiInspection: vi.fn(),
   useSafetySoiInspections: vi.fn(),
 }));
 
@@ -198,6 +200,10 @@ vi.mock('../../hooks/use-safety', () => ({
     safetyQueryMocks.useSafetySearch(...args),
   useSafetySoiCompliance: (...args: unknown[]) =>
     safetyQueryMocks.useSafetySoiCompliance(...args),
+  useSafetySoiFindings: (...args: unknown[]) =>
+    safetyQueryMocks.useSafetySoiFindings(...args),
+  useSafetySoiInspection: (...args: unknown[]) =>
+    safetyQueryMocks.useSafetySoiInspection(...args),
   useSafetySoiInspections: (...args: unknown[]) =>
     safetyQueryMocks.useSafetySoiInspections(...args),
 }));
@@ -1101,6 +1107,32 @@ describe('safety routes', () => {
       error: null,
       isLoading: false,
     });
+    safetyQueryMocks.useSafetySoiInspection.mockReturnValue({
+      data: {
+        checklist_generated_at: '2026-05-01T00:00:00Z',
+        checklist_unique_id: 'SOI-0000007-20260501-0007',
+        cycle_label: 'Q2/2026',
+        id: '42',
+        inspection_reference: 'SOI/ABC/26/07',
+        safety_officer_crew_id: 'co-7',
+        selected_areas: [
+          { area_id: 1, area_name: 'Bridge', inspected: true },
+          { area_id: 2, area_name: 'Deck', inspected: true },
+          { area_id: 3, area_name: 'Engine Room', inspected: false },
+          { area_id: 4, area_name: 'Galley', inspected: false },
+        ],
+        state: 'DOWNLOADED',
+      },
+      error: null,
+      isError: false,
+      isLoading: false,
+    });
+    safetyQueryMocks.useSafetySoiFindings.mockReturnValue({
+      data: [],
+      error: null,
+      isError: false,
+      isLoading: false,
+    });
     safetyQueryMocks.useSafetySoiInspections.mockReturnValue(successState);
     safetyQueryMocks.useSafetySearch.mockReturnValue({
       data: null,
@@ -1123,6 +1155,27 @@ describe('safety routes', () => {
       await screen.findByText('Safety Dashboard')
     ).toBeInTheDocument();
     expect(screen.getByTestId('safety-layout')).toBeInTheDocument();
+  });
+
+  it('allows_marine_superintendent_to_view_soi_findings_register', async () => {
+    renderSafetyRoute('/safety/soi/42/findings', {
+      formIds: ['SAF_F_004'],
+      id: 'aman.oberoi',
+      isGlobal: true,
+      processIds: [],
+      role: 'MARINE SUPERINTENDENT',
+      vesselIds: [],
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: 'SOI Findings Register' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Process access is not available for this page.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Add Finding' })
+    ).not.toBeInTheDocument();
   });
 
   it('wires_vessel_selector_for_global_dashboard_scope', async () => {

@@ -607,9 +607,7 @@ export const safetyRoutes: RouteObject[] = [
       {
         element: renderWithSuspense(
           <PermissionGate formId={safetyRoutePermissions.soi}>
-            <ProcessGate processId="SAF_P_002">
-              <SafetySoiFindingsRoute />
-            </ProcessGate>
+            <SafetySoiFindingsRoute />
           </PermissionGate>,
         ),
         path: "soi/:id/findings",

@@ -117,6 +117,7 @@ class NearMissTriageView(NearMissViewMixin, generics.GenericAPIView):
             "near_miss_mscat_category_id",
             "near_miss_mscat_subcode_id",
             "near_miss_mscat_subcode_ids",
+            "office_comment",
             "state",
             "superseded_by_id",
             "linked_incident_id",
@@ -133,6 +134,7 @@ class NearMissTriageView(NearMissViewMixin, generics.GenericAPIView):
             near_miss.near_miss_mscat_subcode_id = serializer.validated_data["near_miss_mscat_subcode_id"]
             near_miss.near_miss_mscat_category_id = serializer.validated_data["near_miss_mscat_category_id"]
             near_miss.near_miss_mscat_subcode_ids = serializer.validated_data["near_miss_mscat_subcode_ids"]
+        near_miss.office_comment = office_comment or None
         near_miss.updated_by = actor_id
         near_miss.updated_date = timezone.now()
         if not supersede_to_incident:
@@ -144,6 +146,7 @@ class NearMissTriageView(NearMissViewMixin, generics.GenericAPIView):
             "near_miss_mscat_category_id",
             "near_miss_mscat_subcode_id",
             "near_miss_mscat_subcode_ids",
+            "office_comment",
             "state",
             "updated_by",
             "updated_date",

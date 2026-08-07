@@ -90,6 +90,9 @@ export default function SafetySoiFindingsRoute() {
   const canDownloadChecklist = auth.hasProcess("SAF_P_001")
     && pendingClosureRoles.has(normalizedRole)
     && activeSafetyOfficerForRecord;
+  const canAddFinding = auth.hasProcess("SAF_P_002")
+    && pendingClosureRoles.has(normalizedRole)
+    && activeSafetyOfficerForRecord;
   const canSubmitForMasterClosure = auth.hasProcess("SAF_P_014")
     && pendingClosureRoles.has(normalizedRole)
     && activeSafetyOfficerForRecord;
@@ -141,7 +144,7 @@ export default function SafetySoiFindingsRoute() {
                 Download paper
               </Link>
             ) : null}
-            {hasPaperChecklist ? (
+            {hasPaperChecklist && canAddFinding ? (
               <Link
                 className="inline-flex items-center justify-center rounded-full bg-emerald-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
                 to={`/safety/soi/${inspectionId}/findings/create`}

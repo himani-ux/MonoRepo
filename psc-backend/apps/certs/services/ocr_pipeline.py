@@ -481,6 +481,11 @@ def _parse_common_certificate_layouts(raw_text: str) -> dict[str, str]:
     if "bluetech" in squashed and "marineservices" in squashed:
         fields.setdefault("issuing_authority", "BLUE TECH MARINE SERVICES LLC")
 
+    certificate_number = _parse_stacked_certificate_number(raw_text)
+    if certificate_number:
+        fields["certificate_number"] = certificate_number
+    fields.update(_parse_stacked_issue_expiry_dates(raw_text))
+
     regex_fields = {
         "certificate_number": [
             r"Certificate\s*No\.?\s*[:.]?\s*(?P<value>[A-Z0-9][A-Z0-9./\- ]+)",
@@ -543,6 +548,100 @@ def _parse_common_certificate_layouts(raw_text: str) -> dict[str, str]:
             fields["expiry_date"] = expiry_date
 
     return {key: value for key, value in fields.items() if value}
+
+
+def _parse_stacked_certificate_number(raw_text: str) -> str | None:
+    lines = [_clean_field_value(line) for line in raw_text.splitlines()]
+    lines = [line for line in lines if line]
+    for index, line in enumerate(lines):
+        if not re.fullmatch(r"certificate\s*(?:no\.?|number)", line, flags=re.IGNORECASE):
+            continue
+        for candidate in lines[index + 1 : index + 10]:
+            if _is_stacked_certificate_number_label(candidate):
+                continue
+            if _is_stacked_certificate_number_value(candidate):
+                return _clean_certificate_number(candidate)
+    return None
+
+
+def _parse_stacked_issue_expiry_dates(raw_text: str) -> dict[str, str]:
+    lines = [_clean_field_value(line) for line in raw_text.splitlines()]
+    lines = [line for line in lines if line]
+    for index, line in enumerate(lines):
+        if not re.search(r"\bdate\s+of\s+issue\b", line, flags=re.IGNORECASE):
+            continue
+        window = lines[index + 1 : index + 14]
+        expiry_label_index = next(
+            (
+                offset
+                for offset, candidate in enumerate(window)
+                if re.search(r"\bdate\s+of\s+expir(?:y|ation)\b", candidate, flags=re.IGNORECASE)
+            ),
+            None,
+        )
+        date_candidates = [
+            (offset, date_value)
+            for offset, candidate in enumerate(window)
+            if (date_value := _extract_stacked_date_value(candidate))
+        ]
+        if expiry_label_index is None:
+            if len(date_candidates) >= 2:
+                return {
+                    "issue_date": date_candidates[0][1],
+                    "expiry_date": date_candidates[1][1],
+                }
+            continue
+
+        before_expiry_label = [date for offset, date in date_candidates if offset < expiry_label_index]
+        after_expiry_label = [date for offset, date in date_candidates if offset > expiry_label_index]
+        if before_expiry_label and after_expiry_label:
+            return {
+                "issue_date": before_expiry_label[0],
+                "expiry_date": after_expiry_label[0],
+            }
+        if len(after_expiry_label) >= 2:
+            return {
+                "issue_date": after_expiry_label[0],
+                "expiry_date": after_expiry_label[1],
+            }
+    return {}
+
+
+def _extract_stacked_date_value(value: str) -> str | None:
+    text = _clean_field_value(value)
+    iso_match = re.search(r"\b(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})\b", text)
+    if iso_match:
+        try:
+            return datetime(
+                int(iso_match.group("year")),
+                int(iso_match.group("month")),
+                int(iso_match.group("day")),
+            ).date().isoformat()
+        except ValueError:
+            return None
+    normalized = _normalize_ocr_date_text(text)
+    return normalized if _contains_ocr_date(normalized) else None
+
+
+def _is_stacked_certificate_number_label(value: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:works?\s+order|product\s+description|valid\s+for|serial\s+number|date\s+of|calibration|details)\b",
+            value,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _is_stacked_certificate_number_value(value: str) -> bool:
+    text = _clean_certificate_number(value)
+    if len(text) < 4 or not re.search(r"\d", text):
+        return False
+    if re.search(r"[a-z]", text):
+        return False
+    if _contains_ocr_date(text):
+        return False
+    return bool(re.fullmatch(r"[A-Z0-9][A-Z0-9./\- ]{3,}", text))
 
 
 def _clean_field_value(value: str | None) -> str:

@@ -158,6 +158,7 @@ Safety (sidebar group — hidden if user has no SAF_F_* IDs)
 │   └── Export PDF ................. process_ids: SAF_P_007
 ├── SOI ............................ form_ids: SAF_F_004 (inherits standard Safety RBAC, D-SOI-15)
 │   ├── Schedule + generate paper .. process_ids: SAF_P_001
+│   ├── View findings register ..... form_ids: SAF_F_004
 │   ├── Register findings .......... process_ids: SAF_P_002
 │   ├── Mark `pending_closure` ..... process_ids: SAF_P_002
 │   ├── Master approve closure ..... process_ids: SAF_P_004
@@ -900,14 +901,14 @@ Per D-GAP-E4, the paper is authoritative for per-item responses; the digital rec
 ### 7.4 Step 4 — Register Findings — `/safety/soi/:id/findings/`
 
 **FEAT refs:** FEAT-SAF-SOI-011, FEAT-SAF-SOI-012, FEAT-SAF-SOI-013, FEAT-SAF-SOI-016, FEAT-SAF-SOI-017, FEAT-SAF-SOI-018.
-**Role gate:** `PermissionGate(SAF_F_004) + ActionGate(SAF_P_002) + role = SO`.
+**Role gate:** `PermissionGate(SAF_F_004)` for the findings register. Adding findings remains `ActionGate(SAF_P_002) + role = SO`.
 **Data loaded on mount:**
 - `GET /api/safety/soi/:id/findings/`
 - `GET /api/safety/master/mscat/` — optional M-SCAT tagging.
 **Signature transition:**
 - Each finding save captures SO digital signature (implicit via `created_by` + device fingerprint).
 **States:**
-- **Loaded:** Findings table + `[+ Add Finding]`. Top banner reminds SO to enter the unique checklist ID (must match the one on paper); partial-submission indicator `"2 of 5 areas complete"` (FEAT-SAF-SOI-012).
+- **Loaded:** Findings table. Safety Officer users with the finding action can see `[+ Add Finding]`. Top banner reminds SO to enter the unique checklist ID (must match the one on paper); partial-submission indicator `"2 of 5 areas complete"` (FEAT-SAF-SOI-012).
 - **Loading:** Skeleton.
 - **Empty:** `"No findings registered. Select an area and add findings — or submit with zero findings (areas still stamp as inspected)."`
 - **Error — validation:** HIGH severity without ≥1 photo → red block (D-GAP-M24). Unique-ID mismatch → amber warning.

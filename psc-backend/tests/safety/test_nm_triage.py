@@ -14,6 +14,7 @@ bootstrap_django()
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.safety.models import Incident, IncidentPhaseLog, SafetyFieldHistory
+from apps.safety.serializers.near_miss import NearMissSerializer
 from apps.safety.views.near_miss_triage import NearMissTriageView
 
 
@@ -80,6 +81,7 @@ class NearMissTriageTests(unittest.TestCase):
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.near_miss_priority, "LOW")
         self.assertEqual(self.near_miss.state, "OFFICE_COMMENTS_COMPLETED")
+        self.assertEqual(self.near_miss.office_comment, "PIC reviewed and accepts the report.")
         self.assertEqual(response.data["suggested_priority"], "LOW")
         self.assertEqual(response.data["office_comment"], "PIC reviewed and accepts the report.")
 
@@ -93,6 +95,66 @@ class NearMissTriageTests(unittest.TestCase):
             SafetyFieldHistory.objects.filter(parent_id=self.near_miss.pk).values_list("field_name", flat=True)
         )
         self.assertIn("state", history_fields)
+
+    def test_completed_near_miss_recovers_office_comment_when_later_phase_log_exists(self) -> None:
+        self.near_miss.state = Incident.State.OFFICE_COMMENTS_COMPLETED
+        self.near_miss.office_comment = None
+        self.near_miss.save(update_fields=("state", "office_comment"))
+        IncidentPhaseLog.objects.create(
+            incident=self.near_miss,
+            phase_from=1,
+            phase_to=1,
+            transition_type=IncidentPhaseLog.TransitionType.FORWARD,
+            loop_back_reason="Priority change: LOW -> MEDIUM | Office comment: Office accepted after checking vessel review.",
+            actor_user_id="pic-1",
+            actor_role_code="PIC",
+            schema_version=1,
+        )
+        IncidentPhaseLog.objects.create(
+            incident=self.near_miss,
+            phase_from=1,
+            phase_to=1,
+            transition_type=IncidentPhaseLog.TransitionType.FORWARD,
+            loop_back_reason="Later workflow note without office comment.",
+            actor_user_id="system",
+            actor_role_code="SYSTEM",
+            schema_version=1,
+        )
+
+        data = NearMissSerializer(self.near_miss).data
+
+        self.assertEqual(data["office_comment"], "Office accepted after checking vessel review.")
+
+    def test_completed_near_miss_recovers_full_multiline_office_comment(self) -> None:
+        self.near_miss.state = Incident.State.OFFICE_COMMENTS_COMPLETED
+        self.near_miss.office_comment = None
+        self.near_miss.save(update_fields=("state", "office_comment"))
+        full_comment = (
+            "Office comment: Reviewed the reported near miss and acknowledged that no injury was sustained.\n"
+            "However, this event had potential for serious injury during mooring operations.\n"
+            "The vessel should keep continuous vigilance and strict compliance with safe mooring procedures."
+        )
+        IncidentPhaseLog.objects.create(
+            incident=self.near_miss,
+            phase_from=1,
+            phase_to=1,
+            transition_type=IncidentPhaseLog.TransitionType.FORWARD,
+            loop_back_reason=full_comment,
+            actor_user_id="pic-1",
+            actor_role_code="PIC",
+            schema_version=1,
+        )
+
+        data = NearMissSerializer(self.near_miss).data
+
+        self.assertEqual(
+            data["office_comment"],
+            (
+                "Reviewed the reported near miss and acknowledged that no injury was sustained.\n"
+                "However, this event had potential for serious injury during mooring operations.\n"
+                "The vessel should keep continuous vigilance and strict compliance with safe mooring procedures."
+            ),
+        )
 
     def test_non_office_reviewer_is_rejected_even_with_process_permission(self) -> None:
         request = self.factory.patch(

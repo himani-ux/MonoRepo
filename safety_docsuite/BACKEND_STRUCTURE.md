@@ -1820,11 +1820,12 @@ Paper-first checklist generator (D-SOI-10 revised, D-GAP-E4). Returns the dynami
 - **Response 200:** `application/pdf` or `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` binary. Contains QR or Code128 barcode (deferral #10) encoding `checklist_unique_id` in header.
 - **Idempotency:** subsequent downloads with the same `checklist_unique_id` serve identical content (D-GAP-E1) — supports lost/damaged paper recovery (D-GAP-E3).
 
-#### 9.4.5 `POST /api/safety/soi/{id}/register-finding/`
+#### 9.4.5 `GET|POST /api/safety/soi/{id}/findings/`
 
-Register one finding (D-SOI-06). HIGH severity **must** include a photo attachment (D-GAP-M24 hard-enforced by DB CHECK constraint + serializer).
+List or register SOI findings for one inspection (D-SOI-06). GET is read-only and returns the findings register for users who can view SOI. POST registers one finding. HIGH severity **must** include a photo attachment (D-GAP-M24 hard-enforced by DB CHECK constraint + serializer).
 
-- **Auth:** `SAF_F_012` + `SAF_P_013`.
+- **GET Auth:** `SAF_F_004`.
+- **POST Auth:** `SAF_F_004` + `SAF_P_013` or `SAF_P_002`; role must be the active Safety Officer.
 - **Request body:**
   ```json
   {

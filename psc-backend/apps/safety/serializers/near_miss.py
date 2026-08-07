@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from django.utils import timezone
 from rest_framework import serializers
@@ -38,6 +39,8 @@ LEGACY_SHELL_TAGS = {"Software", "Hardware", "Environment", "Liveware", "Livewar
 NEAR_MISS_OTHER_CATEGORY = "Other"
 NEAR_MISS_OTHER_PREFIX = "Other:"
 NEAR_MISS_OTHER_SPECIFY_MAX_LENGTH = 200
+OFFICE_COMMENT_PREFIX_PATTERN = re.compile(r"^\s*office comments?\s*:\s*", re.IGNORECASE)
+OFFICE_COMMENT_MARKER_PATTERN = re.compile(r"\boffice comments?\s*:\s*", re.IGNORECASE)
 
 NEAR_MISS_PLACES = {
     "AT_ANCHOR",
@@ -75,6 +78,25 @@ class NearMissJsonListField(serializers.ListField):
 
 def _json_dump_list(values: list[object]) -> str:
     return json.dumps(values, separators=(",", ":"))
+
+
+def _extract_office_comment_text(value: object) -> str | None:
+    comment = str(value or "").strip()
+    if not comment:
+        return None
+
+    marker_match = OFFICE_COMMENT_MARKER_PATTERN.search(comment)
+    if marker_match:
+        extracted = comment[marker_match.end():].strip()
+        return extracted or None
+
+    for part in re.split(r"\s*\|\s*|\r?\n", comment):
+        cleaned = part.strip()
+        if not cleaned:
+            continue
+        if OFFICE_COMMENT_PREFIX_PATTERN.match(cleaned):
+            return OFFICE_COMMENT_PREFIX_PATTERN.sub("", cleaned).strip() or None
+    return None
 
 
 class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSerializer):
@@ -214,29 +236,30 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
         if stored_comment:
             return stored_comment
 
-        if obj.state != Incident.State.OFFICE_COMMENTS_COMPLETED:
-            return None
-
-        phase_log = (
+        for phase_log in (
             IncidentPhaseLog.objects.filter(
                 incident=obj,
                 transition_type=IncidentPhaseLog.TransitionType.FORWARD,
             )
             .order_by("-occurred_at", "-id")
-            .first()
-        )
-        if phase_log is None:
-            return None
+        ):
+            extracted = _extract_office_comment_text(phase_log.loop_back_reason)
+            if extracted:
+                return extracted
 
-        comment = str(phase_log.loop_back_reason or "").strip()
-        if not comment:
-            return None
+        for history_row in (
+            SafetyFieldHistory.objects.filter(
+                parent_table=obj._meta.db_table,
+                parent_id=obj.pk,
+                change_reason__isnull=False,
+            )
+            .order_by("-changed_at", "-id")
+        ):
+            extracted = _extract_office_comment_text(history_row.change_reason)
+            if extracted:
+                return extracted
 
-        for part in comment.split("|"):
-            cleaned = part.strip()
-            if cleaned.lower().startswith("office comment:"):
-                return cleaned.split(":", 1)[1].strip() or None
-        return comment
+        return None
 
     def get_evidence_attachments(self, obj: Incident) -> list[dict[str, object]]:
         attachments: list[dict[str, object]] = []
