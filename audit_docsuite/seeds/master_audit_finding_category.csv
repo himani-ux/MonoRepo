@@ -1,0 +1,6 @@
+category_code,display_name,default_target_days
+MAJOR_NC,Major Non-Conformity,90
+MINOR_NC,Minor Non-Conformity,30
+OBSERVATION,Observation,30
+IMPROVEMENT_SUGGESTION,Improvement Suggestion,30
+OFI,Opportunity For Improvement,30

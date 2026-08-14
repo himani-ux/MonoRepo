@@ -1,0 +1,90 @@
+clause_no,clause_text,section_no,code_version
+1,General,1,ISM 2018
+1.1,Definitions,1,ISM 2018
+1.1.1,International Safety Management (ISM) Code means the International Management Code for the Safe Operation of Ships and for Pollution Prevention as adopted by the Assembly.,1,ISM 2018
+1.1.2,"Company means the owner of the ship or any other organization or person such as the manager, or the bareboat charterer, who has assumed responsibility for operation of the ship and agreed to take over all duties and responsibilities imposed by the Code.",1,ISM 2018
+1.1.3,Administration means the Government of the State whose flag the ship is entitled to fly.,1,ISM 2018
+1.1.4,Safety management system means a structured and documented system enabling company personnel to implement effectively the company safety and environmental protection policy.,1,ISM 2018
+1.1.5,Document of Compliance means a document issued to a company which complies with the requirements of this Code.,1,ISM 2018
+1.1.6,Safety Management Certificate means a document issued to a ship which signifies that the company and its shipboard management operate in accordance with the approved safety management system.,1,ISM 2018
+1.1.7,"Objective evidence means quantitative or qualitative information, records or statements of fact pertaining to safety or to the existence and implementation of an SMS element, based on observation, measurement or test and which can be verified.",1,ISM 2018
+1.1.8,Observation means a statement of fact made during a safety management audit and substantiated by objective evidence.,1,ISM 2018
+1.1.9,Non-conformity means an observed situation where objective evidence indicates the non-fulfilment of a specified requirement.,1,ISM 2018
+1.1.10,Major non-conformity means an identifiable deviation that poses a serious threat to the safety of personnel or the ship or a serious risk to the environment that requires immediate corrective action or the lack of effective and systematic implementation of a requirement of this Code.,1,ISM 2018
+1.1.11,Anniversary date means the day and month of each year that corresponds to the date of expiry of the relevant document or certificate.,1,ISM 2018
+1.1.12,"Convention means the International Convention for the Safety of Life at Sea, 1974, as amended.",1,ISM 2018
+1.2,"Objectives — ensure safety at sea, prevention of human injury or loss of life, and avoidance of damage to the environment and to property.",1,ISM 2018
+1.2.1,"The objectives of the Code are to ensure safety at sea, prevention of human injury or loss of life, and avoidance of damage to the environment and to property.",1,ISM 2018
+1.2.2,Safety management objectives of the company should provide for safe practices and a safe working environment; assess all identified risks and establish appropriate safeguards; and continuously improve safety management skills of personnel.,1,ISM 2018
+1.2.3,"The safety management system should ensure compliance with mandatory rules and regulations, and that applicable codes, guidelines and standards are taken into account.",1,ISM 2018
+1.3,Application — the requirements of this Code may be applied to all ships.,1,ISM 2018
+1.4,Functional requirements for a safety management system: a safety and environmental-protection policy; instructions and procedures for safe operation; defined levels of authority and lines of communication; procedures for reporting accidents and non-conformities; procedures to prepare for and respond to emergencies; and procedures for internal audits and management reviews.,1,ISM 2018
+2,Safety and environmental-protection policy,2,ISM 2018
+2.1,The company should establish a safety and environmental-protection policy describing how the objectives in paragraph 1.2 will be achieved.,2,ISM 2018
+2.2,"The company should ensure that the policy is implemented and maintained at all levels of the organization, both ship-based and shore-based.",2,ISM 2018
+3,Company responsibilities and authority,3,ISM 2018
+3.1,"If the entity responsible for the operation of the ship is other than the owner, the owner must report the full name and details of such entity to the Administration.",3,ISM 2018
+3.2,"The company should define and document the responsibility, authority and interrelation of all personnel who manage, perform and verify work relating to and affecting safety and pollution prevention.",3,ISM 2018
+3.3,The company is responsible for ensuring that adequate resources and shore-based support are provided to enable the designated person(s) to carry out their functions.,3,ISM 2018
+4,"Designated person(s) — every company should designate a person or persons ashore having direct access to the highest level of management, with responsibility and authority to monitor the safety and pollution-prevention aspects of the operation of each ship and to ensure adequate resources and shore-based support are applied.",4,ISM 2018
+5,Master's responsibility and authority,5,ISM 2018
+5.1,"The company should clearly define and document the master's responsibility with regard to implementing the policy, motivating the crew, issuing appropriate orders and instructions, verifying that specified requirements are observed, and periodically reviewing the SMS and reporting deficiencies to shore-based management.",5,ISM 2018
+5.2,"The company should ensure the SMS contains a clear statement emphasizing the master's authority, including overriding authority and responsibility to make decisions with respect to safety and pollution prevention and to request the company's assistance as necessary.",5,ISM 2018
+6,Resources and personnel,6,ISM 2018
+6.1,"The company should ensure that the master is properly qualified for command, fully conversant with the company's SMS, and given the necessary support so that the master's duties can be safely performed.",6,ISM 2018
+6.2,"The company should ensure that each ship is manned with qualified, certificated and medically-fit seafarers in accordance with national and international requirements, and appropriately manned to encompass all aspects of maintaining safe operations on board.",6,ISM 2018
+6.3,The company should establish procedures to ensure that new personnel and personnel transferred to new assignments related to safety and protection of the environment are given proper familiarization with their duties.,6,ISM 2018
+6.4,"The company should ensure that all personnel involved in the SMS have an adequate understanding of relevant rules, regulations, codes and guidelines.",6,ISM 2018
+6.5,The company should establish and maintain procedures for identifying any training which may be required in support of the SMS and ensure that such training is provided.,6,ISM 2018
+6.6,The company should establish procedures by which the ship's personnel receive relevant information on the SMS in a working language or languages understood by them.,6,ISM 2018
+6.7,The company should ensure that the ship's personnel are able to communicate effectively in the execution of their duties related to the SMS.,6,ISM 2018
+7,"Shipboard operations — the company should establish procedures, plans and instructions, including checklists as appropriate, for key shipboard operations concerning the safety of personnel, ship and protection of the environment; tasks should be defined and assigned to qualified personnel.",7,ISM 2018
+8,Emergency preparedness,8,ISM 2018
+8.1,"The company should identify potential emergency shipboard situations, and establish procedures to respond to them.",8,ISM 2018
+8.2,The company should establish programmes for drills and exercises to prepare for emergency actions.,8,ISM 2018
+8.3,"The SMS should provide for measures ensuring that the company's organization can respond at any time to hazards, accidents and emergency situations involving its ships.",8,ISM 2018
+9,"Reports and analysis of non-conformities, accidents and hazardous occurrences",9,ISM 2018
+9.1,"The SMS should include procedures ensuring that non-conformities, accidents and hazardous situations are reported to the company, investigated and analysed with the objective of improving safety and pollution prevention.",9,ISM 2018
+9.2,"The company should establish procedures for the implementation of corrective action, including measures intended to prevent recurrence.",9,ISM 2018
+10,Maintenance of the ship and equipment,10,ISM 2018
+10.1,The company should establish procedures to ensure that the ship is maintained in conformity with the relevant rules and regulations and with any additional requirements established by the company.,10,ISM 2018
+10.2,In meeting these requirements the company should ensure that inspections are held at appropriate intervals; any non-conformity is reported with its possible cause; appropriate corrective action is taken; and records of these activities are maintained.,10,ISM 2018
+10.3,"The company should identify equipment and technical systems the sudden operational failure of which may result in hazardous situations, and provide specific measures to promote reliability, including regular testing of stand-by arrangements and equipment not in continuous use.",10,ISM 2018
+10.4,The inspections mentioned in 10.2 and the measures referred to in 10.3 should be integrated into the ship's operational maintenance routine.,10,ISM 2018
+11,Documentation,11,ISM 2018
+11.1,The company should establish and maintain procedures to control all documents and data which are relevant to the SMS.,11,ISM 2018
+11.2,The company should ensure that valid documents are available at all relevant locations; that changes to documents are reviewed and approved by authorized personnel; and that obsolete documents are promptly removed.,11,ISM 2018
+11.3,The documents used to describe and implement the SMS may be referred to as the Safety Management Manual; each ship should carry on board all documentation relevant to that ship.,11,ISM 2018
+12,"Company verification, review and evaluation",12,ISM 2018
+12.1,The company should carry out internal safety audits on board and ashore at intervals not exceeding twelve months to verify whether safety and pollution-prevention activities comply with the SMS; in exceptional circumstances this interval may be exceeded by not more than three months.,12,ISM 2018
+12.2,The company should periodically verify whether all those undertaking delegated ISM-related tasks are acting in conformity with the company's responsibilities under the Code.,12,ISM 2018
+12.3,The company should periodically evaluate the effectiveness of the SMS in accordance with procedures established by the company.,12,ISM 2018
+12.4,The audits and possible corrective actions should be carried out in accordance with documented procedures.,12,ISM 2018
+12.5,Personnel carrying out audits should be independent of the areas being audited unless this is impracticable due to the size and nature of the company.,12,ISM 2018
+12.6,The results of the audits and reviews should be brought to the attention of all personnel having responsibility in the area involved.,12,ISM 2018
+12.7,The management personnel responsible for the area involved should take timely corrective action on deficiencies found.,12,ISM 2018
+13,Certification and periodical verification,13,ISM 2018
+13.1,The ship should be operated by a company issued with a Document of Compliance or Interim Document of Compliance relevant to that ship.,13,ISM 2018
+13.2,The Document of Compliance should be issued for a period not exceeding five years to a company complying with the requirements of this Code.,13,ISM 2018
+13.3,"The Document of Compliance is only valid for the ship types explicitly indicated, based on the types of ships on which the initial verification was based.",13,ISM 2018
+13.4,The validity of a Document of Compliance should be subject to annual verification within three months before or after the anniversary date.,13,ISM 2018
+13.5,The Document of Compliance should be withdrawn when the annual verification is not requested or if there is evidence of major non-conformities with this Code.,13,ISM 2018
+13.5.1,All associated Safety Management Certificates and/or Interim Safety Management Certificates should also be withdrawn if the Document of Compliance is withdrawn.,13,ISM 2018
+13.6,A copy of the Document of Compliance should be placed on board so the master can produce it for verification or control purposes.,13,ISM 2018
+13.7,The Safety Management Certificate should be issued to a ship for a period not exceeding five years after verifying that the company and its shipboard management operate in accordance with the approved SMS.,13,ISM 2018
+13.8,The validity of the Safety Management Certificate should be subject to at least one intermediate verification; if only one is carried out it should take place between the second and third anniversary dates.,13,ISM 2018
+13.9,"In addition to 13.5.1, the Safety Management Certificate should be withdrawn when the intermediate verification is not requested or if there is evidence of major non-conformity with this Code.",13,ISM 2018
+13.10,"When the renewal verification is completed within three months before the expiry date, the new DOC or SMC should be valid from the date of completion of the renewal verification for a period not exceeding five years from the date of expiry of the existing certificate.",13,ISM 2018
+13.11,"When the renewal verification is completed more than three months before the expiry date, the new DOC or SMC should be valid from the date of completion of the renewal verification for a period not exceeding five years from that date.",13,ISM 2018
+13.12,"When the renewal verification is completed after the expiry date, the new SMC should be valid from the date of completion to a date not exceeding five years from the expiry date of the existing certificate.",13,ISM 2018
+13.13,"If a renewal verification has been completed but a new SMC cannot be issued or placed on board before the expiry date, the Administration or RO may endorse the existing certificate as valid for a further period not exceeding five months from the expiry date.",13,ISM 2018
+13.14,"If a ship is not in a port in which it is to be verified when the SMC expires, the Administration may extend the period of validity, but only to allow the ship to complete its voyage, for no longer than three months.",13,ISM 2018
+14,Interim certification,14,ISM 2018
+14.1,"An Interim Document of Compliance may be issued to facilitate initial implementation of this Code when a company is newly established, or new ship types are to be added to an existing DOC; valid for a period not exceeding 12 months.",14,ISM 2018
+14.2,"An Interim Safety Management Certificate may be issued to new ships on delivery, when a company takes on responsibility for a ship new to the company, or when a ship changes flag; valid for a period not exceeding six months.",14,ISM 2018
+14.3,"An Administration may, in special cases, extend the validity of an Interim Safety Management Certificate for a further period not exceeding 6 months from the date of expiry.",14,ISM 2018
+14.4,An Interim Safety Management Certificate may be issued following verification that the DOC is relevant to the ship; the SMS includes key elements of the Code; the company has planned the internal audit within three months; the master and officers are familiar with the SMS; essential instructions are provided prior to sailing; and relevant SMS information is given in an understood working language.,14,ISM 2018
+15,"Verification — all verifications required by this Code should be carried out in accordance with procedures acceptable to the Administration, taking into account the guidelines developed by the Organization.",15,ISM 2018
+16,Forms of certificates,16,ISM 2018
+16.1,"The DOC, SMC, Interim DOC and Interim SMC should be drawn up in a form corresponding to the models given in the appendix to this Code; where the language is neither English nor French a translation into one of these languages should be included.",16,ISM 2018
+16.2,"In addition to 13.3, the ship types indicated on the DOC and Interim DOC may be endorsed to reflect any limitations in the operations of the ships described in the SMS.",16,ISM 2018

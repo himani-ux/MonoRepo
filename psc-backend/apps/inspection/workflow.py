@@ -10,6 +10,8 @@ State machine: 9 statuses, 12 named transitions, role-based permissions.
 import logging
 from typing import Optional
 
+from django.db.models import Q
+
 from .deficiency_models import CARStatus
 
 logger = logging.getLogger(__name__)
@@ -130,6 +132,7 @@ def determine_reviewer(owner_rank_name: Optional[str], vessel_id: str):
 class WorkflowAction:
     """Named workflow actions for the unified CAR state machine."""
     START_WORK = 'START_WORK'
+    DRAFT_FOR_VESSEL = 'DRAFT_FOR_VESSEL'
     MARK_COMPLETED = 'MARK_COMPLETED'
     SUBMIT_FOR_CE_REVIEW = 'SUBMIT_FOR_CE_REVIEW'
     SUBMIT_FOR_MASTER_REVIEW = 'SUBMIT_FOR_MASTER_REVIEW'
@@ -141,11 +144,16 @@ class WorkflowAction:
     CLOSE_CAR = 'CLOSE_CAR'
     REOPEN_CAR = 'REOPEN_CAR'
     REQUEST_REWORK = 'REQUEST_REWORK'
+    SUBMIT_TO_LEAD_AUDITOR = 'SUBMIT_TO_LEAD_AUDITOR'
+    LEAD_AUDITOR_CLOSE = 'LEAD_AUDITOR_CLOSE'
+    AWAIT_EXTERNAL_CLOSE_OUT = 'AWAIT_EXTERNAL_CLOSE_OUT'
+    CONFIRM_EXTERNAL_CLOSE = 'CONFIRM_EXTERNAL_CLOSE'
 
 
 # Human-readable labels for each action
 ACTION_LABELS = {
     WorkflowAction.START_WORK: 'Start Work',
+    WorkflowAction.DRAFT_FOR_VESSEL: 'Draft for Vessel',
     WorkflowAction.MARK_COMPLETED: 'Mark Completed',
     WorkflowAction.SUBMIT_FOR_CE_REVIEW: 'Submit for CE Review',
     WorkflowAction.SUBMIT_FOR_MASTER_REVIEW: 'Submit for Master Review',
@@ -157,6 +165,10 @@ ACTION_LABELS = {
     WorkflowAction.CLOSE_CAR: 'Close CAR',
     WorkflowAction.REOPEN_CAR: 'Reopen CAR',
     WorkflowAction.REQUEST_REWORK: 'Request Rework',
+    WorkflowAction.SUBMIT_TO_LEAD_AUDITOR: 'Submit to Lead Auditor',
+    WorkflowAction.LEAD_AUDITOR_CLOSE: 'Lead Auditor Close',
+    WorkflowAction.AWAIT_EXTERNAL_CLOSE_OUT: 'Await External Close Out',
+    WorkflowAction.CONFIRM_EXTERNAL_CLOSE: 'Confirm External Closure',
 }
 
 
@@ -166,14 +178,43 @@ ACTION_LABELS = {
 
 # Each transition: (current_status, action) -> dict
 # allowed_roles: list of role types that can perform the action
-#   'owner' = assigned crew member, 'reviewer' = CE/reviewer, 'master', 'pic', 'dpa'
+#   'owner' = assigned crew member, 'reviewer' = CE/reviewer, 'master',
+#   'pic', 'dpa', 'lead_auditor'
 # comment_required: whether a comment is mandatory
+AUDIT_INTERNAL_NC_SCOPE = 'audit_internal_nc'
+AUDIT_EXTERNAL_NC_SCOPE = 'audit_external_nc'
+
 TRANSITIONS = {
+    # Vessel-side: owner starts work
+    (CARStatus.DRAFT, WorkflowAction.START_WORK): {
+        'target': CARStatus.IN_PROGRESS,
+        'allowed_roles': ['owner', 'master'],
+        'comment_required': False,
+    },
     # Vessel-side: owner starts work
     (CARStatus.ALLOTTED, WorkflowAction.START_WORK): {
         'target': CARStatus.IN_PROGRESS,
         'allowed_roles': ['owner', 'master'],
         'comment_required': False,
+    },
+    # Audit office-led drafting sub-state
+    (CARStatus.ALLOTTED, WorkflowAction.DRAFT_FOR_VESSEL): {
+        'target': CARStatus.OFFICE_DRAFTED,
+        'allowed_roles': ['pic'],
+        'comment_required': False,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
+    },
+    (CARStatus.DRAFT, WorkflowAction.DRAFT_FOR_VESSEL): {
+        'target': CARStatus.OFFICE_DRAFTED,
+        'allowed_roles': ['pic'],
+        'comment_required': False,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
+    },
+    (CARStatus.IN_PROGRESS, WorkflowAction.DRAFT_FOR_VESSEL): {
+        'target': CARStatus.OFFICE_DRAFTED,
+        'allowed_roles': ['pic'],
+        'comment_required': False,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
     },
     # Owner marks work completed
     (CARStatus.IN_PROGRESS, WorkflowAction.MARK_COMPLETED): {
@@ -199,6 +240,13 @@ TRANSITIONS = {
         'allowed_roles': ['master'],
         'comment_required': False,
     },
+    # Master accepts an office-drafted Audit NC and submits it to the PIC pool.
+    (CARStatus.OFFICE_DRAFTED, WorkflowAction.SUBMIT_TO_PIC): {
+        'target': CARStatus.SUBMITTED_TO_PIC,
+        'allowed_roles': ['master'],
+        'comment_required': False,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
+    },
     # Master returns for rework
     (CARStatus.PENDING_MASTER_REVIEW, WorkflowAction.RETURN_FOR_REWORK): {
         'target': CARStatus.IN_PROGRESS,
@@ -223,6 +271,20 @@ TRANSITIONS = {
         'allowed_roles': ['pic'],
         'comment_required': True,
     },
+    # Internal Audit NC: PIC submits to the Lead Auditor, not the DPA.
+    (CARStatus.PIC_REVIEW, WorkflowAction.SUBMIT_TO_LEAD_AUDITOR): {
+        'target': CARStatus.SUBMITTED_TO_LEAD_AUDITOR,
+        'allowed_roles': ['pic'],
+        'comment_required': True,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
+    },
+    # External Audit NC: PIC waits for the external auditor close-out letter.
+    (CARStatus.PIC_REVIEW, WorkflowAction.AWAIT_EXTERNAL_CLOSE_OUT): {
+        'target': CARStatus.AWAITING_EXTERNAL_CLOSE_OUT,
+        'allowed_roles': ['pic'],
+        'comment_required': True,
+        'audit_scope': AUDIT_EXTERNAL_NC_SCOPE,
+    },
     # PIC requests rework from PIC_REVIEW
     (CARStatus.PIC_REVIEW, WorkflowAction.REQUEST_REWORK): {
         'target': CARStatus.PENDING_MASTER_REVIEW,
@@ -234,6 +296,32 @@ TRANSITIONS = {
         'target': CARStatus.CLOSED,
         'allowed_roles': ['dpa'],
         'comment_required': True,
+    },
+    # Internal Audit NC terminal state is held by the Lead Auditor of record.
+    (CARStatus.SUBMITTED_TO_LEAD_AUDITOR, WorkflowAction.LEAD_AUDITOR_CLOSE): {
+        'target': CARStatus.LEAD_AUDITOR_CLOSED,
+        'allowed_roles': ['lead_auditor'],
+        'comment_required': True,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
+    },
+    (CARStatus.SUBMITTED_TO_LEAD_AUDITOR, WorkflowAction.REQUEST_REWORK): {
+        'target': CARStatus.PENDING_MASTER_REVIEW,
+        'allowed_roles': ['lead_auditor'],
+        'comment_required': True,
+        'audit_scope': AUDIT_INTERNAL_NC_SCOPE,
+    },
+    # External Audit NC terminal state is DPA confirmation after close-out letter.
+    (CARStatus.AWAITING_EXTERNAL_CLOSE_OUT, WorkflowAction.CONFIRM_EXTERNAL_CLOSE): {
+        'target': CARStatus.EXTERNAL_AUDITOR_CLOSED,
+        'allowed_roles': ['dpa'],
+        'comment_required': True,
+        'audit_scope': AUDIT_EXTERNAL_NC_SCOPE,
+    },
+    (CARStatus.AWAITING_EXTERNAL_CLOSE_OUT, WorkflowAction.REQUEST_REWORK): {
+        'target': CARStatus.PENDING_MASTER_REVIEW,
+        'allowed_roles': ['dpa'],
+        'comment_required': True,
+        'audit_scope': AUDIT_EXTERNAL_NC_SCOPE,
     },
     # DPA requests rework from SUBMITTED_TO_DPA
     (CARStatus.SUBMITTED_TO_DPA, WorkflowAction.REQUEST_REWORK): {
@@ -251,6 +339,172 @@ TRANSITIONS = {
 
 
 # ============================================================================
+# Audit Context
+# ============================================================================
+
+def _compact_uuid_text(value) -> str:
+    """Return UUID-like values in 32-character form for loose legacy refs."""
+    if value is None:
+        return ''
+    return str(value).strip().replace('-', '').lower()
+
+
+def _get_audit_workflow_context(deficiency):
+    """Return (finding, audit_detail) for an Audit CAR, or None for PSC rows."""
+    if not deficiency:
+        return None
+
+    inspection = getattr(deficiency, 'inspection', None)
+    if getattr(inspection, 'inspection_type', None) != 'AUDIT':
+        return None
+
+    try:
+        from apps.inspection.audit.models import AuditDetail, AuditFinding
+
+        finding = AuditFinding.all_objects.filter(
+            psc_deficiency_id=_compact_uuid_text(deficiency.id),
+            is_deleted=False,
+        ).first()
+        if not finding:
+            return None
+
+        audit_detail = AuditDetail.objects.filter(id=finding.audit_detail_id).first()
+        if not audit_detail:
+            return None
+        return finding, audit_detail
+    except Exception:
+        logger.exception(
+            "Failed to resolve Audit workflow context",
+            extra={'deficiency_id': str(getattr(deficiency, 'id', ''))},
+        )
+        return None
+
+
+def _audit_scope_for_context(audit_context):
+    if not audit_context:
+        return None
+    finding, audit_detail = audit_context
+    if finding.finding_type != 'NC':
+        return 'audit_non_nc'
+    if finding.is_external or audit_detail.audit_classification == 'EXTERNAL':
+        return AUDIT_EXTERNAL_NC_SCOPE
+    return AUDIT_INTERNAL_NC_SCOPE
+
+
+def _transition_scope_error(car, action, transition, audit_context):
+    """Prevent Audit NCs from falling through to PSC terminal transitions."""
+    audit_scope = _audit_scope_for_context(audit_context)
+    required_scope = transition.get('audit_scope')
+
+    if required_scope and audit_scope != required_scope:
+        if audit_scope == 'audit_non_nc':
+            return 'Audit CAR workflow transitions are only valid for NC findings; Observations use their own closure state.'
+        return f'Action "{action}" is not valid for this Audit finding.'
+
+    if audit_scope in (AUDIT_INTERNAL_NC_SCOPE, AUDIT_EXTERNAL_NC_SCOPE):
+        if action == WorkflowAction.SUBMIT_TO_DPA and car.status == CARStatus.PIC_REVIEW:
+            return 'Audit NCs do not use the PSC SUBMITTED_TO_DPA path.'
+        if action == WorkflowAction.CLOSE_CAR and car.status == CARStatus.SUBMITTED_TO_DPA:
+            return 'Audit NCs do not use the PSC CLOSED terminal state.'
+
+    return None
+
+
+def _has_audit_signature(finding, *event_types):
+    try:
+        from apps.inspection.audit.models import AuditFindingSignature
+
+        return AuditFindingSignature.objects.filter(
+            audit_finding_id=finding.id,
+            signature_event_type__in=event_types,
+            signed_at__isnull=False,
+        ).exists()
+    except Exception:
+        logger.exception(
+            "Failed to check Audit finding signature",
+            extra={'finding_id': str(getattr(finding, 'id', ''))},
+        )
+        return False
+
+
+def _get_nc_record(finding):
+    try:
+        from apps.inspection.audit.models import AuditFindingNC
+
+        return AuditFindingNC.objects.filter(audit_finding_id=finding.id).first()
+    except Exception:
+        logger.exception(
+            "Failed to resolve Audit NC record",
+            extra={'finding_id': str(getattr(finding, 'id', ''))},
+        )
+        return None
+
+
+def _has_external_close_out_letter(finding, audit_detail):
+    try:
+        from apps.inspection.audit.models import AuditAttachment
+
+        return AuditAttachment.objects.filter(
+            audit_detail_id=audit_detail.id,
+            category='EXTERNAL_CLOSE_OUT_LETTER',
+            is_deleted=False,
+        ).filter(
+            Q(audit_finding_id=finding.id) | Q(audit_finding_id__isnull=True)
+        ).exists()
+    except Exception:
+        logger.exception(
+            "Failed to check external close-out letter",
+            extra={'finding_id': str(getattr(finding, 'id', ''))},
+        )
+        return False
+
+
+def _audit_gate_error(car, action, transition, audit_context):
+    """Audit-specific signature/attachment gates enforced inside the shared engine."""
+    if not audit_context:
+        return None
+
+    finding, audit_detail = audit_context
+    audit_scope = _audit_scope_for_context(audit_context)
+    if audit_scope == 'audit_non_nc':
+        return 'Audit CAR workflow transitions are only valid for NC findings; Observations use their own closure state.'
+
+    nc_record = _get_nc_record(finding)
+
+    if (
+        audit_scope == AUDIT_INTERNAL_NC_SCOPE
+        and action in (WorkflowAction.MARK_COMPLETED, WorkflowAction.SUBMIT_TO_PIC)
+        and car.status in (CARStatus.IN_PROGRESS, CARStatus.OFFICE_DRAFTED)
+    ):
+        has_master_signature = (
+            bool(getattr(nc_record, 'master_immediate_sign_at', None))
+            or _has_audit_signature(finding, 'MASTER_ACK')
+        )
+        if not has_master_signature:
+            return 'Signature missing for Part B/C.'
+
+    if audit_scope == AUDIT_INTERNAL_NC_SCOPE and action == WorkflowAction.SUBMIT_TO_LEAD_AUDITOR:
+        if not _has_audit_signature(finding, 'SUPT_SIGN'):
+            return 'Signature missing for Part C/D.'
+
+    if audit_scope == AUDIT_INTERNAL_NC_SCOPE and action == WorkflowAction.LEAD_AUDITOR_CLOSE:
+        has_acceptance_signature = (
+            bool(getattr(nc_record, 'acceptance_signer_at', None))
+            or _has_audit_signature(finding, 'LEAD_AUDITOR_CLOSE')
+        )
+        if not has_acceptance_signature:
+            return 'Signature missing for Part F.'
+        if getattr(nc_record, 'acceptance_decision', None) and nc_record.acceptance_decision != 'ACCEPTED':
+            return 'Part F must be ACCEPTED before Lead Auditor closure.'
+
+    if audit_scope == AUDIT_EXTERNAL_NC_SCOPE and action == WorkflowAction.CONFIRM_EXTERNAL_CLOSE:
+        if not _has_external_close_out_letter(finding, audit_detail):
+            return 'External close-out letter is required before external closure.'
+
+    return None
+
+
+# ============================================================================
 # Role Resolution
 # ============================================================================
 
@@ -264,6 +518,20 @@ def _get_user_workflow_roles(user, deficiency=None):
 
     roles = set()
     user_type = getattr(user, 'user_type', '')
+    user_id = getattr(user, 'id', None)
+
+    audit_context = _get_audit_workflow_context(deficiency)
+    if audit_context:
+        _finding, audit_detail = audit_context
+        lead_auditor_user_id = audit_detail.lead_auditor_user_id
+        if (
+            lead_auditor_user_id
+            and (
+                str(user_id) == str(lead_auditor_user_id)
+                or _uuid_match(user_id, lead_auditor_user_id)
+            )
+        ):
+            roles.add('lead_auditor')
 
     if user_type == 'OFFICE':
         role = getattr(user, 'role', '')
@@ -276,7 +544,6 @@ def _get_user_workflow_roles(user, deficiency=None):
     # Vessel user
     rank_cat = classify_rank(getattr(user, 'rank', None))
     user_crew_id = getattr(user, 'crew_id', None)
-    user_id = getattr(user, 'id', None)
 
     if rank_cat == RANK_MASTER:
         roles.add('master')
@@ -339,8 +606,24 @@ def validate_workflow_transition(car, action, user, comment=None):
     if transition['comment_required'] and not (comment and comment.strip()):
         return None, f'A comment is required for the "{ACTION_LABELS.get(action, action)}" action.'
 
-    # Resolve user roles
     deficiency = getattr(car, 'deficiency', None)
+    audit_inspection = (
+        deficiency is not None
+        and getattr(getattr(deficiency, 'inspection', None), 'inspection_type', None) == 'AUDIT'
+    )
+    audit_context = _get_audit_workflow_context(deficiency)
+    if audit_inspection and not audit_context:
+        return None, 'Audit CAR workflow requires an audit_finding extension row.'
+
+    scope_error = _transition_scope_error(car, action, transition, audit_context)
+    if scope_error:
+        return None, scope_error
+
+    gate_error = _audit_gate_error(car, action, transition, audit_context)
+    if gate_error:
+        return None, gate_error
+
+    # Resolve user roles
     user_roles = _get_user_workflow_roles(user, deficiency)
 
     # Check if user has at least one allowed role
@@ -369,11 +652,14 @@ def get_available_actions(car, user):
     Returns list of dicts: [{action, label, comment_required}, ...]
     """
     deficiency = getattr(car, 'deficiency', None)
+    audit_context = _get_audit_workflow_context(deficiency)
     user_roles = _get_user_workflow_roles(user, deficiency)
 
     available = []
     for (status, action), transition in TRANSITIONS.items():
         if status != car.status:
+            continue
+        if _transition_scope_error(car, action, transition, audit_context):
             continue
         allowed = set(transition['allowed_roles'])
         if user_roles & allowed:
@@ -391,7 +677,7 @@ def auto_start_if_allotted(car):
     Auto-transition ALLOTTED -> IN_PROGRESS when CAR content is edited.
     Returns True if transition happened.
     """
-    if car.status == CARStatus.ALLOTTED:
+    if car.status in (CARStatus.DRAFT, CARStatus.ALLOTTED):
         car.status = CARStatus.IN_PROGRESS
         car.save(update_fields=['status'])
         return True

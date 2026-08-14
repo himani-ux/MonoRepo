@@ -39,7 +39,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useUnreadCount } from '@/hooks/use-notifications';
 import { getCertsHomeRoute } from '@/lib/certs/navigation';
 import { ROUTES } from '@/lib/utils/constants';
-import { FORM_IDS } from '@/lib/utils/permission-ids';
+import { FORM_IDS, PROCESS_IDS } from '@/lib/utils/permission-ids';
 import { Button } from '@/components/ui/button';
 
 export interface SidebarProps {
@@ -63,6 +63,12 @@ interface SafetyNavItem {
   href: string;
   label: string;
   icon: typeof Ship;
+}
+
+interface AuditNavItem {
+  href: string;
+  label: string;
+  processIds: string[];
 }
 
 const navItems: NavItem[] = [
@@ -136,6 +142,38 @@ const safetyNavItems: SafetyNavItem[] = [
   { formId: 'SAF_F_020', href: '/safety/admin/auditor-export', label: 'Auditor Export', icon: FileBarChart2 },
 ];
 
+const auditNavItems: AuditNavItem[] = [
+  {
+    href: '/audit/plans',
+    label: 'Audit Plans',
+    processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_EDIT, PROCESS_IDS.AUDIT_CONDUCT],
+  },
+  {
+    href: ROUTES.INSPECTION_NEW,
+    label: 'Register Audit',
+    processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_CONDUCT],
+  },
+  {
+    href: '/audit/external/new',
+    label: 'External Audit',
+    processIds: [PROCESS_IDS.AUDIT_REGISTER_EXTERNAL],
+  },
+  {
+    href: '/dpa/notifications/failed',
+    label: 'Failed Notifications',
+    processIds: [
+      PROCESS_IDS.AUDIT_CREATE,
+      PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
+      PROCESS_IDS.AUDIT_CANCEL_PLAN,
+    ],
+  },
+  {
+    href: '/dpa/scan-validation-queue',
+    label: 'Scan Validation Queue',
+    processIds: [PROCESS_IDS.AUDIT_SCAN_VALIDATION],
+  },
+];
+
 const certsFormIds = [
   FORM_IDS.CERTS_CATALOG,
   FORM_IDS.CERTS_TRACKED_ITEMS,
@@ -173,7 +211,7 @@ function chevronClass(active: boolean) {
 
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
-  const { hasForm, user, isVessel, vesselId } = useAuth();
+  const { hasForm, hasProcess, user, isVessel, vesselId } = useAuth();
   const { data: unreadCount = 0 } = useUnreadCount();
 
   // Filter nav items based on user role
@@ -206,12 +244,22 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       .filter((item): item is NavItem => Boolean(item)),
     ...filteredNavItems.filter((item) => !pscPriorityOrder.includes(item.href as (typeof pscPriorityOrder)[number])),
   ];
+  const visibleAuditItems = auditNavItems.filter((item) => (
+    item.processIds.some((processId) => hasProcess(processId))
+  ));
   const visibleSafetyItems = safetyNavItems.filter((item) => hasForm(item.formId));
 
   const hasActivePscItem = orderedNavItems.some((item) => isActive(item.href));
+  const hasAuditAccess = visibleAuditItems.length > 0;
+  const hasActiveAuditItem = (
+    location.pathname.startsWith('/audit') ||
+    location.pathname === ROUTES.INSPECTION_NEW ||
+    location.pathname === '/dpa/notifications/failed' ||
+    location.pathname === '/dpa/scan-validation-queue'
+  );
   const hasSafetyAccess = visibleSafetyItems.length > 0;
   const hasActiveSafetyItem = location.pathname.startsWith('/safety');
-  const hasActiveInspectionItem = hasActivePscItem || hasActiveSafetyItem;
+  const hasActiveInspectionItem = hasActivePscItem || hasActiveAuditItem || hasActiveSafetyItem;
   const hasCertsAccess = certsFormIds.some((formId) => hasForm(formId));
   const certsHref = getCertsHomeRoute({ user, vesselId, hasForm });
   const legacyModuleItems = [
@@ -236,13 +284,15 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   ].filter((item) => item.visible);
   const [inspectionOpen, setInspectionOpen] = useState(hasActiveInspectionItem);
   const [pscOpen, setPscOpen] = useState(hasActivePscItem);
+  const [auditOpen, setAuditOpen] = useState(hasActiveAuditItem);
   const [safetyOpen, setSafetyOpen] = useState(hasActiveSafetyItem);
 
   useEffect(() => {
     setInspectionOpen(hasActiveInspectionItem);
     setPscOpen(hasActivePscItem);
+    setAuditOpen(hasActiveAuditItem);
     setSafetyOpen(hasActiveSafetyItem);
-  }, [hasActiveInspectionItem, hasActivePscItem, hasActiveSafetyItem]);
+  }, [hasActiveAuditItem, hasActiveInspectionItem, hasActivePscItem, hasActiveSafetyItem]);
 
   const handleInspectionToggle = () => {
     setInspectionOpen((open) => {
@@ -365,6 +415,50 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                       </ul>
                     )}
                   </li>
+
+                  {hasAuditAccess && (
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => setAuditOpen((open) => !open)}
+                        aria-expanded={auditOpen}
+                        className={navItemClass(hasActiveAuditItem || auditOpen)}
+                      >
+                        <ClipboardList
+                          aria-hidden="true"
+                          className={navIconClass(hasActiveAuditItem || auditOpen)}
+                        />
+                        <span className="min-w-max flex-1 text-left">Audit</span>
+                        {auditOpen ? (
+                          <ChevronDown className={chevronClass(hasActiveAuditItem || auditOpen)} />
+                        ) : (
+                          <ChevronRight className={chevronClass(hasActiveAuditItem || auditOpen)} />
+                        )}
+                      </button>
+                      {auditOpen ? (
+                        <ul className={cn(nestedListClass, 'ml-4')}>
+                          {visibleAuditItems.map((item) => {
+                            const active = location.pathname === item.href ||
+                              (item.href === '/audit/plans' && location.pathname.startsWith('/audit/plans')) ||
+                              (item.href === '/audit/external/new' && location.pathname.startsWith('/audit/external')) ||
+                              (item.href === ROUTES.INSPECTION_NEW && location.pathname === ROUTES.INSPECTION_NEW);
+
+                            return (
+                              <li key={`${item.href}-${item.label}`}>
+                                <NavLink
+                                  to={item.href}
+                                  onClick={onClose}
+                                  className={navItemClass(active)}
+                                >
+                                  <span className="min-w-max flex-1 text-left">{item.label}</span>
+                                </NavLink>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
+                    </li>
+                  )}
 
                   {hasSafetyAccess && (
                     <li>

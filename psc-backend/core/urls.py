@@ -87,6 +87,9 @@ urlpatterns = [
     # POST /api/psc/cars/{car_id}/physical-verification/
     path('api/psc/cars/', include('apps.car.urls', namespace='car')),
 
+    # Audit module endpoints
+    path('api/audit/', include('apps.inspection.audit.urls', namespace='audit')),
+
     # Evidence endpoints (separate from CAR)
     # DELETE /api/psc/evidence/{id}/
     path('api/psc/evidence/', include('apps.car.urls_evidence', namespace='evidence')),

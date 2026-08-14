@@ -1,0 +1,7 @@
+checklist_code,name,auditee_type,scope_dept,ship_type_scope,source_form_ref,code_version,is_active
+F605,Vessel Internal Audit Checklist,VESSEL,,Common,F 605,SSQE Rev 01 Feb 2026,1
+F604,Manning Office Audit Checklist,MANNING_AGENT,,,F 604,SSQE Rev 01 Feb 2026,1
+F606_CREW,Office Internal Audit Checklist - CREW Department,OFFICE_DEPT,CREW,,F 606,SSQE Rev 01 Feb 2026,1
+F606_TECH,Office Internal Audit Checklist - TECH Department,OFFICE_DEPT,TECH,,F 606,SSQE Rev 01 Feb 2026,1
+F606_OPS,Office Internal Audit Checklist - OPS Department,OFFICE_DEPT,OPS,,F 606,SSQE Rev 01 Feb 2026,1
+F606_SQA,Office Internal Audit Checklist - SQA Department,OFFICE_DEPT,SQA,,F 606,SSQE Rev 01 Feb 2026,1

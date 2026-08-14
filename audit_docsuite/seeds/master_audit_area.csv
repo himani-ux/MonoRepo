@@ -1,0 +1,15 @@
+area_code,display_name,is_vessel_only,sequence_no
+NAV,Navigation Procedures,1,1
+SAFETY_EQUIP,Safety Equipment & Procedures,1,2
+EMERGENCY_PREP,Emergency Preparedness,0,3
+CARGO,Cargo,1,4
+MOORING,Mooring / Anchoring,1,5
+NC_HANDLING,Non-Conformity Handling,0,6
+PMS,Planned Maintenance System,1,7
+TRAINING,Training,0,8
+SMS_IMPL,SMS Implementation,0,9
+CERT_DOC,Certificate & Document Control,0,10
+ENV_MGMT,Environment Management,0,11
+SECURITY,Security,0,12
+MLC_IMPL,MLC Implementation,1,13
+STRUCTURED_TRAINING,Structured Training,0,14

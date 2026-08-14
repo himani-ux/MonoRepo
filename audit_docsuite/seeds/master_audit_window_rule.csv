@@ -1,0 +1,10 @@
+standard_code,subtype_code,window_open_offset_months,window_close_offset_months,cadence_months,regulatory_citation,is_active
+ISM,SMC_INTERMEDIATE,-3,3,30,ISM Code 13.5 / SOLAS IX,1
+ISM,SMC_RENEWAL,-3,3,60,ISM Code 13.4 / SOLAS IX,1
+ISM,DOC_ANNUAL,-3,3,12,ISM Code 13.5,1
+ISM,DOC_RENEWAL,-3,3,60,ISM Code 13.4,1
+ISPS,ISPS_INTERMEDIATE,-3,3,30,ISPS Code Part A 19.1 / SOLAS XI-2,1
+ISPS,ISPS_RENEWAL,-3,3,60,ISPS Code Part A 19.3 / SOLAS XI-2,1
+MLC,MLC_INTERMEDIATE,-3,3,30,MLC 2006 Standard A5.1.3,1
+MLC,MLC_RENEWAL,-3,3,60,MLC 2006 Standard A5.1.3,1
+ISM,ANNUAL_INTERNAL,8,12,12,SSQE Manual Rev 01 Feb 2026 §10.3.2 (vessel internal audit interval),1

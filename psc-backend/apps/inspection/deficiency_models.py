@@ -27,19 +27,24 @@ class DefStatus(models.TextChoices):
 
 class CARStatus(models.TextChoices):
     """Unified CAR workflow status covering vessel + office lifecycle."""
+    DRAFT = 'DRAFT', 'Draft'
     ALLOTTED = 'ALLOTTED', 'Allotted'
     IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+    OFFICE_DRAFTED = 'OFFICE_DRAFTED', 'Office Drafted'
     PENDING_CE_REVIEW = 'PENDING_CE_REVIEW', 'Pending CE Review'
     PENDING_MASTER_REVIEW = 'PENDING_MASTER_REVIEW', 'Pending Master Review'
     SUBMITTED_TO_PIC = 'SUBMITTED_TO_PIC', 'Submitted to PIC'
     PIC_REVIEW = 'PIC_REVIEW', 'PIC Review'
+    SUBMITTED_TO_LEAD_AUDITOR = 'SUBMITTED_TO_LEAD_AUDITOR', 'Submitted to Lead Auditor'
+    LEAD_AUDITOR_CLOSED = 'LEAD_AUDITOR_CLOSED', 'Lead Auditor Closed'
+    AWAITING_EXTERNAL_CLOSE_OUT = 'AWAITING_EXTERNAL_CLOSE_OUT', 'Awaiting External Close Out'
+    EXTERNAL_AUDITOR_CLOSED = 'EXTERNAL_AUDITOR_CLOSED', 'External Auditor Closed'
     SUBMITTED_TO_DPA = 'SUBMITTED_TO_DPA', 'Submitted to DPA'
     CLOSED = 'CLOSED', 'Closed'
     RETURNED_FOR_REWORK = 'RETURNED_FOR_REWORK', 'Returned for Rework'
 
 
 # Backward-compat aliases for legacy code/tests that still reference old states.
-CARStatus.DRAFT = CARStatus.ALLOTTED
 CARStatus.SUBMITTED = CARStatus.SUBMITTED_TO_PIC
 # Legacy alias for backward compatibility only; do not use for permissions/workflow.
 CARStatus.PIC_ACCEPTED = CARStatus.PIC_REVIEW

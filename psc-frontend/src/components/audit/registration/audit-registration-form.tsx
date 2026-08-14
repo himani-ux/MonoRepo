@@ -1,0 +1,399 @@
+import { type FC } from 'react';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
+import {
+  AUDIT_STANDARDS,
+  AUDIT_TEAM_ROLES,
+  OFFICE_DEPARTMENTS,
+  auditRegistrationDefaults,
+  auditRegistrationSchema,
+  type AuditRegistrationFormData,
+} from '@/schemas/audit/registration';
+import { Button, Checkbox, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@/components/ui';
+import { cn } from '@/lib/utils';
+
+export interface AuditVesselOption {
+  id: string;
+  label: string;
+}
+
+export interface AuditRegistrationFormProps {
+  onSubmit: (data: AuditRegistrationFormData) => void;
+  onCancel: () => void;
+  isSubmitting?: boolean;
+  vesselOptions?: AuditVesselOption[];
+  defaultVesselId?: string | null;
+  defaultLeadAuditorName?: string;
+}
+
+const sectionTitleClass = 'text-lg font-semibold text-neutral-900';
+const gridClass = 'grid gap-4 md:grid-cols-2';
+
+export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
+  onSubmit,
+  onCancel,
+  isSubmitting = false,
+  vesselOptions = [],
+  defaultVesselId,
+  defaultLeadAuditorName,
+}) => {
+  const {
+    control,
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<AuditRegistrationFormData>({
+    resolver: zodResolver(auditRegistrationSchema),
+    defaultValues: {
+      ...auditRegistrationDefaults,
+      vessel_id: defaultVesselId || vesselOptions[0]?.id || '',
+      lead_auditor_name: defaultLeadAuditorName || '',
+      inspector_name: defaultLeadAuditorName || '',
+    },
+  });
+
+  const team = useFieldArray({ control, name: 'team_members' });
+  const attendees = useFieldArray({ control, name: 'attendees' });
+  const schedule = useFieldArray({ control, name: 'schedule_blocks' });
+  const auditeeType = watch('auditee_type');
+  const standards = watch('standards');
+
+  const toggleStandard = (standard: (typeof AUDIT_STANDARDS)[number], checked: boolean) => {
+    const next = checked
+      ? Array.from(new Set([...standards, standard]))
+      : standards.filter((value) => value !== standard);
+    setValue('standards', next, { shouldValidate: true });
+  };
+
+  return (
+    <form className="space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <section className="space-y-4">
+        <h2 className={sectionTitleClass}>Common Header</h2>
+        <div className={gridClass}>
+          <div className="space-y-2">
+            <Label htmlFor="vessel_id">Vessel <span className="text-error-500">*</span></Label>
+            {vesselOptions.length > 0 ? (
+              <Controller
+                control={control}
+                name="vessel_id"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
+                    <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
+                      <SelectValue placeholder="Select vessel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vesselOptions.map((vessel) => (
+                        <SelectItem key={vessel.id} value={vessel.id}>
+                          {vessel.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            ) : (
+              <Input
+                id="vessel_id"
+                placeholder="Vessel UUID"
+                disabled={isSubmitting}
+                {...register('vessel_id')}
+                className={cn(errors.vessel_id && 'border-error-500')}
+              />
+            )}
+            {errors.vessel_id && <p className="text-sm text-error-500">{errors.vessel_id.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="inspection_date">Inspection Date <span className="text-error-500">*</span></Label>
+            <Input id="inspection_date" type="date" disabled={isSubmitting} {...register('inspection_date')} />
+            {errors.inspection_date && <p className="text-sm text-error-500">{errors.inspection_date.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="port_place">Port/Place <span className="text-error-500">*</span></Label>
+            <Input id="port_place" disabled={isSubmitting} {...register('port_place')} />
+            {errors.port_place && <p className="text-sm text-error-500">{errors.port_place.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Input id="country" disabled={isSubmitting} {...register('country')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="inspector_name">Inspector Name</Label>
+            <Input id="inspector_name" disabled={isSubmitting} {...register('inspector_name')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="report_reference">Report Reference</Label>
+            <Input id="report_reference" disabled={isSubmitting} {...register('report_reference')} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className={sectionTitleClass}>Audit Classification</h2>
+        <div className={gridClass}>
+          <div className="space-y-2">
+            <Label>Classification</Label>
+            <Input value="Internal" disabled readOnly />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Subtype</Label>
+            <Input value="Annual Internal" disabled readOnly />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="auditee_type">Auditee Type <span className="text-error-500">*</span></Label>
+            <Controller
+              control={control}
+              name="auditee_type"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
+                  <SelectTrigger id="auditee_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VESSEL">Vessel</SelectItem>
+                    <SelectItem value="OFFICE_DEPT">Office Department</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          {auditeeType === 'OFFICE_DEPT' && (
+            <div className="space-y-2">
+              <Label htmlFor="auditee_office_dept">Office Department <span className="text-error-500">*</span></Label>
+              <Controller
+                control={control}
+                name="auditee_office_dept"
+                render={({ field }) => (
+                  <Select value={field.value || ''} onValueChange={field.onChange} disabled={isSubmitting}>
+                    <SelectTrigger id="auditee_office_dept" error={!!errors.auditee_office_dept}>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OFFICE_DEPARTMENTS.map((department) => (
+                        <SelectItem key={department} value={department}>
+                          {department}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.auditee_office_dept && <p className="text-sm text-error-500">{errors.auditee_office_dept.message}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Harmonised Standards <span className="text-error-500">*</span></Label>
+          <div className="grid gap-3 sm:grid-cols-4">
+            {AUDIT_STANDARDS.map((standard) => (
+              <label key={standard} className="flex items-center gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm text-neutral-700">
+                <Checkbox
+                  checked={standards.includes(standard)}
+                  onCheckedChange={(checked) => toggleStandard(standard, Boolean(checked))}
+                  disabled={isSubmitting}
+                />
+                {standard}
+              </label>
+            ))}
+          </div>
+          {errors.standards && <p className="text-sm text-error-500">{errors.standards.message}</p>}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className={sectionTitleClass}>Lead Auditor</h2>
+        <div className={gridClass}>
+          <div className="space-y-2">
+            <Label htmlFor="lead_auditor_name">Name <span className="text-error-500">*</span></Label>
+            <Input id="lead_auditor_name" disabled={isSubmitting} {...register('lead_auditor_name')} />
+            {errors.lead_auditor_name && <p className="text-sm text-error-500">{errors.lead_auditor_name.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lead_auditor_designation">Designation</Label>
+            <Input id="lead_auditor_designation" disabled={isSubmitting} {...register('lead_auditor_designation')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lead_auditor_company">Company <span className="text-error-500">*</span></Label>
+            <Input id="lead_auditor_company" disabled={isSubmitting} {...register('lead_auditor_company')} />
+            {errors.lead_auditor_company && <p className="text-sm text-error-500">{errors.lead_auditor_company.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lead_auditor_qual">Qualification</Label>
+            <Input id="lead_auditor_qual" disabled={isSubmitting} {...register('lead_auditor_qual')} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={sectionTitleClass}>Audit Team</h2>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => team.append({ member_name: '', member_designation: '', member_company: 'KSM', member_role: 'CO_AUDITOR' })}
+            disabled={isSubmitting}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {team.fields.map((field, index) => (
+            <div key={field.id} className="grid gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[1fr_1fr_1fr_180px_auto]">
+              <Input aria-label="Team member name" placeholder="Name" disabled={isSubmitting} {...register(`team_members.${index}.member_name`)} />
+              <Input aria-label="Team designation" placeholder="Designation" disabled={isSubmitting} {...register(`team_members.${index}.member_designation`)} />
+              <Input aria-label="Team company" placeholder="Company" disabled={isSubmitting} {...register(`team_members.${index}.member_company`)} />
+              <Controller
+                control={control}
+                name={`team_members.${index}.member_role`}
+                render={({ field: roleField }) => (
+                  <Select value={roleField.value || ''} onValueChange={roleField.onChange} disabled={isSubmitting}>
+                    <SelectTrigger aria-label="Team role">
+                      <SelectValue placeholder="Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AUDIT_TEAM_ROLES.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <Button type="button" variant="outline" onClick={() => team.remove(index)} disabled={isSubmitting} aria-label="Remove team member">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={sectionTitleClass}>Personnel Present</h2>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => attendees.append({ attendee_name: '', attendee_rank: '', opening_present: true, closing_present: false })}
+            disabled={isSubmitting}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {attendees.fields.map((field, index) => (
+            <div key={field.id} className="grid gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[1fr_1fr_160px_160px_auto]">
+              <Input aria-label="Attendee name" placeholder="Name" disabled={isSubmitting} {...register(`attendees.${index}.attendee_name`)} />
+              <Input aria-label="Attendee rank" placeholder="Rank" disabled={isSubmitting} {...register(`attendees.${index}.attendee_rank`)} />
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <Controller control={control} name={`attendees.${index}.opening_present`} render={({ field: presentField }) => (
+                  <Checkbox checked={presentField.value} onCheckedChange={presentField.onChange} disabled={isSubmitting} />
+                )} />
+                Opening
+              </label>
+              <label className="flex items-center gap-2 text-sm text-neutral-700">
+                <Controller control={control} name={`attendees.${index}.closing_present`} render={({ field: presentField }) => (
+                  <Checkbox checked={presentField.value} onCheckedChange={presentField.onChange} disabled={isSubmitting} />
+                )} />
+                Closing
+              </label>
+              <Button type="button" variant="outline" onClick={() => attendees.remove(index)} disabled={isSubmitting} aria-label="Remove attendee">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className={sectionTitleClass}>Audit Dates & Scope</h2>
+        <div className={gridClass}>
+          <div className="space-y-2">
+            <Label htmlFor="audit_start_date">Audit Start <span className="text-error-500">*</span></Label>
+            <Input id="audit_start_date" type="date" disabled={isSubmitting} {...register('audit_start_date')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="audit_end_date">Audit End</Label>
+            <Input id="audit_end_date" type="date" disabled={isSubmitting} {...register('audit_end_date')} />
+            {errors.audit_end_date && <p className="text-sm text-error-500">{errors.audit_end_date.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="opening_meeting_at">Opening Meeting</Label>
+            <Input id="opening_meeting_at" type="datetime-local" disabled={isSubmitting} {...register('opening_meeting_at')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="closing_meeting_at">Closing Meeting</Label>
+            <Input id="closing_meeting_at" type="datetime-local" disabled={isSubmitting} {...register('closing_meeting_at')} />
+          </div>
+        </div>
+        <div className={gridClass}>
+          <div className="space-y-2">
+            <Label htmlFor="audit_scope">Audit Scope</Label>
+            <Textarea id="audit_scope" rows={4} disabled={isSubmitting} {...register('audit_scope')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="terms_of_reference">Terms of Reference</Label>
+            <Textarea id="terms_of_reference" rows={4} disabled={isSubmitting} {...register('terms_of_reference')} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={sectionTitleClass}>Audit Plan Blocks</h2>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => schedule.append({ block_date: '', time_from: '', time_to: '', activity: '' })}
+            disabled={isSubmitting}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {schedule.fields.map((field, index) => (
+            <div key={field.id} className="grid gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[170px_130px_130px_1fr_auto]">
+              <Input aria-label="Schedule date" type="date" disabled={isSubmitting} {...register(`schedule_blocks.${index}.block_date`)} />
+              <Input aria-label="Schedule from" type="time" disabled={isSubmitting} {...register(`schedule_blocks.${index}.time_from`)} />
+              <Input aria-label="Schedule to" type="time" disabled={isSubmitting} {...register(`schedule_blocks.${index}.time_to`)} />
+              <Input aria-label="Schedule activity" placeholder="Activity" disabled={isSubmitting} {...register(`schedule_blocks.${index}.activity`)} />
+              <Button type="button" variant="outline" onClick={() => schedule.remove(index)} disabled={isSubmitting} aria-label="Remove schedule block">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 pt-6 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Register Audit'
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+};

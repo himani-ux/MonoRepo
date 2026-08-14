@@ -1004,3 +1004,13 @@ Phase 8: Notifications & Polish
 - Updated: 2026-02-04
 - Author: System Generated
 - This document does not change during execution
+
+## Amendment 29 - 2026-08-14
+
+The Audit module is synced into the maintained Complete VIMS repository from the Audit handover workspace as a separate maintained module. This amendment supersedes the original PSC-only scope wherever it omitted Audit runtime support.
+
+Triggering discovery: the handover includes Audit-specific backend code under `apps/inspection/audit`, frontend code under `src/routes/audit`, `src/components/audit`, `src/hooks/audit`, `src/schemas/audit`, and `src/stores/audit`, plus new inspection migrations for Audit domain/master tables and Audit workflow support.
+
+Implementation boundary: only Audit-related code and docs are imported. Existing non-Audit PSC, Safety, Certs, Circular, ORB, and shared module files are not overwritten from the handover. Shared files receive only isolated Audit route/navigation/permission additions required to wire the module.
+
+Migration note: the current maintained repo already contains `inspection` migration `0017_alter_inspectionreport_description.py`. Audit handover migrations are renumbered after that migration chain so existing migration history is preserved.

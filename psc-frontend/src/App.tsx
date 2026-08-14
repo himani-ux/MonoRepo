@@ -56,6 +56,16 @@ const ORBModulePage = lazy(() =>
 const CertsDashboardPage = lazy(() =>
   import('@/routes/certs').then((m) => ({ default: m.CertsDashboardStubPage }))
 );
+const AuditDetailRoute = lazy(() => import('@/routes/audit/audits/[auditId]'));
+const ExternalAuditRegistrationRoute = lazy(() => import('@/routes/audit/external/new'));
+const ExternalAuditDetailRoute = lazy(() => import('@/routes/audit/external/[auditId]'));
+const AuditChecklistRoute = lazy(() => import('@/routes/audit/audits/[auditId].checklist'));
+const AuditFailedNotificationQueueRoute = lazy(() => import('@/routes/dpa/notifications/failed'));
+const AuditScanValidationQueueRoute = lazy(() => import('@/routes/dpa/scan-validation'));
+const AuditPlanRegisterRoute = lazy(() => import('@/routes/audit/plans'));
+const AuditNcClosureRoute = lazy(() => import('@/routes/audit/findings/[findingId].nc'));
+const AuditNcWizardRoute = lazy(() => import('@/routes/audit/findings/[findingId].nc.wizard'));
+const AuditObsClosureRoute = lazy(() => import('@/routes/audit/findings/[findingId].obs'));
 
 /**
  * Page-level loading fallback for lazy-loaded routes.
@@ -80,13 +90,19 @@ function PermissionGuard({
   children,
   requiredForm,
   requiredProcess,
+  requiredAnyProcess,
 }: {
   children: ReactNode;
   requiredForm?: string;
-  requiredProcess: string;
+  requiredProcess?: string;
+  requiredAnyProcess?: string[];
 }) {
   const { hasForm, hasProcess } = useAuth();
-  if ((requiredForm && !hasForm(requiredForm)) || !hasProcess(requiredProcess)) {
+  const hasRequiredProcess = requiredProcess ? hasProcess(requiredProcess) : true;
+  const hasAnyRequiredProcess = requiredAnyProcess?.length
+    ? requiredAnyProcess.some((processId) => hasProcess(processId))
+    : true;
+  if ((requiredForm && !hasForm(requiredForm)) || !hasRequiredProcess || !hasAnyRequiredProcess) {
     return <Navigate to={ROUTES.CARS} replace />;
   }
   return <>{children}</>;
@@ -206,6 +222,150 @@ function AppShell() {
             <AuthGuard>
               <PermissionGuard requiredProcess={PROCESS_IDS.VIEW_INSPECTION_DETAIL}>
                 <InspectionDetailPage />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/plans"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_EDIT,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                ]}
+              >
+                <AuditPlanRegisterRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/dpa/notifications/failed"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
+                  PROCESS_IDS.AUDIT_CANCEL_PLAN,
+                ]}
+              >
+                <AuditFailedNotificationQueueRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/dpa/scan-validation-queue"
+          element={
+            <AuthGuard>
+              <PermissionGuard requiredProcess={PROCESS_IDS.AUDIT_SCAN_VALIDATION}>
+                <AuditScanValidationQueueRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/external/new"
+          element={
+            <AuthGuard>
+              <PermissionGuard requiredProcess={PROCESS_IDS.AUDIT_REGISTER_EXTERNAL}>
+                <ExternalAuditRegistrationRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/external/:auditId"
+          element={
+            <AuthGuard>
+              <PermissionGuard requiredProcess={PROCESS_IDS.AUDIT_REGISTER_EXTERNAL}>
+                <ExternalAuditDetailRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/audits/:auditId"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_EDIT,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                ]}
+              >
+                <AuditDetailRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/audits/:auditId/checklist"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_EDIT,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                ]}
+              >
+                <AuditChecklistRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/findings/:findingId/nc/wizard"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                  PROCESS_IDS.AUDIT_CLOSE_NC,
+                  PROCESS_IDS.AUDIT_SIGN_CLOSING_MEETING,
+                  PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT,
+                ]}
+              >
+                <AuditNcWizardRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/findings/:findingId/nc"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_EDIT,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                  PROCESS_IDS.AUDIT_CLOSE_NC,
+                ]}
+              >
+                <AuditNcClosureRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/findings/:findingId/obs"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                  PROCESS_IDS.AUDIT_CLOSE_NC,
+                  PROCESS_IDS.AUDIT_SIGN_CLOSING_MEETING,
+                ]}
+              >
+                <AuditObsClosureRoute />
               </PermissionGuard>
             </AuthGuard>
           }
