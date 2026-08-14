@@ -188,6 +188,10 @@ export interface SafetyDashboardCompositeResponse {
     soi_compliance_display: string | null;
     soi_compliance_label: string;
     soi_compliance_percent: number | null;
+    total_corrective_actions?: number;
+    total_findings?: number;
+    total_incidents?: number;
+    total_near_misses?: number;
   };
   period_code: SafetyDashboardPeriodCode;
   scope_id: string;

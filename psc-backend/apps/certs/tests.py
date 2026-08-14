@@ -28,6 +28,7 @@ from apps.certs.services.ocr_pipeline import (
     OcrFieldCandidate,
     OcrThresholds,
     _paddle_prediction_to_text,
+    _parse_fields_from_text,
     process_cert_pdf,
 )
 from apps.certs.services.parsers.base import (
@@ -540,6 +541,216 @@ class PrintArtifactDeliveryTests(SimpleTestCase):
 
 
 class TrackedItemPdfReparseViewTests(SimpleTestCase):
+    def test_upload_reuses_unattached_matching_pdf_blob_without_duplicate_error(self):
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="OFFICE",
+            role="DPA",
+            form_ids=["CERT_F_002"],
+            process_ids=["CERT_P_001"],
+            has_global_vessel_access=True,
+        )
+        request = APIRequestFactory().post(
+            "/api/certs/tracked-items/tracked-1/upload-pdf/",
+            data={
+                "file": SimpleUploadedFile("certificate.pdf", b"%PDF-1.4\n%", content_type="application/pdf"),
+                "context": "office",
+                "reason": "Uploading first certificate file.",
+            },
+            format="multipart",
+        )
+        force_authenticate(request, user=user)
+
+        ocr_payload = {
+            "engine": DEFAULT_OCR_ENGINE_NAME,
+            "status": "processed",
+            "fields": {
+                "certificate_number": {"value": "CERT-NEW", "confidence": 0.99, "mode": "auto_accept"},
+                "expiry_date": {"value": "2030-07-24", "confidence": 0.98, "mode": "auto_accept"},
+            },
+        }
+        item_before = _tracked_item_test_row(status="pending_first_upload", certificate_number=None, expiry_date=None)
+        item_before["pdf_attachment_id"] = None
+        item_before["pdf_missing"] = True
+        item_after = {**item_before, "pdf_attachment_id": "blob-1", "pdf_missing": False, "status": "ok", "version": 2}
+
+        class FakeTrackedItemRepository:
+            def __init__(self):
+                self.update_values = None
+
+            def get_item(self, tracked_item_id):
+                return item_before if tracked_item_id == "tracked-1" else None
+
+            def update_item(self, tracked_item_id, values, *, actor_id):
+                self.update_values = values
+                self.actor_id = actor_id
+                return item_before, item_after
+
+        class FakePdfRepository:
+            def __init__(self, existing_blob):
+                self.existing_blob = existing_blob
+                self.create_called = False
+                self.updated_payload = None
+
+            def get_blob_for_tracked_item_sha(self, *, tracked_item_id, content_sha256):
+                self.lookup = (tracked_item_id, content_sha256)
+                return self.existing_blob
+
+            def create_blob_for_tracked_item(self, **kwargs):
+                self.create_called = True
+                return {}
+
+            def update_ocr_result(self, blob_id, payload):
+                self.updated_payload = payload
+                return {**self.existing_blob, "ocr_payload_json": payload}
+
+            def mark_blob_superseded_for_retention(self, **kwargs):
+                self.superseded = kwargs
+
+        stored = {
+            "relative_path": "certs/vessels/vessel-1/tracked-items/tracked-1/new-upload.pdf",
+            "absolute_path": "C:/uploads/certs/vessels/vessel-1/tracked-items/tracked-1/new-upload.pdf",
+            "filename": "certificate.pdf",
+            "sha256": "same-sha",
+            "size": 9,
+        }
+        existing_blob = _pdf_blob_test_row(blob_storage_path="certs/vessels/vessel-1/tracked-items/tracked-1/orphan.pdf", ocr_payload_json={})
+        existing_blob["content_sha256"] = "same-sha"
+        fake_repository = FakeTrackedItemRepository()
+        fake_pdf_repository = FakePdfRepository(existing_blob)
+
+        with (
+            patch.object(tracked_item_views, "repository", fake_repository),
+            patch.object(tracked_item_views, "pdf_repository", fake_pdf_repository),
+            patch.object(tracked_item_views, "save_uploaded_cert_pdf", return_value=stored),
+            patch.object(tracked_item_views, "delete_stored_blob") as delete_blob,
+            patch.object(tracked_item_views, "process_cert_pdf", return_value=ocr_payload) as process_pdf,
+            patch.object(tracked_item_views, "record_audit_event") as audit,
+            patch.object(tracked_item_views, "record_cert_change_log") as change_log,
+            patch.object(tracked_item_views, "record_approval_event") as approval_event,
+            patch.object(tracked_item_views.transaction, "atomic", return_value=nullcontext()),
+        ):
+            response = tracked_item_views.TrackedItemUploadPdfView.as_view()(request, tracked_item_id="tracked-1")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["pdfBlob"]["id"], "blob-1")
+        self.assertEqual(response.data["trackedItem"]["pdfAttachmentId"], "blob-1")
+        self.assertFalse(fake_pdf_repository.create_called)
+        self.assertEqual(fake_pdf_repository.lookup, ("tracked-1", "same-sha"))
+        self.assertEqual(fake_repository.update_values["pdfAttachmentId"], "blob-1")
+        self.assertEqual(fake_repository.update_values["status"], "ok")
+        self.assertFalse(fake_repository.update_values["pdfMissing"])
+        process_pdf.assert_called_once_with(stored["absolute_path"], context="office")
+        delete_blob.assert_called_once_with(stored["relative_path"])
+        self.assertEqual(fake_pdf_repository.updated_payload, ocr_payload)
+        self.assertEqual(audit.call_count, 2)
+        self.assertEqual(change_log.call_count, 1)
+        approval_event.assert_not_called()
+
+    def test_upload_reuses_attached_matching_pdf_blob_without_duplicate_error(self):
+        user = SimpleNamespace(
+            is_authenticated=True,
+            user_type="OFFICE",
+            role="DPA",
+            form_ids=["CERT_F_002"],
+            process_ids=["CERT_P_001"],
+            has_global_vessel_access=True,
+        )
+        request = APIRequestFactory().post(
+            "/api/certs/tracked-items/tracked-1/upload-pdf/",
+            data={
+                "file": SimpleUploadedFile("certificate.pdf", b"%PDF-1.4\n%", content_type="application/pdf"),
+                "context": "office",
+                "reason": "Read the same PDF again through upload.",
+            },
+            format="multipart",
+        )
+        force_authenticate(request, user=user)
+
+        ocr_payload = {
+            "engine": DEFAULT_OCR_ENGINE_NAME,
+            "status": "processed",
+            "fields": {
+                "certificate_number": {"value": "CERT-NEW", "confidence": 0.99, "mode": "auto_accept"},
+                "expiry_date": {"value": "2030-07-24", "confidence": 0.98, "mode": "auto_accept"},
+            },
+        }
+        item_before = _tracked_item_test_row(status="ok", certificate_number="CERT-OLD", expiry_date="2029-07-24")
+        item_after = {**item_before, "certificate_number": "CERT-NEW", "expiry_date": "2030-07-24", "version": 2}
+
+        class FakeTrackedItemRepository:
+            def __init__(self):
+                self.update_values = None
+
+            def get_item(self, tracked_item_id):
+                return item_before if tracked_item_id == "tracked-1" else None
+
+            def update_item(self, tracked_item_id, values, *, actor_id):
+                self.update_values = values
+                self.actor_id = actor_id
+                return item_before, item_after
+
+        class FakePdfRepository:
+            def __init__(self, existing_blob):
+                self.existing_blob = existing_blob
+                self.create_called = False
+                self.superseded_called = False
+                self.updated_payload = None
+
+            def get_blob_for_tracked_item_sha(self, *, tracked_item_id, content_sha256):
+                self.lookup = (tracked_item_id, content_sha256)
+                return self.existing_blob
+
+            def create_blob_for_tracked_item(self, **kwargs):
+                self.create_called = True
+                return {}
+
+            def update_ocr_result(self, blob_id, payload):
+                self.updated_payload = payload
+                return {**self.existing_blob, "ocr_payload_json": payload}
+
+            def mark_blob_superseded_for_retention(self, **kwargs):
+                self.superseded_called = True
+
+        stored = {
+            "relative_path": "certs/vessels/vessel-1/tracked-items/tracked-1/new-upload.pdf",
+            "absolute_path": "C:/uploads/certs/vessels/vessel-1/tracked-items/tracked-1/new-upload.pdf",
+            "filename": "certificate.pdf",
+            "sha256": "same-sha",
+            "size": 9,
+        }
+        existing_blob = _pdf_blob_test_row(blob_storage_path="certs/vessels/vessel-1/tracked-items/tracked-1/current.pdf", ocr_payload_json={})
+        existing_blob["content_sha256"] = "same-sha"
+        fake_repository = FakeTrackedItemRepository()
+        fake_pdf_repository = FakePdfRepository(existing_blob)
+
+        with (
+            patch.object(tracked_item_views, "repository", fake_repository),
+            patch.object(tracked_item_views, "pdf_repository", fake_pdf_repository),
+            patch.object(tracked_item_views, "save_uploaded_cert_pdf", return_value=stored),
+            patch.object(tracked_item_views, "delete_stored_blob") as delete_blob,
+            patch.object(tracked_item_views, "process_cert_pdf", return_value=ocr_payload) as process_pdf,
+            patch.object(tracked_item_views, "record_audit_event") as audit,
+            patch.object(tracked_item_views, "record_cert_change_log") as change_log,
+            patch.object(tracked_item_views, "record_approval_event") as approval_event,
+            patch.object(tracked_item_views.transaction, "atomic", return_value=nullcontext()),
+        ):
+            response = tracked_item_views.TrackedItemUploadPdfView.as_view()(request, tracked_item_id="tracked-1")
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["pdfBlob"]["id"], "blob-1")
+        self.assertEqual(response.data["trackedItem"]["pdfAttachmentId"], "blob-1")
+        self.assertFalse(fake_pdf_repository.create_called)
+        self.assertFalse(fake_pdf_repository.superseded_called)
+        self.assertEqual(fake_repository.update_values["pdfAttachmentId"], "blob-1")
+        self.assertFalse(fake_repository.update_values["pdfMissing"])
+        process_pdf.assert_called_once_with(stored["absolute_path"], context="office")
+        delete_blob.assert_called_once_with(stored["relative_path"])
+        self.assertEqual(fake_pdf_repository.updated_payload, ocr_payload)
+        self.assertEqual(audit.call_count, 2)
+        self.assertEqual(change_log.call_count, 1)
+        approval_event.assert_not_called()
+
     def test_reparse_active_pdf_updates_ocr_payload_and_auto_fields(self):
         user = SimpleNamespace(
             is_authenticated=True,
@@ -1438,6 +1649,296 @@ Issued Description of Statutory Memoranda
         self.assertEqual(payload["fields"]["certificate_number"]["value"], "3391264")
         self.assertEqual(payload["fields"]["issue_date"]["value"], "2022-07-16")
         self.assertEqual(payload["fields"]["expiry_date"]["value"], "2027-07-16")
+
+    def test_certificate_parser_reads_compact_kr_validity_and_issue_dates(self):
+        fields = _parse_fields_from_text(
+            (
+                "CertificateNo:GZU-IOPPA-0015-25\n"
+                "Thiscertificateisvaliduntil subjecttosurveysinaccordancewithRegulation6ofAnnexIofthe\n"
+                "Convention11July20302\n"
+                "Completiondateofthesurveyonwhichthiscertificateisbased:11August2025\n"
+                "Issuedat on Guangzhou 11August2025\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_number"].value, "GZU-IOPPA-0015-25")
+        self.assertEqual(fields["expiry_date"].value, "11 July 2030")
+        self.assertEqual(fields["issue_date"].value, "11 August 2025")
+
+    def test_certificate_parser_reads_ordinal_valid_until_dates(self):
+        fields = _parse_fields_from_text(
+            (
+                "This Document of Compliance is valid until 14th March 2031, subject to periodical verification.\n"
+                "Date of issue 13th March 2026\n"
+                "Certificate No. 26TB-M002201THADOC\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_number"].value, "26TB-M002201THADOC")
+        self.assertEqual(fields["expiry_date"].value, "14 March 2031")
+        self.assertEqual(fields["issue_date"].value, "13 March 2026")
+
+    def test_certificate_parser_cleans_reissued_suffix_from_number(self):
+        fields = _parse_fields_from_text(
+            (
+                "CertificateNo.:GZU-CG2-0032-25 REISSUED\n"
+                "Dateofissue:11August2025\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_number"].value, "GZU-CG2-0032-25")
+        self.assertEqual(fields["issue_date"].value, "11 August 2025")
+
+    def test_certificate_parser_reads_mlc_insurance_validity_range(self):
+        fields = _parse_fields_from_text(
+            (
+                "Date: 13 January 2026 CERTIFICATE OF INSURANCE OR OTHER FINANCIAL SECURITY IN RESPECT OF "
+                "SHIPOWNERS' LIABILITY AS REQUIRED UNDER REGULATION 4.2 STANDARD A4.2.1\n"
+                "This Certificate has been issued by Assuranceforeningen Skuld (Gjensidig)\n"
+                "Period of validity of the financial security: noon GMT 20 February 2026 to noon GMT 20 February 2027\n"
+                "Port of Registry: BangkokIMO Number: 9584293EAST AYUTTHAYA Name of Ship:\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "MLC Shipowners Liability Insurance Certificate")
+        self.assertEqual(fields["issuing_authority"].value, "Assuranceforeningen Skuld")
+        self.assertEqual(fields["vessel_name"].value, "EAST AYUTTHAYA")
+        self.assertEqual(fields["imo_number"].value, "9584293")
+        self.assertEqual(fields["issue_date"].value, "20 February 2026")
+        self.assertEqual(fields["expiry_date"].value, "20 February 2027")
+
+    def test_certificate_parser_reads_hull_policy_without_guessing_fleet_vessel(self):
+        fields = _parse_fields_from_text(
+            (
+                "Price Forbes Broking Asia Pte Ltd\n"
+                "POLICY REFERENCE: RG2500003\n"
+                "TYPE: Hull and Machinery Insurance\n"
+                "PERIOD: From: 17 October 2025 00:00 to 16 October 2026 23:59\n"
+                "Vessel Name IMO Built GT Class Flag Type Attachment date\n"
+                "SF Darika 9502752 2010 20809 KR Thailand Bulk Carrier\n"
+                "East Ayutthaya 9584293 2008 20809 KR Thailand Bulk Carrier\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "Hull and Machinery Insurance")
+        self.assertEqual(fields["issuing_authority"].value, "Price Forbes Broking Asia Pte Ltd")
+        self.assertEqual(fields["certificate_number"].value, "RG2500003")
+        self.assertEqual(fields["issue_date"].value, "17 October 2025")
+        self.assertEqual(fields["expiry_date"].value, "16 October 2026")
+        self.assertNotIn("vessel_name", fields)
+
+    def test_certificate_parser_reads_sscec_number_vessel_and_punctuated_date(self):
+        fields = _parse_fields_from_text(
+            (
+                "SHIP SANITATION CONTROL EXEMPTION CERTIFICATE\n"
+                "No.: SC5212526000005\n"
+                "Port of / HUMEN Date 16 FEB., 2026\n"
+                "Name of ship EAST AYUTTHAYA Flag\n"
+                "THAILAND IMO No. 9584293\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "Ship Sanitation Control Exemption Certificate")
+        self.assertEqual(fields["certificate_number"].value, "SC5212526000005")
+        self.assertEqual(fields["vessel_name"].value, "EAST AYUTTHAYA")
+        self.assertEqual(fields["imo_number"].value, "9584293")
+        self.assertEqual(fields["issue_date"].value, "16 February 2026")
+
+    def test_certificate_parser_reads_ccs_chinese_issue_date_and_real_certificate_number(self):
+        fields = _parse_fields_from_text(
+            (
+                "Date ofissue2026年01月06日\n"
+                "CHINA CLASSIFICATION SOCIETY /Certificate No.\n"
+                "/Certificate No.ofApproval /Nil. /Approval No.ofDrawings NP21PPP04698\n"
+                "/Certificate No. TZ26PPS00016_09\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issuing_authority"].value, "China Classification Society")
+        self.assertEqual(fields["certificate_number"].value, "TZ26PPS00016_09")
+        self.assertEqual(fields["issue_date"].value, "6 January 2026")
+
+    def test_certificate_parser_reads_dnv_issued_by_authority_and_critical_fields(self):
+        fields = _parse_fields_from_text(
+            (
+                "Certificate No. MEDB00003HC\n"
+                "This Certificate is issued by DNV AS under the authority of the Government of Norway.\n"
+                "Date of Issue 06 April 2023\n"
+                "Expiry Date 05 April 2028\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issuing_authority"].value, "DNV AS")
+        self.assertEqual(fields["certificate_number"].value, "MEDB00003HC")
+        self.assertEqual(fields["issue_date"].value, "6 April 2023")
+        self.assertEqual(fields["expiry_date"].value, "5 April 2028")
+
+    def test_certificate_parser_reads_dnv_uk_issued_by_authority(self):
+        fields = _parse_fields_from_text(
+            (
+                "Certificate No. MERD00002CD\n"
+                "This Certificate is issued by DNV UK Limited based on authorisation of the Maritime & Coast Guard Agency.\n"
+                "Date of Issue 14 March 2024\n"
+                "Not valid after 13 March 2029\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issuing_authority"].value, "DNV UK Limited")
+        self.assertEqual(fields["certificate_number"].value, "MERD00002CD")
+        self.assertEqual(fields["issue_date"].value, "14 March 2024")
+        self.assertEqual(fields["expiry_date"].value, "13 March 2029")
+
+    def test_certificate_parser_reads_kr_abbreviation_issued_by_line(self):
+        fields = _parse_fields_from_text(
+            (
+                "Survey Report\n"
+                "Certificate No. KR-SR-2026-001\n"
+                "Statutory Certificates or Documents of Compliance issued by KR\n"
+                "Date of Issue 08 May 2026\n"
+                "Valid until 07 May 2031\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issuing_authority"].value, "Korean Register")
+        self.assertEqual(fields["certificate_number"].value, "KR-SR-2026-001")
+        self.assertEqual(fields["issue_date"].value, "8 May 2026")
+        self.assertEqual(fields["expiry_date"].value, "7 May 2031")
+
+    def test_certificate_parser_reads_plain_issued_by_label(self):
+        fields = _parse_fields_from_text(
+            (
+                "Declaration of Company Security Officer\n"
+                "Certificate No. CSO-2026-03\n"
+                "Issued By: 3EOM\n"
+                "Date of Issue 01 January 2026\n"
+                "Expiry Date 31 December 2026\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issuing_authority"].value, "3EOM")
+        self.assertEqual(fields["certificate_number"].value, "CSO-2026-03")
+        self.assertEqual(fields["issue_date"].value, "1 January 2026")
+        self.assertEqual(fields["expiry_date"].value, "31 December 2026")
+
+    def test_certificate_parser_treats_issued_until_as_expiry_date(self):
+        fields = _parse_fields_from_text(
+            (
+                "หนังสือรับรองฉบับนี้ออกให้ใช้ได้ถึง\n"
+                "This certificate is issued until 16-Jan-2027\n"
+                "Date of issue 13-Jan-2026\n"
+                "Certificate No. THAI-CERT-001\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_number"].value, "THAI-CERT-001")
+        self.assertEqual(fields["issue_date"].value, "13 January 2026")
+        self.assertEqual(fields["expiry_date"].value, "16 January 2027")
+
+    def test_certificate_parser_reads_valid_to_and_not_valid_after_expiry_phrases(self):
+        valid_to_fields = _parse_fields_from_text(
+            (
+                "Certificate No. MIXED-VALID-001\n"
+                "ออกให้ใช้ได้ถึง\n"
+                "Valid to 20 February 2027\n"
+            ),
+            0.95,
+        )
+        not_valid_after_fields = _parse_fields_from_text(
+            (
+                "Certificate No. MIXED-VALID-002\n"
+                "ไม่สามารถใช้ได้หลังจากวันที่\n"
+                "Not valid after 21-Feb-2027\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(valid_to_fields["expiry_date"].value, "20 February 2027")
+        self.assertEqual(not_valid_after_fields["expiry_date"].value, "21 February 2027")
+
+    def test_certificate_parser_reads_compass_table_ship_name(self):
+        fields = _parse_fields_from_text(
+            (
+                "MAGNETIC COMPASS DEVIATIONS TABLE\n"
+                "Ships NameSFYC ARAYA\n"
+                "Call SignHSB9593\n"
+                "GT19994\n"
+                "Adj. Date2025-09-13\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "Magnetic Compass Deviations Table")
+        self.assertEqual(fields["vessel_name"].value, "SF YC ARAYA")
+
+    def test_certificate_parser_reads_seemp_vessel_and_spaced_imo(self):
+        fields = _parse_fields_from_text(
+            (
+                "SHIP ENERGY EFFICIENCY MANAGEMENT PLAN\n"
+                "(SEEMP PART III - CII)\n"
+                "Vessel: SF DARIKA\n"
+                "IMO No: 9 5027 52\n"
+                "Prepared by: Kaizen Ship Management Co. Ltd.\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "Ship Energy Efficiency Management Plan")
+        self.assertEqual(fields["vessel_name"].value, "SF DARIKA")
+        self.assertEqual(fields["imo_number"].value, "9502752")
+
+    def test_certificate_parser_reads_french_ship_name_label(self):
+        fields = _parse_fields_from_text(
+            (
+                "NOM DU NAVIRE :YC FORTITUDEREGISTER NO\n"
+                "Call Sign 3E6770\n"
+                "IMO No. 9587178\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["vessel_name"].value, "YC FORTITUDE")
+        self.assertEqual(fields["imo_number"].value, "9587178")
+
+    def test_certificate_parser_cleans_common_ocr_typos_in_ship_name(self):
+        fields = _parse_fields_from_text(
+            (
+                "REGISTER OF LIFTING APPLIANCES AND LOOSE GEAR\n"
+                "NAME OF THE SHIP: 5F OARICA\n"
+                "CALL SIGN HSB9024\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "Register of Lifting Appliances and Loose Gear")
+        self.assertEqual(fields["vessel_name"].value, "SF DARIKA")
+
+    def test_certificate_parser_reads_oil_analysis_report_identity(self):
+        fields = _parse_fields_from_text(
+            (
+                "Customer BP - Castrol (Thailand) Limited IMO number / Asset 9587178\n"
+                "Vessel / Asset YC FORTITUDE Sampling Point Crankcase\n"
+                "Diagnosis Satisfactory for further service based on the analysis performed.\n"
+                "Sample Number 26E83241\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_type"].value, "Lubricant Oil Analysis Report")
+        self.assertEqual(fields["issuing_authority"].value, "Castrol")
+        self.assertEqual(fields["vessel_name"].value, "YC FORTITUDE")
+        self.assertEqual(fields["imo_number"].value, "9587178")
 
     def test_paddleocr_v3_prediction_result_is_flattened_to_text_and_confidence(self):
         text, confidence = _paddle_prediction_to_text(

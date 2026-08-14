@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+from uuid import uuid4
 import unittest
 
 from tests.safety.support import bootstrap_django, recreate_incident_table, recreate_soi_tables
@@ -79,7 +80,7 @@ class CompositeScoreServiceTests(unittest.TestCase):
             updated_by="dpa-1",
             schema_version=1,
         )
-        Incident.objects.create(
+        open_near_miss = Incident.objects.create(
             incident_number="NM/2026/073",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
@@ -89,7 +90,7 @@ class CompositeScoreServiceTests(unittest.TestCase):
             updated_by="dpa-1",
             schema_version=1,
         )
-        Incident.objects.create(
+        closed_near_miss = Incident.objects.create(
             incident_number="NM/2026/074",
             vessel_id="7",
             record_type=Incident.RecordType.NEAR_MISS,
@@ -100,7 +101,7 @@ class CompositeScoreServiceTests(unittest.TestCase):
             updated_by="dpa-1",
             schema_version=1,
         )
-        Incident.objects.create(
+        other_vessel_incident = Incident.objects.create(
             incident_number="INC/2026/075",
             vessel_id="9",
             record_type=Incident.RecordType.INCIDENT,
@@ -110,6 +111,15 @@ class CompositeScoreServiceTests(unittest.TestCase):
             updated_by="dpa-1",
             schema_version=1,
         )
+        Incident.objects.filter(
+            pk__in=[
+                self.incident.pk,
+                closed_incident.pk,
+                open_near_miss.pk,
+                closed_near_miss.pk,
+                other_vessel_incident.pk,
+            ]
+        ).update(created_date=self.current_at)
 
         recommendation = Recommendation.objects.create(
             incident=self.incident,
@@ -120,7 +130,7 @@ class CompositeScoreServiceTests(unittest.TestCase):
             updated_by="dpa-1",
             schema_version=1,
         )
-        CorrectiveAction.objects.create(
+        open_action = CorrectiveAction.objects.create(
             source_table="vims_safety_incident",
             source_id=self.incident.pk,
             recommendation=recommendation,
@@ -132,7 +142,7 @@ class CompositeScoreServiceTests(unittest.TestCase):
             updated_by="dpa-1",
             schema_version=1,
         )
-        CorrectiveAction.objects.create(
+        closed_action = CorrectiveAction.objects.create(
             source_table="vims_safety_incident",
             source_id=closed_incident.pk,
             recommendation=recommendation,
@@ -144,6 +154,9 @@ class CompositeScoreServiceTests(unittest.TestCase):
             created_by="dpa-1",
             updated_by="dpa-1",
             schema_version=1,
+        )
+        CorrectiveAction.objects.filter(pk__in=[open_action.pk, closed_action.pk]).update(
+            created_date=self.current_at
         )
 
         self.inspection = SOIInspection.objects.create(
@@ -215,15 +228,17 @@ class CompositeScoreServiceTests(unittest.TestCase):
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_vessel_area_map (
+                    id,
                     vessel_id,
                     area_id,
                     applicable,
                     last_inspected_at,
                     due_at,
                     schema_version
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
+                    str(uuid4()),
                     "7",
                     3,
                     True,
@@ -235,15 +250,17 @@ class CompositeScoreServiceTests(unittest.TestCase):
             cursor.execute(
                 """
                 INSERT INTO vims_safety_soi_vessel_area_map (
+                    id,
                     vessel_id,
                     area_id,
                     applicable,
                     last_inspected_at,
                     due_at,
                     schema_version
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
+                    str(uuid4()),
                     "7",
                     8,
                     True,
@@ -261,9 +278,13 @@ class CompositeScoreServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["metrics"]["open_incidents"], 1)
+        self.assertEqual(payload["metrics"]["total_incidents"], 2)
         self.assertEqual(payload["metrics"]["open_near_misses"], 1)
+        self.assertEqual(payload["metrics"]["total_near_misses"], 2)
         self.assertEqual(payload["metrics"]["open_findings"], 1)
+        self.assertEqual(payload["metrics"]["total_findings"], 2)
         self.assertEqual(payload["metrics"]["overdue_corrective_actions"], 1)
+        self.assertEqual(payload["metrics"]["total_corrective_actions"], 2)
         self.assertEqual(payload["metrics"]["soi_compliance_percent"], 50)
         self.assertEqual(payload["metrics"]["soi_compliance_label"], "SOI Compliance %")
         self.assertEqual(payload["composite_score"], 75)

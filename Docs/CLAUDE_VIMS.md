@@ -475,7 +475,7 @@ These rules are specific to the VIMS Inspection module. Violating these means th
 
 ### CAR Rules
 - No manual CAR creation — system auto-creates from deficiency only
-- CAR number format: SOURCE-YYYY-NNN (e.g., PSC-2026-001)
+- CAR number format for new PSC CARs: VESSEL_CODE-PSC-YYYY-NNN (e.g., EAT-PSC-2026-001); historical SOURCE-YYYY-NNN values remain valid.
 - BEFORE + AFTER evidence both required before CAR submission
 - root_cause_summary minimum 50 characters for submission
 - CAR closure (DPA_CLOSED) is independent of physical verification

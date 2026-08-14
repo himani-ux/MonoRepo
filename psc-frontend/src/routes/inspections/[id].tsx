@@ -102,6 +102,7 @@ export default function InspectionDetailPage() {
 
   const handleDeficiencyAdded = () => {
     setShowDeficiencyModal(false);
+    void refetch();
     toast({
       title: 'Deficiency added',
       description: 'A CAR has been automatically created for this deficiency.',

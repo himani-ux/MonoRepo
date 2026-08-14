@@ -249,7 +249,7 @@ Permission gating uses `msc_profiles.form_ids` (CERT_F_\*) and `msc_profiles.pro
 - **Middle col — Certificate file:**
   - Active certificate file name is shown as the view link. Clicking the file name or "View PDF" fetches the authenticated PDF and opens it in a new tab; the PDF is not loaded automatically.
   - Version history tray (D-CERT-019/020): previous files with `superseded_at` timestamps; deleted-pending blobs grayed out (7-day grace per D-CERT-021).
-  - Upload certificate button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015).
+  - Upload certificate button (renewal / revision auto-detect per D-CERT-170 / FEAT-CERT-TRK-015). Uploading the same PDF again is accepted: the system reuses the existing stored PDF record, runs OCR again from the uploaded file, and applies the normal field updates.
   - "Read PDF again" button is visible for users who can upload when an active PDF exists. It re-runs OCR on the stored active PDF, refreshes the OCR payload, and applies the same auto-accepted field rules as upload without creating a duplicate PDF version.
 - **Right col — Review and history:**
   - UI heading is **Review and history**.

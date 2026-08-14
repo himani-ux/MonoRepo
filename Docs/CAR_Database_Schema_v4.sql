@@ -215,7 +215,7 @@ INSERT INTO CLC_Item (CLC_Code, Category_ID, Item_Name, Sort_Order) VALUES
 
 CREATE TABLE CAR (
     CAR_ID INT IDENTITY(1,1) PRIMARY KEY,
-    CAR_No VARCHAR(20) NOT NULL UNIQUE, -- Format: SOURCE-YYYY-NNN
+    CAR_No VARCHAR(20) NOT NULL UNIQUE, -- Current PSC format: VESSEL_CODE-PSC-YYYY-NNN; legacy SOURCE-YYYY-NNN remains valid
     
     -- Source Identification
     Source VARCHAR(20) NOT NULL, -- PSC, RightShip, Audit
@@ -365,7 +365,7 @@ BEGIN
     FROM CAR_Sequence 
     WHERE Source = @Source AND Year = @Year;
     
-    -- Format: SOURCE-YYYY-NNN
+    -- Legacy format shown for this historical schema script. Current PSC CARs are generated in application code as VESSEL_CODE-PSC-YYYY-NNN.
     SET @CARNo = @Source + '-' + CAST(@Year AS VARCHAR) + '-' + RIGHT('000' + CAST(@NextNum AS VARCHAR), 3);
 END;
 GO

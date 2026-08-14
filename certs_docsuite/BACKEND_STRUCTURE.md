@@ -637,7 +637,7 @@ All under `/api/certs/`. Auth: JWT (SimpleJWT) for primary users; signed token f
 | POST | `/api/certs/tracked-items/<id>/submit/` | CERT_P_002 | C/O / C/E / 2/E (own vessel) | draft â†’ pending_master_approval |
 | POST | `/api/certs/tracked-items/<id>/approve/` | CERT_P_003 | Master (own vessel), DPA, PIC | pending_master_approval â†’ approved |
 | POST | `/api/certs/tracked-items/<id>/reject/` | CERT_P_004 | Master (own vessel), DPA, PIC | pending_master_approval â†’ rejected; reason required |
-| POST | `/api/certs/tracked-items/<id>/upload-pdf/` | CERT_P_001 | Master direct / DPA / FM / Sup'tts | Renewal vs revision auto-detect |
+| POST | `/api/certs/tracked-items/<id>/upload-pdf/` | CERT_P_001 | Master direct / DPA / FM / Sup'tts | Renewal vs revision auto-detect; if the exact same PDF already exists for the certificate, reuse that blob and run OCR again |
 | POST | `/api/certs/tracked-items/<id>/reparse-pdf/` | CERT_P_001 | Same as upload | Re-run OCR on the stored active PDF, refresh OCR payload, and apply auto-accepted fields without creating a new PDF version |
 | GET | `/api/certs/tracked-items/<id>/pdfs/<blob_id>/view/` | (read-vessel) | Per RBAC scope | Authenticated PDF view stream |
 | GET | `/api/certs/tracked-items/<id>/pdfs/` | (read-vessel) | Per RBAC | Active + superseded + pending-delete |

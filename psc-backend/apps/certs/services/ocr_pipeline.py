@@ -442,15 +442,23 @@ def _parse_fields_from_text(
                 continue
             match = pattern.search(cleaned_line)
             if match:
+                if field_name == "certificate_number" and re.search(r"approval\s+no|certificate\s+no\.?\s*of\s*approval", cleaned_line, re.IGNORECASE):
+                    continue
                 value = _clean_field_value(match.group("value"))
                 if field_name in {"issue_date", "expiry_date"}:
                     value = _normalize_ocr_date_text(value)
                     if not _contains_ocr_date(value):
                         continue
+                elif field_name == "vessel_name":
+                    value = _format_vessel_name(value)
+                    if not _looks_like_vessel_name(value):
+                        continue
                 elif field_name == "certificate_number":
                     value = _clean_certificate_number(value)
                 elif field_name == "place_of_issue":
                     value = _clean_place_of_issue(value)
+                if not value:
+                    continue
                 fields[field_name] = OcrFieldCandidate(
                     value=value,
                     confidence=confidence,
@@ -465,49 +473,59 @@ def _parse_fields_from_text(
 def _parse_common_certificate_layouts(raw_text: str) -> dict[str, str]:
     fields: dict[str, str] = {}
     squashed = re.sub(r"\s+", "", raw_text).lower()
+    issuing_authority = _parse_issuing_authority(raw_text)
+    if issuing_authority:
+        fields["issuing_authority"] = issuing_authority
 
-    if "koreanregister" in squashed:
-        fields["issuing_authority"] = "Korean Register"
-    elif "classnk" in squashed or "nipponkaijikyokai" in squashed:
-        fields["issuing_authority"] = "ClassNK"
-    elif "bureauveritas" in squashed:
-        fields["issuing_authority"] = "Bureau Veritas"
-
-    if "certificateofclassification" in squashed:
-        fields["certificate_type"] = "Certificate of Classification"
-    elif "breathingapparatus" in squashed:
-        fields["certificate_type"] = "Breathing Apparatus"
+    certificate_type = _parse_certificate_type(raw_text)
+    if certificate_type:
+        fields["certificate_type"] = certificate_type
 
     if "bluetech" in squashed and "marineservices" in squashed:
         fields.setdefault("issuing_authority", "BLUE TECH MARINE SERVICES LLC")
 
+    fields.update(_parse_vessel_identity(raw_text))
     certificate_number = _parse_stacked_certificate_number(raw_text)
     if certificate_number:
         fields["certificate_number"] = certificate_number
     fields.update(_parse_stacked_issue_expiry_dates(raw_text))
+    compact_dates = _parse_compact_certificate_dates(raw_text)
+    fields.update({key: value for key, value in compact_dates.items() if key not in fields})
+    range_dates = _parse_certificate_date_ranges(raw_text)
+    fields.update({key: value for key, value in range_dates.items() if key not in fields})
 
     regex_fields = {
         "certificate_number": [
-            r"Certificate\s*No\.?\s*[:.]?\s*(?P<value>[A-Z0-9][A-Z0-9./\- ]+)",
-            r"certificateNo\.?\s*[:.]?\s*(?P<value>[A-Z0-9][A-Z0-9./\- ]+)",
+            r"Certificate\s*No\.?\s*[:.]?\s*(?P<value>[A-Z0-9][A-Z0-9_./\- ]+)",
+            r"certificateNo\.?\s*[:.]?\s*(?P<value>[A-Z0-9][A-Z0-9_./\- ]+)",
+            r"\bNo\.?\s*[:.]?\s*(?P<value>[A-Z]{1,4}\d[A-Z0-9_\-/]{4,})\b",
+            r"\bPOLICY\s+REFERENCE\s*[:.]?\s*(?P<value>[A-Z0-9_\-/]{5,})\b",
+            r"\bPolicy\s*No\.?\s*[:.]?\s*(?P<value>\d{6,})\b",
+            r"\b(?P<value>\d{6,})\s+No\.\b",
+            r"\bNTVRP\s*#(?P<value>\d{4,})\b",
         ],
         "imo_number": [
             r"\bIMO\s*No\.?\s*[:.]?\s*(?P<value>\d{7})\b",
             r"\bIMO\s*Number\s*[:.]?\s*(?P<value>\d{7})\b",
             r"\bIMO\s*[:.]?\s*(?P<value>\d{7})\b",
+            r"\bIMO(?P<value>\d{7})\b",
         ],
         "vessel_name": [
-            r"\bVessel\s+(?P<value>[^|\r\n]+)",
             r"Name\s*of\s*Ship\s*[:.]?\s*(?P<value>[^\r\n]+)",
             r"Vessel\s*Name\s*[:.]?\s*(?P<value>[^\r\n]+)",
             r"Name\s*of\s*Vessel\s*[:.]?\s*(?P<value>[^\r\n]+)",
         ],
         "expiry_date": [
             r"valid\s*until\s*(?P<value>\d{1,2}\s*[A-Za-z]{3,9}\s*\d{4})",
+            r"valid\s*until\s*(?P<value>[A-Za-z]{3,9}\.?,?\s+\d{1,2},?\s+\d{4})",
             r"Expiry\s*Date\s*[:.]?\s*(?P<value>[^\r\n]+)",
         ],
         "issue_date": [
             r"\bDate\s*[:.]?\s*(?P<value>\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+            r"\bDate\s*[:.]?\s*(?P<value>\d{1,2}\s+[A-Za-z]{3,9}\.?,?\s+\d{4})",
+            r"\bDate\s*[:.]?\s*(?P<value>[A-Za-z]{3,9}\.?,?\s+\d{1,2},?\s+\d{4})",
+            r"\b[A-Za-z .'-]+,\s*(?P<value>\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\s+\d+\s+Page\b",
+            r"\bNTVRP\s*#\d{4,}\s+on\s+(?P<value>[A-Za-z]{3,9}\.?,?\s+\d{1,2},?\s+\d{4})",
         ],
         "place_of_issue": [
             r"Place\s+of\s+Service\s*\|?\s*(?P<value>[^\r\n]+)",
@@ -522,6 +540,8 @@ def _parse_common_certificate_layouts(raw_text: str) -> dict[str, str]:
             value = _clean_field_value(match.group("value"))
             if field_name == "vessel_name":
                 value = _format_vessel_name(value)
+                if not _looks_like_vessel_name(value):
+                    continue
             if field_name == "certificate_number":
                 value = _clean_certificate_number(value)
             if field_name.endswith("_date"):
@@ -548,6 +568,308 @@ def _parse_common_certificate_layouts(raw_text: str) -> dict[str, str]:
             fields["expiry_date"] = expiry_date
 
     return {key: value for key, value in fields.items() if value}
+
+
+def _compact_ocr_text(raw_text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", raw_text.lower())
+
+
+def _parse_issuing_authority(raw_text: str) -> str | None:
+    compact = _compact_ocr_text(raw_text)
+    alias_rules = (
+        (("dnvuklimited", "dnvukltd"), "DNV UK Limited"),
+        (("dnvas", "wwwdnvcom", "dnvlocalunit"), "DNV AS"),
+        (("koreanregister", "koreanregisterofshipping"), "Korean Register"),
+        (("classnk", "nipponkaijikyokai"), "ClassNK"),
+        (("bureauveritas",), "Bureau Veritas"),
+        (("assuranceforeningenskuld", "skuldmutualprotection"), "Assuranceforeningen Skuld"),
+        (("liberiamaritimeauthority", "republicofliberia"), "Liberia Maritime Authority"),
+        (("chinaclassificationsociety",), "China Classification Society"),
+        (("yangzhouxintianherope",), "Yangzhou Xintianhe Rope Cable Co., Ltd."),
+        (("vikinglifesavingequipment", "vikingservicebase"), "VIKING Life-Saving Equipment"),
+        (("priceforbesbrokingasia",), "Price Forbes Broking Asia Pte Ltd"),
+        (("westerncanadamarineresponsecorporation",), "Western Canada Marine Response Corporation"),
+        (("panamamaritimeauthority",), "Panama Maritime Authority"),
+        (("resolvesalvagefire",), "Resolve Salvage & Fire"),
+        (("gallaghermarinesystems",), "Gallagher Marine Systems"),
+        (
+            ("maritimesafetyadministrationofthepeoplesrepublicofchina", "chinamsa"),
+            "Maritime Safety Administration of the People's Republic of China",
+        ),
+        (("indianregisterofshipping", "irclass"), "Indian Register of Shipping"),
+        (("lloydsregister",), "Lloyd's Register"),
+        (("americanbureauofshipping",), "American Bureau of Shipping"),
+        (("marinedepartment",), "Marine Department"),
+        (("castrol",), "Castrol"),
+    )
+    for needles, authority in alias_rules:
+        if any(needle in compact for needle in needles):
+            return authority
+
+    normalized = re.sub(r"\s+", " ", raw_text).strip()
+    explicit_rules = (
+        (r"\bissued\s+by\s+KR\b", "Korean Register"),
+        (r"\bissued\s+by\s+CCS\b", "China Classification Society"),
+        (r"\bissued\s+by\s+DNV\s+AS\b", "DNV AS"),
+        (r"\bissued\s+by\s+DNV\s+UK\s+(?:Limited|Ltd\.?)\b", "DNV UK Limited"),
+        (r"\bfor\s+DNV\s+AS\b", "DNV AS"),
+        (r"\bfor\s+DNV\s+UK\s+Ltd\.?\b", "DNV UK Limited"),
+    )
+    for pattern, authority in explicit_rules:
+        if re.search(pattern, normalized, re.IGNORECASE):
+            return authority
+
+    label_patterns = (
+        r"\bIssued\s+By\s*[:.]?\s*(?P<value>[^\r\n]+)",
+        r"\bIssued\s+by\s+the\s+Company\s+or\s+Master\s*[:.]?\s*(?P<value>[^\r\n]+)",
+        r"\bThis\s+Certificate\s+(?:has\s+been\s+)?issued\s+by\s+(?P<value>[^\r\n]+)",
+    )
+    for pattern in label_patterns:
+        match = re.search(pattern, raw_text, re.IGNORECASE)
+        if not match:
+            continue
+        value = _clean_issuing_authority_value(match.group("value"))
+        if value:
+            return value
+    return None
+
+
+def _clean_issuing_authority_value(value: str) -> str | None:
+    text = _clean_field_value(value)
+    text = re.split(
+        r"\s+\b(?:under\s+the\s+authority|based\s+on|on\s+behalf\s+of|in\s+accordance|as\s+meeting|which\s+has)\b",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    if ":" in text and re.search(r"\b(?:company|master|issued|approved)\b", text, re.IGNORECASE):
+        text = text.rsplit(":", 1)[-1]
+    text = text.strip(" :.-")
+    if not text or not re.search(r"[A-Za-z]", text):
+        return None
+    if len(text) > 100:
+        return None
+    if re.search(r"\b(?:administration\s+as\s+meeting|medical\s+officer|manning\s+agent|seafarer)\b", text, re.IGNORECASE):
+        return None
+    compact = _compact_ocr_text(text)
+    normalized_names = {
+        "dnvas": "DNV AS",
+        "dnvuklimited": "DNV UK Limited",
+        "dnvukltd": "DNV UK Limited",
+        "kr": "Korean Register",
+        "ccs": "China Classification Society",
+    }
+    return normalized_names.get(compact, text)
+
+
+def _parse_certificate_type(raw_text: str) -> str | None:
+    compact = _compact_ocr_text(raw_text)
+    type_rules = (
+        ("certificateofclassification", "Certificate of Classification"),
+        ("magneticcompassdeviationstable", "Magnetic Compass Deviations Table"),
+        ("shipenergyefficiencymanagementplan", "Ship Energy Efficiency Management Plan"),
+        ("eexitechnicalfile", "EEXI Technical File"),
+        ("agreementforshippollutionresponse", "Agreement for Ship Pollution Response"),
+        ("vesselprefireplanreceiptcertificationofacceptability", "Vessel Pre-Fire Plan Receipt & Certification"),
+        ("spillresponsecontractcertification", "Spill Response Contract Certification"),
+        ("ballastwatermanagementplanapproval", "Ballast Water Management Plan Approval"),
+        ("quarantinevessel", "Quarantine - Vessel"),
+        ("declarationofcompanysecurityofficer", "Declaration of Company Security Officer"),
+        ("servicingcertificateforfirefightingappliances", "Servicing Certificate for Fire Fighting Appliances"),
+        ("servic1ngcertificateforfirefight1ngappliances", "Servicing Certificate for Fire Fighting Appliances"),
+        ("registerofliftingappliancesandloosegear", "Register of Lifting Appliances and Loose Gear"),
+        ("lubricantoilanalysis", "Lubricant Oil Analysis Report"),
+        ("diagnosissatisfactoryforfurtherservice", "Lubricant Oil Analysis Report"),
+        ("shipsanitationcontrolexemptioncertificate", "Ship Sanitation Control Exemption Certificate"),
+        ("declarationofmaritimelabourcompliancepartii", "Declaration of Maritime Labour Compliance - Part II"),
+        ("hullandmachineryinsurance", "Hull and Machinery Insurance"),
+        ("shipnonbulkoilmembershipagreement", "Ship Non-Bulk Oil Membership Agreement"),
+        ("juandefucashipnonbulkoilmembershipagreement", "Juan de Fuca Ship Non-Bulk Oil Membership Agreement"),
+        ("surveyreport", "Survey Report"),
+        ("statementofcompliancewiththeinternationalmaritimesolidbulkcargoescode", "Statement of Compliance - IMSBC Code"),
+        ("statementofcomplianceforinternationalenergyefficiency", "Statement of Compliance - International Energy Efficiency"),
+        ("statementofcomplianceforinternationalantifoulingsystem", "Statement of Compliance - Anti-Fouling System"),
+        ("statementofcompliancedrydockinspectionfortheusepavesselgeneralpermit", "Statement of Compliance - US EPA VGP Dry Dock Inspection"),
+        ("fueloilconsumptionreportingandoperationalcarbonintensityrating", "Statement of Compliance - Fuel Oil Consumption Reporting"),
+        ("documentofcompliance", "Document of Compliance"),
+        ("certificatestatementofcompliance", "Statement of Compliance"),
+        ("certificateofinsuranceorotherfinancialsecurityinrespectofshipownersliability", "MLC Shipowners Liability Insurance Certificate"),
+        ("certificateofinsuranceorotherfinancialsecurityinrespectofseafarerrepatriation", "MLC Repatriation Insurance Certificate"),
+        ("certificateofinsuranceorotherfinancialsecurityinrespectofcivilliabilityforbunkeroilpollutiondamage", "Bunker Civil Liability Insurance Certificate"),
+        ("certificatefurnishedasevidenceofinsurancepursuanttoarticle7oftheinternationalconventiononcivilliabilityforbunkeroilpollutiondamage", "Bunker Civil Liability Insurance Certificate"),
+        ("certificateofinsuranceorotherfinancialsecurityinrespectofliabilityfortheremovalofwrecks", "Wreck Removal Liability Insurance Certificate"),
+        ("certificatefurnishedasevidenceofinsurancepursuanttoarticle12ofthenairobiinternationalconventionontheremovalofwrecks", "Wreck Removal Liability Insurance Certificate"),
+        ("protectionindemnityinsurance", "Protection & Indemnity Insurance"),
+        ("protectionandindemnityinsurance", "Protection & Indemnity Insurance"),
+        ("freightdemurragedefencecover", "Freight, Demurrage & Defence Cover"),
+        ("remoteassessmentconsultationracexercisecertificateofplanaccreditation", "Certificate of Plan Accreditation"),
+        ("certificateofplanaccreditation", "Certificate of Plan Accreditation"),
+        ("certificateofproduct", "Certificate of Product"),
+        ("certificateofreinspection", "Certificate of Re-Inspection"),
+        ("registerofshipsliftingappliancesandcargohandlinggear", "Register of Ship's Lifting Appliances and Cargo Handling Gear"),
+        ("certificateoftestandthoroughexaminationofliftingappliances", "Certificate of Test and Thorough Examination of Lifting Appliances"),
+        ("certificateforloadinginstrument", "Certificate for Loading Instrument"),
+        ("breathingapparatus", "Breathing Apparatus"),
+    )
+    for needle, certificate_type in type_rules:
+        if needle in compact:
+            return certificate_type
+    header_lines = [_clean_field_value(line) for line in raw_text.splitlines() if line.strip()]
+    for line in header_lines[:12]:
+        if re.search(r"\b(?:certificate|statement|document|register)\b", line, re.IGNORECASE):
+            return _clean_field_value(line).title()
+    return None
+
+
+def _parse_vessel_identity(raw_text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    text = re.sub(r"\s+", " ", raw_text)
+    compact = re.sub(r"\s+", "", raw_text)
+
+    imo_match = re.search(r"I\s+M\s+O\s+NO\.?\s*[:.]?\s*(?P<value>\d{7})(?!\d)", text, re.IGNORECASE)
+    if not imo_match:
+        imo_match = re.search(r"I\s*M\s*O\s*(?:No\.?|Number)?(?:\s*/\s*Asset)?\s*[:.]?\s*(?P<value>\d{7})(?!\d)", text, re.IGNORECASE)
+    if not imo_match:
+        spaced_imo_match = re.search(r"I\s*M\s*O\s*(?:No\.?|Number)?(?:\s*/\s*Asset)?\s*[:.]?\s*(?P<value>(?:\d\s*){7,})", text, re.IGNORECASE)
+        if spaced_imo_match:
+            imo_digits = re.sub(r"\D", "", spaced_imo_match.group("value"))
+            if len(imo_digits) >= 7:
+                fields["imo_number"] = imo_digits[:7]
+    if not imo_match:
+        imo_match = re.search(r"\bIMO(?P<value>\d{7})(?!\d)", compact, re.IGNORECASE)
+    if not imo_match:
+        imo_match = re.search(r"\bHSB\d+\s+(?P<value>\d{7})(?!\d)", text, re.IGNORECASE)
+    if imo_match and "imo_number" not in fields:
+        fields["imo_number"] = imo_match.group("value")
+
+    table_vessel_names: list[str] = []
+    for line in raw_text.splitlines():
+        clean_line = _clean_field_value(line)
+        table_match = re.match(r"(?P<value>[A-Za-z][A-Za-z .'-]{3,}?)\s+\d{7}\s+\d{4}\s+[\d,]+", clean_line)
+        if table_match:
+            vessel_name = _format_vessel_name(table_match.group("value"))
+            if _looks_like_vessel_name(vessel_name):
+                table_vessel_names.append(vessel_name)
+    unique_table_vessel_names = sorted(set(table_vessel_names))
+    if len(unique_table_vessel_names) == 1:
+        fields["vessel_name"] = unique_table_vessel_names[0]
+
+    if "vessel_name" in fields:
+        return fields
+
+    vessel_patterns = (
+        r"Ships?\s*Name\s*[:.]?\s*(?P<value>[A-Z][A-Z0-9 .'-]{2,}?)(?:\s+Call\s*Sign|\s+GT\b|\s+Sea\s+Cond\b|$)",
+        r"Vessel\s*/\s*Asset\s*[:.]?\s*(?P<value>[A-Z][A-Z0-9 .'-]{2,}?)(?:\s+Sampling\s+Point\b|\s+Machinery\b|$)",
+        r"\bVessel\s*[:.]?\s*(?P<value>[A-Z][A-Z0-9 .'-]{2,}?)(?:\s+IMO\b|\s+Prepared\b|\s+Flag\b|$)",
+        r"Nom\s+du\s+navire\s*:?\s*(?P<value>[A-Z][A-Z0-9 .'-]{2,}?)(?:\s*Register\s+No\b|\s+N[°o]\b|\s+Call\s+Sign\b|$)",
+        r"Name\s*of\s*Ship\s*[:.]?\s*(?P<value>[A-Z][A-Z0-9 .'-]{2,}?)(?:\s+Class\s*No\.?|\s+Distinctive\b|\s+Port\s+of\b|\s+Owner\b|\s+IMO\b|\s+Call\s*Sign|$)",
+        r"NameofShip\s*[:.]?\s*(?P<value>[A-Z][A-Z0-9 .'-]{2,}?)(?:ClassNo|Distinctive|Portof|IMONumber|$)",
+        r"NAME\s+OF\s+THE\s+SHIP\s*[:.]?\s*(?P<value>[A-Z0-9][A-Z0-9 .'-]{2,}?)(?:\s+OFFICIAL\s+NUMBER\b|\s+CALL\s+SIGN\b|$)",
+        r"(?P<value>[A-Z][A-Z ]{3,})\s+Name\s*:\s*This\s+is\s+to\s+certify",
+        r"\d{7}\s*(?P<value>[A-Z][A-Z ]{3,})\s+Name\s+of\s+Ship\b",
+        r"(?P<value>[A-Z][A-Z ]{3,})\s+HSB\d+\s+\d{7}\b",
+        r"\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}(?P<value>[A-Z][A-Z ]{3,})\d{7}\b",
+        r"\bMV\s+(?P<value>[A-Z][A-Z ]{3,})(?:,|\s+IMO\b|$)",
+    )
+    for pattern in vessel_patterns:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            vessel_name = _format_vessel_name(match.group("value"))
+            if _looks_like_vessel_name(vessel_name):
+                fields["vessel_name"] = vessel_name
+                break
+        if "vessel_name" in fields:
+            break
+    return fields
+
+
+def _parse_compact_certificate_dates(raw_text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    readable_text = re.sub(r"\s+", " ", raw_text)
+    compact_text = re.sub(r"\s+", "", raw_text)
+
+    expiry_date = _extract_date_after_label(
+        (readable_text, compact_text),
+        labels=(
+            r"certificates?\s+(?:is\s+)?issued\s+until",
+            r"issued\s+until",
+            r"valid\s*until",
+            r"valid\s*(?:to|till|through)",
+            r"valid\s+up\s+to",
+            r"validity\s*until",
+            r"not\s+valid\s+after",
+            r"expires?\s*(?:on)?",
+            r"expiry\s*date",
+        ),
+        window_size=260,
+    )
+    if expiry_date:
+        fields["expiry_date"] = expiry_date
+
+    issue_date = _extract_date_after_label(
+        (readable_text, compact_text),
+        labels=(r"date\s*of\s*issue", r"issue\s*date", r"issued\s*at\s*(?:on)?"),
+        window_size=180,
+    )
+    if issue_date:
+        fields["issue_date"] = issue_date
+
+    return fields
+
+
+def _parse_certificate_date_ranges(raw_text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    text = re.sub(r"\s+", " ", raw_text)
+    date = _ocr_date_regex_fragment()
+    range_patterns = (
+        rf"(?:Duration\s+of\s+Security|Period\s+of\s+validity\s+of\s+the\s+financial\s+security)\s*[:.]?\s*(?:noon\s+GMT\s+)?(?P<start>{date})\s*(?:to|-)\s*(?:noon\s+GMT\s+)?(?P<end>{date})",
+        rf"(?:effective\s+as\s+from|effective\s+from)\s*[:.]?\s*(?:noon\s+GMT\s+)?(?P<start>{date})\s*(?:to|-)\s*(?:noon\s+GMT\s+)?(?P<end>{date})",
+        rf"\bPERIOD\s*:\s*From\s*:\s*(?P<start>{date})(?:\s+\d{{2}}:\d{{2}})?\s*(?:to|-)\s*(?P<end>{date})",
+        rf"\bfrom\s+(?P<start>{date})\s*(?:to|-)\s*(?P<end>{date})",
+    )
+    for pattern in range_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            continue
+        start = _normalize_ocr_date_text(match.group("start"))
+        end = _normalize_ocr_date_text(match.group("end"))
+        if _contains_ocr_date(start):
+            fields["issue_date"] = start
+        if _contains_ocr_date(end):
+            fields["expiry_date"] = end
+        return fields
+    return fields
+
+
+def _extract_date_after_label(texts: tuple[str, ...], *, labels: tuple[str, ...], window_size: int) -> str | None:
+    for text in texts:
+        for label in labels:
+            for match in re.finditer(label, text, flags=re.IGNORECASE):
+                window = text[match.end() : match.end() + window_size]
+                date_value = _extract_first_ocr_date(window)
+                if date_value:
+                    return date_value
+    return None
+
+
+def _extract_first_ocr_date(value: str) -> str | None:
+    date_pattern = re.compile(_ocr_date_regex_fragment(), re.IGNORECASE)
+    for match in date_pattern.finditer(value):
+        normalized = _normalize_ocr_date_text(match.group(0))
+        if _contains_ocr_date(normalized):
+            return normalized
+    return None
+
+
+def _ocr_date_regex_fragment() -> str:
+    return (
+        r"(?<!\d)\d{4}-\d{1,2}-\d{1,2}(?!\d)"
+        r"|(?<!\d)\d{4}年\d{1,2}月\d{1,2}日"
+        r"|(?<!\d)20\d{6}(?!\d)"
+        r"|(?<!\d)\d{1,2}(?:st|nd|rd|th)?[\s-]*[A-Za-z]{3,9}\.?,?[\s-]*\d{4}"
+        r"|(?<!\d)[A-Za-z]{3,9}\.?,?\s+\d{1,2},?\s+\d{4}"
+        r"|(?<!\d)\d{1,2}[/-]\d{1,2}[/-]\d{2,4}(?!\d)"
+        r"|(?<!\d)\d{1,2}-\d{4}(?!\d)"
+    )
 
 
 def _parse_stacked_certificate_number(raw_text: str) -> str | None:
@@ -654,14 +976,60 @@ def _clean_field_value(value: str | None) -> str:
 def _format_vessel_name(value: str) -> str:
     text = _clean_field_value(value).upper()
     text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[^\x00-\x7F]+", "", text)
+    text = re.sub(r"^\s*NOM\s+DU\s+NAVIRE\s*:?\s*", "", text)
+    text = re.sub(r"\b5F\b", "SF", text)
+    text = re.sub(r"\bOARICA\b", "DARIKA", text)
+    text = re.sub(r"\bCHAL\s+ISA\b", "CHALISA", text)
+    text = re.split(
+        r"\s+EX\.\s*NAME\b|\s+CLASS(?:IFICATION)?\s*(?:NO\.?|NUMBER)\b|\s+IMO\s*(?:NO\.?|NUMBER)?\b|\s+CALL\s*SIGN\b.*$|\s+FLAG\b.*$|\s+REGISTER\s+NO\b|\s+N[°o]\s+DE\s+REGISTRE\b",
+        text,
+        maxsplit=1,
+    )[0].strip()
     for prefix in ("EAST", "WEST", "NORTH", "SOUTH"):
         if text.startswith(prefix) and len(text) > len(prefix) + 3 and not text.startswith(f"{prefix} "):
+            return f"{prefix} {text[len(prefix):]}".strip()
+    for prefix in ("SF", "YC"):
+        if text.startswith(prefix) and len(text) > len(prefix) + 2 and not text.startswith(f"{prefix} "):
             return f"{prefix} {text[len(prefix):]}".strip()
     return text
 
 
+def _looks_like_vessel_name(value: str) -> bool:
+    text = _clean_field_value(value).upper()
+    if len(text) < 4 or len(text) > 80:
+        return False
+    blocked = {
+        "GROSS",
+        "DISTINCTIVE",
+        "CO-ASSURED",
+        "OWNER",
+        "REGISTERED OWNER",
+        "POLICY OF INSURANCE",
+        "TECHNICAL MANAGER",
+        "OWNER/OPERATOR/AUTHORIZED AGENT",
+        "NAME",
+    }
+    if text in blocked:
+        return False
+    if "_" in text or re.search(r"\b(?:OWNER|OPERATOR|AGENT|MANAGER|CO-ASSURED|FINANCIAL|SECURITY|GROSS|DISTINCTIVE|ATTACHMENT|DATE|REGISTRATION|PERSON|AUTHORIZED|ARRANGEMENT|AGREEMENT|IMO|CLASS|PORT|REGISTRY|VESSEL)\b", text):
+        return False
+    return bool(re.search(r"[A-Z]", text))
+
+
 def _clean_certificate_number(value: str) -> str:
-    return _clean_field_value(value).strip("()[]{}")
+    text = _clean_field_value(value).strip("()[]{}")
+    if re.search(r"certificate\s*no|certificateno|policy\s*no", text, re.IGNORECASE):
+        text = re.split(r"certificate\s*no\.?|certificateno\.?|policy\s*no\.?", text, flags=re.IGNORECASE)[-1]
+    token_matches = [
+        token
+        for token in re.findall(r"[A-Z0-9]{2,}(?:[-_][A-Z0-9]+){1,}[A-Z0-9]*|\b[A-Z]{1,4}\d[A-Z0-9_\-/]{4,}\b|\b\d{6,}\b", text, flags=re.IGNORECASE)
+        if re.search(r"[A-Z]", token, flags=re.IGNORECASE) or token.isdigit()
+    ]
+    if token_matches:
+        text = token_matches[-1]
+    text = re.sub(r"\s+\bREISSUED\b.*$", "", text, flags=re.IGNORECASE).strip()
+    return text.strip(" :.-()[]{}")
 
 
 def _clean_place_of_issue(value: str) -> str:
@@ -672,7 +1040,56 @@ def _clean_place_of_issue(value: str) -> str:
 
 def _normalize_ocr_date_text(value: str) -> str:
     text = _clean_field_value(value)
-    match = re.search(r"(?P<day>\d{1,2})\s*(?P<month>[A-Za-z]{3,9})\s*(?P<year>\d{4})", text)
+    text = re.sub(r"\b(\d{1,2})(st|nd|rd|th)\b", r"\1", text, flags=re.IGNORECASE)
+    chinese_match = re.search(r"\b(?P<year>\d{4})年(?P<month>\d{1,2})月(?P<day>\d{1,2})日", text)
+    if chinese_match:
+        try:
+            parsed = datetime(
+                int(chinese_match.group("year")),
+                int(chinese_match.group("month")),
+                int(chinese_match.group("day")),
+            )
+        except ValueError:
+            return text
+        return parsed.strftime("%d %B %Y").lstrip("0")
+    compact_match = re.search(r"\b(?P<year>20\d{2})(?P<month>\d{2})(?P<day>\d{2})\b", text)
+    if compact_match:
+        try:
+            parsed = datetime(
+                int(compact_match.group("year")),
+                int(compact_match.group("month")),
+                int(compact_match.group("day")),
+            )
+        except ValueError:
+            return text
+        return parsed.strftime("%d %B %Y").lstrip("0")
+    iso_match = re.search(r"\b(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})\b", text)
+    if iso_match:
+        try:
+            parsed = datetime(
+                int(iso_match.group("year")),
+                int(iso_match.group("month")),
+                int(iso_match.group("day")),
+            )
+        except ValueError:
+            return text
+        return parsed.strftime("%d %B %Y").lstrip("0")
+    month_first_match = re.search(
+        r"(?P<month>[A-Za-z]{3,9})\.?,?\s+(?P<day>\d{1,2}),?\s+(?P<year>\d{4})",
+        text,
+        re.IGNORECASE,
+    )
+    if month_first_match:
+        month = _MONTH_ALIASES.get(month_first_match.group("month").lower(), month_first_match.group("month").capitalize())
+        return f"{int(month_first_match.group('day'))} {month} {month_first_match.group('year')}"
+    month_year_match = re.search(r"\b(?P<month>\d{1,2})-(?P<year>\d{4})\b", text)
+    if month_year_match:
+        month = int(month_year_match.group("month"))
+        year = int(month_year_match.group("year"))
+        if 1 <= month <= 12:
+            parsed = datetime(year, month, 1)
+            return parsed.strftime("%B %Y")
+    match = re.search(r"(?P<day>\d{1,2})\s*-?\s*(?P<month>[A-Za-z]{3,9})\.?,?\s*-?\s*(?P<year>\d{4})", text)
     if not match:
         slash_match = re.search(r"(?P<day>\d{1,2})[/-](?P<month>\d{1,2})[/-](?P<year>\d{2,4})", text)
         if not slash_match:
@@ -690,7 +1107,12 @@ def _normalize_ocr_date_text(value: str) -> str:
 
 
 def _contains_ocr_date(value: str) -> bool:
-    return bool(re.search(r"\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", value))
+    return bool(
+        re.search(
+            r"\d{1,2}[\s-]+[A-Za-z]{3,9}\.?,?[\s-]+\d{4}|[A-Za-z]{3,9}\.?,?\s+\d{1,2},?\s+\d{4}|\d{4}年\d{1,2}月\d{1,2}日|\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|[A-Za-z]{3,9}\s+\d{4}",
+            value,
+        )
+    )
 
 
 def _add_year_to_ocr_date(value: str | None) -> str | None:

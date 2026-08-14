@@ -183,7 +183,7 @@ A comprehensive inspection management system for maritime vessels that handles P
 **User Story:** As a system, I want to automatically create a CAR when a deficiency is added so that 1:1 relationship is enforced.
 **Acceptance Criteria:**
 - [ ] Triggered automatically on deficiency INSERT
-- [ ] CAR number format: SOURCE-YYYY-NNN (e.g., PSC-2026-001)
+- [ ] CAR number format for new PSC CARs: VESSEL_CODE-PSC-YYYY-NNN (e.g., EAT-PSC-2026-001); legacy SOURCE-YYYY-NNN values remain valid for older records.
 - [ ] CAR created in DRAFT status
 - [ ] Target date defaults to deficiency target or +7 days
 - [ ] No manual CAR creation allowed

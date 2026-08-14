@@ -478,3 +478,8 @@
 **What happened:** The normal Certs PDF had already stopped printing internal print ID/hash/scope metadata, but the Excel companion still printed Print ID, Scope, and System state hash rows.
 **Why:** A print/export workflow can generate multiple artifacts from separate renderers, so fixing only the PDF leaves the user-facing Excel with the same technical clutter.
 **Rule:** When removing internal metadata from generated print output, inspect and test every delivered format in the workflow: PDF, Excel, ZIP manifest, result panel, email body, and Print History. Preserve DB/API/audit traceability, but keep normal user-facing files clean unless the user explicitly asks for those identifiers.
+
+## L-090 - Same certificate PDF uploads should reprocess, not block
+**What happened:** A Certs first-upload issue was fixed for unattached matching PDF blobs, but the user clarified that the duplicate-PDF error should not appear in any same-file upload case.
+**Why:** For users, uploading the same certificate PDF usually means "process this file again" or recover from a stale server record; blocking it creates a dead end.
+**Rule:** In Certs certificate upload flows, treat exact same-PDF uploads as successful reprocessing against the existing blob. Avoid user-facing duplicate-file errors unless the user explicitly asks for hard duplicate prevention.

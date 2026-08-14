@@ -1649,13 +1649,13 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 ### FEAT-SAF-DASH-001 — Safety Intelligence Dashboard (Composite Score)
 
 **Priority:** V1
-**User story:** As DPA / FM, I see a simplified Safety Dashboard with the key score, current view context, filters, and export controls first, with detailed analytics available only when I open them.
+**User story:** As DPA / FM, I see a simplified Safety Dashboard with overall status, current view context, filters, total summary counts, an open-work pie chart, a ranked score-health breakdown, hover help on the main cards, and export controls first, with detailed analytics available only when I open them.
 **Acceptance criteria:**
 - Single landing page at `/safety/dashboard`.
-- Default panels: Safety score, current view context, time-period controls, vessel controls when available, and DPA export controls. Repeat-root-cause radar (FEAT-SAF-DASH-003), Pareto screening (FEAT-SAF-DASH-004), CA aging (FEAT-SAF-DASH-006), Heinrich ratio (FEAT-SAF-DASH-002), and SOI Compliance % (FEAT-SAF-DASH-005) remain available behind **Show dashboard details**.
+- Default panels: compact overall status, total-count KPI cards, open-work pie chart, ranked score-health breakdown, time-period controls, vessel controls when available, and DPA export controls. Main summary cards expose simple hover help for new users. Open counts are used by the Open work pie chart; the top KPI cards show total incidents, total near misses, total findings, total corrective actions, and SOI Compliance % for the selected period/scope. Repeat-root-cause radar (FEAT-SAF-DASH-003), Pareto screening (FEAT-SAF-DASH-004), CA aging (FEAT-SAF-DASH-006), and SOI Compliance % (FEAT-SAF-DASH-005) remain available behind **Show details**. The Reporting trend / Heinrich ratio card is not rendered on the current Safety Dashboard.
 - Period persistence per user session (build-time deferral).
 - DPA-only export rights (FEAT-SAF-DASH-007).
-**Dependencies:** FEAT-SAF-DASH-002, FEAT-SAF-DASH-003, FEAT-SAF-DASH-004, FEAT-SAF-DASH-005, FEAT-SAF-DASH-006, FEAT-SAF-DASH-007.
+**Dependencies:** FEAT-SAF-DASH-003, FEAT-SAF-DASH-004, FEAT-SAF-DASH-005, FEAT-SAF-DASH-006, FEAT-SAF-DASH-007.
 **Decisions:** §2B.14, D-GAP-H1.
 **SSOT refs:** see SSOT §2B.14.
 
@@ -1672,6 +1672,7 @@ Ten sections per D-GAP-R09 refinement of D-PDF-01:
 **Dependencies:** FEAT-SAF-DASH-001.
 **Decisions:** D-DNV-13, D-GAP-M27, D-GAP-H2.
 **SSOT refs:** see SSOT §2B.14; §6 D-GAP-M27.
+**Current dashboard note:** retained as backend/dashboard compatibility logic only; `/safety/dashboard/` no longer renders this card after CR-139.
 
 ### FEAT-SAF-DASH-003 — Repeat-Root-Cause Radar (Fleet + Vessel)
 

@@ -723,6 +723,10 @@ describe('safety routes', () => {
           soi_compliance_display: '100%',
           soi_compliance_label: 'SOI Compliance %',
           soi_compliance_percent: 100,
+          total_corrective_actions: 2,
+          total_findings: 3,
+          total_incidents: 4,
+          total_near_misses: 5,
         },
         period_code: '3Y',
         scope_id: 'vessel-1',
@@ -1154,6 +1158,19 @@ describe('safety routes', () => {
     expect(
       await screen.findByText('Safety Dashboard')
     ).toBeInTheDocument();
+    expect(screen.getByText('Overall status')).toBeInTheDocument();
+    expect(screen.getByText('Total incidents')).toBeInTheDocument();
+    expect(screen.getByText('Total near misses')).toBeInTheDocument();
+    expect(screen.getByText('Total findings')).toBeInTheDocument();
+    expect(screen.getByText('Total actions')).toBeInTheDocument();
+    expect(screen.getByText('Open work')).toBeInTheDocument();
+    expect(screen.getByText('Score breakdown')).toBeInTheDocument();
+    expect(screen.getByText('Lowest score appears first.')).toBeInTheDocument();
+    expect(screen.getByText(/quick health check for the selected view/i)).toBeInTheDocument();
+    expect(screen.getByText(/work still waiting for action/i)).toBeInTheDocument();
+    expect(screen.getByText(/which safety areas are helping or lowering/i)).toBeInTheDocument();
+    expect(screen.getByText('Pulling score down most')).toBeInTheDocument();
+    expect(screen.getAllByText('Finding closure')).toHaveLength(2);
     expect(screen.getByTestId('safety-layout')).toBeInTheDocument();
   });
 
@@ -1202,6 +1219,10 @@ describe('safety routes', () => {
             soi_compliance_display: '100%',
             soi_compliance_label: 'SOI Compliance %',
             soi_compliance_percent: 100,
+            total_corrective_actions: 0,
+            total_findings: 0,
+            total_incidents: 0,
+            total_near_misses: 0,
           },
           period_code: '3Y',
           scope_id: vesselId || '',
@@ -1234,7 +1255,7 @@ describe('safety routes', () => {
 
     await waitFor(() => {
       expect(
-        safetyQueryMocks.useSafetyDashboardHeinrich
+        safetyQueryMocks.useSafetyDashboardRepeatRoot
       ).toHaveBeenLastCalledWith('vessel-2');
     });
     expect(screen.getByText('Scope: MV02 - Beacon')).toBeInTheDocument();

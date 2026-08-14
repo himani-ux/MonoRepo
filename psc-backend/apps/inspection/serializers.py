@@ -11,6 +11,7 @@ Serializers:
 
 from rest_framework import serializers
 from django.utils import timezone
+from django.db import connection
 
 from .models import Inspection, InspectionReport, InspectionStatus, InspectionType
 
@@ -201,9 +202,28 @@ class InspectionDetailSerializer(serializers.ModelSerializer):
         Crew members only see deficiencies assigned to them.
         """
         from .deficiency_serializers import DeficiencyListSerializer
-        active = obj.active_deficiencies
+        from .deficiency_models import Deficiency
 
         request = self.context.get('request')
+
+        if connection.vendor == 'microsoft':
+            sql = [
+                "SELECT d.*",
+                "FROM psc_deficiency d",
+                "WHERE d.inspection_id = %s",
+                "AND ISNULL(d.is_deleted, 0) = 0",
+            ]
+            params = [str(obj.id).replace('-', '').lower()]
+
+            if request and getattr(request.user, 'role', None) == 'VESSEL_CREW':
+                sql.append("AND (d.assigned_crew_id = %s OR d.assigned_crew_id = %s)")
+                params.extend([request.user.crew_id, request.user.id])
+
+            sql.append("ORDER BY d.sequence_no, d.created_date")
+            active = list(Deficiency.objects.raw(" ".join(sql), params))
+            return DeficiencyListSerializer(active, many=True).data
+
+        active = obj.active_deficiencies
         if request and getattr(request.user, 'role', None) == 'VESSEL_CREW':
             from django.db.models import Q
             active = active.filter(

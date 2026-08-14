@@ -986,12 +986,12 @@ Standard loaded/loading/error.
 **Role gate:** `PermissionGate(SAF_F_005) + role ∈ {DPA, FM, TD, HOD (shore), Master (own vessel view)}`.
 **Data loaded on mount:**
 - `GET /api/safety/dashboard/composite/?period={p}` — composite Safety Health Score.
-- Panels loaded in parallel: Heinrich (FEAT-SAF-DASH-002), Repeat-root-cause (DASH-003), Pareto (DASH-004), SOI Compliance % (DASH-005, label per D-GAP-DESIGN-01), CA Aging (DASH-006).
+- Panels loaded in parallel: Repeat-root-cause (DASH-003), Pareto (DASH-004), SOI Compliance % (DASH-005, label per D-GAP-DESIGN-01), CA Aging (DASH-006). The Reporting trend / Heinrich dashboard query is not loaded by this screen.
 **Signature transition:** n/a.
 **States:**
 - **Loaded:** Grid of panels; period selector; export button (DPA-only `SAF_P_007`).
 - **Loading:** Skeleton panel grid.
-- **Empty per panel:** e.g., Heinrich `"Reporting Culture Gap — insufficient data"` (D-GAP-M27). SOI compliance on new vessel → `"N/A — awaiting first cycle"` (D-GAP-M30).
+- **Empty per panel:** SOI compliance on new vessel → `"N/A — awaiting first cycle"` (D-GAP-M30); optional detail panels can show their own empty-state text.
 - **Error — network:** per-panel error badges; other panels continue.
 - **Error — auth:** FM sees dashboards but **no export** (D-GAP-M31).
 **Navigation:**
@@ -1213,7 +1213,7 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 | FEAT-SAF-AUDIT-006 | R: auto-save draft persistence across forms; Phase 1 keeps the header free of internal incident-id and auto-save badges | CR-026 |
 | FEAT-SAF-AUDIT-007 | System-level; no UI surface | — |
 | FEAT-SAF-DASH-001 | P: `/safety/dashboard/` | — |
-| FEAT-SAF-DASH-002 | R: Heinrich panel | — |
+| FEAT-SAF-DASH-002 | Backend/API compatibility only; not rendered on current Safety Dashboard | — |
 | FEAT-SAF-DASH-003 | R: repeat-root radar panel | — |
 | FEAT-SAF-DASH-004 | R: Pareto panel | — |
 | FEAT-SAF-DASH-005 | R: SOI Compliance % panel + SOI list tile | **Label per D-GAP-DESIGN-01** |
@@ -1248,6 +1248,6 @@ Note: FEAT-SAF-INC-012 through FEAT-SAF-INC-014 are superseded for the current u
 **Open BLOCKED stubs:**
 - §8.2 — FTS engine selection (build-time deferral, Round 20).
 
-**CR-084 current Safety Dashboard and auditor export presentation:** `/safety/dashboard/` uses the visible heading **Safety Dashboard** and defaults to a quiet office view with Safety score, Current view, period/vessel controls, and export controls. Repeat issues, top repeat causes, corrective-action age, Heinrich Ratio, and SOI Compliance % remain available only after the user opens **Show dashboard details**. `/safety/admin/auditor-export/` uses a Vessel filter dropdown populated from active vessel options rather than a free-text vessel field.
+**CR-142 current Safety Dashboard presentation and CR-084 auditor export presentation:** `/safety/dashboard/` uses the visible heading **Safety Dashboard** and defaults to a quiet office view with compact scope/period/vessel controls, overall status, total-count KPI cards, open-work pie chart, ranked score-health breakdown, and export controls. The main summary cards provide short plain-language hover help so new users can understand each card without extra permanent text. The top summary boxes show total incidents, total near misses, total findings, total corrective actions, and SOI Compliance % for the selected period/scope. The Open work pie chart uses open/overdue counts. The score breakdown uses existing component scores, shows the lowest score first, and highlights the part pulling the total down most. Repeat issues, top repeat causes, corrective-action age, and SOI Compliance % remain available only after the user opens **Show details**. The Reporting trend / Heinrich Ratio card is not shown on this screen. `/safety/admin/auditor-export/` uses a Vessel filter dropdown populated from active vessel options rather than a free-text vessel field.
 
 **End of APP_FLOW.**

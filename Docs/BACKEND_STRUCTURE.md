@@ -453,7 +453,7 @@ CREATE INDEX [IX_psc_def_action_history_deficiency_id] ON [psc_deficiency_action
 CREATE TABLE [dbo].[psc_car] (
     [id] [uniqueidentifier] NOT NULL DEFAULT NEWID(),
     [deficiency_id] [uniqueidentifier] NOT NULL UNIQUE,  -- 1:1 relationship
-    [car_number] [varchar](20) NOT NULL,          -- PSC-2026-001
+    [car_number] [varchar](20) NOT NULL,          -- EAT-PSC-2026-001 for new CARs; legacy PSC-2026-001 remains valid
     [status] [varchar](30) NOT NULL DEFAULT 'DRAFT',  -- DRAFT, SUBMITTED, PIC_ACCEPTED, REWORK_REQUESTED, DPA_CLOSED
     [root_cause_summary] [nvarchar](max) NULL,
     [target_date] [date] NULL,
@@ -827,51 +827,15 @@ CREATE INDEX [IX_psc_notification_created_date] ON [psc_notification]([created_d
 
 ### 8.1 Auto-Create CAR on Deficiency Insert
 
-```sql
-CREATE TRIGGER [trg_psc_deficiency_auto_create_car]
-ON [dbo].[psc_deficiency]
-AFTER INSERT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    INSERT INTO [psc_car] (
-        [id],
-        [deficiency_id],
-        [car_number],
-        [status],
-        [target_date],
-        [created_by],
-        [created_date]
-    )
-    SELECT 
-        NEWID(),
-        i.[id],
-        -- Generate CAR number: {TYPE}-{YEAR}-{SEQ}
-        (
-            SELECT TOP 1 
-                insp.inspection_type + '-' + 
-                CAST(YEAR(insp.inspection_date) AS VARCHAR) + '-' +
-                RIGHT('000' + CAST(
-                    ISNULL((
-                        SELECT COUNT(*) + 1 
-                        FROM psc_car c2 
-                        INNER JOIN psc_deficiency d2 ON c2.deficiency_id = d2.id
-                        INNER JOIN psc_inspection i2 ON d2.inspection_id = i2.id
-                        WHERE i2.inspection_type = insp.inspection_type
-                        AND YEAR(i2.inspection_date) = YEAR(insp.inspection_date)
-                    ), 1) AS VARCHAR), 3)
-            FROM psc_inspection insp 
-            WHERE insp.id = i.inspection_id
-        ),
-        'DRAFT',
-        ISNULL(i.target_date, DATEADD(day, 7, GETDATE())),
-        i.created_by,
-        GETDATE()
-    FROM inserted i;
-END;
-GO
-```
+Live implementation: Django `post_save` signal on `Deficiency` creates the CAR and calls `CAR.generate_car_number(inspection=...)`.
+
+Number format for new auto-created PSC CARs:
+
+`<VESSEL_CODE>-PSC-<YEAR>-<SEQUENCE>`
+
+Example: `EAT-PSC-2026-001`
+
+The SQL trigger-style example used in earlier design notes is historical and should not be treated as the live generator.
 
 ### 8.2 Auto-Clear Deficiency on Action Code 10
 
@@ -1038,29 +1002,15 @@ END;
 GO
 ```
 
-### 9.3 usp_psc_generate_car_number
+### 9.3 CAR number generation
 
-```sql
-CREATE PROCEDURE [dbo].[usp_psc_generate_car_number]
-    @inspection_type varchar(20),
-    @year int,
-    @car_number varchar(20) OUTPUT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    DECLARE @seq int;
-    
-    SELECT @seq = ISNULL(MAX(
-        CAST(RIGHT(c.car_number, 3) AS INT)
-    ), 0) + 1
-    FROM psc_car c
-    WHERE c.car_number LIKE @inspection_type + '-' + CAST(@year AS VARCHAR) + '-%';
-    
-    SET @car_number = @inspection_type + '-' + CAST(@year AS VARCHAR) + '-' + RIGHT('000' + CAST(@seq AS VARCHAR), 3);
-END;
-GO
-```
+New auto-created PSC CARs use the application-side format:
+
+`<VESSEL_CODE>-PSC-<YEAR>-<SEQUENCE>`
+
+Example: `EAT-PSC-2026-001`
+
+The sequence is calculated from existing CAR rows for the same vessel and calendar year through the existing CAR -> deficiency -> inspection relationship. Historical CAR numbers such as `PSC-2026-001` remain valid and are not rewritten.
 
 ---
 
@@ -1216,7 +1166,7 @@ Content-Type: application/json
         "is_cleared": false,
         "car": {
           "id": "uuid",
-          "car_number": "PSC-2026-001",
+          "car_number": "EAT-PSC-2026-001",
           "status": "DRAFT"
         }
       }
@@ -1308,7 +1258,7 @@ Content-Type: application/json
     ...
     "car": {
       "id": "uuid",
-      "car_number": "PSC-2026-001",
+      "car_number": "EAT-PSC-2026-001",
       "status": "DRAFT"
     }
   },
@@ -1345,7 +1295,7 @@ Content-Type: application/json
 {
   "data": {
     "id": "uuid",
-    "car_number": "PSC-2026-001",
+    "car_number": "EAT-PSC-2026-001",
     "status": "DRAFT",
     "deficiency": {
       "id": "uuid",

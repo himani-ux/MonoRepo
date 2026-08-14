@@ -2837,6 +2837,118 @@ Current behavior after CR-087:
 - The global sidebar and mobile bottom nav show Certs only for users with at least one `CERT_F_*` form permission.
 - Certs parsing/OCR/Slack dependencies are listed in backend requirements for deployment.
 
+## Amendment 38 - 2026-08-13
+
+Safety dashboard presentation is simplified again under CR-135. Current `/safety/dashboard/` default view shows compact scope/period/vessel controls, Safety score, KPI cards, and export controls first. Repeat issues, top repeat causes, corrective-action age, Heinrich Ratio, and SOI Compliance % remain available only inside **Show details**.
+
+Triggering discovery: post-shipment user review found the Safety Dashboard still looked chaotic and asked for a cleaner PSC-dashboard-style layout.
+
+Supersedes:
+- Amendment 36 / CR-084 only where the dashboard still showed a separate Current view panel or named the optional analytics control **Show dashboard details**.
+
+Current behavior after CR-135:
+- The dashboard route keeps the existing dashboard endpoints, calculations, export permissions, and **SOI Compliance %** label.
+- The first screen presents the main safety score and open-item KPI cards before optional analytics.
+- Optional analytics remain hidden by default and open from **Show details**.
+
+## Amendment 39 - 2026-08-13
+
+Safety dashboard presentation is visually enhanced under CR-136 without changing the simplified CR-135 workflow. Current `/safety/dashboard/` default view keeps compact scope/period/vessel controls, Safety score, KPI cards, and export controls first, and now adds compact open-work and score-breakdown chart panels in the summary area. Repeat issues, top repeat causes, corrective-action age, Heinrich Ratio, and SOI Compliance % remain available only inside **Show details**.
+
+Triggering discovery: user review found the CR-135 dashboard clean but too plain, and requested styling plus charts while keeping the simplified PSC-dashboard-style workflow.
+
+Supersedes:
+- Amendment 38 / CR-135 only where the first-screen summary listed KPI cards without any visual chart panels.
+
+Current behavior after CR-136:
+- The dashboard route keeps the existing dashboard endpoints, calculations, export permissions, and **SOI Compliance %** label.
+- The first screen presents Safety score, open-item KPI cards, an open-work chart, and a score-breakdown chart.
+- Optional analytics remain hidden by default and open from **Show details**.
+
+## Amendment 40 - 2026-08-13
+
+Safety dashboard presentation is refined under CR-137 so the summary visuals read as real charts instead of simple progress bars. Current `/safety/dashboard/` default view keeps compact scope/period/vessel controls, Safety score, KPI cards, and export controls first, and now renders an open-work donut chart and score-breakdown horizontal chart in the summary area. Repeat issues, top repeat causes, corrective-action age, Heinrich Ratio, and SOI Compliance % remain available only inside **Show details**.
+
+Triggering discovery: user clarified that the dashboard should include graphs and charts, not only simple bar-style summary visuals.
+
+Supersedes:
+- Amendment 39 / CR-136 only where the summary chart panels were implemented as simple bar indicators.
+
+Current behavior after CR-137:
+- The dashboard route keeps the existing dashboard endpoints, calculations, export permissions, and **SOI Compliance %** label.
+- The first screen presents Safety score, open-item KPI cards, an open-work donut chart, and a score-breakdown horizontal chart.
+- Optional analytics remain hidden by default and open from **Show details**.
+
+## Amendment 41 - 2026-08-13
+
+Safety dashboard presentation is refined under CR-138 so the open-work visual remains a pie chart but no longer uses the donut/ring style. Current `/safety/dashboard/` default view keeps compact scope/period/vessel controls, Safety score, KPI cards, export controls, and the score-breakdown horizontal chart, while the open-work panel renders a full pie chart with separated slices and legend values.
+
+Triggering discovery: user wanted to keep the pie chart but asked for a different pie-chart style.
+
+Supersedes:
+- Amendment 40 / CR-137 only where the open-work visual was described as a donut chart.
+
+Current behavior after CR-138:
+- The dashboard route keeps the existing dashboard endpoints, calculations, export permissions, and **SOI Compliance %** label.
+- The first screen presents Safety score, open-item KPI cards, an open-work full pie chart, and a score-breakdown horizontal chart.
+- Optional analytics remain hidden by default and open from **Show details**.
+
+## Amendment 42 - 2026-08-14
+
+Safety dashboard presentation is refined under CR-139 so the optional **Reporting trend** / Heinrich Ratio card is no longer shown. Current `/safety/dashboard/` default view keeps compact scope/period/vessel controls, Safety score, KPI cards, export controls, the open-work full pie chart, and the score-breakdown horizontal chart. **Show details** now exposes repeat issues, top repeat causes, corrective-action age, and SOI Compliance % only.
+
+Triggering discovery: user requested removal of the **Reporting trend** card from the Safety Dashboard.
+
+Supersedes:
+- Amendments 38 through 41 and CR-135 through CR-138 only where they said Heinrich Ratio / Reporting trend remained available inside **Show details**.
+
+Current behavior after CR-139:
+- The dashboard route keeps the existing composite dashboard calculations, export permissions, and **SOI Compliance %** label.
+- The frontend no longer calls the dashboard Heinrich query from `/safety/dashboard/`.
+- The backend Heinrich/reporting-trend endpoint and logic are retained for compatibility and are not removed by this UI change.
+
+## Amendment 43 - 2026-08-14
+
+Safety dashboard score explanation is refined under CR-140 so the **Score breakdown** card no longer renders as a raw horizontal chart. Current `/safety/dashboard/` uses the existing composite `component_scores` payload and displays a ranked score-health list: the lowest component score appears first, the weakest part is highlighted as pulling the score down most, and each component is labelled Good, Watch, or Needs attention.
+
+Triggering discovery: user review found the Score breakdown card confusing and asked to improve it logic-wise so users can understand it.
+
+Supersedes:
+- Amendments 39 through 42 and CR-136 through CR-139 only where they described the Score breakdown as a horizontal chart.
+
+Current behavior after CR-140:
+- Backend composite score calculations and response fields are unchanged.
+- The first screen still presents Safety score, open-item KPI cards, an open-work full pie chart, and export controls.
+- Score breakdown explains existing score components using plain labels and weakest-first ordering.
+
+## Amendment 44 - 2026-08-14
+
+Safety dashboard summary meaning is refined under CR-141. Current `/safety/dashboard/` shows **Overall status** instead of the numeric Safety score as the first summary card. The top KPI cards show total incidents, total near misses, total findings, total corrective actions, and SOI Compliance % for the selected period/scope. The Open work pie chart remains the place where open incidents, open near misses, open findings, and overdue corrective actions are shown.
+
+Triggering discovery: user review found the top cards repeated open counts already shown in the pie chart and asked to avoid the primary score number.
+
+Supersedes:
+- Amendments 38 through 43 and CR-135 through CR-140 only where they described the first summary card as a numeric Safety score or described the top KPI cards as open-item cards.
+
+Current behavior after CR-141:
+- Existing open-count fields and score calculation remain in the dashboard response for compatibility and chart/status logic.
+- The dashboard response adds total metric fields for top-card display.
+- The frontend uses total metric fields for the top KPI cards and open/overdue metric fields for the Open work pie chart.
+
+## Amendment 45 - 2026-08-14
+
+Safety dashboard usability is refined under CR-142. Current `/safety/dashboard/` keeps the CR-141 overall status, total-count KPI cards, open-work pie chart, and ranked score breakdown, and adds short plain-language hover help to the main summary cards. The help text explains what each card means for new users without changing the metrics, charts, routes, permissions, exports, or backend response.
+
+Triggering discovery: user review found new users may still be confused by dashboard cards and requested simplified detail info on hover.
+
+Supersedes:
+- No previous calculation, workflow, endpoint, permission, or export behavior. This amendment only adds the hover-help presentation state to the current Safety Dashboard.
+
+Current behavior after CR-142:
+- Main Safety Dashboard cards expose plain hover help.
+- Hover help explains the card meaning only and avoids technical wording.
+- Existing dashboard calculations and response fields remain unchanged.
+
 **Document Control:**
 - Created: 2026-04-17
 - Author: Wave 3 docsuite generation agent (Implementation Plan)

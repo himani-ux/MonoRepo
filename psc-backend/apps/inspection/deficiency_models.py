@@ -8,7 +8,8 @@ Tables:
 """
 
 import uuid
-from django.db import models
+import re
+from django.db import connection, models
 from django.utils import timezone
 
 from .models import Inspection
@@ -62,7 +63,7 @@ class CAR(models.Model):
     # 1:1 relationship with deficiency (set in Deficiency model)
     # deficiency field will be set via OneToOneField from Deficiency
 
-    # CAR number: PSC-{YEAR}-{SEQ}
+    # CAR number: <VESSEL_CODE>-PSC-{YEAR}-{SEQ} for newly auto-created PSC CARs.
     car_number = models.CharField(max_length=20, unique=True, db_index=True)
 
     # Status workflow
@@ -128,15 +129,27 @@ class CAR(models.Model):
         return self.car_number
 
     @classmethod
-    def generate_car_number(cls):
+    def generate_car_number(cls, *, inspection: Inspection | None = None, vessel_code: str | None = None):
         """
-        Generate next CAR number: PSC-{YEAR}-{SEQ}
-        Format: PSC-2026-001, PSC-2026-002, etc.
+        Generate next CAR number.
+
+        New auto-created CARs use: <VESSEL_CODE>-PSC-{YEAR}-{SEQ}
+        Legacy no-context callers keep the historical PSC-{YEAR}-{SEQ} format.
         """
         current_year = timezone.now().year
-        prefix = f"PSC-{current_year}-"
+        if inspection is not None or vessel_code:
+            return cls._generate_vessel_car_number(
+                year=current_year,
+                vessel_id=getattr(inspection, "vessel_id", None),
+                vessel_code=vessel_code or _lookup_vessel_code(getattr(inspection, "vessel_id", None)),
+            )
 
-        # Get the highest sequence number for this year
+        return cls._generate_legacy_car_number(year=current_year)
+
+    @classmethod
+    def _generate_legacy_car_number(cls, *, year: int) -> str:
+        prefix = f"PSC-{year}-"
+
         last_car = cls.objects.filter(
             car_number__startswith=prefix
         ).order_by('-car_number').first()
@@ -152,6 +165,88 @@ class CAR(models.Model):
             next_seq = 1
 
         return f"{prefix}{next_seq:03d}"
+
+    @classmethod
+    def _generate_vessel_car_number(cls, *, year: int, vessel_id: object, vessel_code: str | None) -> str:
+        normalized_code = _normalize_vessel_code(vessel_code, vessel_id=vessel_id)
+        prefix = f"{normalized_code}-PSC-{year}-"
+        queryset = cls.objects.filter(car_number__startswith=prefix)
+
+        last_seq = 0
+        for car_number in queryset.values_list("car_number", flat=True):
+            match = re.match(rf"^{re.escape(prefix)}(\d+)$", str(car_number or ""))
+            if not match:
+                continue
+            last_seq = max(last_seq, int(match.group(1)))
+
+        candidate = f"{prefix}{last_seq + 1:03d}"
+        max_length = cls._meta.get_field("car_number").max_length or 20
+        if len(candidate) > max_length:
+            raise ValueError(
+                "Generated CAR number exceeds psc_car.car_number length. "
+                "A database datatype change is required before this vessel code/sequence can be used."
+            )
+        return candidate
+
+
+def _normalize_vessel_code(value: str | None, *, vessel_id: object = None) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]", "", str(value or "")).upper()
+    if not normalized:
+        raise ValueError(
+            "Vessel code is required for PSC CAR numbering. "
+            "Check VesselData.vesselCode for this vessel before creating a CAR."
+        )
+    if len(normalized) > 7:
+        raise ValueError(
+            "Vessel code is too long for the current psc_car.car_number length. "
+            "A database datatype change is required before this code can be used."
+        )
+    return normalized
+
+
+def _compact_uuid(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        return uuid.UUID(raw).hex
+    except (TypeError, ValueError, AttributeError):
+        return raw.replace("-", "").lower()
+
+
+def _lookup_vessel_code(vessel_id: object) -> str | None:
+    if not vessel_id:
+        return None
+    try:
+        if connection.vendor == "microsoft":
+            compact_vessel_id = _compact_uuid(vessel_id)
+            if not compact_vessel_id:
+                return None
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT TOP 1 vesselCode
+                    FROM VesselData
+                    WHERE id = CAST(
+                        STUFF(STUFF(STUFF(STUFF(%s, 9, 0, '-'), 14, 0, '-'), 19, 0, '-'), 24, 0, '-')
+                        AS uniqueidentifier
+                    )
+                      AND is_active = 1
+                      AND is_deleted = 0
+                    """,
+                    [compact_vessel_id],
+                )
+                row = cursor.fetchone()
+            return str(row[0]).strip() if row and row[0] else None
+
+        from apps.accounts.models import VesselData
+        return (
+            VesselData.objects.filter(id=vessel_id)
+            .values_list("vesselCode", flat=True)
+            .first()
+        )
+    except Exception:
+        return None
 
 
 class Deficiency(models.Model):

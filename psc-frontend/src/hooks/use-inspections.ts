@@ -298,7 +298,21 @@ export function useCreateDeficiency(inspectionId: number | string) {
 
   return useMutation<Deficiency, Error, CreateDeficiencyInput>({
     mutationFn: (data) => inspectionsApi.createDeficiency(inspectionId, data),
-    onSuccess: () => {
+    onSuccess: (createdDeficiency) => {
+      queryClient.setQueryData<InspectionDetail>(
+        inspectionKeys.detail(inspectionId),
+        (current) => {
+          if (!current) return current;
+          const deficiencies = current.deficiencies ?? [];
+          if (deficiencies.some((item) => String(item.id) === String(createdDeficiency.id))) {
+            return current;
+          }
+          return {
+            ...current,
+            deficiencies: [...deficiencies, createdDeficiency],
+          };
+        }
+      );
       // Invalidate inspection detail to update deficiency count
       queryClient.invalidateQueries({
         queryKey: inspectionKeys.detail(inspectionId),

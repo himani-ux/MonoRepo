@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import Value
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib.pagesizes import A4
@@ -58,10 +58,14 @@ from apps.car.views import (
     PhysicalVerificationCloseView,
     PhysicalVerificationCreateView,
 )
-from apps.inspection.deficiency_models import CAR, CARStatus, Deficiency
+from apps.inspection.deficiency_models import CAR, CARStatus, Deficiency, _lookup_vessel_code
 from apps.inspection.deficiency_serializers import DeficiencyActionCodeUpdateSerializer
-from apps.inspection.deficiency_views import DeficiencyCreateView
+from apps.inspection.deficiency_views import (
+    DeficiencyCreateView,
+    _persist_deficiency_workflow_fields,
+)
 from apps.inspection.models import Inspection, InspectionStatus
+from apps.inspection.serializers import InspectionDetailSerializer
 from apps.notifications.models import Notification
 
 
@@ -84,6 +88,169 @@ def make_user(
         crew_id=crew_id,
         is_authenticated=True,
     )
+
+
+class TestDeficiencyWorkflowPersistence(SimpleTestCase):
+    """Regression coverage for create-time workflow assignment persistence."""
+
+    @patch("apps.inspection.deficiency_views.Deficiency.objects")
+    def test_persist_workflow_fields_uses_queryset_update_and_syncs_instance(self, mock_objects):
+        deficiency = SimpleNamespace(
+            pk=uuid.uuid4(),
+            def_status=None,
+            owner_rank=None,
+            owner_name=None,
+            reviewer_crew_id=None,
+            reviewer_rank=None,
+            reviewer_name=None,
+        )
+        fields = {
+            "def_status": "ALLOCATED",
+            "owner_rank": "ABLE SEAMAN",
+            "owner_name": "Assigned Crew",
+            "reviewer_crew_id": "reviewer-1",
+            "reviewer_rank": "MASTER",
+            "reviewer_name": "Vessel Master",
+        }
+        queryset = MagicMock()
+        queryset.update.return_value = 1
+        mock_objects.filter.return_value = queryset
+
+        updated = _persist_deficiency_workflow_fields(deficiency, fields)
+
+        self.assertEqual(updated, 1)
+        mock_objects.filter.assert_called_once_with(pk=deficiency.pk)
+        queryset.update.assert_called_once_with(**fields)
+        for field_name, field_value in fields.items():
+            self.assertEqual(getattr(deficiency, field_name), field_value)
+
+    @patch("apps.inspection.deficiency_views._deficiency_exists_for_inspection", return_value=True)
+    @patch("apps.inspection.deficiency_views.DeficiencyDetailSerializer")
+    @patch("apps.inspection.deficiency_views.ActivityHistory.objects.create")
+    @patch("apps.inspection.deficiency_views.DeficiencyCreateSerializer")
+    @patch("apps.inspection.deficiency_views.HasVesselAccess.has_object_permission", return_value=True)
+    @patch("apps.inspection.deficiency_views.get_object_or_404")
+    def test_create_deficiency_inserts_workflow_fields_with_initial_save(
+        self,
+        mock_get_object,
+        _mock_access,
+        mock_serializer_class,
+        _mock_activity_create,
+        mock_detail_serializer,
+        _mock_persisted,
+    ):
+        inspection = SimpleNamespace(
+            id=uuid.uuid4(),
+            vessel_id=uuid.uuid4(),
+            def_reported="YES",
+        )
+        mock_get_object.return_value = inspection
+
+        serializer = MagicMock()
+        serializer.is_valid.return_value = True
+        serializer.validated_data = {"assigned_crew_id": "KSM0001"}
+        serializer.save.return_value = SimpleNamespace(
+            id=uuid.uuid4(),
+            assigned_crew_id="KSM0001",
+            def_code="10101",
+        )
+        mock_serializer_class.return_value = serializer
+        mock_detail_serializer.return_value.data = {"id": str(serializer.save.return_value.id)}
+
+        workflow_assignment = {
+            "crew_id": "KSM0001",
+            "fields": {
+                "def_status": "ALLOCATED",
+                "owner_rank": "ABLE SEAMAN",
+                "owner_name": "Assigned Crew",
+                "reviewer_crew_id": "reviewer-1",
+                "reviewer_rank": "MASTER",
+                "reviewer_name": "Vessel Master",
+            },
+        }
+        request = SimpleNamespace(
+            data={"def_code_id": "10101", "description": "Valid deficiency text"},
+            user=make_user(
+                role=RoleCodes.VESSEL_MASTER,
+                user_type="VESSEL",
+                display_name="Vessel Master",
+            ),
+        )
+        view = DeficiencyCreateView()
+
+        with patch.object(
+            view,
+            "_build_workflow_assignment",
+            return_value=workflow_assignment,
+        ) as mock_build, patch.object(view, "_notify_assigned_crew") as mock_notify:
+            response = view.post(request, inspection_id=inspection.id)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_build.assert_called_once_with("KSM0001", inspection)
+        serializer.save.assert_called_once_with(
+            inspection=inspection,
+            created_by="Vessel Master",
+            **workflow_assignment["fields"],
+        )
+        mock_notify.assert_called_once()
+
+
+class TestCARVesselCodeLookup(SimpleTestCase):
+    """Regression coverage for SQL Server compact UUID vessel-code lookup."""
+
+    @patch("apps.inspection.deficiency_models.connection")
+    def test_mssql_lookup_uses_vesseldata_code_for_compact_uuid(self, mock_connection):
+        mock_connection.vendor = "microsoft"
+        cursor = MagicMock()
+        cursor.fetchone.return_value = ("SFD",)
+        mock_connection.cursor.return_value.__enter__.return_value = cursor
+
+        vessel_id = "2fbe4cc40723ef11be3c30d042027dcf"
+
+        self.assertEqual(_lookup_vessel_code(vessel_id), "SFD")
+        cursor.execute.assert_called_once()
+        sql, params = cursor.execute.call_args.args
+        self.assertIn("FROM VesselData", sql)
+        self.assertIn("vesselCode", sql)
+        self.assertEqual(params, [vessel_id])
+
+    def test_vessel_car_number_requires_real_vessel_code(self):
+        with self.assertRaisesMessage(ValueError, "Vessel code is required"):
+            CAR._generate_vessel_car_number(
+                year=date.today().year,
+                vessel_id="2fbe4cc40723ef11be3c30d042027dcf",
+                vessel_code=None,
+            )
+
+
+class TestInspectionDetailDeficiencyLookup(SimpleTestCase):
+    """Regression coverage for SQL Server-safe deficiency detail lookup."""
+
+    @patch("apps.inspection.deficiency_serializers.DeficiencyListSerializer")
+    @patch("apps.inspection.deficiency_models.Deficiency.objects")
+    @patch("apps.inspection.serializers.connection")
+    def test_mssql_detail_uses_raw_try_convert_lookup_for_deficiencies(
+        self,
+        mock_connection,
+        mock_objects,
+        mock_list_serializer,
+    ):
+        mock_connection.vendor = "microsoft"
+        inspection_id = uuid.uuid4()
+        deficiencies = [SimpleNamespace(id="def-1")]
+        mock_objects.raw.return_value = deficiencies
+        mock_list_serializer.return_value.data = [{"id": "def-1"}]
+
+        result = InspectionDetailSerializer(context={}).get_deficiencies(
+            SimpleNamespace(id=inspection_id)
+        )
+
+        self.assertEqual(result, [{"id": "def-1"}])
+        mock_objects.raw.assert_called_once()
+        raw_sql, raw_params = mock_objects.raw.call_args.args
+        self.assertIn("WHERE d.inspection_id = %s", raw_sql)
+        self.assertEqual(raw_params, [inspection_id.hex])
+        mock_list_serializer.assert_called_once_with(deficiencies, many=True)
 
 
 class BaseCARAPITestCase(TestCase):
@@ -278,9 +445,10 @@ class TestFEAT_CAR_001_AutoCreateCAR(BaseCARAPITestCase):
         self.assertIsNotNone(deficiency.car_id)
         self.assertTrue(CAR.objects.filter(id=deficiency.car_id).exists())
 
+    @patch("apps.inspection.deficiency_models._lookup_vessel_code", return_value="EAT")
     @patch("apps.inspection.deficiency_serializers.PSCDefCode.objects.get")
-    def test_happy_path_car_number_format_source_year_sequence(self, mock_def_get):
-        """PRD FEAT-CAR-001: CAR number format SOURCE-YYYY-NNN."""
+    def test_happy_path_car_number_format_source_year_sequence(self, mock_def_get, _mock_vessel_code):
+        """PRD FEAT-CAR-001: CAR number format VESSEL-PSC-YYYY-NNN."""
         mock_def_get.return_value = SimpleNamespace(def_code="10101", def_name="Certificate issue")
 
         view = DeficiencyCreateView.as_view()
@@ -296,8 +464,77 @@ class TestFEAT_CAR_001_AutoCreateCAR(BaseCARAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         deficiency = Deficiency.objects.get(id=response.data["data"]["id"])
         car = deficiency.car
-        self.assertRegex(car.car_number, r"^PSC-\d{4}-\d{3}$")
-        self.assertTrue(car.car_number.startswith(f"PSC-{date.today().year}-"))
+        self.assertRegex(car.car_number, r"^EAT-PSC-\d{4}-\d{3}$")
+        self.assertTrue(car.car_number.startswith(f"EAT-PSC-{date.today().year}-"))
+
+    @patch("apps.inspection.deficiency_models._lookup_vessel_code", return_value="EAT")
+    def test_happy_path_car_number_increments_within_same_prefix_year(self, _mock_vessel_code):
+        """PRD FEAT-CAR-001: same vessel-code/year CAR numbers should increment."""
+        year = date.today().year
+        existing_car = CAR.objects.create(
+            car_number=f"EAT-PSC-{year}-001",
+            status=CARStatus.DRAFT,
+            target_date=date.today() + timedelta(days=7),
+        )
+        Deficiency.objects.create(
+            inspection=self.inspection,
+            def_code_id="10101",
+            def_code="10101",
+            description="Existing CAR for sequence test",
+            car=existing_car,
+            created_by=self.vessel_master.id,
+        )
+
+        self.assertEqual(
+            CAR.generate_car_number(inspection=self.inspection),
+            f"EAT-PSC-{year}-002",
+        )
+
+    @patch("apps.inspection.deficiency_models._lookup_vessel_code", return_value="EAT")
+    def test_regression_car_number_increments_when_existing_same_prefix_car_is_unlinked(self, _mock_vessel_code):
+        """Regression: orphan/unlinked CAR numbers must still be counted to avoid unique-key failures."""
+        year = date.today().year
+        CAR.objects.create(
+            car_number=f"EAT-PSC-{year}-001",
+            status=CARStatus.DRAFT,
+            target_date=date.today() + timedelta(days=7),
+        )
+
+        self.assertEqual(
+            CAR.generate_car_number(inspection=self.inspection),
+            f"EAT-PSC-{year}-002",
+        )
+
+    def test_happy_path_car_number_sequence_isolated_by_vessel(self):
+        """PRD FEAT-CAR-001: different vessels start their own yearly sequence."""
+        year = date.today().year
+        other_inspection = self.create_inspection(vessel_id=self.other_vessel_id)
+        existing_car = CAR.objects.create(
+            car_number=f"EAT-PSC-{year}-001",
+            status=CARStatus.DRAFT,
+            target_date=date.today() + timedelta(days=7),
+        )
+        Deficiency.objects.create(
+            inspection=self.inspection,
+            def_code_id="10101",
+            def_code="10101",
+            description="Existing EAT CAR for isolation test",
+            car=existing_car,
+            created_by=self.vessel_master.id,
+        )
+        code_by_vessel = {
+            str(self.vessel_id): "EAT",
+            str(self.other_vessel_id): "SFD",
+        }
+
+        with patch(
+            "apps.inspection.deficiency_models._lookup_vessel_code",
+            side_effect=lambda vessel_id: code_by_vessel[str(vessel_id)],
+        ):
+            self.assertEqual(
+                CAR.generate_car_number(inspection=other_inspection),
+                f"SFD-PSC-{year}-001",
+            )
 
     @patch("apps.inspection.deficiency_serializers.PSCDefCode.objects.get")
     def test_happy_path_car_created_in_draft_status(self, mock_def_get):

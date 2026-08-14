@@ -91,7 +91,17 @@ class CompositeScoreService:
             window_start=window_start,
             window_end=window_end,
         )
+        total_incident_count = self._count_total_incidents(
+            scope=scope,
+            window_start=window_start,
+            window_end=window_end,
+        )
         open_near_miss_count = self._count_open_near_misses(
+            scope=scope,
+            window_start=window_start,
+            window_end=window_end,
+        )
+        total_near_miss_count = self._count_total_near_misses(
             scope=scope,
             window_start=window_start,
             window_end=window_end,
@@ -101,7 +111,17 @@ class CompositeScoreService:
             window_start=window_start,
             window_end=window_end,
         )
+        total_finding_count = self._count_total_findings(
+            scope=scope,
+            window_start=window_start,
+            window_end=window_end,
+        )
         overdue_ca_count = self._count_overdue_corrective_actions(scope=scope, as_of=current_at.date())
+        total_ca_count = self._count_total_corrective_actions(
+            scope=scope,
+            window_start=window_start,
+            window_end=window_end,
+        )
         soi_summary = self._build_soi_summary(scope=scope)
 
         component_scores: dict[str, int] = {
@@ -126,9 +146,13 @@ class CompositeScoreService:
             "score_status": self._score_status(composite_score),
             "metrics": {
                 "open_incidents": open_incident_count,
+                "total_incidents": total_incident_count,
                 "open_near_misses": open_near_miss_count,
+                "total_near_misses": total_near_miss_count,
                 "open_findings": open_finding_count,
+                "total_findings": total_finding_count,
                 "overdue_corrective_actions": overdue_ca_count,
+                "total_corrective_actions": total_ca_count,
                 "soi_compliance_percent": soi_summary["compliance_percent"],
                 "soi_compliance_display": soi_summary["display_value"],
                 "soi_compliance_label": soi_summary["label"],
@@ -202,12 +226,40 @@ class CompositeScoreService:
             queryset = queryset.filter(vessel_id=scope.scope_id)
         return queryset.count()
 
+    def _count_total_incidents(self, *, scope: RollupScope, window_start: date, window_end: date) -> int:
+        return self._count_total_records(
+            record_type=self.incident_model.RecordType.INCIDENT,
+            scope=scope,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
     def _count_open_near_misses(self, *, scope: RollupScope, window_start: date, window_end: date) -> int:
         queryset = self.incident_model.objects.filter(
             record_type=self.incident_model.RecordType.NEAR_MISS,
             is_deleted=False,
             superseded_by_id__isnull=True,
             closed_at__isnull=True,
+            created_date__date__gte=window_start,
+            created_date__date__lte=window_end,
+        )
+        if scope.scope_type == SafetyDashboardRollup.ScopeType.VESSEL:
+            queryset = queryset.filter(vessel_id=scope.scope_id)
+        return queryset.count()
+
+    def _count_total_near_misses(self, *, scope: RollupScope, window_start: date, window_end: date) -> int:
+        return self._count_total_records(
+            record_type=self.incident_model.RecordType.NEAR_MISS,
+            scope=scope,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
+    def _count_total_records(self, *, record_type: str, scope: RollupScope, window_start: date, window_end: date) -> int:
+        queryset = self.incident_model.objects.filter(
+            record_type=record_type,
+            is_deleted=False,
+            superseded_by_id__isnull=True,
             created_date__date__gte=window_start,
             created_date__date__lte=window_end,
         )
@@ -229,11 +281,53 @@ class CompositeScoreService:
             queryset = queryset.filter(inspection_id__in=inspection_ids)
         return queryset.count()
 
+    def _count_total_findings(self, *, scope: RollupScope, window_start: date, window_end: date) -> int:
+        queryset = self.finding_model.objects.filter(
+            is_deleted=False,
+            created_date__date__gte=window_start,
+            created_date__date__lte=window_end,
+        )
+        if scope.scope_type == SafetyDashboardRollup.ScopeType.VESSEL:
+            inspection_ids = self.inspection_model.objects.filter(
+                is_deleted=False,
+                vessel_id=scope.scope_id,
+            ).values_list("id", flat=True)
+            queryset = queryset.filter(inspection_id__in=inspection_ids)
+        return queryset.count()
+
     def _count_overdue_corrective_actions(self, *, scope: RollupScope, as_of: date) -> int:
         queryset = self.corrective_action_model.objects.filter(
             is_deleted=False,
             due_date__lt=as_of,
         ).exclude(status=self.corrective_action_model.Status.CLOSED)
+
+        if scope.scope_type == SafetyDashboardRollup.ScopeType.FLEET:
+            return queryset.count()
+
+        incident_ids = list(
+            self.incident_model.objects.filter(is_deleted=False, vessel_id=scope.scope_id).values_list("id", flat=True)
+        )
+        meeting_ids = list(
+            self.meeting_model.objects.filter(is_deleted=False, vessel_id=scope.scope_id).values_list("id", flat=True)
+        )
+        agenda_ids = list(
+            self.agenda_model.objects.filter(meeting_id__in=meeting_ids).values_list("id", flat=True)
+        ) if meeting_ids else []
+
+        vessel_filter = Q(recommendation__incident__vessel_id=scope.scope_id)
+        if incident_ids:
+            vessel_filter |= Q(source_table=self.incident_model._meta.db_table, source_id__in=incident_ids)
+        if agenda_ids:
+            vessel_filter |= Q(source_table=self.agenda_model._meta.db_table, source_id__in=agenda_ids)
+
+        return queryset.filter(vessel_filter).count()
+
+    def _count_total_corrective_actions(self, *, scope: RollupScope, window_start: date, window_end: date) -> int:
+        queryset = self.corrective_action_model.objects.filter(
+            is_deleted=False,
+            created_date__date__gte=window_start,
+            created_date__date__lte=window_end,
+        )
 
         if scope.scope_type == SafetyDashboardRollup.ScopeType.FLEET:
             return queryset.count()

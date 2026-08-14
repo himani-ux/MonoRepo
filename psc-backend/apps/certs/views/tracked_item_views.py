@@ -370,35 +370,34 @@ class TrackedItemUploadPdfView(generics.GenericAPIView):
                 content_sha256=str(stored["sha256"]),
             )
             if isinstance(existing_blob, dict) and existing_blob:
-                delete_stored_blob(str(stored["relative_path"]))
-                return Response(
-                    {
-                        "detail": "This PDF has already been uploaded for this certificate. Upload a different PDF or use the existing version history.",
-                        "code": "DUPLICATE_CERT_PDF",
-                        "existingPdfBlob": serialize_pdf_blob(existing_blob),
-                    },
-                    status=status.HTTP_409_CONFLICT,
+                blob = existing_blob
+                source_pdf_path = str(stored["absolute_path"])
+                reuse_existing_blob = True
+            else:
+                blob = pdf_repository.create_blob_for_tracked_item(
+                    tracked_item_id=str(tracked_item_id),
+                    storage_path=str(stored["relative_path"]),
+                    filename=str(stored["filename"]),
+                    content_sha256=str(stored["sha256"]),
+                    content_size_bytes=int(stored["size"]),
+                    uploaded_by=actor_id,
                 )
-            blob = pdf_repository.create_blob_for_tracked_item(
-                tracked_item_id=str(tracked_item_id),
-                storage_path=str(stored["relative_path"]),
-                filename=str(stored["filename"]),
-                content_sha256=str(stored["sha256"]),
-                content_size_bytes=int(stored["size"]),
-                uploaded_by=actor_id,
-            )
+                source_pdf_path = str(stored["absolute_path"])
+                reuse_existing_blob = False
             blob_id = str(blob.get("blob_id"))
             try:
-                ocr_payload = process_cert_pdf(str(stored["absolute_path"]), context=context)
+                ocr_payload = process_cert_pdf(source_pdf_path, context=context)
             except OcrPipelineError as exc:
                 ocr_payload = manual_entry_payload(
                     context=context,
                     engine_name=DEFAULT_OCR_ENGINE_NAME,
                     reason=str(exc),
                 )
+            if reuse_existing_blob:
+                delete_stored_blob(str(stored["relative_path"]))
             processed_blob = pdf_repository.update_ocr_result(blob_id, ocr_payload)
             existing_blob_id = str(current.get("pdf_attachment_id") or "")
-            if existing_blob_id:
+            if existing_blob_id and existing_blob_id.lower() != blob_id.lower():
                 pdf_repository.mark_blob_superseded_for_retention(
                     blob_id=existing_blob_id,
                     section_code=current.get("catalog_section_code"),

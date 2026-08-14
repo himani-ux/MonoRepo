@@ -12,7 +12,6 @@ Views:
 import math
 import uuid
 from django.db import connection, transaction
-from django.db import transaction
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -65,6 +64,42 @@ def _compact_uuid_text(value):
         return uuid.UUID(raw).hex
     except (ValueError, TypeError, AttributeError):
         return raw.replace('-', '')
+
+
+def _persist_deficiency_workflow_fields(deficiency, field_values):
+    """Persist workflow fields without relying on model save rowcount behavior."""
+    updated = Deficiency.objects.filter(pk=deficiency.pk).update(**field_values)
+    for field_name, field_value in field_values.items():
+        setattr(deficiency, field_name, field_value)
+    return updated
+
+
+def _compact_db_uuid(value):
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        return uuid.UUID(raw).hex
+    except (ValueError, TypeError, AttributeError):
+        return raw.replace('-', '').lower()
+
+
+def _deficiency_exists_for_inspection(deficiency_id, inspection_id):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT COUNT(1)
+            FROM psc_deficiency
+            WHERE id = %s
+              AND inspection_id = %s
+              AND ISNULL(is_deleted, 0) = 0
+            """,
+            [_compact_db_uuid(deficiency_id), _compact_db_uuid(inspection_id)],
+        )
+        row = cursor.fetchone()
+    return bool(row and row[0])
 
 
 def _resolve_rank_label(rank_value):
@@ -312,7 +347,6 @@ def _resolve_rank_label(rank_value):
 class DeficiencyCreateView(APIView):
     permission_classes = [IsAuthenticated, CanAddDeficiency]
 
-    @transaction.atomic
     def post(self, request, inspection_id):
         # 1. Get inspection safely
         inspection = get_object_or_404(Inspection, id=inspection_id, is_deleted=False)
@@ -340,20 +374,46 @@ class DeficiencyCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        deficiency = serializer.save(
-            inspection=inspection,
-            created_by=request.user.display_name or request.user.username,
-        )
-
-        # 5. Workflow assignment - WRAPPED IN SUB-TRANSACTION to prevent poisoning
-        if deficiency.assigned_crew_id:
+        workflow_assignment = None
+        assigned_crew_id = serializer.validated_data.get('assigned_crew_id')
+        if assigned_crew_id:
             try:
-                # Nested atomic block ensures that if _set_workflow_fields fails,
-                # it rolls back only those changes and doesn't break the main POST transaction.
-                with transaction.atomic():
-                    self._set_workflow_fields(deficiency, inspection, request.user)
+                workflow_assignment = self._build_workflow_assignment(assigned_crew_id, inspection)
             except Exception as e:
-                logger.error(f"Workflow assignment failed for deficiency {deficiency.id}: {e}")
+                logger.error(f"Workflow assignment failed before deficiency create: {e}")
+
+        save_kwargs = {
+            'inspection': inspection,
+            'created_by': request.user.display_name or request.user.username,
+        }
+        if workflow_assignment:
+            save_kwargs.update(workflow_assignment['fields'])
+
+        deficiency = serializer.save(**save_kwargs)
+        if not _deficiency_exists_for_inspection(deficiency.id, inspection.id):
+            logger.error(
+                "Deficiency create did not persist linked row. deficiency_id=%s inspection_id=%s",
+                deficiency.id,
+                inspection.id,
+            )
+            return Response(
+                {
+                    'error': 'Deficiency was not saved against this inspection. Please try again.',
+                    'details': {
+                        'deficiency_id': str(deficiency.id),
+                        'inspection_id': str(inspection.id),
+                    },
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if workflow_assignment:
+            self._notify_assigned_crew(
+                deficiency,
+                crew_id=workflow_assignment['crew_id'],
+                inspection=inspection,
+                requesting_user=request.user,
+            )
 
         # 6. Activity History - Now safe from "poisoned" transactions
         ActivityHistory.objects.create(
@@ -373,9 +433,22 @@ class DeficiencyCreateView(APIView):
         )
 
     def _set_workflow_fields(self, deficiency, inspection, requesting_user=None):
-        owner_crew_id = str(deficiency.assigned_crew_id).strip()
-        if not owner_crew_id:
+        workflow_assignment = self._build_workflow_assignment(deficiency.assigned_crew_id, inspection)
+        if not workflow_assignment:
             return
+
+        _persist_deficiency_workflow_fields(deficiency, workflow_assignment['fields'])
+        self._notify_assigned_crew(
+            deficiency,
+            crew_id=workflow_assignment['crew_id'],
+            inspection=inspection,
+            requesting_user=requesting_user,
+        )
+
+    def _build_workflow_assignment(self, assigned_crew_id, inspection):
+        owner_crew_id = str(assigned_crew_id).strip()
+        if not owner_crew_id:
+            return None
 
         # Compatibility: if UUID was persisted in older data, resolve it to CrewID.
         try:
@@ -415,25 +488,32 @@ class DeficiencyCreateView(APIView):
             row = cursor.fetchone()
 
         if not row:
-            return
+            return None
 
         owner_id, crew_id, owner_rank_name, full_name = row
-        deficiency.owner_rank = owner_rank_name
-        deficiency.owner_name = full_name
-        deficiency.def_status = DefStatus.ALLOCATED
+        workflow_fields = {
+            'def_status': DefStatus.ALLOCATED,
+            'owner_rank': owner_rank_name,
+            'owner_name': full_name,
+            'reviewer_crew_id': None,
+            'reviewer_rank': None,
+            'reviewer_name': None,
+        }
 
         reviewer = self._determine_reviewer_safe(owner_rank_name, inspection.vessel_id)
         if reviewer:
-            deficiency.reviewer_crew_id = _compact_uuid_text(reviewer.get("id"))
-            deficiency.reviewer_rank = reviewer.get("rank_name")
-            deficiency.reviewer_name = reviewer.get("full_name")
+            workflow_fields.update(
+                reviewer_crew_id=_compact_uuid_text(reviewer.get("id")),
+                reviewer_rank=reviewer.get("rank_name"),
+                reviewer_name=reviewer.get("full_name"),
+            )
 
-        deficiency.save(update_fields=[
-            'def_status', 'owner_rank', 'owner_name', 
-            'reviewer_crew_id', 'reviewer_rank', 'reviewer_name'
-        ])
+        return {
+            'crew_id': crew_id,
+            'fields': workflow_fields,
+        }
 
-        # Notify logic
+    def _notify_assigned_crew(self, deficiency, *, crew_id, inspection, requesting_user=None):
         requester_crew_id = getattr(requesting_user, 'crew_id', None)
         if not requester_crew_id or str(crew_id) != str(requester_crew_id):
             from apps.notifications.signals import notify_def_assigned

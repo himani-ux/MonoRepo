@@ -8,6 +8,7 @@ Signals:
 
 from datetime import timedelta
 
+from django.db import IntegrityError, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -23,25 +24,33 @@ def auto_create_car(sender, instance, created, **kwargs):
     Per BACKEND_STRUCTURE.md Section 8.1:
     - Every deficiency must have exactly one CAR (1:1 relationship)
     - CAR is created automatically, no manual creation allowed
-    - CAR number format: PSC-{YEAR}-{SEQ}
+    - CAR number format: {VESSEL_CODE}-PSC-{YEAR}-{SEQ}
     """
     if created and not instance.car:
         from apps.car.models import ActivityHistory
 
-        # Generate CAR number
-        car_number = CAR.generate_car_number()
-
         # Default CAR target date from deficiency target date or +7 days
         default_target_date = instance.target_date or (timezone.now().date() + timedelta(days=7))
 
-        # Create CAR in ALLOTTED status
-        car = CAR.objects.create(
-            car_number=car_number,
-            status='ALLOTTED',
-            target_date=default_target_date,
-            initial_action_code=instance.action_code,
-            created_by=instance.created_by,
-        )
+        car = None
+        for _attempt in range(3):
+            car_number = CAR.generate_car_number(inspection=instance.inspection)
+            try:
+                with transaction.atomic():
+                    # Create CAR in ALLOTTED status
+                    car = CAR.objects.create(
+                        car_number=car_number,
+                        status='ALLOTTED',
+                        target_date=default_target_date,
+                        initial_action_code=instance.action_code,
+                        created_by=instance.created_by,
+                    )
+                break
+            except IntegrityError:
+                if _attempt == 2:
+                    raise
+        if car is None:
+            raise IntegrityError("Unable to create CAR with a unique CAR number")
 
         # Link CAR to deficiency
         instance.car = car

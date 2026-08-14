@@ -317,7 +317,7 @@ These changes were made later on after the original v1.0 screen inventory:
 │ ┌─────────────────────────────────────────────────────────┐│
 │ │ [10101] Fire dampers                    ActionCode: 30  ││
 │ │ Fire damper in engine room found inoperative...         ││
-│ │ CAR: PSC-2026-001 | Status: DRAFT                       ││
+│ │ CAR: EAT-PSC-2026-001 | Status: DRAFT                   ││
 │ │ Target: 22 Jan 2026                          [View CAR] ││
 │ └─────────────────────────────────────────────────────────┘│
 │ ┌─────────────────────────────────────────────────────────┐│
@@ -427,7 +427,7 @@ These changes were made later on after the original v1.0 screen inventory:
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │ ┌─────────────────────────────────────────────────────────┐│
-│ │ PSC-2026-001                           Status: DRAFT    ││
+│ │ EAT-PSC-2026-001                       Status: DRAFT    ││
 │ │ [10101] Fire dampers                                    ││
 │ │ MV Example | Target: 22 Jan 2026                        ││
 │ │ ⚠️ Missing evidence                                     ││
@@ -466,7 +466,7 @@ These changes were made later on after the original v1.0 screen inventory:
 │ [←] CAR Detail                           [⋮ More Actions]   │
 ├─────────────────────────────────────────────────────────────┤
 │ ┌─────────────────────────────────────────────────────────┐│
-│ │ PSC-2026-001                          Status: DRAFT     ││
+│ │ EAT-PSC-2026-001                      Status: DRAFT     ││
 │ │ Created: 15 Jan 2026                                    ││
 │ │ Target: 22 Jan 2026                                     ││
 │ └─────────────────────────────────────────────────────────┘│
@@ -577,7 +577,7 @@ These changes were made later on after the original v1.0 screen inventory:
 **Layout:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ [←] Edit CAR: PSC-2026-001                     [Save Draft] │
+│ [←] Edit CAR: EAT-PSC-2026-001                 [Save Draft] │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │ ─── DEFICIENCY (Read-only) ───────────────────────────────  │
@@ -727,7 +727,7 @@ These changes were made later on after the original v1.0 screen inventory:
 ┌─────────────────────────────────────────────────────────────┐
 │ Accept CAR                                            [✕]   │
 ├─────────────────────────────────────────────────────────────┤
-│ You are accepting CAR: PSC-2026-001                         │
+│ You are accepting CAR: EAT-PSC-2026-001                     │
 │                                                             │
 │ ┌─────────────────────────────────────────────────────────┐│
 │ │ PIC Comments * (mandatory)                              ││
@@ -745,7 +745,7 @@ These changes were made later on after the original v1.0 screen inventory:
 ┌─────────────────────────────────────────────────────────────┐
 │ Request Rework                                        [✕]   │
 ├─────────────────────────────────────────────────────────────┤
-│ You are requesting rework for CAR: PSC-2026-001             │
+│ You are requesting rework for CAR: EAT-PSC-2026-001         │
 │                                                             │
 │ ┌─────────────────────────────────────────────────────────┐│
 │ │ Rework Reason * (minimum 20 characters)                 ││
@@ -774,7 +774,7 @@ These changes were made later on after the original v1.0 screen inventory:
 ┌─────────────────────────────────────────────────────────────┐
 │ DPA Close CAR                                         [✕]   │
 ├─────────────────────────────────────────────────────────────┤
-│ You are closing CAR: PSC-2026-001                           │
+│ You are closing CAR: EAT-PSC-2026-001                       │
 │                                                             │
 │ ┌─────────────────────────────────────────────────────────┐│
 │ │ DPA Comments * (mandatory)                              ││
@@ -823,7 +823,7 @@ These changes were made later on after the original v1.0 screen inventory:
 │ PENDING CHANGES                                             │
 │ ┌─────────────────────────────────────────────────────────┐│
 │ │ 📤 2 changes waiting to sync                            ││
-│ │ • CAR PSC-2026-001 updated                              ││
+│ │ • CAR EAT-PSC-2026-001 updated                          ││
 │ │ • Evidence uploaded (pending)                           ││
 │ └─────────────────────────────────────────────────────────┘│
 │                                                             │
@@ -876,7 +876,7 @@ These changes were made later on after the original v1.0 screen inventory:
 ├─────────────────────────────────────────────────────────────┤
 │ TODAY                                                       │
 │ ┌─────────────────────────────────────────────────────────┐│
-│ │ 🔵 CAR PSC-2026-001 created for deficiency 10101        ││
+│ │ 🔵 CAR EAT-PSC-2026-001 created for deficiency 10101    ││
 │ │    15 Jan 2026 11:15                                    ││
 │ └─────────────────────────────────────────────────────────┘│
 │ ┌─────────────────────────────────────────────────────────┐│

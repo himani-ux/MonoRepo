@@ -569,7 +569,7 @@ You are the override authority for guard #5 (blame-fixation) via `SAF_P_006`. Us
 
 | Route | Purpose |
 |-------|---------|
-| `/safety/dashboard/` | Fleet-wide Safety Dashboard. Safety score, current view, filters, and export controls show first; repeat issues, top causes, action age, Heinrich Ratio, and SOI Compliance % open from **Show dashboard details**. |
+| `/safety/dashboard/` | Fleet-wide Safety Dashboard. Overall status, total-count cards, simple filters, open-work pie chart, ranked score breakdown, and export controls show first; hover on the main cards to see a short explanation; repeat issues, top causes, action age, and SOI Compliance % open from **Show details**. |
 | `/safety/incidents/:id/phase-5/` | Office Review acceptance or rework for any risk band |
 | `/safety/incidents/:id/fleet-alert/` | Incident Fleet Alert selected-ship in-app/email dispatch |
 | `/safety/near-miss/:id/triage/` | LOW / HIGH triage |

@@ -489,6 +489,8 @@ Every regulatory-driven validation cites its code edition on first use. Re-verif
 | Zero bare `safety_*` prefixes (without `vims_` / `master_`) | PASS — every table reference is `vims_safety_*` or `master_*` |
 | Signature sequencing Reporter → Master → HOD → DPA → FM | PASS — V-INC-070..073; FM gated on RED per V-INC-074 |
 
-**CR-084 dashboard presentation note:** SOI Compliance % may be hidden by default behind **Show dashboard details** on `/safety/dashboard/`, but whenever shown the label remains exactly **SOI Compliance %** and must never read "Inspection Compliance %". The same optional details area also holds repeat issues, top causes, and corrective-action age so the default dashboard stays summary-first.
+**CR-141 dashboard presentation note:** SOI Compliance % may be hidden by default behind **Show details** on `/safety/dashboard/`, but whenever shown the label remains exactly **SOI Compliance %** and must never read "Inspection Compliance %". The default dashboard stays summary-first but includes overall status, total-count KPI cards, an open-work pie chart, and a ranked score-health breakdown using the existing composite dashboard response. Top KPI cards use total metric fields; the Open work pie chart uses open/overdue metric fields. The same optional details area also holds repeat issues, top causes, and corrective-action age. Reporting trend is not rendered on the current Safety Dashboard.
+
+**CR-142 dashboard hover help note:** The main Safety Dashboard summary cards expose short hover help text in plain user language. Hover help must explain the card meaning only; it must not introduce new calculations, technical wording, or extra required user actions.
 
 **No BLOCKED stubs required.** All rule specifications resolved from 159 locked decisions + Round 20/21 directives.
