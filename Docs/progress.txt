@@ -411,3 +411,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-08-17 | MAINTAIN | T1 | Updated Audit Gap 2 with the local dataset journey rerun result and remaining Audit detail, NC closure, Observation closure, and Acting HoD gaps | docs: audit_docsuite/AUDIT_GAP_2.md | exemptions: none
 2026-08-17 | MAINTAIN | T1 | Added senior-facing Audit status reply covering live deployment status and current SCR-AUD journey gaps | docs: audit_docsuite/AUDIT_SENIOR_STATUS_REPLY_2026-08-17.md | exemptions: none
 2026-08-17 | MAINTAIN | T1 | Updated renamed Audit senior status file with local journey validation access usernames while keeping passwords out of repo documentation | docs: audit_docsuite/AUDIT_08-17.md | exemptions: none
+2026-08-17 | MAINTAIN | T1 | Replaced the live server URL in the Audit senior status file with the Audit Git repository link | docs: audit_docsuite/AUDIT_08-17.md | exemptions: none

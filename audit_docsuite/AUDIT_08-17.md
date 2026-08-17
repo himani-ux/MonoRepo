@@ -2,17 +2,18 @@
 
 Date: 2026-08-17
 
-## 1. Live URL And Access
+## 1. Repository And Access
 
-Live VIMS URL:
+Audit Git repository:
 
 ```text
-https://vims.ksmpms.com
+https://github.com/himani-ux/VIMS_Audit.git
 ```
 
 Current deployment status:
 
-- Audit module code is not deployed on the live URL yet.
+- Audit module code is available in the repository above.
+- Audit module code is not deployed on the live server yet.
 - Because of that, there is currently no live Audit URL/screen available for user testing.
 - The existing live VIMS login continues to work for already deployed modules only.
 - Audit access can be validated only after the Audit code is deployed to live.
@@ -105,7 +106,7 @@ Register Audit is fixed.
 
 Most already built Audit screens are reachable locally.
 
-The live URL does not have Audit deployed yet, so live Audit access cannot be provided at this stage.
+Audit code is available in the Git repository above, but it is not deployed on the live server yet, so live Audit access cannot be provided at this stage.
 
 The remaining confirmed not-yet-built screen is:
 
