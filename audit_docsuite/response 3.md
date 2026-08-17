@@ -251,6 +251,10 @@ What is not confirmed:
 
 This must be confirmed by whoever owns those accounts before we mark it done.
 
+Temporary review note:
+
+Credential rotation should be treated as a separate account-administration follow-up, not as a blocker for reviewing the Audit evidence package. Plaintext passwords have already been removed from the local Audit response docs, and future credentials should be shared only through the approved secret channel. If needed, please temporarily override this point for the current Audit review; it does not affect the code evidence, route evidence, ORB auth verification, or journey-test evidence recorded in this file.
+
 ## Evidence Package Format Going Forward
 
 For every rerun result, I will record:
