@@ -2,6 +2,18 @@
 
 Commit checked locally: `a2f308127f1e9b03137408deb08c5fe1a7e6ad52`
 
+## Git Delivery Status
+
+The latest Audit evidence response package has been pushed to:
+
+```text
+https://github.com/himani-ux/VIMS_Audit.git
+branch: main
+evidence package commit: a87176d
+```
+
+This note is added so the receiving team can pull the Git repo and review the same Audit response/docs package.
+
 ## 1. Phase 13.4 Quality Stamp
 
 The Phase 13.4 stamp exists in my handover copy at:
