@@ -80,8 +80,6 @@ DEFAULT_AUDIT_GATES_BY_DESIGNATION = {
     "OFFICE_SSQE": SEQ_MANAGER_GATES,
     "SEQ_MANAGER": SEQ_MANAGER_GATES,
     "DPA": DPA_GATES,
-    "LEAD_AUDITOR": LEAD_AUDITOR_GATES,
-    "CONDUCTOR": CONDUCTOR_GATES,
     "OFFICE_PIC": OFFICE_PIC_GATES,
     "OFFICE_SUPT": OFFICE_PIC_GATES,
     "PIC": OFFICE_PIC_GATES,
@@ -89,7 +87,6 @@ DEFAULT_AUDIT_GATES_BY_DESIGNATION = {
     "FLEET_MANAGER": FLEET_MANAGER_GATES,
     "VESSEL_MASTER": MASTER_GATES,
     "MASTER": MASTER_GATES,
-    "HOD": HOD_GATES,
 }
 
 AUDIT_CAR_WORKFLOW_ACTION_GATES = {
@@ -254,6 +251,19 @@ def _user_identity(user) -> str:
     return ""
 
 
+def _user_identity_values(user) -> list[str]:
+    values: list[str] = []
+    for attr_name in ("id", "user_id", "employee_id", "login_id", "username", "crew_id"):
+        value = str(getattr(user, attr_name, "") or "").strip()
+        if value and value not in values:
+            values.append(value)
+    return values
+
+
+def user_identity_matches(user, target_user_id: object) -> bool:
+    return any(_same_identifier(value, target_user_id) for value in _user_identity_values(user))
+
+
 def is_office_user(user) -> bool:
     return _user_type(user) == "OFFICE"
 
@@ -264,6 +274,83 @@ def is_vessel_user(user) -> bool:
 
 def is_fleet_manager(user) -> bool:
     return normalized_audit_role(user) in {"FM", "FLEET_MANAGER"}
+
+
+def is_audit_lead_auditor(user, audit_detail) -> bool:
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return user_identity_matches(user, getattr(audit_detail, "lead_auditor_user_id", None))
+
+
+def is_audit_conductor(user, audit_detail) -> bool:
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return user_identity_matches(user, getattr(audit_detail, "conductor_user_id", None))
+
+
+def _active_hod_user_id_for_dept(office_dept: object, *, today=None) -> str:
+    dept = str(office_dept or "").strip().upper()
+    if not dept:
+        return ""
+    try:
+        from django.db import DatabaseError
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from apps.inspection.audit.models import MasterHodAssignment
+
+        current_date = today or timezone.localdate()
+        queryset = MasterHodAssignment.objects.filter(
+            dept=dept,
+            effective_from__lte=current_date,
+        ).filter(Q(effective_to__isnull=True) | Q(effective_to__gte=current_date))
+        confirmed = queryset.filter(is_acting=False).order_by("-effective_from", "-created_date").first()
+        assignment = confirmed or queryset.filter(is_acting=True).order_by("-effective_from", "-created_date").first()
+    except (DatabaseError, RuntimeError, LookupError, ImportError):
+        return ""
+    return str(getattr(assignment, "user_id", "") or "") if assignment is not None else ""
+
+
+def is_audit_hod(user, audit_detail, *, today=None) -> bool:
+    if not getattr(user, "is_authenticated", False) or not is_office_user(user):
+        return False
+    if _normalize_token(getattr(audit_detail, "auditee_type", None)) != "OFFICE_DEPT":
+        return False
+    hod_user_id = _active_hod_user_id_for_dept(getattr(audit_detail, "auditee_office_dept", None), today=today)
+    return user_identity_matches(user, hod_user_id)
+
+
+def audit_assignment_process_ids_for_user(user, audit_detail, *, today=None) -> set[str]:
+    if audit_detail is None or not getattr(user, "is_authenticated", False):
+        return set()
+
+    process_ids: set[str] = set()
+    if is_audit_lead_auditor(user, audit_detail):
+        process_ids.update(LEAD_AUDITOR_GATES)
+    if is_audit_conductor(user, audit_detail):
+        process_ids.update(CONDUCTOR_GATES)
+    if is_audit_hod(user, audit_detail, today=today):
+        process_ids.update(HOD_GATES)
+    return process_ids & AUDIT_GATE_SET
+
+
+def audit_effective_process_ids_for_user(user, audit_detail, *, today=None) -> set[str]:
+    return (audit_process_ids_for_user(user) | audit_assignment_process_ids_for_user(user, audit_detail, today=today)) & AUDIT_GATE_SET
+
+
+def audit_effective_process_ids_for_request(request, audit_detail, *, today=None) -> set[str]:
+    return (
+        audit_process_ids_for_request(request)
+        | audit_assignment_process_ids_for_user(getattr(request, "user", None), audit_detail, today=today)
+    ) & AUDIT_GATE_SET
+
+
+def has_audit_detail_process_id(user, audit_detail, process_id: str, *, today=None) -> bool:
+    return process_id.strip().upper() in audit_effective_process_ids_for_user(user, audit_detail, today=today)
+
+
+def request_has_audit_detail_process_id(request, audit_detail, process_id: str, *, today=None) -> bool:
+    return process_id.strip().upper() in audit_effective_process_ids_for_request(request, audit_detail, today=today)
 
 
 def user_has_vessel_scope(user, vessel_id: object) -> bool:
@@ -309,10 +396,12 @@ def user_has_vessel_scope(user, vessel_id: object) -> bool:
 def user_can_access_audit_detail(user, audit_detail) -> bool:
     if not getattr(user, "is_authenticated", False):
         return False
-    if not has_any_audit_process_id(user):
-        return False
+    if audit_assignment_process_ids_for_user(user, audit_detail):
+        return True
 
     auditee_type = _normalize_token(getattr(audit_detail, "auditee_type", None))
+    if not has_any_audit_process_id(user):
+        return False
     if auditee_type == "OFFICE_DEPT":
         return is_office_user(user)
 
@@ -386,7 +475,20 @@ class CanUseAuditCarWorkflow(BasePermission):
         action = getattr(request, "data", {}).get("action")
         required_process_ids = audit_car_workflow_required_gates(action)
         request_process_ids = audit_process_ids_for_request(request)
-        return any(process_id in request_process_ids for process_id in required_process_ids)
+        if any(process_id in request_process_ids for process_id in required_process_ids):
+            return True
+
+        finding_id = getattr(view, "kwargs", {}).get("id")
+        if not finding_id:
+            return False
+        try:
+            from apps.inspection.audit.services.car_workflow import resolve_audit_car_workflow_context
+
+            context = resolve_audit_car_workflow_context(finding_id)
+        except Exception:
+            return False
+        effective_process_ids = audit_effective_process_ids_for_request(request, context.audit_detail)
+        return any(process_id in effective_process_ids for process_id in required_process_ids)
 
 
 CanCreateAudit = HasAuditProcessPermission.requiring(AUDIT_P_001)
@@ -447,19 +549,28 @@ __all__ = [
     "DEFAULT_AUDIT_GATES_BY_DESIGNATION",
     "HasAnyAuditProcessPermission",
     "HasAuditProcessPermission",
+    "audit_assignment_process_ids_for_user",
     "audit_car_workflow_required_gates",
+    "audit_effective_process_ids_for_request",
+    "audit_effective_process_ids_for_user",
     "audit_process_ids_for_request",
     "audit_process_ids_for_user",
     "can_authorize_acting_hod",
     "default_audit_gates_for_designation",
     "default_audit_gates_for_user",
+    "has_audit_detail_process_id",
     "has_any_audit_process_id",
     "has_audit_process_id",
     "has_request_audit_process_id",
+    "is_audit_conductor",
+    "is_audit_hod",
+    "is_audit_lead_auditor",
     "is_fleet_manager",
     "is_office_user",
     "is_vessel_user",
     "normalized_audit_role",
+    "request_has_audit_detail_process_id",
+    "user_identity_matches",
     "user_can_access_audit_detail",
     "user_has_vessel_scope",
 ]

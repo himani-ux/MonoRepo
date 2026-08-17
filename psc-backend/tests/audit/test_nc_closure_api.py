@@ -143,6 +143,7 @@ class AuditNcClosureApiTests(unittest.TestCase):
             lead_auditor_name="Lead Auditor",
             lead_auditor_company="KSM",
             lead_auditor_user_id="lead-1",
+            conductor_user_id="conductor-1",
             trigger_reason="SCHEDULED",
             audit_start_date=date(2026, 7, 29),
             status="IN_PROGRESS",
@@ -358,6 +359,32 @@ class AuditNcClosureApiTests(unittest.TestCase):
         car = CAR.objects.get(deficiency__id=uuid.UUID(str(finding.psc_deficiency_id)))
         self.assertEqual(car.status, CARStatus.OFFICE_DRAFTED)
         self.assertEqual(car.last_action, WorkflowAction.DRAFT_FOR_VESSEL)
+
+    def test_assigned_conductor_can_draft_for_vessel_without_profile_wide_audit_gate(self) -> None:
+        _audit_detail, finding = self._create_finding(nc_category="MINOR_NC")
+        conductor = make_user(
+            role="Conductor",
+            user_type="OFFICE",
+            user_id="conductor-1",
+            process_ids=[],
+            vessel_ids=[],
+        )
+
+        response = self._post_draft(
+            finding.id,
+            {
+                "comment": "Assigned conductor drafted closure for vessel review.",
+                "immediate_action_text": "Temporary containment was drafted for Master review.",
+                "rca_method": "FIVE_WHY",
+                "problem_statement": "Crew could not complete the draft unaided.",
+                "root_cause_categories": ["TRAINING_GAP"],
+                "root_cause_summary": "Assigned conductor provided the required closure draft based on the audit finding and vessel evidence.",
+            },
+            conductor,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["car"]["status"], CARStatus.OFFICE_DRAFTED)
 
     def test_office_draft_requires_audit_p003(self) -> None:
         _audit_detail, finding = self._create_finding(nc_category="MINOR_NC")

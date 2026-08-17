@@ -142,11 +142,12 @@ class AuditPlanCancelSerializer(serializers.Serializer):
 
 class AuditPlanResponseSerializer(serializers.Serializer):
     def to_representation(self, instance: MasterAuditPlan):
+        vessel_label_map = self.context.get("vessel_label_map", {})
         return {
             "id": str(instance.id),
             "target_vessel_id": str(instance.target_vessel_id) if instance.target_vessel_id else None,
             "target_office_dept": instance.target_office_dept,
-            "target_label": _target_label(instance),
+            "target_label": _target_label(instance, vessel_label_map),
             "audit_classification": instance.audit_classification,
             "audit_standards_csv": instance.audit_standards_csv,
             "planned_window_start": instance.planned_window_start.isoformat() if instance.planned_window_start else None,
@@ -186,11 +187,12 @@ def _blank_to_none(value):
     return value
 
 
-def _target_label(plan: MasterAuditPlan) -> str:
+def _target_label(plan: MasterAuditPlan, vessel_label_map: dict[str, str] | None = None) -> str:
     if plan.target_office_dept:
         return f"Office - {plan.target_office_dept}"
     if plan.target_vessel_id:
-        return str(plan.target_vessel_id)
+        vessel_id = str(plan.target_vessel_id)
+        return (vessel_label_map or {}).get(vessel_id.lower()) or vessel_id
     return "Unassigned"
 
 

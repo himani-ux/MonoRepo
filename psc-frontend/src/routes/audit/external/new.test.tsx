@@ -6,6 +6,7 @@ const externalRouteMocks = vi.hoisted(() => ({
   createAuditRegistration: vi.fn(),
   navigate: vi.fn(),
   toast: vi.fn(),
+  useAuditVessels: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -17,6 +18,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('@/hooks/audit/use-audit-registration', () => ({
+  useAuditVessels: () => externalRouteMocks.useAuditVessels(),
   useCreateAuditRegistration: () => ({
     mutateAsync: externalRouteMocks.createAuditRegistration,
     isPending: false,
@@ -46,6 +48,18 @@ describe('ExternalAuditRegistrationRoute', () => {
     externalRouteMocks.createAuditRegistration.mockReset();
     externalRouteMocks.navigate.mockReset();
     externalRouteMocks.toast.mockReset();
+    externalRouteMocks.useAuditVessels.mockReset();
+    externalRouteMocks.useAuditVessels.mockReturnValue({
+      data: [
+        {
+          id: '33333333-3333-4333-8333-333333333333',
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
     externalRouteMocks.createAuditRegistration.mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       inspection_id: '22222222-2222-4222-8222-222222222222',
@@ -63,7 +77,7 @@ describe('ExternalAuditRegistrationRoute', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'External Audit' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/vessel uuid/i), {
+    fireEvent.change(screen.getByLabelText(/^vessel/i), {
       target: { value: '33333333-3333-4333-8333-333333333333' },
     });
     fireEvent.change(screen.getByLabelText(/completion date/i), { target: { value: '2026-08-01' } });

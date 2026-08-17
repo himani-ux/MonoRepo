@@ -26,6 +26,7 @@ from .plan import (
 from .registration import AuditRegistrationView
 from .scan_validation import AuditAttachmentValidateView, AuditScanValidationQueueView
 from .submit import AuditAcknowledgeView, AuditSubmitView
+from .vessels import AuditVesselOptionListView
 
 __all__ = [
     "AuditAcknowledgeView",
@@ -62,4 +63,5 @@ __all__ = [
     "AuditScanValidationQueueView",
     "AuditScorecardView",
     "AuditSubmitView",
+    "AuditVesselOptionListView",
 ]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 import uuid
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from apps.inspection.audit.permissions import (
     AUDIT_GATE_IDS,
@@ -25,10 +26,13 @@ from apps.inspection.audit.permissions import (
     AUDIT_P_018,
     CanUseAuditCarWorkflow,
     HasAuditProcessPermission,
+    audit_assignment_process_ids_for_user,
     audit_car_workflow_required_gates,
+    audit_effective_process_ids_for_user,
     can_authorize_acting_hod,
     default_audit_gates_for_designation,
     has_audit_process_id,
+    request_has_audit_detail_process_id,
     user_can_access_audit_detail,
     user_has_vessel_scope,
 )
@@ -87,12 +91,12 @@ class AuditPermissionTests(unittest.TestCase):
             default_audit_gates_for_designation("DPA"),
             frozenset({AUDIT_P_001, AUDIT_P_005, AUDIT_P_006, AUDIT_P_007, AUDIT_P_013, AUDIT_P_014, AUDIT_P_016, AUDIT_P_018}),
         )
-        self.assertEqual(default_audit_gates_for_designation("Lead Auditor"), frozenset({AUDIT_P_002, AUDIT_P_003, AUDIT_P_004}))
-        self.assertEqual(default_audit_gates_for_designation("Conductor"), frozenset({AUDIT_P_003}))
+        self.assertEqual(default_audit_gates_for_designation("Lead Auditor"), frozenset())
+        self.assertEqual(default_audit_gates_for_designation("Conductor"), frozenset())
         self.assertEqual(default_audit_gates_for_designation("Office Supt"), frozenset({AUDIT_P_004, AUDIT_P_007}))
         self.assertEqual(default_audit_gates_for_designation("Fleet Manager"), frozenset({AUDIT_P_016}))
         self.assertEqual(default_audit_gates_for_designation("Master"), frozenset({AUDIT_P_008, AUDIT_P_017}))
-        self.assertEqual(default_audit_gates_for_designation("HoD"), frozenset({AUDIT_P_008}))
+        self.assertEqual(default_audit_gates_for_designation("HoD"), frozenset())
 
     def test_process_permission_reads_user_auth_and_json_claims(self) -> None:
         permission = HasAuditProcessPermission.requiring(AUDIT_P_004)()
@@ -124,6 +128,48 @@ class AuditPermissionTests(unittest.TestCase):
         unmapped_user = make_user(role="PHYSICAL_VERIFIER", role_name="PHYSICAL_VERIFIER", process_ids=[])
         self.assertFalse(has_audit_process_id(unmapped_user, AUDIT_P_018))
         self.assertFalse(HasAuditProcessPermission.requiring(AUDIT_P_018)().has_permission(make_request(unmapped_user), None))
+
+    def test_per_audit_assignments_grant_only_assigned_record_gates(self) -> None:
+        assigned_audit = SimpleNamespace(
+            auditee_type="VESSEL",
+            vessel_id=uuid.uuid4().hex,
+            lead_auditor_user_id="lead-1",
+            conductor_user_id="cond-1",
+        )
+        other_audit = SimpleNamespace(
+            auditee_type="VESSEL",
+            vessel_id=uuid.uuid4().hex,
+            lead_auditor_user_id="lead-2",
+            conductor_user_id="cond-2",
+        )
+        lead = make_user(id="lead-1", role="Lead Auditor", process_ids=[])
+        conductor = make_user(id="cond-1", role="Conductor", process_ids=[])
+
+        self.assertEqual(audit_assignment_process_ids_for_user(lead, assigned_audit), {AUDIT_P_002, AUDIT_P_003, AUDIT_P_004})
+        self.assertEqual(audit_assignment_process_ids_for_user(conductor, assigned_audit), {AUDIT_P_003})
+        self.assertEqual(audit_assignment_process_ids_for_user(lead, other_audit), set())
+        self.assertEqual(audit_assignment_process_ids_for_user(conductor, other_audit), set())
+        self.assertFalse(has_audit_process_id(lead, AUDIT_P_003))
+        self.assertFalse(has_audit_process_id(conductor, AUDIT_P_003))
+        self.assertTrue(user_can_access_audit_detail(lead, assigned_audit))
+        self.assertFalse(user_can_access_audit_detail(lead, other_audit))
+        self.assertTrue(request_has_audit_detail_process_id(make_request(conductor), assigned_audit, AUDIT_P_003))
+
+    def test_office_hod_gate_comes_from_active_assignment_not_static_label(self) -> None:
+        office_audit = SimpleNamespace(
+            auditee_type="OFFICE_DEPT",
+            auditee_office_dept="TECH",
+            vessel_id=None,
+            lead_auditor_user_id="lead-1",
+            conductor_user_id="cond-1",
+        )
+        hod = make_user(id="hod-1", role="HoD", process_ids=[])
+
+        self.assertFalse(has_audit_process_id(hod, AUDIT_P_008))
+        with patch("apps.inspection.audit.permissions._active_hod_user_id_for_dept", return_value="hod-1"):
+            self.assertEqual(audit_assignment_process_ids_for_user(hod, office_audit), {AUDIT_P_008})
+            self.assertIn(AUDIT_P_008, audit_effective_process_ids_for_user(hod, office_audit))
+            self.assertTrue(user_can_access_audit_detail(hod, office_audit))
 
     def test_audit_car_workflow_action_gates(self) -> None:
         self.assertEqual(audit_car_workflow_required_gates("START_PIC_REVIEW"), (AUDIT_P_004,))

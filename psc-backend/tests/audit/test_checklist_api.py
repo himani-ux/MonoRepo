@@ -120,6 +120,7 @@ class AuditChecklistApiTests(unittest.TestCase):
             audit_subtype="ANNUAL_INTERNAL",
             lead_auditor_name="Lead Auditor",
             lead_auditor_company="KSM",
+            conductor_user_id="conductor-1",
             trigger_reason="SCHEDULED",
             audit_start_date=date(2026, 8, 5),
             status="IN_PROGRESS",
@@ -183,6 +184,14 @@ class AuditChecklistApiTests(unittest.TestCase):
         self.assertIsNone(data["ship_type_filter"])
         self.assertFalse(data["item_filter_applied"])
         self.assertEqual([item["item_code"] for item in data["items"]], ["002", "001", "003"])
+
+    def test_assigned_conductor_can_open_checklist_without_profile_wide_audit_gate(self) -> None:
+        user = make_user(user_id="conductor-1", role="Conductor", process_ids=[], vessel_ids=[])
+
+        response = self._get_checklist(user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["data"]["selected"])
 
     def test_vessel_audit_can_apply_explicit_ship_type_item_filter(self) -> None:
         user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])

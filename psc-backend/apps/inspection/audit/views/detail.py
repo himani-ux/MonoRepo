@@ -10,8 +10,8 @@ from apps.inspection.audit.models import AuditDetail
 from apps.inspection.audit.permissions import (
     AUDIT_P_002,
     AUDIT_P_003,
-    HasAnyAuditProcessPermission,
-    audit_process_ids_for_request,
+    audit_effective_process_ids_for_request,
+    request_has_audit_detail_process_id,
     user_can_access_audit_detail,
 )
 from apps.inspection.audit.serializers.detail import (
@@ -45,11 +45,11 @@ class AuditDetailView(APIView):
         audit_detail = self._get_audit_detail(id)
         if not user_can_access_audit_detail(request.user, audit_detail):
             return _forbidden("You do not have access to this audit.")
-        return self._detail_response(audit_detail)
+        return self._detail_response(audit_detail, request)
 
     def patch(self, request, id):
         audit_detail = self._get_audit_detail(id)
-        if AUDIT_P_002 not in audit_process_ids_for_request(request):
+        if not request_has_audit_detail_process_id(request, audit_detail, AUDIT_P_002):
             return _forbidden("You do not have permission to edit this audit.")
         if not user_can_access_audit_detail(request.user, audit_detail):
             return _forbidden("You do not have access to this audit.")
@@ -65,7 +65,7 @@ class AuditDetailView(APIView):
             data=serializer.validated_data,
             user=request.user,
         )
-        return self._detail_response(audit_detail)
+        return self._detail_response(audit_detail, request)
 
     def _get_audit_detail(self, id):
         try:
@@ -73,15 +73,17 @@ class AuditDetailView(APIView):
         except AuditDetail.DoesNotExist as exc:
             raise Http404("Audit not found.") from exc
 
-    def _detail_response(self, audit_detail: AuditDetail) -> Response:
+    def _detail_response(self, audit_detail: AuditDetail, request) -> Response:
         bundle = get_audit_detail_bundle(audit_detail.id)
-        return Response({"data": AuditDetailResponseSerializer(bundle).data})
+        data = AuditDetailResponseSerializer(bundle).data
+        data["effective_permissions"] = sorted(audit_effective_process_ids_for_request(request, audit_detail))
+        return Response({"data": data})
 
 
 class AuditScorecardView(APIView):
     """PUT /api/audit/audits/{id}/scorecard/ for the 14-area scorecard."""
 
-    permission_classes = [IsAuthenticated, HasAnyAuditProcessPermission.requiring_any(AUDIT_P_003)]
+    permission_classes = [IsAuthenticated]
 
     def put(self, request, id):
         try:
@@ -91,6 +93,8 @@ class AuditScorecardView(APIView):
 
         if not user_can_access_audit_detail(request.user, audit_detail):
             return _forbidden("You do not have access to this audit.")
+        if not request_has_audit_detail_process_id(request, audit_detail, AUDIT_P_003):
+            return _forbidden("You do not have permission to update this audit scorecard.")
 
         serializer = AuditScorecardSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -100,4 +104,6 @@ class AuditScorecardView(APIView):
             user=request.user,
         )
         bundle = get_audit_detail_bundle(audit_detail.id)
-        return Response({"data": AuditDetailResponseSerializer(bundle).data})
+        data = AuditDetailResponseSerializer(bundle).data
+        data["effective_permissions"] = sorted(audit_effective_process_ids_for_request(request, audit_detail))
+        return Response({"data": data})

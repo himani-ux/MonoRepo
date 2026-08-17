@@ -53,6 +53,12 @@ export interface AuditRegistrationResponse {
   auditee_type: string;
 }
 
+export interface AuditVesselOption {
+  id: string;
+  vessel_code: string;
+  vessel_name: string;
+}
+
 export interface ExternalAuditCloseoutPayload {
   certificate_impact: 'NONE' | 'CERT_VALID' | 'RENEWAL_AT_RISK' | 'SUSPENDED' | 'WITHDRAWN';
   is_cycle_resetting?: boolean;
@@ -135,6 +141,13 @@ export async function getAuditPlans(isAdditional?: boolean): Promise<AuditPlanLi
   const response = await apiClient.get<AuditApiResponse<AuditPlanList>>(
     `${API_BASE_URL}/api/audit/plans/`,
     { params: isAdditional === undefined ? undefined : { is_additional: isAdditional } }
+  );
+  return response.data.data;
+}
+
+export async function getAuditVessels(): Promise<AuditVesselOption[]> {
+  const response = await apiClient.get<AuditApiResponse<AuditVesselOption[]>>(
+    `${API_BASE_URL}/api/audit/vessels/`
   );
   return response.data.data;
 }
@@ -459,6 +472,7 @@ export const auditApi = {
   getAuditObsClosure,
   getAuditPlan,
   getAuditPlans,
+  getAuditVessels,
   getAuditRcaTemplates,
   issueAuditFindingCircular,
   getAuditDetail,

@@ -6,20 +6,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.inspection.audit.models import MasterRcaTemplate
-from apps.inspection.audit.permissions import (
-    AUDIT_P_003,
-    AUDIT_P_004,
-    AUDIT_P_008,
-    AUDIT_P_017,
-    HasAnyAuditProcessPermission,
-)
 from apps.inspection.audit.services.finding import RULE_BOOK_MASTER_MODELS
 
 
 class AuditClauseMasterView(APIView):
     """GET /api/audit/masters/clauses/{book}/ for the finding-create modal."""
 
-    permission_classes = [IsAuthenticated, HasAnyAuditProcessPermission.requiring_any(AUDIT_P_003)]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, book):
         rule_book_type = str(book or "").strip().upper()
@@ -39,10 +32,7 @@ class AuditClauseMasterView(APIView):
 class AuditRcaTemplateMasterView(APIView):
     """GET /api/audit/masters/rca-templates/ for the NC closure wizard."""
 
-    permission_classes = [
-        IsAuthenticated,
-        HasAnyAuditProcessPermission.requiring_any(AUDIT_P_003, AUDIT_P_004, AUDIT_P_008, AUDIT_P_017),
-    ]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         category = str(request.query_params.get("category") or "").strip().upper()

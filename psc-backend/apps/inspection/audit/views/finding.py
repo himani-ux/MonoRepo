@@ -11,6 +11,7 @@ from apps.inspection.audit.permissions import (
     AUDIT_P_007,
     AUDIT_P_003,
     HasAnyAuditProcessPermission,
+    request_has_audit_detail_process_id,
     user_can_access_audit_detail,
 )
 from apps.inspection.audit.serializers.finding import (
@@ -41,7 +42,7 @@ def _forbidden(message: str) -> Response:
 class AuditFindingCreateView(APIView):
     """POST /api/audit/audits/{id}/findings/ for checklist and emergent findings."""
 
-    permission_classes = [IsAuthenticated, HasAnyAuditProcessPermission.requiring_any(AUDIT_P_003)]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, id):
         try:
@@ -51,6 +52,8 @@ class AuditFindingCreateView(APIView):
 
         if not user_can_access_audit_detail(request.user, audit_detail):
             return _forbidden("You do not have access to this audit.")
+        if not request_has_audit_detail_process_id(request, audit_detail, AUDIT_P_003):
+            return _forbidden("You do not have permission to add findings for this audit.")
 
         serializer = AuditFindingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

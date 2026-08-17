@@ -37,6 +37,7 @@ from apps.inspection.audit.services.extension import (
     request_plan_extension,
 )
 from apps.inspection.audit.services.notification_dispatcher import dispatch_audit_notification
+from apps.inspection.audit.services.vessels import audit_vessel_label_map
 
 
 def _forbidden(message: str) -> Response:
@@ -65,6 +66,21 @@ def _plan_queryset():
     return MasterAuditPlan.objects.order_by("planned_window_end", "planned_window_start", "id")
 
 
+def _serialize_plan(plan: MasterAuditPlan):
+    return AuditPlanResponseSerializer(
+        plan,
+        context={"vessel_label_map": audit_vessel_label_map([plan.target_vessel_id])},
+    ).data
+
+
+def _serialize_plans(plans: list[MasterAuditPlan]):
+    return AuditPlanResponseSerializer(
+        plans,
+        many=True,
+        context={"vessel_label_map": audit_vessel_label_map([plan.target_vessel_id for plan in plans])},
+    ).data
+
+
 class AuditPlanListCreateView(APIView):
     """GET/POST /api/audit/plans/ for the Phase 8.1 plan register."""
 
@@ -82,7 +98,7 @@ class AuditPlanListCreateView(APIView):
         if additional_filter is not None:
             queryset = queryset.filter(is_additional=additional_filter.strip().lower() in {"1", "true", "yes"})
 
-        rows = AuditPlanResponseSerializer(list(queryset), many=True).data
+        rows = _serialize_plans(list(queryset))
         return Response({"data": {"count": len(rows), "results": rows}})
 
     def post(self, request):
@@ -99,7 +115,7 @@ class AuditPlanListCreateView(APIView):
                 _dispatch_plan_notification(plan, "AUDIT_SCHEDULED")
         return Response(
             {
-                "data": AuditPlanResponseSerializer(plan).data,
+                "data": _serialize_plan(plan),
                 "message": "Audit plan entry created successfully",
             },
             status=status.HTTP_201_CREATED,
@@ -114,7 +130,7 @@ class AuditPlanDetailView(APIView):
     def get(self, request, id):
         if not is_office_user(request.user):
             return _forbidden("Audit plan register is restricted to office users.")
-        return Response({"data": AuditPlanResponseSerializer(self._get_plan(id)).data})
+        return Response({"data": _serialize_plan(self._get_plan(id))})
 
     def patch(self, request, id):
         if not is_office_user(request.user):
@@ -141,7 +157,7 @@ class AuditPlanDetailView(APIView):
             )
             if previous_status != "CONFIRMED" and updated_plan.status == "CONFIRMED":
                 _dispatch_plan_notification(updated_plan, "AUDIT_SCHEDULED")
-        return Response({"data": AuditPlanResponseSerializer(updated_plan).data})
+        return Response({"data": _serialize_plan(updated_plan)})
 
     def _get_plan(self, id):
         try:
@@ -172,7 +188,7 @@ class AuditPlanExtensionRequestView(APIView):
             )
         except AuditPlanWorkflowError as exc:
             return _bad_request(exc.errors)
-        return Response({"data": AuditPlanResponseSerializer(plan).data})
+        return Response({"data": _serialize_plan(plan)})
 
 
 class AuditPlanExtensionDecideView(APIView):
@@ -202,7 +218,7 @@ class AuditPlanExtensionDecideView(APIView):
             return _bad_request(exc.errors)
         return Response(
             {
-                "data": AuditPlanResponseSerializer(result.plan).data,
+                "data": _serialize_plan(result.plan),
                 "approved": result.approved,
             }
         )
@@ -231,7 +247,7 @@ class AuditPlanFlagNotifyView(APIView):
             )
         except AuditPlanWorkflowError as exc:
             return _bad_request(exc.errors)
-        return Response({"data": AuditPlanResponseSerializer(plan).data})
+        return Response({"data": _serialize_plan(plan)})
 
 
 class AuditPlanCancelView(APIView):
@@ -264,8 +280,8 @@ class AuditPlanCancelView(APIView):
             return _bad_request(exc.errors)
         return Response(
             {
-                "data": AuditPlanResponseSerializer(plan).data,
-                "replacement_plan": AuditPlanResponseSerializer(replacement).data,
+                "data": _serialize_plan(plan),
+                "replacement_plan": _serialize_plan(replacement),
             }
         )
 
@@ -287,7 +303,7 @@ class AuditPlanAdditionalView(APIView):
             return _bad_request(exc.errors)
         return Response(
             {
-                "data": AuditPlanResponseSerializer(plan).data,
+                "data": _serialize_plan(plan),
                 "message": "Additional audit plan entry created successfully",
             },
             status=status.HTTP_201_CREATED,

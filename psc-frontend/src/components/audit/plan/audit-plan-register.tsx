@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, Bell, CheckCircle2, Edit2, FilePlus2, Filter, Loader2, Plus, Save } from 'lucide-react';
+import { Ban, Bell, CheckCircle2, ChevronDown, Edit2, FilePlus2, Filter, Loader2, Plus, Save } from 'lucide-react';
 import { Button, Badge, Card, CardContent, CardHeader, CardTitle, Input, Label, Textarea } from '@/components/ui';
 import { PageHeader } from '@/components/layout/page-header';
 import { RootLayout } from '@/components/layout/root-layout';
@@ -37,9 +37,13 @@ import {
   useRequestAuditPlanExtension,
   useUpdateAuditPlan,
 } from '@/hooks/audit/use-audit-plan';
+import { useAuditVessels } from '@/hooks/audit/use-audit-registration';
+import type { AuditVesselOption } from '@/lib/api/audit';
 
 const officeDepartments = ['', 'CREW', 'TECH', 'PURCHASE', 'IT', 'MARINE', 'SEQ', 'OTHER'] as const;
+const auditStandardOptions = ['ISM', 'ISPS', 'MLC', 'EMS'] as const;
 const triggerTypes = ['PSC_INSPECTION', 'DETENTION_NOTICE', 'FLAG_LETTER', 'INCIDENT_REPORT', 'MGMT_DIRECTIVE', 'OTHER'] as const;
+type AuditStandardOption = (typeof auditStandardOptions)[number];
 type WorkflowMode = 'extension' | 'decision' | 'flag' | 'cancel' | null;
 
 function statusVariant(status: string) {
@@ -70,6 +74,7 @@ export function AuditPlanRegister() {
   const recordFlag = useRecordAuditPlanFlagNotification(workflowPlan?.id);
   const cancelPlan = useCancelAuditPlan(workflowPlan?.id);
   const createAdditional = useCreateAdditionalAuditPlan();
+  const vesselQuery = useAuditVessels();
   const canCreatePlan = hasProcess(PROCESS_IDS.AUDIT_CREATE);
   const canEditPlan = hasProcess(PROCESS_IDS.AUDIT_CREATE) || hasProcess(PROCESS_IDS.AUDIT_EDIT);
   const canApproveExtension = hasProcess(PROCESS_IDS.AUDIT_APPROVE_EXTENSION);
@@ -407,7 +412,13 @@ export function AuditPlanRegister() {
               <CardTitle>{selectedPlan ? 'Edit routine plan entry' : 'Create routine plan entry'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <PlanFields form={form} setField={setField} idPrefix="routine_" />
+              <PlanFields
+                form={form}
+                setField={setField}
+                idPrefix="routine_"
+                vesselOptions={vesselQuery.data ?? []}
+                vesselsLoading={vesselQuery.isLoading}
+              />
               <div className="flex flex-wrap justify-end gap-2">
                 {selectedPlan && (
                   <Button type="button" variant="outline" onClick={() => setSelectedPlan(null)}>
@@ -440,7 +451,14 @@ export function AuditPlanRegister() {
               <CardTitle>Create additional audit</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4" data-eid="MOCKUP-PLAN-07:plan.additional_form">
-              <PlanFields form={additionalForm} setField={setAdditionalField} idPrefix="additional_" statusDisabled />
+              <PlanFields
+                form={additionalForm}
+                setField={setAdditionalField}
+                idPrefix="additional_"
+                vesselOptions={vesselQuery.data ?? []}
+                vesselsLoading={vesselQuery.isLoading}
+                statusDisabled
+              />
               <div className="grid gap-4 lg:grid-cols-3" data-eid="MOCKUP-PLAN-07:plan.trigger_picker">
                 <div className="space-y-2">
                   <Label htmlFor="trigger_event_type">Trigger type</Label>
@@ -486,23 +504,36 @@ function PlanFields({
   form,
   setField,
   idPrefix,
+  vesselOptions,
+  vesselsLoading,
   statusDisabled = false,
 }: {
   form: AuditPlanFormData;
   setField: (fieldName: keyof AuditPlanFormData, value: string) => void;
   idPrefix: string;
+  vesselOptions: AuditVesselOption[];
+  vesselsLoading: boolean;
   statusDisabled?: boolean;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <FieldInput
-        id={`${idPrefix}target_vessel_id`}
-        label="Target vessel UUID"
-        value={form.target_vessel_id}
-        placeholder="Vessel UUID for vessel audit"
-        onChange={(value) => setField('target_vessel_id', value)}
-        eid="MOCKUP-PLAN-07:plan_form.target"
-      />
+      <div className="space-y-2" data-eid="MOCKUP-PLAN-07:plan_form.target">
+        <Label htmlFor={`${idPrefix}target_vessel_id`}>Target vessel</Label>
+        <select
+          id={`${idPrefix}target_vessel_id`}
+          value={form.target_vessel_id}
+          onChange={(event) => setField('target_vessel_id', event.target.value)}
+          disabled={vesselsLoading}
+          className="h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:bg-neutral-100"
+        >
+          <option value="">{vesselsLoading ? 'Loading vessels...' : 'Not a vessel audit'}</option>
+          {vesselOptions.map((vessel) => (
+            <option key={vessel.id} value={vessel.id}>
+              {formatVesselOption(vessel)}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}target_office_dept`}>Target office department</Label>
         <select
@@ -518,11 +549,9 @@ function PlanFields({
           ))}
         </select>
       </div>
-      <FieldInput
+      <StandardsDropdown
         id={`${idPrefix}audit_standards_csv`}
-        label="Standards"
         value={form.audit_standards_csv}
-        placeholder="ISM,ISPS,MLC"
         onChange={(value) => setField('audit_standards_csv', value)}
       />
       <div className="space-y-2">
@@ -553,6 +582,71 @@ function PlanFields({
         value={form.planned_window_end}
         onChange={(value) => setField('planned_window_end', value)}
       />
+    </div>
+  );
+}
+
+function StandardsDropdown({
+  id,
+  value,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedStandards = parseStandardsCsv(value);
+  const selectedKnownStandards = selectedStandards.filter(isAuditStandardOption);
+  const displayValue = selectedStandards.length ? selectedStandards.join(', ') : 'Select standards';
+
+  const toggleStandard = (standard: AuditStandardOption, checked: boolean) => {
+    const selected = new Set(selectedStandards);
+    if (checked) {
+      selected.add(standard);
+    } else {
+      selected.delete(standard);
+    }
+    const orderedKnown = auditStandardOptions.filter((option) => selected.has(option));
+    const otherValues = selectedStandards.filter((option) => !isAuditStandardOption(option) && selected.has(option));
+    onChange([...orderedKnown, ...otherValues].join(','));
+  };
+
+  return (
+    <div className="relative space-y-2">
+      <Label htmlFor={id}>Standards</Label>
+      <button
+        id={id}
+        type="button"
+        aria-expanded={open}
+        className="flex h-10 w-full items-center justify-between rounded-md border border-neutral-300 bg-white px-3 py-2 text-left text-sm text-neutral-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className={cn('truncate', selectedStandards.length ? 'text-neutral-900' : 'text-neutral-500')}>
+          {displayValue}
+        </span>
+        <ChevronDown className={cn('ml-2 h-4 w-4 shrink-0 text-neutral-500 transition-transform', open && 'rotate-180')} />
+      </button>
+      {open ? (
+        <div className="absolute z-30 w-full rounded-md border border-neutral-200 bg-white p-2 shadow-lg">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {auditStandardOptions.map((standard) => (
+              <label
+                key={standard}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedKnownStandards.includes(standard)}
+                  onChange={(event) => toggleStandard(standard, event.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                />
+                {standard}
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -616,6 +710,17 @@ function RegisterMetric({ label, value }: { label: string; value: number }) {
   );
 }
 
+function parseStandardsCsv(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function isAuditStandardOption(value: string): value is AuditStandardOption {
+  return auditStandardOptions.includes(value as AuditStandardOption);
+}
+
 function workflowTitle(mode: WorkflowMode) {
   if (mode === 'extension') return 'Request OPM F 713';
   if (mode === 'decision') return 'DPA extension decision';
@@ -640,4 +745,11 @@ function setTargetExclusive<T extends AuditPlanFormData>(
     return { ...current, target_office_dept: value, target_vessel_id: '' };
   }
   return { ...current, [fieldName]: value };
+}
+
+function formatVesselOption(vessel: AuditVesselOption): string {
+  if (vessel.vessel_code && vessel.vessel_name) {
+    return `${vessel.vessel_code} - ${vessel.vessel_name}`;
+  }
+  return vessel.vessel_name || vessel.vessel_code || vessel.id;
 }

@@ -20,6 +20,7 @@ const planRouteMocks = vi.hoisted(() => ({
   updatePlan: vi.fn(),
   toast: vi.fn(),
   hasProcess: vi.fn(),
+  useAuditVessels: vi.fn(),
 }));
 
 vi.mock('@/hooks/audit/use-audit-plan', () => ({
@@ -37,6 +38,10 @@ vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => ({
     hasProcess: planRouteMocks.hasProcess,
   }),
+}));
+
+vi.mock('@/hooks/audit/use-audit-registration', () => ({
+  useAuditVessels: () => planRouteMocks.useAuditVessels(),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -112,6 +117,11 @@ function sampleList(results: AuditPlan[] = [samplePlan()]): AuditPlanList {
   };
 }
 
+function addPlanStandard(formIndex: number, standard: string) {
+  fireEvent.click(screen.getAllByLabelText('Standards')[formIndex]);
+  fireEvent.click(screen.getByLabelText(standard));
+}
+
 describe('AuditPlanRegisterRoute', () => {
   beforeEach(() => {
     planRouteMocks.useAuditPlans.mockReset();
@@ -131,10 +141,22 @@ describe('AuditPlanRegisterRoute', () => {
     planRouteMocks.updatePlan.mockReset();
     planRouteMocks.toast.mockReset();
     planRouteMocks.hasProcess.mockReset();
+    planRouteMocks.useAuditVessels.mockReset();
 
     planRouteMocks.hasProcess.mockImplementation((processId: string) =>
       ['AUDIT_P_001', 'AUDIT_P_002'].includes(processId)
     );
+    planRouteMocks.useAuditVessels.mockReturnValue({
+      data: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    });
     planRouteMocks.createPlan.mockResolvedValue(samplePlan());
     planRouteMocks.createAdditional.mockResolvedValue(samplePlan({ is_additional: true }));
     planRouteMocks.cancelPlan.mockResolvedValue(samplePlan({ status: 'CANCELLED' }));
@@ -228,10 +250,10 @@ describe('AuditPlanRegisterRoute', () => {
 
     render(<AuditPlanRegisterRoute />);
 
-    fireEvent.change((await screen.findAllByLabelText('Target vessel UUID'))[0], {
+    fireEvent.change((await screen.findAllByLabelText('Target vessel'))[0], {
       target: { value: '22222222-2222-4222-8222-222222222222' },
     });
-    fireEvent.change(screen.getAllByLabelText('Standards')[0], { target: { value: 'ISM,MLC' } });
+    addPlanStandard(0, 'MLC');
     fireEvent.change(screen.getAllByLabelText('Planned window start')[0], { target: { value: '2026-05-01' } });
     fireEvent.change(screen.getAllByLabelText('Planned window end')[0], { target: { value: '2026-09-01' } });
     fireEvent.click(screen.getByRole('button', { name: /new plan entry/i }));
@@ -250,6 +272,25 @@ describe('AuditPlanRegisterRoute', () => {
     });
   });
 
+  it('shows only internal audit standards in the plan standards selector', async () => {
+    planRouteMocks.useAuditPlans.mockReturnValue({
+      data: sampleList([]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AuditPlanRegisterRoute />);
+
+    fireEvent.click((await screen.findAllByLabelText('Standards'))[0]);
+
+    expect(screen.getByLabelText('ISM')).toBeInTheDocument();
+    expect(screen.getByLabelText('ISPS')).toBeInTheDocument();
+    expect(screen.getByLabelText('MLC')).toBeInTheDocument();
+    expect(screen.getByLabelText('EMS')).toBeInTheDocument();
+    expect(screen.queryByLabelText('DOC')).not.toBeInTheDocument();
+  });
+
   it('JOURNEY-1 validates DPA plan creation and confirmation from the plan register', async () => {
     planRouteMocks.hasProcess.mockImplementation((processId: string) =>
       ['AUDIT_P_001', 'AUDIT_P_002', 'AUDIT_P_005', 'AUDIT_P_006'].includes(processId)
@@ -266,10 +307,10 @@ describe('AuditPlanRegisterRoute', () => {
     expect(await screen.findByRole('heading', { name: 'Audit Plan Register' })).toBeInTheDocument();
     expect(screen.getByText('2026-05-01 -> 2026-09-01')).toBeInTheDocument();
 
-    fireEvent.change(screen.getAllByLabelText('Target vessel UUID')[0], {
+    fireEvent.change(screen.getAllByLabelText('Target vessel')[0], {
       target: { value: '22222222-2222-4222-8222-222222222222' },
     });
-    fireEvent.change(screen.getAllByLabelText('Standards')[0], { target: { value: 'ISM,ISPS' } });
+    addPlanStandard(0, 'ISPS');
     fireEvent.change(screen.getAllByLabelText('Planned window start')[0], { target: { value: '2026-05-01' } });
     fireEvent.change(screen.getAllByLabelText('Planned window end')[0], { target: { value: '2026-09-01' } });
     fireEvent.click(screen.getByRole('button', { name: /new plan entry/i }));
@@ -417,7 +458,7 @@ describe('AuditPlanRegisterRoute', () => {
 
     render(<AuditPlanRegisterRoute />);
 
-    fireEvent.change(await screen.findAllByLabelText('Target vessel UUID').then((fields) => fields[1]), {
+    fireEvent.change(await screen.findAllByLabelText('Target vessel').then((fields) => fields[1]), {
       target: { value: '22222222-2222-4222-8222-222222222222' },
     });
     fireEvent.change(screen.getAllByLabelText('Planned window start')[1], { target: { value: '2026-09-01' } });

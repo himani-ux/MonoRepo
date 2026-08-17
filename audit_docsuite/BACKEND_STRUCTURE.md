@@ -57,6 +57,7 @@ The following endpoints were added later and are part of the current implementat
 - `GET /api/psc/auth/crew/?vessel_id=<uuid>`
 - `GET /api/psc/auth/company-logo/`
 - `POST /api/psc/auth/company-logo/`
+- `GET /api/audit/vessels/` - returns readable vessel options (`id`, `vessel_code`, `vessel_name`) for Audit forms while preserving UUID IDs in saved payloads
 
 ## 1. Database Overview
 

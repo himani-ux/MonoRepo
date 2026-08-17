@@ -131,15 +131,34 @@ Live DB additive update applied 2026-08-16:
 - Verification after update confirmed all old `process_ids` remained present
   and all `form_ids` were unchanged for those eight rows.
 
-Remaining boundary after DB update:
+Assignment-scoped permission resolution applied 2026-08-17:
 
-- Per-audit roles such as Lead Auditor and Conductor are still not static
-  `msc_profiles` grants. They must continue to be enforced from audit-team /
-  qualified-auditor assignment data plus the action's permission checks.
+- Lead Auditor, Conductor, and office HoD are no longer treated as static
+  fallback profile grants.
+- Backend Audit permission helpers now derive audit-specific gates from the
+  current audit record:
+  - `AuditDetail.lead_auditor_user_id` grants Lead Auditor gates for that
+    audit only.
+  - `AuditDetail.conductor_user_id` grants Conduct gates for that audit only.
+  - active `MasterHodAssignment` for `AuditDetail.auditee_office_dept` grants
+    HoD signing gates for that office audit only.
+- Record-level Audit endpoints now load the audit/finding first, then evaluate
+  the user's effective permissions for that audit. Stable global profile gates
+  from `msc_profiles` still apply for DPA, SEQ, Fleet Manager, Master, and
+  office superintendent actions.
+- Audit-linked CAR workflow actions are checked inside the Audit proxy and
+  again inside the shared CAR workflow engine so direct PSC-CAR calls cannot
+  bypass the audit-specific permission model.
+- Frontend Audit record routes no longer rely only on global Audit process IDs;
+  the backend remains the source of truth for access to a specific audit
+  record.
+
+Remaining boundary after assignment fix:
+
 - If KSM wants `ACTING MASTER` to receive the same Audit gates as `MASTER`, or
   wants `AUDIT_P_013` granted to vessel-side Master for external registration,
-  that needs an explicit product/security ruling before another additive
-  update.
+  that still needs an explicit product/security ruling before another
+  additive update.
 
 ## 2. First Backend Startup Error Previously Seen
 

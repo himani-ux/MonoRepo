@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/page-header';
 import { RootLayout } from '@/components/layout/root-layout';
 import { Button, Checkbox, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@/components/ui';
-import { useCreateAuditRegistration } from '@/hooks/audit/use-audit-registration';
+import { useAuditVessels, useCreateAuditRegistration } from '@/hooks/audit/use-audit-registration';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/api/client';
 import {
@@ -69,6 +69,7 @@ export function ExternalAuditRegistrationPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const mutation = useCreateAuditRegistration();
+  const vesselQuery = useAuditVessels();
   const [linkedCertText, setLinkedCertText] = useState('');
   const {
     control,
@@ -84,7 +85,14 @@ export function ExternalAuditRegistrationPage() {
 
   const standards = watch('standards');
   const subtypes = watch('external_audit_subtypes');
+  const selectedVesselId = watch('vessel_id');
   const hasDocSubtype = subtypes.some((subtype) => subtype.startsWith('DOC_'));
+
+  useEffect(() => {
+    if (!selectedVesselId && vesselQuery.data?.[0]?.id) {
+      setValue('vessel_id', vesselQuery.data[0].id, { shouldValidate: true });
+    }
+  }, [selectedVesselId, setValue, vesselQuery.data]);
 
   const toggleStandard = (standard: (typeof EXTERNAL_AUDIT_STANDARDS)[number], checked: boolean) => {
     const next = checked
@@ -135,8 +143,30 @@ export function ExternalAuditRegistrationPage() {
           <h2 className={sectionTitleClass}>Post-Facto Registration</h2>
           <div className={gridClass}>
             <div className="space-y-2">
-              <Label htmlFor="vessel_id">Vessel UUID <span className="text-error-500">*</span></Label>
-              <Input id="vessel_id" disabled={mutation.isPending} {...register('vessel_id')} />
+              <Label htmlFor="vessel_id">Vessel <span className="text-error-500">*</span></Label>
+              <Controller
+                control={control}
+                name="vessel_id"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={mutation.isPending || vesselQuery.isLoading || !vesselQuery.data?.length}
+                  >
+                    <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
+                      <SelectValue placeholder={vesselPlaceholder(vesselQuery)} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(vesselQuery.data ?? []).map((vessel) => (
+                        <SelectItem key={vessel.id} value={vessel.id}>
+                          {formatVesselOption(vessel)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {vesselQuery.isError && <p className="text-sm text-error-500">Could not load vessels.</p>}
               {errors.vessel_id && <p className="text-sm text-error-500">{errors.vessel_id.message}</p>}
             </div>
             <div className="space-y-2">
@@ -319,4 +349,18 @@ export function ExternalAuditRegistrationPage() {
       </form>
     </RootLayout>
   );
+}
+
+function formatVesselOption(vessel: { id: string; vessel_code?: string; vessel_name?: string }): string {
+  if (vessel.vessel_code && vessel.vessel_name) {
+    return `${vessel.vessel_code} - ${vessel.vessel_name}`;
+  }
+  return vessel.vessel_name || vessel.vessel_code || vessel.id;
+}
+
+function vesselPlaceholder(vesselQuery: { isLoading: boolean; data?: unknown[] }): string {
+  if (vesselQuery.isLoading) {
+    return 'Loading vessels...';
+  }
+  return vesselQuery.data?.length ? 'Select vessel' : 'No vessels available';
 }

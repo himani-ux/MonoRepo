@@ -8,9 +8,13 @@ const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   toast: vi.fn(),
   useCreateInspection: vi.fn(),
+  useCreateAuditRegistration: vi.fn(),
+  useAuditVessels: vi.fn(),
   createMutateAsync: vi.fn(),
+  createAuditMutateAsync: vi.fn(),
   uploadInspectionReport: vi.fn(),
   inspectionFormProps: null as any,
+  auditRegistrationFormProps: null as any,
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -27,6 +31,11 @@ vi.mock('@/hooks/use-toast', () => ({
 
 vi.mock('@/hooks/use-inspections', () => ({
   useCreateInspection: () => mocks.useCreateInspection(),
+}));
+
+vi.mock('@/hooks/audit/use-audit-registration', () => ({
+  useCreateAuditRegistration: () => mocks.useCreateAuditRegistration(),
+  useAuditVessels: () => mocks.useAuditVessels(),
 }));
 
 vi.mock('@/lib/api/inspections', () => ({
@@ -107,6 +116,61 @@ vi.mock('@/components/inspection/inspection-form', () => ({
   },
 }));
 
+vi.mock('@/components/audit/registration/audit-registration-form', () => ({
+  AuditRegistrationForm: (props: any) => {
+    mocks.auditRegistrationFormProps = props;
+    return (
+      <div>
+        <label htmlFor="auditee_type">Auditee Type</label>
+        <select id="auditee_type" defaultValue="VESSEL">
+          <option value="VESSEL">Vessel</option>
+          <option value="OFFICE_DEPT">Office Department</option>
+        </select>
+        <button
+          type="button"
+          onClick={() =>
+            props.onSubmit({
+              vessel_id: '11111111-1111-4111-8111-111111111111',
+              inspection_date: '2026-02-08',
+              port_place: 'Singapore',
+              country: 'SG',
+              authority: 'Authority',
+              inspector_name: 'Lead Auditor',
+              report_reference: 'AUD-001',
+              audit_classification: 'INTERNAL',
+              auditee_type: 'OFFICE_DEPT',
+              auditee_office_dept: 'SEQ',
+              audit_subtype: 'ANNUAL_INTERNAL',
+              lead_auditor_name: 'Lead Auditor',
+              lead_auditor_designation: 'Auditor',
+              lead_auditor_company: 'KSM',
+              lead_auditor_qual: 'ISM',
+              lead_auditor_user_id: 'auditor-1',
+              trigger_reason: 'SCHEDULED',
+              audit_plan_id: '',
+              parent_audit_id: '',
+              audit_start_date: '2026-02-08',
+              audit_end_date: '',
+              opening_meeting_at: '',
+              closing_meeting_at: '',
+              audit_scope: 'Office audit',
+              terms_of_reference: '',
+              prev_internal_ca_verified: '',
+              prev_external_ca_verified: '',
+              standards: ['ISM'],
+              team_members: [],
+              attendees: [],
+              schedule_blocks: [],
+            })
+          }
+        >
+          Submit Audit Registration
+        </button>
+      </div>
+    );
+  },
+}));
+
 import CreateInspectionPage from './new';
 
 describe('CreateInspectionPage RBAC type restrictions', () => {
@@ -115,18 +179,55 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
     mocks.useAuth.mockReset();
     mocks.toast.mockReset();
     mocks.useCreateInspection.mockReset();
+    mocks.useCreateAuditRegistration.mockReset();
+    mocks.useAuditVessels.mockReset();
     mocks.createMutateAsync.mockReset();
+    mocks.createAuditMutateAsync.mockReset();
     mocks.uploadInspectionReport.mockReset();
     mocks.inspectionFormProps = null;
+    mocks.auditRegistrationFormProps = null;
 
     mocks.createMutateAsync.mockResolvedValue({ id: 'ins-100' });
+    mocks.createAuditMutateAsync.mockResolvedValue({ id: 'audit-100', inspection_id: 'ins-100', status: 'IN_PROGRESS' });
     mocks.useCreateInspection.mockReturnValue({
       mutateAsync: mocks.createMutateAsync,
       isPending: false,
     });
+    mocks.useCreateAuditRegistration.mockReturnValue({
+      mutateAsync: mocks.createAuditMutateAsync,
+      isPending: false,
+    });
+    mocks.useAuditVessels.mockReturnValue({
+      data: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      isLoading: false,
+    });
   });
 
-  it('office user sees only AUDIT type and cannot submit PSC', async () => {
+  it('office user sees the audit registration form with auditee type controls', async () => {
+    mocks.useAuth.mockReturnValue({
+      user: {
+        role: USER_ROLES.OFFICE_PIC,
+        vessel_id: 'vessel-1',
+        full_name: 'Office Auditor',
+      },
+    });
+
+    render(<CreateInspectionPage />);
+
+    expect(screen.getByRole('heading', { name: 'Register Audit' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Auditee Type')).toBeInTheDocument();
+    expect(mocks.inspectionFormProps).toBeNull();
+    expect(mocks.auditRegistrationFormProps.vesselOptions).toHaveLength(1);
+    expect(mocks.auditRegistrationFormProps.defaultLeadAuditorName).toBe('Office Auditor');
+  });
+
+  it('office user submits through the audit registration endpoint', async () => {
     mocks.useAuth.mockReturnValue({
       user: {
         role: USER_ROLES.OFFICE_PIC,
@@ -135,43 +236,20 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
     });
 
     render(<CreateInspectionPage />);
-
-    expect(mocks.inspectionFormProps.allowedInspectionTypes).toEqual([
-      INSPECTION_TYPES.AUDIT,
-    ]);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Submit PSC' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Audit Registration' }));
 
     await waitFor(() => {
+      expect(mocks.createAuditMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          audit_classification: 'INTERNAL',
+          auditee_type: 'OFFICE_DEPT',
+          lead_auditor_user_id: 'auditor-1',
+        })
+      );
       expect(mocks.createMutateAsync).not.toHaveBeenCalled();
-      expect(mocks.toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Access denied',
-          variant: 'destructive',
-        })
-      );
-    });
-  });
-
-  it('office user can still submit AUDIT', async () => {
-    mocks.useAuth.mockReturnValue({
-      user: {
-        role: USER_ROLES.OFFICE_PIC,
-        vessel_id: 'vessel-1',
-      },
-    });
-
-    render(<CreateInspectionPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'Submit Audit' }));
-
-    await waitFor(() => {
-      expect(mocks.createMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          inspection_type: INSPECTION_TYPES.AUDIT,
-          vessel_id: 'vessel-1',
-        })
-      );
-      expect(mocks.navigate).toHaveBeenCalledWith('/inspections/ins-100');
+      expect(mocks.navigate).toHaveBeenCalledWith('/audit/audits/audit-100', {
+        replace: true,
+      });
     });
   });
 
@@ -200,7 +278,9 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
           vessel_id: 'vessel-1',
         })
       );
-      expect(mocks.navigate).toHaveBeenCalledWith('/inspections/ins-100');
+      expect(mocks.navigate).toHaveBeenCalledWith('/inspections', {
+        replace: true,
+      });
     });
   });
 });

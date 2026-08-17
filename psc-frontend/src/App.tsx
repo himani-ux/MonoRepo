@@ -298,15 +298,7 @@ function AppShell() {
           path="/audit/audits/:auditId"
           element={
             <AuthGuard>
-              <PermissionGuard
-                requiredAnyProcess={[
-                  PROCESS_IDS.AUDIT_CREATE,
-                  PROCESS_IDS.AUDIT_EDIT,
-                  PROCESS_IDS.AUDIT_CONDUCT,
-                ]}
-              >
-                <AuditDetailRoute />
-              </PermissionGuard>
+              <AuditDetailRoute />
             </AuthGuard>
           }
         />
@@ -314,15 +306,7 @@ function AppShell() {
           path="/audit/audits/:auditId/checklist"
           element={
             <AuthGuard>
-              <PermissionGuard
-                requiredAnyProcess={[
-                  PROCESS_IDS.AUDIT_CREATE,
-                  PROCESS_IDS.AUDIT_EDIT,
-                  PROCESS_IDS.AUDIT_CONDUCT,
-                ]}
-              >
-                <AuditChecklistRoute />
-              </PermissionGuard>
+              <AuditChecklistRoute />
             </AuthGuard>
           }
         />
@@ -330,16 +314,7 @@ function AppShell() {
           path="/audit/findings/:findingId/nc/wizard"
           element={
             <AuthGuard>
-              <PermissionGuard
-                requiredAnyProcess={[
-                  PROCESS_IDS.AUDIT_CONDUCT,
-                  PROCESS_IDS.AUDIT_CLOSE_NC,
-                  PROCESS_IDS.AUDIT_SIGN_CLOSING_MEETING,
-                  PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT,
-                ]}
-              >
-                <AuditNcWizardRoute />
-              </PermissionGuard>
+              <AuditNcWizardRoute />
             </AuthGuard>
           }
         />
@@ -347,16 +322,7 @@ function AppShell() {
           path="/audit/findings/:findingId/nc"
           element={
             <AuthGuard>
-              <PermissionGuard
-                requiredAnyProcess={[
-                  PROCESS_IDS.AUDIT_CREATE,
-                  PROCESS_IDS.AUDIT_EDIT,
-                  PROCESS_IDS.AUDIT_CONDUCT,
-                  PROCESS_IDS.AUDIT_CLOSE_NC,
-                ]}
-              >
-                <AuditNcClosureRoute />
-              </PermissionGuard>
+              <AuditNcClosureRoute />
             </AuthGuard>
           }
         />
@@ -364,15 +330,7 @@ function AppShell() {
           path="/audit/findings/:findingId/obs"
           element={
             <AuthGuard>
-              <PermissionGuard
-                requiredAnyProcess={[
-                  PROCESS_IDS.AUDIT_CONDUCT,
-                  PROCESS_IDS.AUDIT_CLOSE_NC,
-                  PROCESS_IDS.AUDIT_SIGN_CLOSING_MEETING,
-                ]}
-              >
-                <AuditObsClosureRoute />
-              </PermissionGuard>
+              <AuditObsClosureRoute />
             </AuthGuard>
           }
         />

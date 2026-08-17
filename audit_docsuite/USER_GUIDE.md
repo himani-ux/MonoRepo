@@ -15,6 +15,8 @@ The items below were added or changed later on after the original guide baseline
 - settings now includes company logo management for PDF reports
 - office reviewer mapping can be vessel-scoped or global depending on the external mapping tables
 - CAR workflow now uses the unified operational statuses shown in the status section at the end of this guide
+- Audit plan and registration forms show vessel dropdowns; users select the vessel name/code and the system saves the correct vessel ID behind the scenes
+- Audit plan Standards are selected from fixed options, so users no longer type comma-separated standard codes
 
 ---
 

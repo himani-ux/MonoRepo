@@ -45,6 +45,9 @@ The route block above is the original v1.0 baseline. The live application was ch
 /reports                    -> Reports / DefIntel Workspace
 /settings                   -> User Settings
 /sync                       -> Sync Status
+/audit/plans                -> Audit Plan Register
+/audit/external/new         -> External Audit Registration
+/audit/audits/:id           -> Audit Detail
 ```
 
 ### 1.2 Later-Added Screen Notes
@@ -55,6 +58,8 @@ These changes were made later on after the original v1.0 screen inventory:
 - `/deficiencies` was added as a dedicated workflow screen for deficiency allocation and review
 - `/reports` was expanded into a real DefIntel/OpenSource workspace
 - `/settings` now includes company logo management for PDF reports
+- Audit plan and registration forms use vessel dropdowns backed by `GET /api/audit/vessels/`; users select vessel names/codes while the saved payload still sends the matching vessel UUID
+- Audit Plan Register Standards now use selectable options while preserving the same saved CSV value used by the backend
 - older v1.0 journey examples that mention legacy CAR states such as `DRAFT` and `PIC_ACCEPTED` should be read as historical baseline text; the live CAR workflow now uses the unified workflow documented in `docs/LATER_CHANGES.md`
 
 ---

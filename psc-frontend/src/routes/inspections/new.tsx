@@ -18,14 +18,17 @@ import { useNavigate } from 'react-router-dom';
 import { RootLayout } from '@/components/layout/root-layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { InspectionForm } from '@/components/inspection/inspection-form';
+import { AuditRegistrationForm } from '@/components/audit/registration/audit-registration-form';
 import { ConfirmDialog } from '@/components/shared';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useCreateInspection } from '@/hooks/use-inspections';
+import { useAuditVessels, useCreateAuditRegistration } from '@/hooks/audit/use-audit-registration';
 import { inspectionsApi } from '@/lib/api/inspections';
 import { INSPECTION_TYPES, ROUTES, USER_ROLES } from '@/lib/utils/constants';
 import { getErrorMessage } from '@/lib/api/client';
 import type { CreateInspectionFormData } from '@/lib/validations/inspection';
+import type { AuditRegistrationFormData } from '@/schemas/audit/registration';
 
 /**
  * Create Inspection page component.
@@ -158,21 +161,25 @@ export function CreateInspectionPage() {
     <RootLayout>
       {/* Page header with back button */}
       <PageHeader
-        title="New Inspection"
+        title={isVesselMaster ? 'New Inspection' : 'Register Audit'}
         showBack
         backTo={ROUTES.INSPECTIONS}
       />
 
       {/* Form */}
-      <div className="mx-auto max-w-2xl pb-8">
-        <InspectionForm
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          isSubmitting={isSubmitting}
-          submitLabel="Create Draft"
-          requireReport
-          allowedInspectionTypes={allowedInspectionTypes}
-        />
+      <div className={isVesselMaster ? 'mx-auto max-w-2xl pb-8' : 'mx-auto max-w-6xl pb-8'}>
+        {isVesselMaster ? (
+          <InspectionForm
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            isSubmitting={isSubmitting}
+            submitLabel="Create Draft"
+            requireReport
+            allowedInspectionTypes={allowedInspectionTypes}
+          />
+        ) : (
+          <OfficeAuditRegistrationSection user={user} onCancel={handleCancel} />
+        )}
       </div>
 
       {/* Cancel confirmation dialog */}
@@ -188,6 +195,68 @@ export function CreateInspectionPage() {
       />
     </RootLayout>
   );
+}
+
+function OfficeAuditRegistrationSection({
+  user,
+  onCancel,
+}: {
+  user: unknown;
+  onCancel: () => void;
+}) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const createAuditRegistration = useCreateAuditRegistration();
+  const vesselQuery = useAuditVessels();
+
+  const handleAuditRegistrationSubmit = useCallback(
+    async (data: AuditRegistrationFormData) => {
+      try {
+        const audit = await createAuditRegistration.mutateAsync(data);
+        toast({
+          title: 'Audit registered',
+          description: 'The audit record has been created.',
+        });
+        navigate(`/audit/audits/${audit.id}`, { replace: true });
+      } catch (error) {
+        toast({
+          title: 'Audit not registered',
+          description: getErrorMessage(error),
+          variant: 'destructive',
+        });
+      }
+    },
+    [createAuditRegistration, navigate, toast]
+  );
+
+  return (
+    <AuditRegistrationForm
+      onSubmit={handleAuditRegistrationSubmit}
+      onCancel={onCancel}
+      isSubmitting={createAuditRegistration.isPending}
+      vesselOptions={vesselQuery.data ?? []}
+      defaultVesselId={getUserVesselId(user)}
+      defaultLeadAuditorName={getUserDisplayName(user)}
+    />
+  );
+}
+
+function getUserVesselId(user: unknown): string | null {
+  if (!user || typeof user !== 'object') return null;
+  const candidate = user as { vessel_id?: string };
+  return candidate.vessel_id || null;
+}
+
+function getUserDisplayName(user: unknown): string {
+  if (!user || typeof user !== 'object') return '';
+  const candidate = user as {
+    full_name?: string;
+    name?: string;
+    display_name?: string;
+    username?: string;
+    user_id?: string;
+  };
+  return candidate.full_name || candidate.name || candidate.display_name || candidate.username || candidate.user_id || '';
 }
 
 export default CreateInspectionPage;

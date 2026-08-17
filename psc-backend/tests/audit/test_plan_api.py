@@ -50,6 +50,7 @@ from apps.inspection.audit.views import (  # noqa: E402
     AuditPlanExtensionRequestView,
     AuditPlanFlagNotifyView,
     AuditPlanListCreateView,
+    AuditVesselOptionListView,
 )
 from rest_framework.test import APIRequestFactory, force_authenticate  # noqa: E402
 
@@ -86,20 +87,40 @@ class AuditPlanApiTests(unittest.TestCase):
                     schema_editor.delete_model(model)
             for model in SCHEMA_MODELS:
                 schema_editor.create_model(model)
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS VesselData")
+            cursor.execute(
+                """
+                CREATE TABLE VesselData (
+                    id TEXT PRIMARY KEY,
+                    vesselCode TEXT,
+                    vesselName TEXT,
+                    is_deleted INTEGER DEFAULT 0
+                )
+                """
+            )
 
     @classmethod
     def tearDownClass(cls) -> None:
         with connection.schema_editor() as schema_editor:
             for model in reversed(SCHEMA_MODELS):
                 schema_editor.delete_model(model)
+        with connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS VesselData")
         super().tearDownClass()
 
     def setUp(self) -> None:
         with connection.cursor() as cursor:
             for model in reversed(SCHEMA_MODELS):
                 cursor.execute(f"DELETE FROM {model._meta.db_table}")
+            cursor.execute("DELETE FROM VesselData")
         self.factory = APIRequestFactory()
         self.vessel_id = uuid.uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO VesselData (id, vesselCode, vesselName, is_deleted) VALUES (%s, %s, %s, 0)",
+                [str(self.vessel_id), "EAT", "EAST AYUTTHAYA"],
+            )
 
     def _list_plans(self, user, query: str = ""):
         request = self.factory.get(f"/api/audit/plans/{query}")
@@ -146,6 +167,11 @@ class AuditPlanApiTests(unittest.TestCase):
         force_authenticate(request, user=user)
         return AuditPlanAdditionalView.as_view()(request)
 
+    def _list_vessels(self, user):
+        request = self.factory.get("/api/audit/vessels/")
+        force_authenticate(request, user=user)
+        return AuditVesselOptionListView.as_view()(request)
+
     def _valid_payload(self):
         return {
             "target_vessel_id": str(self.vessel_id),
@@ -171,10 +197,29 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertFalse(plan.is_additional)
         self.assertEqual(plan.created_by, "seq-1")
         self.assertEqual(create_response.data["data"]["status"], "PLANNED")
+        self.assertEqual(create_response.data["data"]["target_label"], "EAT - EAST AYUTTHAYA")
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.data["data"]["count"], 1)
         self.assertEqual(list_response.data["data"]["results"][0]["id"], str(plan.id))
+        self.assertEqual(list_response.data["data"]["results"][0]["target_label"], "EAT - EAST AYUTTHAYA")
         self.assertEqual(list_response.data["data"]["results"][0]["window_label"], "2026-05-01 -> 2026-09-01")
+
+    def test_vessel_option_endpoint_returns_readable_labels_for_audit_forms(self) -> None:
+        user = make_user(role="DPA", process_ids=[AUDIT_P_001])
+
+        response = self._list_vessels(user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["data"],
+            [
+                {
+                    "id": str(self.vessel_id),
+                    "vessel_code": "EAT",
+                    "vessel_name": "EAST AYUTTHAYA",
+                }
+            ],
+        )
 
     def test_patch_plan_updates_editable_register_fields(self) -> None:
         user = make_user(process_ids=[AUDIT_P_001, AUDIT_P_002])

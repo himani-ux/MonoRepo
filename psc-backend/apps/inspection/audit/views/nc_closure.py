@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from apps.inspection.audit.permissions import (
     AUDIT_P_003,
     AUDIT_P_004,
-    audit_process_ids_for_request,
+    request_has_audit_detail_process_id,
     user_can_access_audit_detail,
 )
 from apps.inspection.audit.serializers.nc_closure import AuditNcDraftSerializer, PART_SERIALIZERS
@@ -86,7 +86,7 @@ class AuditFindingNcPartView(APIView):
 
         if not user_can_access_audit_detail(request.user, bundle.audit_detail):
             return _forbidden("You do not have access to this audit.")
-        if self.part_name in {"part-e", "part-f", "part-g"} and AUDIT_P_004 not in audit_process_ids_for_request(request):
+        if self.part_name in {"part-e", "part-f", "part-g"} and not request_has_audit_detail_process_id(request, bundle.audit_detail, AUDIT_P_004):
             return _forbidden("You do not have permission to close Audit NC Parts E/F/G.")
 
         try:
@@ -118,7 +118,7 @@ class AuditFindingNcDraftView(APIView):
 
         if not user_can_access_audit_detail(request.user, bundle.audit_detail):
             return _forbidden("You do not have access to this audit.")
-        if AUDIT_P_003 not in audit_process_ids_for_request(request):
+        if not request_has_audit_detail_process_id(request, bundle.audit_detail, AUDIT_P_003):
             return _forbidden("You do not have permission to draft Audit NC Parts B/C for the vessel.")
 
         try:

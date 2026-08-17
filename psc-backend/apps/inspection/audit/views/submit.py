@@ -10,8 +10,8 @@ from apps.inspection.audit.models import AuditDetail
 from apps.inspection.audit.permissions import (
     AUDIT_P_003,
     AUDIT_P_017,
-    HasAnyAuditProcessPermission,
     audit_process_ids_for_request,
+    request_has_audit_detail_process_id,
     is_vessel_user,
     normalized_audit_role,
     user_can_access_audit_detail,
@@ -49,12 +49,14 @@ def _conflict(message: str) -> Response:
 class AuditSubmitView(APIView):
     """POST /api/audit/audits/{id}/submit/ runs the D-071 gates."""
 
-    permission_classes = [IsAuthenticated, HasAnyAuditProcessPermission.requiring_any(AUDIT_P_003)]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, id):
         audit_detail = _get_audit_detail(id)
         if not user_can_access_audit_detail(request.user, audit_detail):
             return _forbidden("You do not have access to this audit.")
+        if not request_has_audit_detail_process_id(request, audit_detail, AUDIT_P_003):
+            return _forbidden("You do not have permission to submit this audit.")
 
         try:
             updated = submit_audit_report(audit_detail=audit_detail, user=request.user)

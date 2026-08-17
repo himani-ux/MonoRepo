@@ -504,6 +504,31 @@ def _audit_gate_error(car, action, transition, audit_context):
     return None
 
 
+def _audit_permission_error(user, action, audit_context):
+    """Enforce Audit process gates inside the shared CAR engine for Audit-linked CARs."""
+    if not audit_context:
+        return None
+    _finding, audit_detail = audit_context
+    try:
+        from apps.inspection.audit.permissions import (
+            AUDIT_CAR_WORKFLOW_ACTION_GATES,
+            audit_effective_process_ids_for_user,
+        )
+
+        action_key = str(action or "").strip().upper()
+        if action_key not in AUDIT_CAR_WORKFLOW_ACTION_GATES:
+            return None
+        required_process_ids = AUDIT_CAR_WORKFLOW_ACTION_GATES[action_key]
+        effective_process_ids = audit_effective_process_ids_for_user(user, audit_detail)
+    except Exception:
+        logger.exception("Failed to resolve Audit CAR workflow permissions")
+        return 'Audit CAR workflow permission check failed.'
+
+    if any(process_id in effective_process_ids for process_id in required_process_ids):
+        return None
+    return 'You do not have permission to perform this Audit CAR workflow action.'
+
+
 # ============================================================================
 # Role Resolution
 # ============================================================================
@@ -524,14 +549,10 @@ def _get_user_workflow_roles(user, deficiency=None):
     if audit_context:
         _finding, audit_detail = audit_context
         lead_auditor_user_id = audit_detail.lead_auditor_user_id
-        if (
-            lead_auditor_user_id
-            and (
-                str(user_id) == str(lead_auditor_user_id)
-                or _uuid_match(user_id, lead_auditor_user_id)
-            )
-        ):
+        if _workflow_user_matches(user, lead_auditor_user_id):
             roles.add('lead_auditor')
+        if _workflow_user_matches(user, audit_detail.conductor_user_id):
+            roles.add('pic')
 
     if user_type == 'OFFICE':
         role = getattr(user, 'role', '')
@@ -562,6 +583,16 @@ def _get_user_workflow_roles(user, deficiency=None):
                 roles.add('reviewer')
 
     return roles
+
+
+def _workflow_user_matches(user, target_user_id) -> bool:
+    if not target_user_id:
+        return False
+    for attr_name in ("id", "user_id", "employee_id", "login_id", "username", "crew_id"):
+        value = getattr(user, attr_name, None)
+        if value and (str(value) == str(target_user_id) or _uuid_match(value, target_user_id)):
+            return True
+    return False
 
 
 # ============================================================================
@@ -623,6 +654,10 @@ def validate_workflow_transition(car, action, user, comment=None):
     if gate_error:
         return None, gate_error
 
+    permission_error = _audit_permission_error(user, action, audit_context)
+    if permission_error:
+        return None, permission_error
+
     # Resolve user roles
     user_roles = _get_user_workflow_roles(user, deficiency)
 
@@ -660,6 +695,8 @@ def get_available_actions(car, user):
         if status != car.status:
             continue
         if _transition_scope_error(car, action, transition, audit_context):
+            continue
+        if _audit_permission_error(user, action, audit_context):
             continue
         allowed = set(transition['allowed_roles'])
         if user_roles & allowed:

@@ -24,6 +24,7 @@ import {
 import { useIssueAuditCircular } from '@/hooks/audit/use-audit-finding';
 import { getErrorMessage } from '@/lib/api/client';
 import { ROUTES } from '@/lib/utils/constants';
+import { PROCESS_IDS } from '@/lib/utils/permission-ids';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -209,6 +210,11 @@ export function AuditDetailPage({ auditId }: AuditDetailPageProps) {
     }
   };
 
+  const effectivePermissions = new Set(audit.effective_permissions ?? []);
+  const canEditAudit = effectivePermissions.has(PROCESS_IDS.AUDIT_EDIT);
+  const canConductAudit = effectivePermissions.has(PROCESS_IDS.AUDIT_CONDUCT);
+  const canAcknowledgeAudit = effectivePermissions.has(PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT);
+
   return (
     <RootLayout>
       <PageHeader
@@ -239,7 +245,7 @@ export function AuditDetailPage({ auditId }: AuditDetailPageProps) {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {audit.status === 'IN_PROGRESS' && (
+              {audit.status === 'IN_PROGRESS' && canConductAudit && (
                 <Button asChild variant="outline">
                   <Link to={`/audit/audits/${audit.id}/checklist`}>
                     <ClipboardList className="mr-2 h-4 w-4" />
@@ -247,13 +253,13 @@ export function AuditDetailPage({ auditId }: AuditDetailPageProps) {
                   </Link>
                 </Button>
               )}
-              {audit.status === 'IN_PROGRESS' && (
+              {audit.status === 'IN_PROGRESS' && canConductAudit && (
                 <Button onClick={submitReport} disabled={submitAudit.isPending}>
                   {submitAudit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                   Submit Report
                 </Button>
               )}
-              {audit.status === 'REPORT_FINALIZED' && (
+              {audit.status === 'REPORT_FINALIZED' && canAcknowledgeAudit && (
                 <Button onClick={acknowledgeReport} disabled={acknowledgeAudit.isPending}>
                   {acknowledgeAudit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                   Vessel Acknowledge Audit Report
@@ -324,7 +330,7 @@ export function AuditDetailPage({ auditId }: AuditDetailPageProps) {
               />
             </div>
             <div className="flex justify-end">
-              <Button onClick={saveDetail} disabled={updateDetail.isPending}>
+              <Button onClick={saveDetail} disabled={updateDetail.isPending || !canEditAudit}>
                 {updateDetail.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Save Detail
               </Button>
@@ -350,7 +356,7 @@ export function AuditDetailPage({ auditId }: AuditDetailPageProps) {
               ))}
             </div>
             <div className="flex justify-end">
-              <Button onClick={saveScorecard} disabled={updateScorecard.isPending}>
+              <Button onClick={saveScorecard} disabled={updateScorecard.isPending || !canConductAudit}>
                 {updateScorecard.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Save Scorecard
               </Button>

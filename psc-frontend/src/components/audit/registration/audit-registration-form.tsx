@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { useEffect, type FC } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
@@ -11,11 +11,12 @@ import {
   type AuditRegistrationFormData,
 } from '@/schemas/audit/registration';
 import { Button, Checkbox, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@/components/ui';
-import { cn } from '@/lib/utils';
 
 export interface AuditVesselOption {
   id: string;
-  label: string;
+  label?: string;
+  vessel_code?: string;
+  vessel_name?: string;
 }
 
 export interface AuditRegistrationFormProps {
@@ -60,6 +61,13 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
   const schedule = useFieldArray({ control, name: 'schedule_blocks' });
   const auditeeType = watch('auditee_type');
   const standards = watch('standards');
+  const selectedVesselId = watch('vessel_id');
+
+  useEffect(() => {
+    if (!selectedVesselId && vesselOptions[0]?.id) {
+      setValue('vessel_id', vesselOptions[0].id, { shouldValidate: true });
+    }
+  }, [selectedVesselId, setValue, vesselOptions]);
 
   const toggleStandard = (standard: (typeof AUDIT_STANDARDS)[number], checked: boolean) => {
     const next = checked
@@ -75,34 +83,24 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
         <div className={gridClass}>
           <div className="space-y-2">
             <Label htmlFor="vessel_id">Vessel <span className="text-error-500">*</span></Label>
-            {vesselOptions.length > 0 ? (
-              <Controller
-                control={control}
-                name="vessel_id"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
-                    <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
-                      <SelectValue placeholder="Select vessel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vesselOptions.map((vessel) => (
-                        <SelectItem key={vessel.id} value={vessel.id}>
-                          {vessel.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            ) : (
-              <Input
-                id="vessel_id"
-                placeholder="Vessel UUID"
-                disabled={isSubmitting}
-                {...register('vessel_id')}
-                className={cn(errors.vessel_id && 'border-error-500')}
-              />
-            )}
+            <Controller
+              control={control}
+              name="vessel_id"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting || vesselOptions.length === 0}>
+                  <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
+                    <SelectValue placeholder={vesselOptions.length > 0 ? 'Select vessel' : 'No vessels available'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vesselOptions.map((vessel) => (
+                      <SelectItem key={vessel.id} value={vessel.id}>
+                        {formatVesselOption(vessel)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
             {errors.vessel_id && <p className="text-sm text-error-500">{errors.vessel_id.message}</p>}
           </div>
 
@@ -397,3 +395,13 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
     </form>
   );
 };
+
+function formatVesselOption(vessel: AuditVesselOption): string {
+  if (vessel.label) {
+    return vessel.label;
+  }
+  if (vessel.vessel_code && vessel.vessel_name) {
+    return `${vessel.vessel_code} - ${vessel.vessel_name}`;
+  }
+  return vessel.vessel_name || vessel.vessel_code || vessel.id;
+}

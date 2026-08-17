@@ -150,7 +150,7 @@ class AuditCarWorkflowProxyTests(unittest.TestCase):
             user_type="OFFICE",
             user_id="lead-1",
             display_name="Lead Auditor",
-            process_ids=[AUDIT_P_004],
+            process_ids=[],
         )
         self.dpa = make_user(
             role=RoleCodes.DPA,

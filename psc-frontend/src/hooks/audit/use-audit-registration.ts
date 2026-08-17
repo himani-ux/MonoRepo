@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { auditApi, type AuditRegistrationResponse } from '@/lib/api/audit';
+import { auditApi, type AuditRegistrationResponse, type AuditVesselOption } from '@/lib/api/audit';
 import type { ExternalAuditCloseoutPayload, ExternalCertLinkPayload } from '@/lib/api/audit';
 import type { AuditDetail, AuditDetailEditableFields, AuditScorecardRow } from '@/schemas/audit/detail';
 import type { AuditRegistrationPayload } from '@/schemas/audit/registration';
@@ -8,6 +8,7 @@ export const auditKeys = {
   all: ['audit'] as const,
   audits: () => [...auditKeys.all, 'audits'] as const,
   detail: (id: string | undefined) => [...auditKeys.audits(), id || 'unknown'] as const,
+  vessels: () => [...auditKeys.all, 'vessels'] as const,
 };
 
 export function useCreateAuditRegistration() {
@@ -19,6 +20,13 @@ export function useCreateAuditRegistration() {
       queryClient.invalidateQueries({ queryKey: auditKeys.audits() });
       queryClient.invalidateQueries({ queryKey: ['inspections', 'list'] });
     },
+  });
+}
+
+export function useAuditVessels() {
+  return useQuery<AuditVesselOption[], Error>({
+    queryKey: auditKeys.vessels(),
+    queryFn: auditApi.getAuditVessels,
   });
 }
 

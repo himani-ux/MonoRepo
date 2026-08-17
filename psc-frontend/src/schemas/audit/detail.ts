@@ -112,6 +112,7 @@ export interface AuditDetail {
     observations: number;
     total_findings: number;
   };
+  effective_permissions?: string[];
   scorecard: AuditScorecardRow[];
   findings: AuditFindingRow[];
 }

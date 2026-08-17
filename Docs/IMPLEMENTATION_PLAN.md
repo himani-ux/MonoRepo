@@ -1018,3 +1018,11 @@ Migration note: the current maintained repo already contains `inspection` migrat
 ## Amendment 30 - 2026-08-17
 
 The post-sync Audit gap-resolution package was reviewed and safely folded into the maintained repo. The current repo imports the revised Audit runtime gap evidence, approved mock references, the Audit create-page route permission allowance, and the ORB decorator correction that removes unsafe `AllowAny` activation from four function views. Broad source-workspace dependency updates and unrelated PSC/Safety changes are intentionally excluded. No database changes are executed by this amendment; the `msc_profiles` live update noted in the handover remains an operational record pending environment-specific deployment handling.
+
+## Amendment 31 - 2026-08-17
+
+Audit Lead Auditor, Conductor, and office HoD permissions are now resolved from the audit record and active Audit master assignment data instead of static profile-wide fallback labels. This amendment supersedes the temporary runtime-gap assumption that `Lead Auditor`, `Conductor`, or `HoD` designation text could safely provide global Audit process gates.
+
+Triggering discovery: live `msc_profiles` review confirmed that per-audit responsibilities are not stable profile rows, and granting Lead Auditor/Conductor/HoD gates globally would over-grant actions across unrelated audits.
+
+Implementation boundary: no database schema change is introduced. Existing columns `AuditDetail.lead_auditor_user_id`, `AuditDetail.conductor_user_id`, and existing `MasterHodAssignment` rows are the source of assignment-scoped permission. Stable profile gates from `msc_profiles` continue to cover DPA, SEQ, Fleet Manager, Master, Admin, Super Admin, and office superintendent responsibilities. Shared CAR workflow changes are limited to Audit-linked CARs and do not change normal PSC CAR behavior.

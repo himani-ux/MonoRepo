@@ -37,10 +37,16 @@ from apps.inspection.audit.views import (
     AuditScorecardView,
     AuditScanValidationQueueView,
     AuditSubmitView,
+    AuditVesselOptionListView,
 )
 
 app_name = "audit"
 urlpatterns = [
+    path(
+        "vessels/",
+        AuditVesselOptionListView.as_view(),
+        name="audit-vessel-options",
+    ),
     path(
         "dpa/notifications/failed/",
         AuditFailedNotificationListView.as_view(),
