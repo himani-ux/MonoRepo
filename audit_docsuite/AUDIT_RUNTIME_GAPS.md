@@ -216,6 +216,23 @@ Fix applied during debugging:
   `Complete_VIMS_audit_dev/psc-backend/requirements.txt` pins
   `pypdf==6.15.0`, and current production imports now match that pin.
 
+Current verification on 2026-08-17:
+
+- Checked local commit `a2f308127f1e9b03137408deb08c5fe1a7e6ad52`.
+- Project default DRF permission is `IsAuthenticated`
+  (`psc-backend/core/settings.py`).
+- Direct unauthenticated DRF `APIRequestFactory` calls returned `401` for all
+  four affected ORB functions:
+  `get_operations`, `list_for_chief`,
+  `get_all_crew_onboarding_history`, and
+  `get_vessel_id_for_current_user`.
+- `get_vessel_id_for_current_user` is URL-wired locally. The other three
+  functions are not URL-wired locally, so they were verified by direct DRF
+  view invocation rather than route-level HTTP requests.
+- Follow-up hardening item: add committed regression coverage so any future
+  route wiring for these functions still proves unauthenticated access returns
+  `401` or `403`.
+
 ## 3. Additional Development Review Gaps
 
 These are the remaining review-facing gaps observed from the local development

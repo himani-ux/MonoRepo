@@ -1,4 +1,4 @@
-# Audit Status Reply For Senior
+
 
 Date: 2026-08-17
 
@@ -10,28 +10,23 @@ Audit Git repository:
 https://github.com/himani-ux/VIMS_Audit.git
 ```
 
-Current deployment status:
 
-- Audit module code is available in the repository above.
-- Audit module code is not deployed on the live server yet.
-- Because of that, there is currently no live Audit URL/screen available for user testing.
-- The existing live VIMS login continues to work for already deployed modules only.
-- Audit access can be validated only after the Audit code is deployed to live.
 
 Access users for local/development Audit journey validation:
 
-| Role | Username | Note |
+| Role | Username | Password sharing |
 |---|---|---|
-| DPA | `harman.s` | Password to be shared separately through a secure channel. |
-| Master | `KSM0225` | Master account for Aarya. Password to be shared separately through a secure channel. |
-| Superintendent/PIC | `Aman.Oberoi` | Password to be shared separately through a secure channel. |
-| Fleet Manager | `Prince. S` | Use if available. Password to be shared separately through a secure channel. |
+| DPA | `harman.s` | Share through the approved secret channel only. |
+| Master | `KSM0225` | Share through the approved secret channel only. |
+| Superintendent/PIC | `Aman.Oberoi` | Share through the approved secret channel only. |
+| Fleet Manager | `Prince. S` | Share through the approved secret channel only. |
 
 Current Audit build status:
 
 - Audit is available in local/development code.
 - Journey testing was run against the local/development build, not the live deployment.
 - Different Audit journeys need different actors, such as DPA/SEQ, Lead Auditor/Conductor, Master, and Superintendent/PIC.
+- Passwords already shared in plaintext should be rotated before reuse.
 
 Local/development routes already built:
 
@@ -90,7 +85,28 @@ These are the current SCR-AUD gaps from the local Phase 5 journey run.
 | `SCR-AUD-6` | Observation Closure | Observation Closure page opens, but Observation closure record is not found. | Needs Observation closure child record/state verification. |
 | `SCR-AUD-13` | Acting HoD Coverage | Acting HoD assignment screen/route is absent. | Expected gap, not yet built. |
 
-## 4. Not Counted As General Build Gaps
+## 4. Permission Model Status
+
+This is not an open permission-model decision.
+
+`msc_profiles` grants fixed profile-wide Audit permissions for rows such as `SEQ Manager`, `MASTER`, `Marine Superintendent`, `Technical Superintendent`, `admin`, and `Super Admin`.
+
+Assignment-based Audit permissions are resolved from the audit record and active assignment data:
+
+Current status:
+
+- `audit_detail.lead_auditor_user_id` is used for Lead Auditor access.
+- `audit_detail.conductor_user_id` is used for Conductor access.
+- `master_hod_assignment` is used for HoD / Acting HoD access.
+- Backend gate logic merges static `AUDIT_P_*` profile grants with these per-record assignment grants.
+- Audit Detail frontend reads `effective_permissions` from the API to decide which actions are visible.
+
+Remaining validation:
+
+- Re-run the failed journeys with test users deliberately assigned on the exact audit/finding records under test.
+- Do not treat a journey run against arbitrary or pre-existing IDs as permission proof.
+
+## 5. Not Counted As General Build Gaps
 
 `JOURNEY-6` failed under DPA, but passed when rerun with Superintendent/PIC.
 
@@ -100,7 +116,7 @@ Meaning:
 - It is not currently treated as a general code failure.
 - The journey needs the correct user role and workflow state for that step.
 
-## 5. Simple Summary
+## 6. Simple Summary
 
 Register Audit is fixed.
 

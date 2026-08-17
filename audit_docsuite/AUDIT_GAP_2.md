@@ -4,7 +4,7 @@ Date: 2026-08-17
 
 ## Current Journey Result
 
-After fixing the Register Audit route and rerunning with the local Audit test dataset, the journey result is now:
+After fixing the Register Audit route and rerunning with the local Audit test dataset, the previous local run reported:
 
 - 8 journeys passed.
 - 5 journeys failed.
@@ -33,9 +33,57 @@ Skipped:
 
 - JOURNEY-14: Acting HoD page is absent.
 
+Evidence correction on 2026-08-17:
+
+- The previous pass list should not be treated as formally verified until each
+  journey has the agreed evidence package: commit SHA, account/persona, route,
+  record IDs, command, raw output/log, and screenshot for manual checks.
+- `JOURNEY-2`, `JOURNEY-4`, and `JOURNEY-10` especially need rerun evidence
+  because their actor usage and dependent screens were not fully recorded.
+- `JOURNEY-12` is added to the rerun list because the external-audit record
+  view still needs explicit verification evidence.
+- `JOURNEY-6` is not a DPA failure. The backend negative guard now has a
+  passing regression test for Lead Auditor denied PIC review on own audit, but
+  the browser/manual positive PIC case still needs a complete evidence package.
+
+Current unified rerun list:
+
+- JOURNEY-2.
+- JOURNEY-3.
+- JOURNEY-4.
+- JOURNEY-5.
+- JOURNEY-7.
+- JOURNEY-8.
+- JOURNEY-10.
+- JOURNEY-12.
+- JOURNEY-13.
+
 The previous Register Audit blocker is resolved. The Register Audit screen now opens the Audit Registration form and exposes the auditee type field.
 
 One-line gap summary: Acting HoD assignment screen/route is not available, and the remaining failures are now around Audit detail action controls, NC/Observation closure records not being found, workflow state, and actor-specific access.
+
+## Permission Model Status - msc_profiles And Per-Record Roles
+
+This is not an open permission-model decision.
+
+`msc_profiles` works for fixed profile-wide Audit permissions such as `SEQ Manager`, `MASTER`, `Marine Superintendent`, `Technical Superintendent`, `admin`, and `Super Admin`.
+
+Audit also has roles that come from the audit record itself. These roles are not solved by adding rows into `msc_profiles`.
+
+Confirmed access sources:
+
+Current position:
+
+- `audit_detail.lead_auditor_user_id` grants Lead Auditor access for that audit.
+- `audit_detail.conductor_user_id` grants Conductor access for that audit.
+- `master_hod_assignment` grants HoD / Acting HoD access where the assignment is active.
+- Backend permission logic merges static `AUDIT_P_*` grants with these per-record assignment grants.
+- Audit Detail frontend reads the API `effective_permissions` value for action visibility.
+
+Remaining validation:
+
+- The failed journeys must be rerun with real test users deliberately written into the matching audit/finding assignment fields.
+- A run against arbitrary existing IDs is only a data-state check, not proof that assigned-role controls are missing.
 
 ## What Is Not A Development Bug
 
