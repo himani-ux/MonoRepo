@@ -1014,3 +1014,7 @@ Triggering discovery: the handover includes Audit-specific backend code under `a
 Implementation boundary: only Audit-related code and docs are imported. Existing non-Audit PSC, Safety, Certs, Circular, ORB, and shared module files are not overwritten from the handover. Shared files receive only isolated Audit route/navigation/permission additions required to wire the module.
 
 Migration note: the current maintained repo already contains `inspection` migration `0017_alter_inspectionreport_description.py`. Audit handover migrations are renumbered after that migration chain so existing migration history is preserved.
+
+## Amendment 30 - 2026-08-17
+
+The post-sync Audit gap-resolution package was reviewed and safely folded into the maintained repo. The current repo imports the revised Audit runtime gap evidence, approved mock references, the Audit create-page route permission allowance, and the ORB decorator correction that removes unsafe `AllowAny` activation from four function views. Broad source-workspace dependency updates and unrelated PSC/Safety changes are intentionally excluded. No database changes are executed by this amendment; the `msc_profiles` live update noted in the handover remains an operational record pending environment-specific deployment handling.

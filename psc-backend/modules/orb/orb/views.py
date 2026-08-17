@@ -821,7 +821,6 @@ def get_last_page_number(request):
 
 
 
-@permission_classes([AllowAny])
 @api_view(['GET'])
 def get_operations(request):
     vessel_id = request.GET.get('vessel_id')
@@ -1167,7 +1166,6 @@ def get_csrf_token(request):
 
 
 
-@permission_classes([AllowAny])
 @api_view(['GET'])
 def list_for_chief(request):
     vessel_id = request.GET.get('vessel_id')
@@ -1767,7 +1765,6 @@ def download_pdf(request, pdf_id):
 
 
 
-@permission_classes([AllowAny])
 @api_view(["GET"])
 def get_all_crew_onboarding_history(request):
     """
@@ -1795,7 +1792,6 @@ def get_all_crew_onboarding_history(request):
 
 
 
-@permission_classes([AllowAny])
 @api_view(["GET"])
 def get_vessel_id_for_current_user(request):
     """

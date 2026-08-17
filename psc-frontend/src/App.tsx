@@ -210,7 +210,13 @@ function AppShell() {
           path="/inspections/new"
           element={
             <AuthGuard>
-              <PermissionGuard requiredProcess={PROCESS_IDS.CREATE_INSPECTION}>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.CREATE_INSPECTION,
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                ]}
+              >
                 <CreateInspectionPage />
               </PermissionGuard>
             </AuthGuard>
