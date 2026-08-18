@@ -1,10 +1,26 @@
 # Audit Response - 2026-08-18
 
+## Four Open Items
+
+1. Authoritative commit:
+   The authoritative branch is `main` in `https://github.com/himani-ux/VIMS_Audit.git` after pull. Do not use `a2f308127f1e9b03137408deb08c5fe1a7e6ad52` or `a87176d`. The current repo contains `QUALITY_GATE_STAMP.json` and `audit_docsuite/AUDIT_RUNTIME_GAPS.md` for direct review.
+
+2. Rerun list:
+   `JOURNEY-11` is back on the rerun list. `JOURNEY-1` and `JOURNEY-9` are also treated as unvalidated until rerun with raw evidence. No earlier narrative pass is being claimed as final evidence.
+
+3. UAT report format:
+   Going forward, every journey result will be packaged as `UAT_REPORT_<date>.md` using `journey/docs/uat-report-format.md`, with path:line evidence quotes, raw output/logs, route tested, account/persona used, record IDs, and artifact hashes or screenshots where manual evidence is used.
+
+4. Credential rotation:
+   Credential rotation is still a separate account-admin item. No plaintext passwords are included in this repo response. Code/evidence review can continue in parallel, but final closure needs one-line confirmation from the account owner with rotated accounts and rotation date.
+
 ## Direct Status
 
-Latest committed base used for the rerun report:
+Original rerun report base, kept here only as historical evidence for that rerun:
 
 `2063e624035637e263473588c96ff9bb3afd5fb2 - Add audit response 4`
+
+Current authoritative review target is the latest `main` branch after pull, as stated in the four-item answer above.
 
 Rerun report created:
 
@@ -85,9 +101,11 @@ This should give the senior team concrete items to resolve instead of vague conf
 
 ## Evidence Pack
 
-### 1. Commit And Working State
+### 1. Original Rerun Commit And Working State
 
-Command:
+This command output belongs to the original rerun evidence package only. It is not the current authoritative branch head.
+
+Command from the original rerun:
 
 ```text
 git rev-parse HEAD
