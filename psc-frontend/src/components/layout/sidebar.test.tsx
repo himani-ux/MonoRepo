@@ -280,7 +280,7 @@ describe('Sidebar', () => {
     const navigation = screen.getByRole('navigation', { name: /main navigation/i });
     const pscButton = screen.getByRole('button', { name: /psc/i });
 
-    expect(sidebar).toHaveClass('w-72');
+    expect(sidebar).toHaveClass('w-80');
     expect(navigation).toHaveClass('overflow-y-auto');
     expect(navigation).toHaveClass('overflow-x-auto');
     expect(pscButton.querySelector('svg')).toBeInTheDocument();

@@ -325,7 +325,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full min-h-0 w-72 shrink-0 flex-col bg-white shadow-lg transition-transform duration-300',
+          'fixed left-0 top-0 z-50 flex h-full min-h-0 w-80 shrink-0 flex-col bg-white shadow-lg transition-transform duration-300',
           'md:relative md:z-0 md:h-full md:translate-x-0 md:shadow-none md:border-r md:border-neutral-200',
           isOpen ? 'translate-x-0' : '-translate-x-full',
           className
