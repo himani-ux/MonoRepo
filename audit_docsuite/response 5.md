@@ -28,13 +28,18 @@ These are the concrete gaps that need product/workflow attention:
 
 ## Test Setup Blockers
 
-These journeys could not be browser-rerun because the local journey runner package and required journey environment values are missing:
+These journeys could not be browser-rerun in this report because, at the time of the rerun, the local journey runner package and required journey environment values were missing:
 
 `JOURNEY-1, JOURNEY-2, JOURNEY-4, JOURNEY-6, JOURNEY-9, JOURNEY-10, JOURNEY-11, JOURNEY-12, JOURNEY-13`
 
-Missing runner/config:
+Post-sync correction:
 
-- `journey/surface-check`
+- The runner-folder blocker has since been closed by commit `5ee3062 Sync audit journey test docs`.
+- `journey/surface-check` is now present in the repo.
+- The remaining setup items are credentials/env values through the secret channel and installing runner dependencies before browser execution.
+
+Required runtime config:
+
 - `APP_BASE_URL`
 - `JOURNEY_USERNAME`
 - `JOURNEY_PASSWORD`
@@ -62,7 +67,7 @@ External audit close-out remains blocked because no local external audit detail 
 
 ## What We Need To Close The Blockers
 
-1. Restore or provide the correct `journey/surface-check` runner setup.
+1. Install the synced `journey/surface-check` runner dependencies from its lock file before browser execution.
 2. Provide required test-user credentials through the secret channel.
 3. Confirm the exact Acting HoD frontend route, or schedule/build the missing screen.
 4. Create or provide one local external audit detail record for JOURNEY-12 close-out.
@@ -128,13 +133,20 @@ tests/journeys/README.md:43:JOURNEY_EXTERNAL_AUDIT_ID=<audit_uuid>
 tests/journeys/README.md:44:JOURNEY_ACTING_HOD_ROUTE=<route_if_implemented>
 ```
 
-Local folder check:
+Initial local folder check before the handover journey docs were synced:
 
 ```text
-MISSING: journey/surface-check
+PRE_SYNC: Test-Path journey/surface-check returned False
 ```
 
-Conclusion: browser journey execution is blocked by missing runner setup until `journey/surface-check` is restored/provided and the required env values are supplied.
+Post-sync folder check after commit `5ee3062 Sync audit journey test docs`:
+
+```text
+PRESENT: journey/surface-check
+PRESENT: journey/docs/uat-report-format.md
+```
+
+Conclusion: the runner-folder blocker is closed in the repo. Browser journey execution now requires runner dependency installation and the required env/account values.
 
 ### 3. Frontend Route Evidence
 
