@@ -16,6 +16,7 @@ Current evidence base before this response file:
 
 Primary files to review in the repo:
 
+- `QUALITY_GATE_STAMP.json`
 - `audit_docsuite/response 6.md`
 - `audit_docsuite/response 5.md`
 - `audit_docsuite/UAT_REPORT_2026-08-18_RERUN.md`
@@ -25,6 +26,20 @@ Primary files to review in the repo:
 - `journey/surface-check/package.json`
 - `tests/journeys/README.md`
 - `tests/journeys/`
+
+## Direct Reply To The Four Open Items
+
+1. Authoritative commit:
+   The authoritative target is `main` HEAD in `https://github.com/himani-ux/VIMS_Audit.git`, not `a2f308127f1e9b03137408deb08c5fe1a7e6ad52` or `a87176d`. The repo includes the synced journey runner, this response package, `QUALITY_GATE_STAMP.json`, and `audit_docsuite/AUDIT_RUNTIME_GAPS.md`.
+
+2. JOURNEY-11, JOURNEY-1, and JOURNEY-9:
+   `JOURNEY-11` is back on the rerun list. `JOURNEY-1` and `JOURNEY-9` are also treated as unvalidated until rerun with raw evidence. No browser journey is being claimed as passed from the earlier narrative report.
+
+3. UAT report packaging:
+   Future reruns must be packaged as `UAT_REPORT_<date>.md` using the repo format at `journey/docs/uat-report-format.md`, with path:line evidence quotes, raw command output/logs, route, account/persona, record IDs, and artifact hashes or screenshots for manual checks.
+
+4. Credential rotation:
+   Credential rotation is still a separate account-administration item. This repo response contains no plaintext passwords. Code/evidence review can proceed in parallel, but final closure needs the account owner to confirm the rotated accounts and rotation date through the approved secret/admin channel.
 
 ## Current Answers
 
@@ -42,6 +57,15 @@ git log --oneline -3
 5ee3062 Sync audit journey test docs
 218fcfb Add audit rerun evidence package
 2063e62 Add audit response 4
+```
+
+Quality stamp file included in repo root:
+
+```text
+QUALITY_GATE_STAMP.json
+result: PASS
+timestamp: 2026-08-14T08:18:18Z
+git_tree_hash: sha256:fe57e69e86d5533546b44b18fcdbf4366c5b8908b2e03f2e97f595a00b8c397c
 ```
 
 ### 2. Journey Runner And UAT Format
@@ -191,6 +215,7 @@ audit_docsuite/response 6.md
 Attach or point to these supporting files:
 
 ```text
+QUALITY_GATE_STAMP.json
 audit_docsuite/UAT_REPORT_2026-08-18_RERUN.md
 audit_docsuite/response 5.md
 journey/docs/uat-report-format.md

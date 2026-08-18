@@ -1,0 +1,27 @@
+{
+  "git_tree_hash": "sha256:fe57e69e86d5533546b44b18fcdbf4366c5b8908b2e03f2e97f595a00b8c397c",
+  "quality_gates_md_hash": "sha256:77c8eea7809b4911c85192216d188067c5e6cdffc4afec50808ff0dbab1597df",
+  "tech_stack_md_hash": "sha256:8478c4670edcdb5f07c7494e36c7fe9952f3b812355be0ee6f5b7b65d6e5ed6a",
+  "script_hashes": {
+    "check-hygiene.sh": "sha256:8e2d1127d5e2a8c9f931ef150f0c681edce59d04bdd1ded4b78861e387b793fd",
+    "check-security.sh": "sha256:45f7d16739178f32183f3040bd1f2931f8f16164729509dd2b0ff35a89e819f7",
+    "check-perf.sh": "sha256:2d592e1b40f51b4f273ce4d0b6f8e1c2b59594d1d975c77bbe27ee21c8417223",
+    "quality-gate.sh": "sha256:a0d8ff89c23ff3dc0bb2f0cc3fd7165c8d0f3d494ffeb7926f111fe1b6a70e24"
+  },
+  "tool_versions": {
+    "ruff": "0.15.21",
+    "gitleaks": "8.30.1",
+    "size-limit": "12.1.0"
+  },
+  "report_hashes": {
+    "hygiene.json": "sha256:f96d2dcb72933d6c0dcfda0d2948f3d8a91a4e188116bb77deff13332d5c5ce8",
+    "security.json": "sha256:6e0580f83c2f0925f2d4649d58be2d77d03109c1b14739b0185b35b7ecc319a0",
+    "perf.json": "sha256:012988ed70dd9b8890b739633521a08a610e62d952a38014062f4444ce520682",
+    "quality-gate-summary.json": "sha256:92f0977b6068fd9f27e98afa8435bf3000016d7d04180c9209393fd46c1895f8"
+  },
+  "result": "PASS",
+  "reason_codes": [],
+  "timestamp": "2026-08-14T08:18:18Z",
+  "overall_activation_state": "RESOLVED",
+  "activation_points": {}
+}
