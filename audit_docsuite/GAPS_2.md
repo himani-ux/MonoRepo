@@ -68,3 +68,52 @@ When a Lead Auditor is selected, the system should save:
 Important rule:
 
 Office role/profile alone should not make a user eligible as Lead Auditor. For example, a Marine Superintendent profile identifies the user's office role, but qualified-auditor eligibility must still come from `master_audit_qualified_auditor`.
+
+## External Audit Organisation Master Data Gap
+
+### Gap
+
+External Audit registration expects users to select an external audit organisation, but the supporting table `master_external_audit_org` is currently empty and the repository does not include a seed file for this master.
+
+### Why This Matters
+
+Without external audit organisation master data, the External Audit registration dropdown cannot provide real organisations such as class societies, flag administrations, or recognised external audit bodies. Users would either be blocked from registering an external audit or forced into manual/free-text workarounds.
+
+### Current Evidence
+
+- Model/table exists: `psc-backend/apps/inspection/audit/models/masters.py`
+- Migration creates the table: `psc-backend/apps/inspection/migrations/0019_audit_master_tables.py`
+- No repository seed file exists for `master_external_audit_org`
+- Current DB observation: `master_external_audit_org` has no usable rows
+
+### Required Resolution
+
+Create and seed real external audit organisation master data before making External Audit registration fully dropdown-driven.
+
+Minimum required fields:
+
+- `name`
+- `org_type`
+- `country`
+- `linked_class_society_ref`
+- `is_active`
+
+Recommended organisation types:
+
+- `CLASS_SOCIETY`
+- `FLAG_STATE`
+- `PORT_STATE`
+- `CUSTOMER`
+- `OTHER`
+
+### Recommended UI Behavior
+
+The External Audit organisation field should become a dropdown sourced from active rows in `master_external_audit_org`.
+
+When an organisation is selected, the UI should auto-fill or constrain:
+
+- external organisation type
+- linked class society reference, if present
+- country, if present
+
+If the organisation is missing, SEQ/DPA should be able to add it through a controlled master-data process instead of typing one-off values inside the audit registration form.
