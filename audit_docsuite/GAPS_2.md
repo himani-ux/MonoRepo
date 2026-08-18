@@ -117,3 +117,37 @@ When an organisation is selected, the UI should auto-fill or constrain:
 - country, if present
 
 If the organisation is missing, SEQ/DPA should be able to add it through a controlled master-data process instead of typing one-off values inside the audit registration form.
+
+## Vessel RO Delegation Master Data Gap
+
+### Gap
+
+External Audit and RO delegation logic expects vessel-level recognised organisation delegation data, but `vessel_audit_ro_delegation` currently has no usable rows after ignoring demo data.
+
+### Why This Matters
+
+Without real vessel RO delegation rows, the system cannot reliably resolve which recognised organisation is delegated for a vessel and standard. This affects External Audit registration, class/RO-linked validation, and any future dropdown/filtering that depends on vessel-specific RO delegation.
+
+### Current Evidence
+
+- Model/table exists: `psc-backend/apps/inspection/audit/models/masters.py`
+- Migration creates the table: `psc-backend/apps/inspection/migrations/0019_audit_master_tables.py`
+- Current DB observation: `vessel_audit_ro_delegation` has only demo data and no usable rows
+
+### Required Resolution
+
+Create and seed real vessel RO delegation data.
+
+Minimum required fields:
+
+- `target_vessel_id`
+- `standard_code`
+- `master_external_audit_org_id`
+- `effective_from`
+- `effective_to`
+
+### Recommended UI Behavior
+
+When registering an External Audit, the system should use the selected vessel and standard to pre-filter or suggest the correct recognised organisation from `vessel_audit_ro_delegation`.
+
+If no delegation row exists, the UI should show a clear master-data warning instead of silently allowing an incorrect organisation selection.
