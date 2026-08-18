@@ -1,0 +1,56 @@
+# journey-ledger.conf — trusted-source configuration for journey-ledger-fetch.sh
+#
+# Copy to journey-ledger.conf and configure for your CI. The adapter FAILS CLOSED
+# if this is missing/unreadable or if any required key below is unset.
+#
+# !! PRODUCTION SECURITY (read journey-ledger-fetch.sh §E.2 residual seam) !!
+# This file is inside the repo and is therefore PR-editable. At gate time the CI
+# job MUST load the conf from a source a PR cannot control — the protected-branch
+# copy of this file, a CI org-level secret, or OIDC-bound config — otherwise a PR
+# could switch to test-fixture mode or repoint EXPECTED_SOURCE and forge GREEN.
+
+# ── Required (all modes) ──────────────────────────────────────────────────────
+# LEDGER_SOURCE: git-branch | ci-artifact | test-fixture   (unknown/unset → fail closed)
+LEDGER_SOURCE=git-branch
+
+# EXPECTED_SOURCE: the trusted source identity. The fetched ledger's top-level
+# `.source` MUST equal this, else the ledger is treated as UNTRUSTED (fail closed).
+EXPECTED_SOURCE=github-actions://kloss/journey-status@refs/heads/journey-status
+
+# ── git-branch mode (PRODUCTION) ──────────────────────────────────────────────
+# Trust root: PRs cannot push the protected ref, so its content is CI-owned.
+# The adapter reads via `git fetch origin refs/heads/<ref>` then
+# `git show FETCH_HEAD:<path>` — never from the working tree.
+# A bare LEDGER_REF is qualified to refs/heads/ by the adapter; refs/tags/* is
+# REJECTED — branch protection does not cover the tag namespace, so a
+# same-named tag is an attacker-controllable shadow, never a trust root.
+# REQUIRED alongside branch protection: protect the TAG namespace too (GitHub
+# tag ruleset / pre-receive hook denying refs/tags/journey-status*).
+LEDGER_REF=journey-status          # a PROTECTED branch: push restricted to the CI principal
+LEDGER_PATH=JOURNEY_STATUS.json    # path of the ledger on that ref
+
+# ── ci-artifact mode (PRODUCTION) ─────────────────────────────────────────────
+# Trust root: PRs cannot write another job's artifacts. Point at the path the
+# trusted CI job published (OIDC / signed artifact download).
+# LEDGER_SOURCE=ci-artifact
+# LEDGER_ARTIFACT=/ci/artifacts/JOURNEY_STATUS.json
+
+# ── test-fixture mode (TEST ONLY — NEVER set in production) ────────────────────
+# Reads a local fixture file. Requires ALLOW_TEST_FIXTURE=1 or the adapter fails
+# closed. Exists solely so the test suite can exercise validation/fail-closed paths.
+# LEDGER_SOURCE=test-fixture
+# ALLOW_TEST_FIXTURE=1
+# LEDGER_PATH=journey/tests/fixtures/ledger/green.json
+# EXPECTED_SOURCE=test-fixture://trusted
+
+# ── Staleness (REQUIRED in production modes) ──────────────────────────────────
+# LEDGER_MAX_AGE_SECONDS: fail closed if the ledger's generated_at is older
+# than this. REQUIRED in git-branch and ci-artifact modes — the adapter fails
+# closed if it is missing (spec §4.5: a stale ledger fails closed by default).
+# Optional only in test-fixture mode (fixtures carry frozen dates).
+# If the timestamp cannot be parsed portably, the adapter fails closed.
+LEDGER_MAX_AGE_SECONDS=86400
+
+# ── Optional ──────────────────────────────────────────────────────────────────
+# LEDGER_OUT: also write the validated ledger to this stable path for later gates.
+# LEDGER_OUT=.journey-cache/ledger.validated.json

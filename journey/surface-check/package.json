@@ -1,0 +1,14 @@
+{
+  "name": "journey-surface-check",
+  "private": true,
+  "type": "module",
+  "description": "Node island for the KLOSS journey layer (Increment 2): TEST_SURFACE execution verifier + fixture app. Used ONLY behind RUN_APP_CHECK=1; no node dependency exists outside this directory.",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  },
+  "scripts": {
+    "fixture-app": "node fixture-app/server.mjs",
+    "check-surface": "node check-surface.mjs",
+    "test:journeys": "playwright test --config=playwright.config.mjs"
+  }
+}

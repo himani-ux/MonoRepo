@@ -1,0 +1,32 @@
+reviewed_sha256: @RSHA@
+repo_root: @REPO_ROOT@
+
+UAT-VERDICT: UAT-CLAIM-1
+- verdict: confirm
+- reason: The cited throw exists at the cited line and matches the artifact.
+- evidence: src/pda/send.ts:12 — "throw new Error('portal timeout')"
+- checked_hash: @RSHA@
+
+UAT-VERDICT: UAT-CLAIM-2
+- verdict: confirm
+- reason: Author search and a broader search both find nothing at the pinned commit.
+- search: grep -rFn -- "PORTAL_MAGIC_BYPASS" config/
+- search: grep -rFn -- "PORTAL_MAGIC_BYPASS" src/
+- checked_hash: @RSHA@
+
+UAT-VERDICT: UAT-CLAIM-3
+- verdict: confirm
+- reason: Both sides of the contradiction verify at their cited lines.
+- evidence: docs/PRD.md:8 — "invoices can be exported as CSV"
+- evidence: src/export.ts:22 — "if (fmt === 'csv') reject()"
+- checked_hash: @RSHA@
+
+UAT-VERDICT: UAT-CLAIM-4
+- verdict: confirm
+- reason: Inference is plausibly sampled; nothing in code contradicts it.
+- checked_hash: @RSHA@
+
+UAT-VERDICT: UAT-CLAIM-5
+- verdict: confirm
+- reason: Agreed undeterminable from browser evidence; recorded as a question.
+- checked_hash: @RSHA@

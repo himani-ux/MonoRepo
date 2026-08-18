@@ -1,0 +1,823 @@
+{
+  "JOURNEY-1": {
+    "covers": [
+      "FEAT-AUD-1003",
+      "FEAT-AUD-1204",
+      "FEAT-AUD-1205",
+      "FEAT-AUD-201",
+      "FEAT-AUD-202",
+      "FEAT-AUD-203",
+      "FEAT-AUD-801",
+      "FEAT-AUD-802",
+      "FEAT-AUD-803"
+    ],
+    "flows": [
+      "AFJ-1"
+    ]
+  },
+  "JOURNEY-10": {
+    "covers": [
+      "FEAT-AUD-1204",
+      "FEAT-AUD-207",
+      "FEAT-AUD-208",
+      "FEAT-AUD-209",
+      "FEAT-AUD-312",
+      "FEAT-AUD-313"
+    ],
+    "flows": [
+      "AFJ-10"
+    ]
+  },
+  "JOURNEY-11": {
+    "covers": [
+      "FEAT-AUD-804",
+      "FEAT-AUD-806",
+      "FEAT-AUD-807",
+      "FEAT-AUD-901",
+      "FEAT-AUD-902",
+      "FEAT-AUD-903"
+    ],
+    "flows": [
+      "AFJ-11"
+    ]
+  },
+  "JOURNEY-12": {
+    "covers": [
+      "FEAT-AUD-1102",
+      "FEAT-AUD-1103",
+      "FEAT-AUD-111",
+      "FEAT-AUD-601",
+      "FEAT-AUD-602",
+      "FEAT-AUD-603",
+      "FEAT-AUD-604",
+      "FEAT-AUD-605",
+      "FEAT-AUD-606"
+    ],
+    "flows": [
+      "AFJ-12"
+    ]
+  },
+  "JOURNEY-13": {
+    "covers": [
+      "FEAT-AUD-103",
+      "FEAT-AUD-1204",
+      "FEAT-AUD-1205",
+      "FEAT-AUD-404",
+      "FEAT-AUD-805"
+    ],
+    "flows": [
+      "AFJ-13"
+    ]
+  },
+  "JOURNEY-14": {
+    "covers": [
+      "FEAT-AUD-1004",
+      "FEAT-AUD-803"
+    ],
+    "flows": [
+      "AFJ-14"
+    ]
+  },
+  "JOURNEY-2": {
+    "covers": [
+      "FEAT-AUD-1001",
+      "FEAT-AUD-1002",
+      "FEAT-AUD-101",
+      "FEAT-AUD-102",
+      "FEAT-AUD-103",
+      "FEAT-AUD-104",
+      "FEAT-AUD-105",
+      "FEAT-AUD-106",
+      "FEAT-AUD-107",
+      "FEAT-AUD-108",
+      "FEAT-AUD-109",
+      "FEAT-AUD-1105",
+      "FEAT-AUD-1106",
+      "FEAT-AUD-1206",
+      "FEAT-AUD-301",
+      "FEAT-AUD-302",
+      "FEAT-AUD-303",
+      "FEAT-AUD-304",
+      "FEAT-AUD-305",
+      "FEAT-AUD-306",
+      "FEAT-AUD-307",
+      "FEAT-AUD-701"
+    ],
+    "flows": [
+      "AFJ-2"
+    ]
+  },
+  "JOURNEY-3": {
+    "covers": [
+      "FEAT-AUD-110",
+      "FEAT-AUD-1101",
+      "FEAT-AUD-308",
+      "FEAT-AUD-309",
+      "FEAT-AUD-310",
+      "FEAT-AUD-311",
+      "FEAT-AUD-412"
+    ],
+    "flows": [
+      "AFJ-3"
+    ]
+  },
+  "JOURNEY-4": {
+    "covers": [
+      "FEAT-AUD-1005",
+      "FEAT-AUD-1404",
+      "FEAT-AUD-401",
+      "FEAT-AUD-402",
+      "FEAT-AUD-403",
+      "FEAT-AUD-405",
+      "FEAT-AUD-407",
+      "FEAT-AUD-408",
+      "FEAT-AUD-410"
+    ],
+    "flows": [
+      "AFJ-4"
+    ]
+  },
+  "JOURNEY-5": {
+    "covers": [
+      "FEAT-AUD-1101",
+      "FEAT-AUD-1102",
+      "FEAT-AUD-1103",
+      "FEAT-AUD-411",
+      "FEAT-AUD-413"
+    ],
+    "flows": [
+      "AFJ-5"
+    ]
+  },
+  "JOURNEY-6": {
+    "covers": [
+      "FEAT-AUD-1203",
+      "FEAT-AUD-1204",
+      "FEAT-AUD-1207",
+      "FEAT-AUD-409",
+      "FEAT-AUD-701"
+    ],
+    "flows": [
+      "AFJ-6"
+    ]
+  },
+  "JOURNEY-7": {
+    "covers": [
+      "FEAT-AUD-1201",
+      "FEAT-AUD-1202",
+      "FEAT-AUD-402",
+      "FEAT-AUD-404",
+      "FEAT-AUD-406",
+      "FEAT-AUD-411"
+    ],
+    "flows": [
+      "AFJ-7"
+    ]
+  },
+  "JOURNEY-8": {
+    "covers": [
+      "FEAT-AUD-1102",
+      "FEAT-AUD-1103",
+      "FEAT-AUD-1406",
+      "FEAT-AUD-501",
+      "FEAT-AUD-502",
+      "FEAT-AUD-503"
+    ],
+    "flows": [
+      "AFJ-8"
+    ]
+  },
+  "JOURNEY-9": {
+    "covers": [
+      "FEAT-AUD-1404",
+      "FEAT-AUD-203",
+      "FEAT-AUD-204",
+      "FEAT-AUD-205",
+      "FEAT-AUD-206"
+    ],
+    "flows": [
+      "AFJ-9"
+    ]
+  },
+  "_index": {
+    "AFJ-1": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1"
+      ]
+    },
+    "AFJ-10": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-10"
+      ]
+    },
+    "AFJ-11": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    },
+    "AFJ-12": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "AFJ-13": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-13"
+      ]
+    },
+    "AFJ-14": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-14"
+      ]
+    },
+    "AFJ-2": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "AFJ-3": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "AFJ-4": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "AFJ-5": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-5"
+      ]
+    },
+    "AFJ-6": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-6"
+      ]
+    },
+    "AFJ-7": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-7"
+      ]
+    },
+    "AFJ-8": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-8"
+      ]
+    },
+    "AFJ-9": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-9"
+      ]
+    },
+    "FEAT-AUD-1001": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-1002": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-1003": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1"
+      ]
+    },
+    "FEAT-AUD-1004": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-14"
+      ]
+    },
+    "FEAT-AUD-1005": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-101": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-102": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-103": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-13",
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-104": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-105": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-106": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-107": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-108": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-109": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-110": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "FEAT-AUD-1101": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3",
+        "JOURNEY-5"
+      ]
+    },
+    "FEAT-AUD-1102": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12",
+        "JOURNEY-5",
+        "JOURNEY-8"
+      ]
+    },
+    "FEAT-AUD-1103": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12",
+        "JOURNEY-5",
+        "JOURNEY-8"
+      ]
+    },
+    "FEAT-AUD-1105": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-1106": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-111": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-1201": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-7"
+      ]
+    },
+    "FEAT-AUD-1202": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-7"
+      ]
+    },
+    "FEAT-AUD-1203": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-6"
+      ]
+    },
+    "FEAT-AUD-1204": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1",
+        "JOURNEY-10",
+        "JOURNEY-13",
+        "JOURNEY-6"
+      ]
+    },
+    "FEAT-AUD-1205": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1",
+        "JOURNEY-13"
+      ]
+    },
+    "FEAT-AUD-1206": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-1207": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-6"
+      ]
+    },
+    "FEAT-AUD-1401": {
+      "gap": "FEAT-AUD-1401",
+      "journeys": []
+    },
+    "FEAT-AUD-1403": {
+      "gap": "FEAT-AUD-1403",
+      "journeys": []
+    },
+    "FEAT-AUD-1404": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4",
+        "JOURNEY-9"
+      ]
+    },
+    "FEAT-AUD-1406": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-8"
+      ]
+    },
+    "FEAT-AUD-201": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1"
+      ]
+    },
+    "FEAT-AUD-202": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1"
+      ]
+    },
+    "FEAT-AUD-203": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1",
+        "JOURNEY-9"
+      ]
+    },
+    "FEAT-AUD-204": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-9"
+      ]
+    },
+    "FEAT-AUD-205": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-9"
+      ]
+    },
+    "FEAT-AUD-206": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-9"
+      ]
+    },
+    "FEAT-AUD-207": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-10"
+      ]
+    },
+    "FEAT-AUD-208": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-10"
+      ]
+    },
+    "FEAT-AUD-209": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-10"
+      ]
+    },
+    "FEAT-AUD-301": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-302": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-303": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-304": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-305": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-306": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-307": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2"
+      ]
+    },
+    "FEAT-AUD-308": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "FEAT-AUD-309": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "FEAT-AUD-310": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "FEAT-AUD-311": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "FEAT-AUD-312": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-10"
+      ]
+    },
+    "FEAT-AUD-313": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-10"
+      ]
+    },
+    "FEAT-AUD-401": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-402": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4",
+        "JOURNEY-7"
+      ]
+    },
+    "FEAT-AUD-403": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-404": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-13",
+        "JOURNEY-7"
+      ]
+    },
+    "FEAT-AUD-405": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-406": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-7"
+      ]
+    },
+    "FEAT-AUD-407": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-408": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-409": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-6"
+      ]
+    },
+    "FEAT-AUD-410": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-4"
+      ]
+    },
+    "FEAT-AUD-411": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-5",
+        "JOURNEY-7"
+      ]
+    },
+    "FEAT-AUD-412": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-3"
+      ]
+    },
+    "FEAT-AUD-413": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-5"
+      ]
+    },
+    "FEAT-AUD-501": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-8"
+      ]
+    },
+    "FEAT-AUD-502": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-8"
+      ]
+    },
+    "FEAT-AUD-503": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-8"
+      ]
+    },
+    "FEAT-AUD-601": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-602": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-603": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-604": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-605": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-606": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-12"
+      ]
+    },
+    "FEAT-AUD-701": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-2",
+        "JOURNEY-6"
+      ]
+    },
+    "FEAT-AUD-801": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1"
+      ]
+    },
+    "FEAT-AUD-802": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1"
+      ]
+    },
+    "FEAT-AUD-803": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-1",
+        "JOURNEY-14"
+      ]
+    },
+    "FEAT-AUD-804": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    },
+    "FEAT-AUD-805": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-13"
+      ]
+    },
+    "FEAT-AUD-806": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    },
+    "FEAT-AUD-807": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    },
+    "FEAT-AUD-901": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    },
+    "FEAT-AUD-902": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    },
+    "FEAT-AUD-903": {
+      "gap": null,
+      "journeys": [
+        "JOURNEY-11"
+      ]
+    }
+  }
+}

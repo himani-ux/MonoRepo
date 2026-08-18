@@ -1,0 +1,12 @@
+reviewed_sha256: @RSHA@
+repo_root: @REPO_ROOT@
+
+UAT-VERDICT: UAT-CLAIM-1
+- verdict: confirm
+- reason: Agreed undeterminable from browser evidence; recorded as a question.
+- checked_hash: @RSHA@
+
+UAT-VERDICT: UAT-CLAIM-2
+- verdict: confirm
+- reason: Agreed undeterminable from browser evidence; recorded as a question.
+- checked_hash: @RSHA@

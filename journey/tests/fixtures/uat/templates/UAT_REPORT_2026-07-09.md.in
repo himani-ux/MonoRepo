@@ -1,0 +1,16 @@
+# UAT-REPORT
+report_date: 2026-07-09
+repo_commit: @COMMIT@
+app_target: http://127.0.0.1:3002
+
+Narrative prose is allowed here and carries no authority.
+
+## UAT-CLAIM-1: Tariff editor data source undetermined
+- journey_ids: JOURNEY-113
+- grade: [G]
+- claim: Cannot determine from the browser whether tariff data load uses the versioned register.
+
+## UAT-CLAIM-2: Save button debounce behavior undetermined
+- journey_ids: JOURNEY-114
+- grade: [G]
+- claim: Cannot determine from the browser whether the save button debounces repeat clicks.

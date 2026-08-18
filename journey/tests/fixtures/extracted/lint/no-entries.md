@@ -1,0 +1,3 @@
+# JOURNEY-EXTRACTED
+extraction_commit: abcdef0123456789abcdef0123456789abcdef01
+manifest_sha256:   abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789

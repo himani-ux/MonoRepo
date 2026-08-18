@@ -1,0 +1,38 @@
+# UAT-REPORT
+report_date: 2026-07-08
+repo_commit: 0123456789012345678901234567890123456789
+app_target: http://127.0.0.1:3002
+
+Narrative prose is allowed here and carries no authority.
+
+## UAT-CLAIM-1: Send action surfaced HTTP 500
+- journey_ids: JOURNEY-106
+- grade: [C]
+- claim: Clicking Send on the PDA screen returned HTTP 500 to the user.
+- evidence: src/pda/send.ts:12 — "throw new Error('portal timeout')"
+- evidence: artifact evidence/journey-106-send-500.png sha256:4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a4d3c2b1a
+
+## UAT-CLAIM-2: No dev-auth bypass exists for UAT
+- journey_ids: JOURNEY-106, JOURNEY-107
+- grade: [C-absent]
+- claim: The app has no development auth bypass usable for browser UAT.
+- search: grep -rFn -- "PORTAL_MAGIC_BYPASS" config/
+
+## UAT-CLAIM-3: Docs promise CSV export but code rejects it
+- journey_ids: JOURNEY-109
+- grade: [X]
+- claim: PRD says invoices export to CSV; the export handler rejects csv.
+- evidence: docs/PRD.md:8 — "invoices can be exported as CSV"
+- evidence: src/export.ts:22 — "if (fmt === 'csv') reject()"
+
+## UAT-CLAIM-4: Save errors likely redirect without message
+- journey_ids: JOURNEY-114
+- grade: [I]
+- claim: Admin save failures redirect with a query flag and no visible error.
+- evidence: artifact evidence/journey-114-save-error.png sha256:1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d
+- sample: 4 instances
+
+## UAT-CLAIM-5: Tariff editor data source undetermined
+- journey_ids: JOURNEY-113
+- grade: [G]
+- claim: Cannot determine from the browser whether tariff data load uses the versioned register.

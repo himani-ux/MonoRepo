@@ -1,0 +1,31 @@
+{
+  "JOURNEY-101": {
+    "covers": ["FEAT-001"],
+    "flows": ["AFJ-001"],
+    "field_sources": {
+      "oracle": { "from": "PRD", "ref": "FEAT-001 AC-1/AC-2", "quote": "valid credentials are accepted; the dashboard loads" },
+      "steps":  { "from": "APP_FLOW", "ref": "AFJ-001 steps 1-3", "quote": "land on /login ... observe dashboard" }
+    }
+  },
+  "JOURNEY-102": {
+    "covers": ["FEAT-002"],
+    "flows": ["AFJ-002"],
+    "field_sources": {
+      "oracle": { "from": "PRD", "ref": "FEAT-002 AC-1", "quote": "a valid file is accepted" },
+      "steps":  { "from": "APP_FLOW", "ref": "AFJ-002 steps 1-3", "quote": "land on /upload ... observe ACCEPTED" }
+    }
+  },
+  "JOURNEY-103": {
+    "covers": [],
+    "flows": [],
+    "field_sources": {}
+  },
+  "_index": {
+    "FEAT-001": { "journeys": ["JOURNEY-101"], "gap": null },
+    "FEAT-002": { "journeys": ["JOURNEY-102"], "gap": null },
+    "FEAT-003": { "journeys": [], "gap": "FEAT-003" },
+    "AFJ-001":  { "journeys": ["JOURNEY-101"], "gap": null },
+    "AFJ-002":  { "journeys": ["JOURNEY-102"], "gap": null },
+    "AFJ-003":  { "journeys": [], "gap": "AFJ-003" }
+  }
+}

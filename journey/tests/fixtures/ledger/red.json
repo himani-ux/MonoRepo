@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "generated_by": "ci",
+  "generated_at": "2026-06-22T10:45:00Z",
+  "source": "test-fixture://trusted",
+  "journeys": {
+    "JOURNEY-001": {
+      "ci_status": "RED",
+      "last_run": "2026-06-22T10:45:00Z",
+      "ci_run_id": "gha-1284571",
+      "ci_artifact": "artifacts/journey-001-report.zip",
+      "failure_summary": "Step 3 assertion failed: expected ACCEPTED, got REJECTED"
+    }
+  }
+}

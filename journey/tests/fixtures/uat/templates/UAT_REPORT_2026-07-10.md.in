@@ -1,0 +1,12 @@
+# UAT-REPORT
+report_date: 2026-07-10
+repo_commit: @COMMIT@
+app_target: http://127.0.0.1:3002
+
+Narrative prose is allowed here and carries no authority.
+
+## UAT-CLAIM-1: No dev-auth bypass exists
+- journey_ids: JOURNEY-106
+- grade: [C-absent]
+- claim: The app has no development auth bypass usable for browser UAT.
+- search: grep -rFn -- "ENABLE_DEV_AUTH_BYPASS" config/

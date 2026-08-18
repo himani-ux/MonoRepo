@@ -1,0 +1,93 @@
+# Forge-proof Journey Validation CI wiring (EXAMPLE)
+#
+# Two jobs with SEPARATED authority. Job A (trusted) is the ONLY writer of runtime
+# truth; Job B (the PR gate) can only READ it. This is what makes a forged GREEN
+# impossible by construction: a PR's code runs in Job B, which has no write path to
+# the ledger's protected location.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# TRUST MODEL — read before adapting
+# ─────────────────────────────────────────────────────────────────────────────
+# - Repo-local `journey-ledger.conf` is NOT a production trust root. It is fine for
+#   tests/local dev only.
+# - PR-controllable config MUST NOT decide the trusted ledger source. A PR that can
+#   edit the conf (or set the gate's environment) at gate time could repoint the
+#   source or enable test-fixture mode — so the config that the PR gate uses must
+#   come from outside the PR.
+# - Production CI MUST source ledger config AND gate environment from protected CI
+#   settings, protected-branch configuration, OIDC-attested config, or an equivalent
+#   non-PR-controllable control plane.
+# - A commit author name, a branch name, an unchecked environment variable, or a
+#   script flag is NOT sufficient CI identity. Trust comes from the un-writable READ
+#   LOCATION (protected branch / artifact store) plus the EXPECTED_SOURCE match.
+# - Protect the TAG namespace alongside the branch: branch protection does NOT
+#   cover refs/tags/*, and a tag named like the ledger branch would shadow it in
+#   short-name resolution. The fetch adapter qualifies bare refs to refs/heads/
+#   and rejects refs/tags/* outright, but ALSO add a tag ruleset (deny creating
+#   refs/tags/journey-status*) so the shadow cannot even exist in the repo.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 0 — DOC-DERIVED COVERAGE (runs on every PR; ordering is BINDING)
+# ─────────────────────────────────────────────────────────────────────────────
+# JOURNEY_COVERAGE_MANIFEST.json is GENERATED EVIDENCE, not an authored document
+# (owner ruling 2026-07-14, item 3). The order below is not a style preference:
+#
+#   1. generate-or-drift-verify the manifest from PRD / APP_FLOW / JOURNEY_MAP /
+#      JOURNEY_COVERAGE_GAPS;
+#   2. THEN run check-journey-coverage.sh AGAINST THE VERIFIED MANIFEST.
+#
+# Reversing them is worthless: a coverage gate run against a stale or hand-edited
+# manifest proves nothing about the code that was actually committed. The drift
+# check is the ONLY thing standing between "coverage" and "a JSON file someone
+# typed until the gate went quiet".
+journey-coverage:
+  permissions:
+    contents: read
+  steps:
+    - run: |
+        # (1) The committed manifest must match what the source docs actually say.
+        #     Exit 1 = MANIFEST_STALE -> regenerate it; never hand-edit it.
+        sh journey/bin/generate-journey-coverage-manifest.sh \
+          docs/PRD.md docs/APP_FLOW.md JOURNEY_MAP.md JOURNEY_COVERAGE_GAPS.md \
+          --check JOURNEY_COVERAGE_MANIFEST.json
+    - run: |
+        # (2) Only now is the manifest trustworthy enough to reconcile against.
+        sh journey/bin/check-journey-coverage.sh \
+          docs/PRD.md docs/APP_FLOW.md JOURNEY_MAP.md \
+          JOURNEY_COVERAGE_MANIFEST.json JOURNEY_COVERAGE_GAPS.md
+
+# ── Job A — trusted runtime publisher (NOT triggered by PRs) ──────────────────
+journey-runtime-publish:
+  # Runs only in a trusted context (e.g. push to the protected default branch,
+  # or a protected/manual pipeline). Holds write authority Job B does not have.
+  permissions:
+    contents: write          # restricted to this trusted job / CI principal only
+  steps:
+    - run: |
+        # Execute the deterministic journey tests for this build, then stamp results.
+        ./journey/bin/journey-status-stamp.sh JOURNEY-001 GREEN \
+          --run-id "$CI_RUN_ID" --artifact "$ARTIFACT_URL"
+    - run: |
+        # Publish JOURNEY_STATUS.json to a PROTECTED, CI-owned location.
+        # Branch protection restricts pushing 'journey-status' to the CI principal,
+        # so PR jobs cannot forge it. (An artifact store / OIDC-bound upload is an
+        # equivalent alternative.)
+        git push origin HEAD:journey-status
+
+# ── Job B — PR gate (runs on every pull request; CANNOT write runtime truth) ──
+journey-gate:
+  permissions:
+    contents: read           # read-only: no path to write the ledger
+  steps:
+    - run: |
+        # Load the trusted ledger CONFIG from a non-PR-controllable source — NOT the
+        # PR's working-tree journey-ledger.conf. (Here: a protected-branch copy.)
+        git show journey-status:journey/conf/journey-ledger.conf > /tmp/trusted-ledger.conf
+    - run: |
+        # The conf selects LEDGER_SOURCE=git-branch with LEDGER_REF=journey-status,
+        # so the adapter fetches the ledger FRESH from origin's protected ref — a
+        # location this PR cannot have written.
+        sh journey/bin/journey-acceptance.sh \
+          /tmp/trusted-ledger.conf JOURNEY_MAP.md tests/journeys
+        # journey-acceptance.sh fails closed if any gate fails — including when the
+        # ledger is missing, stale, malformed, untrusted, or non-GREEN.

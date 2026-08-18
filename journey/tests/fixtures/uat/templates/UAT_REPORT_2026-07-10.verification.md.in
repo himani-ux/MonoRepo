@@ -1,0 +1,9 @@
+reviewed_sha256: @RSHA@
+repo_root: @REPO_ROOT@
+
+UAT-VERDICT: UAT-CLAIM-1
+- verdict: refute
+- reason: src/auth/bypass.ts defines a dev-auth bypass flag; the author's search only covered config/ and missed it.
+- evidence: src/auth/bypass.ts:1 — "export const ENABLE_DEV_AUTH_BYPASS"
+- residual: bridge exists; the observed 401s are plausibly runtime configuration — unverified.
+- checked_hash: @RSHA@

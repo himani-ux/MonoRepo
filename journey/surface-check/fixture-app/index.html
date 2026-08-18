@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Invoices — fixture app</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    table { border-collapse: collapse; min-width: 24rem; }
+    td, th { border: 1px solid #ccc; padding: .4rem .8rem; text-align: left; }
+    .error { color: #b00020; margin: .5rem 0; }
+    .visually-hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  </style>
+</head>
+<body>
+  <h1>Invoices</h1>
+  <p>
+    <button id="upload-btn" type="button">Upload invoice</button>
+    <input class="visually-hidden-input" data-testid="upload-input" id="upload-input" type="file" accept=".csv">
+  </p>
+  <div class="error" data-testid="upload-error" id="upload-error" hidden></div>
+  <table aria-label="Invoices" data-testid="invoice-list" id="invoice-list">
+    <thead><tr><th>File</th><th>Status</th><th></th></tr></thead>
+    <tbody id="rows">
+      <!-- hidden exemplar row: keeps every contract selector ATTACHED on load
+           (resolve = attached, not visible — see TEST_SURFACE header) -->
+      <tr hidden aria-hidden="false">
+        <td>—</td>
+        <td data-testid="invoice-status">—</td>
+        <td><button type="button" hidden>Retry</button></td>
+      </tr>
+    </tbody>
+  </table>
+  <script>
+    const input = document.getElementById('upload-input');
+    const errorBox = document.getElementById('upload-error');
+    let retryTarget = null;
+
+    document.getElementById('upload-btn').addEventListener('click', () => {
+      retryTarget = null;
+      input.click();
+    });
+
+    async function refresh() {
+      const res = await fetch('/invoices', { headers: { accept: 'application/json' } });
+      const rows = await res.json();
+      const tbody = document.getElementById('rows');
+      tbody.querySelectorAll('tr:not([hidden])').forEach((tr) => tr.remove());
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        const tdName = document.createElement('td');
+        tdName.textContent = row.name;
+        const tdStatus = document.createElement('td');
+        tdStatus.dataset.testid = 'invoice-status';
+        tdStatus.textContent = row.status;
+        const tdRetry = document.createElement('td');
+        if (row.status === 'REJECTED') {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = 'Retry';
+          btn.addEventListener('click', () => { retryTarget = row.name; input.click(); });
+          tdRetry.appendChild(btn);
+        }
+        tr.append(tdName, tdStatus, tdRetry);
+        tbody.appendChild(tr);
+      }
+    }
+
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const content = await file.text();
+      const res = await fetch('/invoices/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: file.name, content, replaces: retryTarget }),
+      });
+      const row = await res.json();
+      retryTarget = null;
+      input.value = '';
+      if (row.status === 'REJECTED') {
+        errorBox.textContent = row.error;
+        errorBox.hidden = false;
+      } else {
+        errorBox.hidden = true;
+      }
+      await refresh();
+    });
+  </script>
+</body>
+</html>

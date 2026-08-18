@@ -1,0 +1,28 @@
+# JOURNEY-INBOX
+
+## INBOX-1 — "duplicate whose covers repeats a token"
+promotion_status: ACCEPTED
+origin:          SIMULATOR
+persona:         P2 (impatient ops user)
+goal:            goal text for the repeated-token candidate
+priority:        P1
+covers:          FEAT-001, FEAT-001
+oracle_surface:  UI
+negative_states: err_1
+steps:
+  1. land on /page-1
+  2. err_1 happens
+  3. recover
+oracle:          repeated-token oracle text
+evidence:        traces/inbox-1-sim.zip
+test:            tests/journeys/journey-inbox-1.spec.ts
+runner:          playwright
+author_status:   UNWRITTEN
+simulator_trace:
+  - persona: P2
+  - goal: goal text for the repeated-token candidate
+  - app_build: build-2026-07-10
+  - runner: playwright
+  - patience_budget: 2
+  - path: land on /page-1
+  - evidence: traces/inbox-1-sim.zip

@@ -1,0 +1,30 @@
+{
+  "JOURNEY-101": {
+    "covers": ["FEAT-001"],
+    "flows": ["AFJ-001"],
+    "field_sources": {
+      "goal":            { "from": "PRD",      "ref": "FEAT-001 user_story", "quote": "As an ops user, I upload an invoice CSV and see it accepted." },
+      "oracle":          { "from": "PRD",      "ref": "FEAT-001 AC-1",       "quote": "a valid CSV is accepted and shows status=ACCEPTED" },
+      "steps":           { "from": "APP_FLOW", "ref": "AFJ-001 steps 1-4",   "quote": "land on /invoices (state: EMPTY) ... observe status=ACCEPTED in the invoice list" },
+      "negative_states": { "from": "APP_FLOW", "ref": "AFJ-001 step 2 (ERROR state)", "quote": "schema_error displayed inline", "generated_minimal": false },
+      "persona":         { "from": "SSOT",     "ref": "persona P1 — Operations User" }
+    }
+  },
+  "JOURNEY-102": {
+    "covers": ["FEAT-002"],
+    "flows": ["AFJ-002"],
+    "field_sources": {
+      "goal":            { "from": "PRD",      "ref": "FEAT-002 user_story", "quote": "As an ops user, I can correct and re-upload a rejected invoice." },
+      "oracle":          { "from": "PRD",      "ref": "FEAT-002 AC-1/AC-2",  "quote": "a corrected re-upload replaces the rejected entry; the status transitions from REJECTED to ACCEPTED" },
+      "steps":           { "from": "APP_FLOW", "ref": "AFJ-002 steps 1-4",   "quote": "land on /invoices with an existing REJECTED row ... observe the status transition: REJECTED -> ACCEPTED" },
+      "negative_states": { "from": "APP_FLOW", "ref": "AFJ-002 states (REJECTED)", "quote": "REJECTED", "generated_minimal": false },
+      "persona":         { "from": "SSOT",     "ref": "persona P1 — Operations User" }
+    }
+  },
+  "_index": {
+    "FEAT-001": { "journeys": ["JOURNEY-101"], "gap": null },
+    "FEAT-002": { "journeys": ["JOURNEY-102"], "gap": null },
+    "AFJ-001":  { "journeys": ["JOURNEY-101"], "gap": null },
+    "AFJ-002":  { "journeys": ["JOURNEY-102"], "gap": null }
+  }
+}

@@ -1,6 +1,6 @@
 # VIMS Audit Module — Journey Map (v3, hand-authored from the banked decision record)
 
-Authored 2026-07-13 (v3 handover upgrade); **persona layer repaired 2026-07-14 (v4)**. JOURNEY-1..14 across Batches A–D — A plan & schedule (1, 9, 10, 14), B conduct & submit (2, 3), C closure & review (4–8), D oversight queues, office audit & external (11, 12, 13). Grounded in the frozen `VIMS-AUDIT-RS-MODULE-SSOT.md` v0.21 (D-AUDRS-001..287 + supplemental D-124..137 + D-288..299) and `docs/COVERAGE.md` 237/237 GREEN (N=925); screens/routes per `docs/APP_FLOW.md` `## Screens`; every oracle cites `docs/PRD.md` FEAT acceptance criteria. Origin is PERSONA (hand-derived — this bundle predates Step-0 extraction). Runtime validation status: formal journey status remains UNWRITTEN for JOURNEY-1..14 because no canonical journey-runner tests are authored; JOURNEY-1 has non-canonical route-level Vitest support evidence as of 2026-08-14, but no full Playwright journey validation is claimed. Coverage accounting: 78 P0/P1 anchors = 76 journey-covered + 2 gap records (`JOURNEY_COVERAGE_GAPS.md` — FEAT-AUD-1401, FEAT-AUD-1403, build-time infra with no user surface).
+Authored 2026-07-13 (v3 handover upgrade); **persona layer repaired 2026-07-14 (v4)**. JOURNEY-1..14 across Batches A–D — A plan & schedule (1, 9, 10, 14), B conduct & submit (2, 3), C closure & review (4–8), D oversight queues, office audit & external (11, 12, 13). Grounded in the frozen `VIMS-AUDIT-RS-MODULE-SSOT.md` v0.21 (D-AUDRS-001..287 + supplemental D-124..137 + D-288..299) and `docs/COVERAGE.md` 237/237 GREEN (N=925); screens/routes per `docs/APP_FLOW.md` `## Screens`; every oracle cites `docs/PRD.md` FEAT acceptance criteria. Origin is PERSONA (hand-derived — this bundle predates Step-0 extraction). Runtime validation status: starter Playwright journey specs were authored under `tests/journeys/` on 2026-08-17, but no trusted runtime GREEN ledger is claimed; record-specific closure specs require seeded sample IDs via environment variables. Coverage accounting: 78 P0/P1 anchors = 76 journey-covered + 2 gap records (`JOURNEY_COVERAGE_GAPS.md` — FEAT-AUD-1401, FEAT-AUD-1403, build-time infra with no user surface).
 
 **Two grammars, deliberately distinct (v4 repair — `journey/bin/check-persona-journeys.sh`).** Personas are the **SSOT `## Personas` set P1..P8** (D-AUDRS-295; mirrored at `docs/PERSONAS.md`) — not ad-hoc labels.
 - `(misbehavior: <kebab-token>)` = **a human mistake made by this journey's own persona.** The token must be one of **that persona's** `known_misbehaviors` in the SSOT — the gate fails `FOREIGN_MISBEHAVIOR` otherwise. A persona journey without its persona's mistakes is a happy path in costume.
@@ -24,9 +24,9 @@ steps:
   4. An office user whose master_RoleByVessel scope excludes this vessel tries to open the same plan entry and audit and is denied (negative_state: out_of_scope_vessel_blocked) — vessel-scope filtering shows them nothing outside their scope.
 oracle:          per FEAT-AUD-203 AC-1 the T-90 tick notified the SEQ Manager and auto-created the draft PLANNED entry; per FEAT-AUD-202 AC-1/AC-3/AC-4 the window equals last_completion +8/+12 months, read from master_audit_window_rule (never hardcoded) and surfaced daily on dashboard + register; per FEAT-AUD-201 AC-2 the plan status runs PLANNED → CONFIRMED; per FEAT-AUD-1003 AC-1 and FEAT-AUD-1204 AC-1 the Lead Auditor picker filters to active + non-expired + scope-matching qualified-auditor rows — which is exactly what makes the DPA's unchecked pick safe rather than lucky; per FEAT-AUD-802 AC-1/AC-2 AUDIT_SCHEDULED is a fixed type with a fixed resolver; per FEAT-AUD-803 AC-1 recipients resolve to Master + HoDs; per FEAT-AUD-801 AC-1/AC-3 the in-system row is source-of-truth in the same transaction and channel failure never rolls back; per FEAT-AUD-1205 AC-1 the out-of-scope office user is denied by the master_RoleByVessel filter.
 evidence:        []
-test:
+test:            tests/journeys/journey-001.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-2 — "Conductor registers the audit, walks the checklist and a stalled-link double-save never yields a second CAR"
@@ -47,9 +47,9 @@ steps:
   5. On the stalled satellite link the save shows no confirmation and the Conductor clicks Save Finding again; the repeated submission is not honoured as a new capture (negative_state: duplicate_finding_submit_rejected) — the audit detail (SCR-AUD-2) still shows that finding with exactly one CAR, per the 1:1 rule.
 oracle:          per FEAT-AUD-1206 AC-1 the pre-audit widget reuses /deficiencies + a vessel filter and shows previous findings + outstanding NCs; per FEAT-AUD-1105 AC-1 and FEAT-AUD-1106 AC-1 the PRE_AUDIT_REFERENCE upload lands in the categorised attachment store within type/size limits; per FEAT-AUD-109 AC-1/AC-2 the sidebar exposes Audit top-level with its sub-tabs; per FEAT-AUD-101 AC-1/AC-2, FEAT-AUD-102 AC-1/AC-2, FEAT-AUD-103 AC-1, FEAT-AUD-104 AC-1, FEAT-AUD-106 AC-1, FEAT-AUD-107 AC-1/AC-2, FEAT-AUD-108 AC-1 the AUDIT branch captures header/classification/standards/auditee/subtype/attendees/team with the Detention checkbox hidden; per FEAT-AUD-105 AC-2 the branch admits only office users holding AUDIT_P_001/003; per FEAT-AUD-301 AC-1/AC-2 the checklist auto-picks by auditee_type + standards + ship_type and walks per item; per FEAT-AUD-302 AC-1, FEAT-AUD-304 AC-1, FEAT-AUD-305 AC-1, FEAT-AUD-306 AC-1 and FEAT-AUD-307 AC-1 the finding carries its type, validated polymorphic clause refs with one primary, the OTHER free-text ref, and objective evidence — and per FEAT-AUD-304 AC-1 specifically, the app layer validates rule_clause_id against the master named by rule_book_type, so the Conductor's wrong-standard clause reference is rejected rather than stored; per FEAT-AUD-1001 AC-1 and FEAT-AUD-1002 AC-1 the pickers are powered by the seeded audit-domain and rule-book masters; per FEAT-AUD-303 AC-1/AC-2/AC-3 and FEAT-AUD-701 AC-1 exactly one CAR (AUDIT-YYYY-NNN, unchanged engine) exists for the finding after the duplicate click — the repeat never produces a second CAR.
 evidence:        []
-test:
+test:            tests/journeys/journey-002.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-3 — "Conductor is hard-blocked at submit until the record is complete, findings freeze, and the Master's acknowledgement starts the SLA clocks"
@@ -69,9 +69,9 @@ steps:
   4. P5 (Vessel Master) opens the finalized report on SCR-AUD-2 and clicks "Vessel Acknowledge Audit Report" (Master-rank-bound); the status moves REPORT_FINALIZED → VESSEL_ACKNOWLEDGED and the NC closure SLA clocks start counting from this instant — the wet-ink signed report scan is uploaded, never a digital signature.
 oracle:          per FEAT-AUD-308 AC-1/AC-2 and FEAT-AUD-309 AC-1 the 14-area scorecard and equipment list capture with N/A counting as satisfied; per FEAT-AUD-310 AC-1..AC-4 the submit hard-blocks until opening/closing meetings + attendees, all 14 scorecard rows, the ≥100-char summary and a non-empty equipment list all pass; per FEAT-AUD-110 AC-1 classification/standards are read-only once a finding exists; per FEAT-AUD-311 AC-1/AC-2 the post-submit findings list is frozen and a new insert is rejected HTTP 409; per FEAT-AUD-412 AC-1/AC-2/AC-3 the chain adds VESSEL_ACKNOWLEDGED, the action is Master-rank-bound behind AUDIT_P_017, and the SLA clocks anchor on it; per FEAT-AUD-1101 AC-1/AC-2 signatures follow the wet-ink print-sign-scan-upload model.
 evidence:        []
-test:
+test:            tests/journeys/journey-003.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-4 — "Crew action owner closes a Minor NC in the plain-language wizard and a dead browser costs nothing past the last advance"
@@ -91,9 +91,9 @@ steps:
   4. Finishing on the ship's office desktop (≥1024px), the same wizard renders the 2-column layout — 60% content, 40% persistent context panel with the Part A finding, prior answers and progress — and the crew completes Parts B–D; the CAR advances toward SUBMITTED_TO_PIC on the internal chain.
 oracle:          per FEAT-AUD-407 AC-1/AC-2 the wizard is single-question-per-screen with draft-save on every advance and unchanged backend fields; per FEAT-AUD-408 AC-1/AC-2 and FEAT-AUD-1005 AC-1 the carousel pre-fills from the ~25-row seeded template library and the crew edits to fit; per FEAT-AUD-403 AC-3 and FEAT-AUD-1404 AC-1/AC-3 the ≥50-char RCA minimum hard-blocks on save with an inline error; per FEAT-AUD-401 AC-1 closure follows the 7-part KSM-F-NC-001 model; per FEAT-AUD-405 AC-1 the Minor-NC default deadline is 30 days; per FEAT-AUD-402 AC-1 the CAR advances along the internal state chain; per FEAT-AUD-410 AC-1/AC-2 the desktop 2-column layout and the mobile layout render from the same component — and re-entry resumes the server-persisted draft, never the stale local copy.
 evidence:        []
-test:
+test:            tests/journeys/journey-004.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-5 — "Master's signature gates the transition and a 45-day backdate is refused"
@@ -113,9 +113,9 @@ steps:
   4. On another finding — a part he actually signed on paper during the last port call and never uploaded — the Master claims a 45-day backdate (misbehavior: backdates-signature-past-30d-window); it is hard-blocked (negative_state: backdate_beyond_window_blocked) — 30 days is the limit, and the honest route is a fresh signature with the real date.
 oracle:          per FEAT-AUD-411 AC-1 the missing Part B/C signature scan hard-blocks leaving IN_PROGRESS; per FEAT-AUD-1101 AC-1/AC-2 the model is print, wet-ink sign, scan, upload with blank signature lines and pre-print name/date capture; per FEAT-AUD-1103 AC-1/AC-2 the signer resolves rank-bound at sign time and the UI badges previous/current Master; per FEAT-AUD-1102 AC-1/AC-2 each signature event records signer, rank-at-signing and claimed-vs-actual datetimes; per FEAT-AUD-413 AC-1/AC-2 a ≤30-day backdate with reason ≥50 chars records claimed vs actual, and beyond 30 days is a hard block.
 evidence:        []
-test:
+test:            tests/journeys/journey-005.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-6 — "Office Supt drafts for the vessel, picks up PIC review from the open pool, and the Lead Auditor is refused PIC on their own audit"
@@ -135,9 +135,9 @@ steps:
   4. The Supt picks it up, becomes PIC of record, and completes the review; the CAR moves PIC_REVIEW → SUBMITTED_TO_LEAD_AUDITOR through the unchanged CAR engine; the audit header keeps conductor and Lead Auditor as two distinct fields throughout.
 oracle:          per FEAT-AUD-409 AC-1/AC-2/AC-3 office-led drafting sets OFFICE_DRAFTED, the Master reviews and signs Part B, and both names render on the PDF footer; per FEAT-AUD-1203 AC-1 the first in-scope AUDIT_P_004 holder to act becomes PIC of record; per FEAT-AUD-1204 AC-2 Lead Auditor ≠ PIC is enforced at action time with HTTP 403; per FEAT-AUD-701 AC-1 the CAR state machine is the unchanged engine; per FEAT-AUD-1207 AC-1 conductor and Lead Auditor stay distinct fields with their own edit locks.
 evidence:        []
-test:
+test:            tests/journeys/journey-006.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-7 — "Lead Auditor accepts closure, and a NOT_EFFECTIVE effectiveness review re-opens the finding"
@@ -157,9 +157,9 @@ steps:
   4. After rework the Lead Auditor accepts Part F again and completes Part G verification; the CAR runs LEAD_AUDITOR_CLOSED → EFFECTIVENESS_REVIEWED → AUDITOR_VERIFIED with the full state history visible.
 oracle:          per FEAT-AUD-411 AC-1 the Lead Auditor cannot reach LEAD_AUDITOR_CLOSED without the Part F signature scan — the signature-gated transition hard-blocks the unsigned close attempt; per FEAT-AUD-402 AC-1/AC-2 the internal chain runs to LEAD_AUDITOR_CLOSED then EFFECTIVENESS_REVIEWED → AUDITOR_VERIFIED with the Lead Auditor of record (not the DPA) as closer; per FEAT-AUD-1201 AC-1 and FEAT-AUD-1202 AC-1 the actions gate on the AUDIT_P_* family per the fixed role mapping; per FEAT-AUD-404 AC-1 certificates_at_risk multi-selects from the cert enum; per FEAT-AUD-406 AC-1/AC-2/AC-4 the EffRev schedules due +30d / expiry +90d, notifies at T+30, and a NOT_EFFECTIVE outcome re-opens the finding via REWORK_REQUESTED.
 evidence:        []
-test:
+test:            tests/journeys/journey-007.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-8 — "Master closes an Observation terminal at his signature, and a dropped satellite link denies the action instead of faking an offline save"
@@ -179,9 +179,9 @@ steps:
   4. Link restored, the Master signs Part B at the shared ship's-office PC without logging the crew action owner out first — resuming whatever session was left open on it rather than authenticating as himself (misbehavior: signs-on-shared-browser-after-session-lock). The signature binds to the authenticated account and to the Master rank, not to whoever is at the keyboard: the signer is resolved rank-bound at sign time from the active-crew-by-rank lookup, and the sign event records signer, rank-at-signing and timestamps — so a signature made from the wrong session is attributable, not anonymous. The Observation reaches MASTER_CLOSED — terminal; the later DPA Part C review and auditor Part D verification are recorded as timestamps/remarks only and change no state.
 oracle:          per FEAT-AUD-501 AC-1/AC-2 the closure follows the 4-part KSM-F-OBS-001 model with Parts C/D audit-trail only; per FEAT-AUD-502 AC-1/AC-2 the state machine runs NOT_STARTED → IN_PROGRESS → SUBMITTED → MASTER_CLOSED (terminal) and C/D gate nothing; per FEAT-AUD-503 AC-1 the 3-question crew wizard + adaptive layout apply; per FEAT-AUD-1103 AC-1 the Master signature binds to rank, not person — the active-crew-by-rank lookup resolves the signer at sign time — and per FEAT-AUD-1102 AC-1/AC-2 the signature event records signer_user_id, signed_at and rank-at-signing, so the shared-browser signature is traceable to the account that made it; per FEAT-AUD-1406 AC-1 the module is online-only (sync columns present but unused, no offline shell) — the dropped link denies the sign action rather than queuing an offline write.
 evidence:        []
-test:
+test:            tests/journeys/journey-008.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-9 — "SEQ Manager rescues an overdue plan through OPM F 713, and a date beyond window_end + 3 months is refused"
@@ -202,9 +202,9 @@ steps:
   5. On a different vessel's stale entry the DPA cancels with a ≥50-char reason and a mandatory future next_planned_date; the entry goes CANCELLED read-only, AUDIT_CANCELLED fires, and a new PLANNED entry auto-creates at next_planned_date − 90 days.
 oracle:          per FEAT-AUD-203 AC-3 the T-0 OVERDUE banner shows on the register/dashboard; per FEAT-AUD-204 AC-1/AC-2/AC-3 the extension captures reason ≥50 chars, enforces proposed_new_target_date ≤ window_end + 3 months, and DPA approval sets extended_due_date with the auto-numbered OPM-F-713-{YYYY}-{NNN}; per FEAT-AUD-1404 AC-1/AC-3 the ≥50-char minimum hard-blocks on save with an inline error; per FEAT-AUD-205 AC-1/AC-2 the Flag notification fields record and the persistent alert clears only when set; per FEAT-AUD-206 AC-1/AC-2/AC-3 cancellation is DPA-only with reason + future date, leaves the entry read-only, fires AUDIT_CANCELLED, and auto-creates the next PLANNED entry at −90 days.
 evidence:        []
-test:
+test:            tests/journeys/journey-009.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-10 — "DPA raises an incident-triggered additional audit that never touches the routine cadence clock"
@@ -224,9 +224,9 @@ steps:
   4. During the additional audit the conductor raises an NC with priority HIGH and flags is_fleetwide_relevance; from the NC closure record the DPA later clicks "Issue Circular" — a pre-filled Circular module entry opens and the cross-link is stored on the finding.
 oracle:          per FEAT-AUD-207 AC-1/AC-2/AC-3 the additional audit carries is_additional + reason ≥50 chars, is DPA-only with no alert ladder, and is excluded from cadence math (window calc filters is_additional=0); per FEAT-AUD-207 AC-4 it then runs the same forms, CAR engine and closure path as a routine audit — which is why the plan-time Lead Auditor selection applies here at all — and per FEAT-AUD-1204 AC-1 that picker is filtered to active + non-expired + scope-matching qualified-auditor rows, so the DPA's unchecked pick cannot produce an out-of-scope Lead Auditor; per FEAT-AUD-208 AC-1/AC-2 the trigger enum + polymorphic linkage resolve via FK picker or free text + mandatory TRIGGER_EVIDENCE; per FEAT-AUD-209 AC-1/AC-2/AC-3 the red PDF banner, register badge and KPI exclusion (with the separate quarterly card) all render; per FEAT-AUD-312 AC-1 the finding priority field captures; per FEAT-AUD-313 AC-1/AC-2 the fleet-wide flag and the pre-filled Circular cross-link work from the closure record.
 evidence:        []
-test:
+test:            tests/journeys/journey-010.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-11 — "DPA works the operational queues: a permanently failed email and a QR-mismatched scan both get honest resolutions"
@@ -246,9 +246,9 @@ steps:
   4. Spot-checking the source documents, the DPA confirms the F 602 carried the diagonal grey DRAFT watermark while the audit was IN_PROGRESS and lost it on submission, and that every generated page footer carries the QR encoding the finding/audit/kind/version/hash tuple with each generation recorded.
 oracle:          per FEAT-AUD-804 AC-1/AC-2 the null vessel email produces notification_delivery_log FAILED_PERMANENT surfaced in the DPA queue; per FEAT-AUD-807 AC-1..AC-4 the widget lists FAILED_PERMANENT rows, Manual Retry resets attempts to QUEUED, mark-offline demands ≥30 chars, and the poll is 60s; per FEAT-AUD-806 AC-1/AC-2 every attempt writes the 7-year delivery log with per-row PDF export; per FEAT-AUD-903 AC-1/AC-2/AC-3 the QR footer tuple and generation record exist and MISMATCH/UNREADABLE scans surface in the queue for accept-with-reason/reject under AUDIT_P_018; per FEAT-AUD-902 AC-1 the DRAFT watermark shows pre-final and is removed at submission; per FEAT-AUD-901 AC-1 the audit PDFs render from the 4-generator A4-portrait set.
 evidence:        []
-test:
+test:            tests/journeys/journey-011.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-12 — "Master and DPA register an external SMC audit late under override, link Certs, and a writeback conflict surfaces for ACCEPT/FORCE"
@@ -268,9 +268,9 @@ steps:
   4. The Certs writeback enqueues an outbox row; the background worker hits a CAS version conflict on the cert row and the CONFLICT surfaces in the DPA queue for ACCEPT (re-read + retry) or FORCE with reason (negative_state: cert_writeback_conflict); the close-out itself never blocked on Certs availability.
 oracle:          per FEAT-AUD-111 AC-1/AC-3 the external record is created at SUBMITTED and the 7-day-soft/30-day-hard SLA admits a late registration only under DPA override with reason; per FEAT-AUD-601 AC-1..AC-3 the external foundation registers post-facto with Master vessel-side; per FEAT-AUD-602 AC-1..AC-3 org, org type, auditor name/credential and the mandatory report PDF capture; per FEAT-AUD-603 AC-1/AC-2 cert linkage uses the scoped type-ahead and Certs data is read, never recomputed; per FEAT-AUD-606 AC-1/AC-2/AC-3 findings enter is_external=1 with no auditor login and closure runs the simplified chain requiring the close-out letter + DPA confirmation with no internal Lead Auditor step; per FEAT-AUD-605 AC-1 certificate_impact is mandatory at close-out; per FEAT-AUD-604 AC-1..AC-3 the outbox drains asynchronously, close-out never blocks, and the CAS CONFLICT surfaces in the DPA queue with ACCEPT/FORCE; per FEAT-AUD-1103 AC-1 the Master's Part B signature binds to rank, not person (active-crew-by-rank resolves the signer at sign time), and per FEAT-AUD-1102 AC-1/AC-2 the sign event records signer_user_id, signed_at and rank-at-signing — so the shared-browser signature is attributable to the authenticated account rather than assumed to be the Master's.
 evidence:        []
-test:
+test:            tests/journeys/journey-012.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-13 — "HoD and DPA run an office-department audit, and the SEQ conflict-of-interest rejects the DPA as Lead Auditor"
@@ -290,9 +290,9 @@ steps:
   4. An office NC captures certificates_at_risk restricted to DOC | NONE in the UI — vessel-specific certs are hidden and a forced vessel-cert value is rejected HTTP 400; P7 (HoD (office)) signs NC Part B as the responsible officer on the same form template.
 oracle:          per FEAT-AUD-103 AC-2 the OFFICE_DEPT department qualifier is mandatory; per FEAT-AUD-1204 AC-4 the SEQ CoI rule rejects Lead Auditor = DPA with HTTP 422 and the picker pre-filters to qualified_for_seq rows; per FEAT-AUD-1205 AC-2 office audits bypass vessel scope for all office users with read gates; per FEAT-AUD-805 AC-2 office-internal audits skip Slack (in-system + email only); per FEAT-AUD-404 AC-2/AC-3 office cert-at-risk restricts to DOC | NONE with HTTP 400 on vessel values.
 evidence:        []
-test:
+test:            tests/journeys/journey-013.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
 
 ## JOURNEY-14 — "Fleet Manager assigns an Acting HoD, and a self-assignment is forbidden"
@@ -312,7 +312,7 @@ steps:
   4. A subsequent office-audit notification resolves through the HoD-assignment master: the confirmed HoD wins over acting where both are active and the latest assignment within a tier wins, so the TECH notification lands on the Acting HoD only while no confirmed HoD is active.
 oracle:          per FEAT-AUD-1004 AC-1/AC-2/AC-3 the assignment master carries dept/user/is_acting/effective range with confirmed-over-acting latest-wins resolution and history preserved, Acting-HoD authorisation is DPA + FM only via AUDIT_P_016 with self-acting forbidden, and the period caps at 90 days with auto-expiry at 00:01 ITC; per FEAT-AUD-803 AC-2 the office-audit notification resolves the audited department's HoD through master_hod_assignment.
 evidence:        []
-test:
+test:            tests/journeys/journey-014.spec.ts
 runner:          playwright
-author_status:   UNWRITTEN
+author_status:   WRITTEN
 exemptions:      []
