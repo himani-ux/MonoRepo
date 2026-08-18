@@ -73,6 +73,7 @@ describe('Sidebar', () => {
       isMaster: true,
       canAccessReports: false,
       hasForm: vi.fn((formId: string) => formId !== 'PSC_F_007'),
+      hasProcess: vi.fn(() => false),
     });
     sidebarMocks.useUnreadCount.mockReturnValue({ data: 0 });
   });
@@ -205,6 +206,36 @@ describe('Sidebar', () => {
     expect(safetyButton.querySelector('svg')).toBeInTheDocument();
     expect(committeeLink).toHaveAttribute('href', '/safety/scm');
     expect(committeeLink.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('renders_audit_parent_and_child_icons_when_user_has_audit_access', () => {
+    sidebarMocks.useLocation.mockReturnValue({ pathname: '/audit/plans' });
+    sidebarMocks.useAuth.mockReturnValue({
+      user: {
+        user_type: 'office',
+      },
+      isVessel: false,
+      isOffice: true,
+      isMaster: false,
+      canAccessReports: false,
+      hasForm: vi.fn(() => false),
+      hasProcess: vi.fn((processId: string) =>
+        ['AUDIT_P_001', 'AUDIT_P_002', 'AUDIT_P_003'].includes(processId),
+      ),
+    });
+
+    render(<Sidebar isOpen />);
+
+    const auditButton = screen.getByRole('button', { name: /audit/i });
+    const auditPlansLink = screen.getByRole('link', { name: 'Audit Plans' });
+    const registerAuditLink = screen.getByRole('link', { name: 'Register Audit' });
+
+    expect(auditButton).toHaveAttribute('aria-expanded', 'true');
+    expect(auditButton.querySelector('svg')).toBeInTheDocument();
+    expect(auditPlansLink).toHaveAttribute('href', '/audit/plans');
+    expect(auditPlansLink.querySelector('svg')).toBeInTheDocument();
+    expect(registerAuditLink).toHaveAttribute('href', '/inspections/new');
+    expect(registerAuditLink.querySelector('svg')).toBeInTheDocument();
   });
 
   it('hides_broad_safety_admin_link_but_keeps_auditor_export', () => {

@@ -69,6 +69,7 @@ interface AuditNavItem {
   href: string;
   label: string;
   processIds: string[];
+  icon: typeof Ship;
 }
 
 const navItems: NavItem[] = [
@@ -147,16 +148,19 @@ const auditNavItems: AuditNavItem[] = [
     href: '/audit/plans',
     label: 'Audit Plans',
     processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_EDIT, PROCESS_IDS.AUDIT_CONDUCT],
+    icon: ClipboardList,
   },
   {
     href: ROUTES.INSPECTION_NEW,
     label: 'Register Audit',
     processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_CONDUCT],
+    icon: ClipboardCheck,
   },
   {
     href: '/audit/external/new',
     label: 'External Audit',
     processIds: [PROCESS_IDS.AUDIT_REGISTER_EXTERNAL],
+    icon: ShipWheel,
   },
   {
     href: '/dpa/notifications/failed',
@@ -166,11 +170,13 @@ const auditNavItems: AuditNavItem[] = [
       PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
       PROCESS_IDS.AUDIT_CANCEL_PLAN,
     ],
+    icon: Bell,
   },
   {
     href: '/dpa/scan-validation-queue',
     label: 'Scan Validation Queue',
     processIds: [PROCESS_IDS.AUDIT_SCAN_VALIDATION],
+    icon: FileCheck2,
   },
 ];
 
@@ -211,7 +217,7 @@ function chevronClass(active: boolean) {
 
 export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
   const location = useLocation();
-  const { hasForm, hasProcess, user, isVessel, vesselId } = useAuth();
+  const { hasForm, hasProcess = () => false, user, isVessel, vesselId } = useAuth();
   const { data: unreadCount = 0 } = useUnreadCount();
 
   // Filter nav items based on user role
@@ -438,6 +444,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                       {auditOpen ? (
                         <ul className={cn(nestedListClass, 'ml-4')}>
                           {visibleAuditItems.map((item) => {
+                            const Icon = item.icon;
                             const active = location.pathname === item.href ||
                               (item.href === '/audit/plans' && location.pathname.startsWith('/audit/plans')) ||
                               (item.href === '/audit/external/new' && location.pathname.startsWith('/audit/external')) ||
@@ -450,6 +457,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                                   onClick={onClose}
                                   className={navItemClass(active)}
                                 >
+                                  <Icon aria-hidden="true" className={navIconClass(active)} />
                                   <span className="min-w-max flex-1 text-left">{item.label}</span>
                                 </NavLink>
                               </li>
