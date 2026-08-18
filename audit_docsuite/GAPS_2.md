@@ -17,53 +17,11 @@ Without real qualified auditor data, a Lead Auditor dropdown would be empty or s
 - No repository seed file exists for `master_audit_qualified_auditor`
 - Existing seed files cover other audit masters, but not the qualified auditor master
 
-### Required Resolution
+### Office User Data Gap
 
-Create and seed real qualified auditor master data before converting Lead Auditor fields into a strict dropdown.
+If Lead Auditor selection is restricted to office users or vessel users, the system should not ask users to type auditor details manually.
 
-Minimum required fields:
-
-- `user_id`
-- `qualification_text`
-- `qualification_date`
-- `expiry_date`
-- `scope_standards_csv`
-- `auditor_scope`
-- `qualified_for_seq`
-- `is_active`
-
-### Recommended UI Behavior
-
-The Lead Auditor field should become a dropdown sourced from `master_audit_qualified_auditor`, filtered by:
-
-- active auditor record
-- non-expired qualification
-- selected audit standard
-- audit scope
-- SEQ qualification where applicable
-
-After selecting an auditor, the UI should auto-fill name, designation, company, and qualification from the auditor/user profile data.
-
-### Office User Source Recommendation
-
-If Lead Auditor selection is restricted to office users, the system should not ask users to type auditor details manually.
-
-Recommended source split:
-
-- `master_audit_qualified_auditor` should be used for qualification and eligibility.
-- Existing office user/profile master data should be used for person details.
-
-The Lead Auditor dropdown should resolve `master_audit_qualified_auditor.user_id` against the existing office user/profile data and display practical labels such as:
-
-`Name - Designation - Standards Scope - Qualification Expiry`
-
-When a Lead Auditor is selected, the system should save:
-
-- `audit_detail.lead_auditor_user_id`
-- `audit_detail.lead_auditor_name`
-- `audit_detail.lead_auditor_designation`
-- `audit_detail.lead_auditor_company`
-- `audit_detail.lead_auditor_qual`
+Existing office users and vessel crew must come from the common user/crew master tables. Audit-specific master tables should not become duplicate identity stores for those users.
 
 Important rule:
 
@@ -86,38 +44,6 @@ Without external audit organisation master data, the External Audit registration
 - No repository seed file exists for `master_external_audit_org`
 - Current DB observation: `master_external_audit_org` has no usable rows
 
-### Required Resolution
-
-Create and seed real external audit organisation master data before making External Audit registration fully dropdown-driven.
-
-Minimum required fields:
-
-- `name`
-- `org_type`
-- `country`
-- `linked_class_society_ref`
-- `is_active`
-
-Recommended organisation types:
-
-- `CLASS_SOCIETY`
-- `FLAG_STATE`
-- `PORT_STATE`
-- `CUSTOMER`
-- `OTHER`
-
-### Recommended UI Behavior
-
-The External Audit organisation field should become a dropdown sourced from active rows in `master_external_audit_org`.
-
-When an organisation is selected, the UI should auto-fill or constrain:
-
-- external organisation type
-- linked class society reference, if present
-- country, if present
-
-If the organisation is missing, SEQ/DPA should be able to add it through a controlled master-data process instead of typing one-off values inside the audit registration form.
-
 ## Vessel RO Delegation Master Data Gap
 
 ### Gap
@@ -133,21 +59,3 @@ Without real vessel RO delegation rows, the system cannot reliably resolve which
 - Model/table exists: `psc-backend/apps/inspection/audit/models/masters.py`
 - Migration creates the table: `psc-backend/apps/inspection/migrations/0019_audit_master_tables.py`
 - Current DB observation: `vessel_audit_ro_delegation` has only demo data and no usable rows
-
-### Required Resolution
-
-Create and seed real vessel RO delegation data.
-
-Minimum required fields:
-
-- `target_vessel_id`
-- `standard_code`
-- `master_external_audit_org_id`
-- `effective_from`
-- `effective_to`
-
-### Recommended UI Behavior
-
-When registering an External Audit, the system should use the selected vessel and standard to pre-filter or suggest the correct recognised organisation from `vessel_audit_ro_delegation`.
-
-If no delegation row exists, the UI should show a clear master-data warning instead of silently allowing an incorrect organisation selection.
