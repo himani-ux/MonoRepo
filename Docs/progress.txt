@@ -438,3 +438,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-08-18 | MAINTAIN | T1 | Added icons to Audit sidebar parent and child navigation links without changing routes or permissions | docs: none - visual sidebar-only update | exemptions: none
 2026-08-18 | MAINTAIN | T1 | Increased the application sidebar width slightly from w-72 to w-80 for better Audit navigation spacing | docs: none - visual sidebar-only update | exemptions: none
 2026-08-18 | MAINTAIN | T1 | Documented the Audit qualified Lead Auditor master data gap blocking a reliable Lead Auditor dropdown | docs: audit_docsuite/GAPS_2.md | exemptions: none
+2026-08-18 | MAINTAIN | T1 | Added the recommended office-user source split for Audit Lead Auditor details and qualification eligibility | docs: audit_docsuite/GAPS_2.md | exemptions: none
