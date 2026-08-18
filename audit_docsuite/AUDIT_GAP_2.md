@@ -38,7 +38,7 @@ Evidence correction on 2026-08-17:
 - The previous pass list should not be treated as formally verified until each
   journey has the agreed evidence package: commit SHA, account/persona, route,
   record IDs, command, raw output/log, and screenshot for manual checks.
-- `JOURNEY-2`, `JOURNEY-4`, and `JOURNEY-10` especially need rerun evidence
+- `JOURNEY-1`, `JOURNEY-2`, `JOURNEY-4`, `JOURNEY-9`, `JOURNEY-10`, and `JOURNEY-11` especially need rerun evidence
   because their actor usage and dependent screens were not fully recorded.
 - `JOURNEY-12` is added to the rerun list because the external-audit record
   view still needs explicit verification evidence.
@@ -54,7 +54,9 @@ Current unified rerun list:
 - JOURNEY-5.
 - JOURNEY-7.
 - JOURNEY-8.
+- JOURNEY-9.
 - JOURNEY-10.
+- JOURNEY-11.
 - JOURNEY-12.
 - JOURNEY-13.
 

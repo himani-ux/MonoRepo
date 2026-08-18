@@ -9,10 +9,17 @@ The latest Audit evidence response package has been pushed to:
 ```text
 https://github.com/himani-ux/VIMS_Audit.git
 branch: main
-evidence package commit: a87176d
+latest pushed evidence package before the UAT-tracking update: 80154b724a8fecc8b0b6a0e8fe0ca3e1d44eef46
 ```
 
 This note is added so the receiving team can pull the Git repo and review the same Audit response/docs package.
+
+Authoritative commit clarification:
+
+- `a2f308127f1e9b03137408deb08c5fe1a7e6ad52` was the baseline commit used when the first evidence checks were performed.
+- `a87176d` was the first pushed Audit evidence response package.
+- `80154b724a8fecc8b0b6a0e8fe0ca3e1d44eef46` was the latest pushed evidence package before the UAT-tracking correction.
+- For review, use the current `main` branch HEAD from `https://github.com/himani-ux/VIMS_Audit.git`, not the older baseline hashes.
 
 ## 1. Phase 13.4 Quality Stamp
 
@@ -170,18 +177,21 @@ Positive PIC browser case:
 Current unified rerun list:
 
 ```text
+JOURNEY-1
 JOURNEY-2
 JOURNEY-3
 JOURNEY-4
 JOURNEY-5
 JOURNEY-7
 JOURNEY-8
+JOURNEY-9
 JOURNEY-10
+JOURNEY-11
 JOURNEY-12
 JOURNEY-13
 ```
 
-`JOURNEY-6` should not be listed as a DPA failure. The backend negative guard is passing, and the positive PIC path needs evidence packaging if it is to be logged as verified.
+`JOURNEY-1`, `JOURNEY-9`, and `JOURNEY-11` must also be treated as unvalidated until rerun with the agreed evidence package. `JOURNEY-6` should not be listed as a DPA failure. The backend negative guard is passing, and the positive PIC path needs evidence packaging if it is to be logged as verified.
 
 ## 5. SCR-AUD-9 And SCR-AUD-10 Route Evidence
 
@@ -237,9 +247,7 @@ So `AUDIT_SCAN_VALIDATION` is not a new permission ID. It is a frontend constant
 
 ## 6. Credential Rotation
 
-I cannot confirm credential rotation from local files.
-
-What is confirmed:
+Credential rotation remains a separate open account-administration item.
 
 - Plaintext passwords were removed from the local Audit response docs.
 - Future password sharing should happen only through the approved secret channel.
@@ -249,22 +257,28 @@ What is not confirmed:
 - Whether the four exposed test accounts were rotated.
 - The rotation date.
 
-This must be confirmed by whoever owns those accounts before we mark it done.
-
 Temporary review note:
 
-Credential rotation should be treated as a separate account-administration follow-up, not as a blocker for reviewing the Audit evidence package. Plaintext passwords have already been removed from the local Audit response docs, and future credentials should be shared only through the approved secret channel. If needed, please temporarily override this point for the current Audit review; it does not affect the code evidence, route evidence, ORB auth verification, or journey-test evidence recorded in this file.
+Credential rotation should be treated as a separate account-administration follow-up, not as a blocker for reviewing the Audit evidence package in parallel. Plaintext passwords have already been removed from the local Audit response docs, and future credentials should be shared only through the approved secret channel. This item should not be closed until the account owner/admin provides the one-line confirmation: accounts rotated plus rotation date.
 
-## Evidence Package Format Going Forward
+## UAT Report Format Requirement
 
-For every rerun result, I will record:
+Future rerun evidence must be packaged as:
 
-- commit SHA,
-- account/persona used,
-- route tested,
-- audit/finding/closure record IDs,
-- command executed,
-- raw output or log,
-- screenshot for manual browser checks.
+```text
+UAT_REPORT_<YYYY-MM-DD>.md
+```
 
-Without those fields, the result should be treated as locally observed but not verified for formal logging.
+The format source is:
+
+```text
+C:\Users\himan\Desktop\VIMS_handovers\VIMS-AUDIT-HANDOVER-v5\VIMS-AUDIT-HANDOVER-v5\journey\docs\uat-report-format.md
+```
+
+The first UAT-tracking file for the current correction is:
+
+```text
+audit_docsuite/UAT_REPORT_2026-08-18.md
+```
+
+That file records that no journey pass is being claimed until the browser reruns produce proper evidence, including path:line quotes, raw output/logs, screenshots where manual, and artifact hashes where artifacts are used.
