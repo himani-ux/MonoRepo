@@ -4175,8 +4175,52 @@ class TestWorkflowStartPICReviewRules(SimpleTestCase):
         self.assertEqual(transition["target"], CARStatus.PIC_REVIEW)
         self.assertFalse(transition["comment_required"])
 
+    def test_start_pic_review_accepts_legacy_submitted_status(self):
+        from apps.inspection.workflow import WorkflowAction, validate_workflow_transition
+
+        self.car.status = "SUBMITTED"
+
+        transition, error = validate_workflow_transition(
+            self.car,
+            WorkflowAction.START_PIC_REVIEW,
+            self.office_pic,
+            "",
+        )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(transition)
+        self.assertEqual(transition["target"], CARStatus.PIC_REVIEW)
+        self.assertFalse(transition["comment_required"])
+
+    def test_start_pic_review_is_idempotent_for_legacy_pic_accepted_status(self):
+        from apps.inspection.workflow import WorkflowAction, validate_workflow_transition
+
+        self.car.status = "PIC_ACCEPTED"
+
+        transition, error = validate_workflow_transition(
+            self.car,
+            WorkflowAction.START_PIC_REVIEW,
+            self.office_pic,
+            "",
+        )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(transition)
+        self.assertEqual(transition["target"], CARStatus.PIC_REVIEW)
+        self.assertFalse(transition["comment_required"])
+
     def test_available_actions_marks_start_pic_review_comment_optional(self):
         from apps.inspection.workflow import get_available_actions
+
+        actions = {row["action"]: row for row in get_available_actions(self.car, self.office_pic)}
+
+        self.assertIn("START_PIC_REVIEW", actions)
+        self.assertFalse(actions["START_PIC_REVIEW"]["comment_required"])
+
+    def test_available_actions_normalizes_legacy_submitted_status(self):
+        from apps.inspection.workflow import get_available_actions
+
+        self.car.status = "SUBMITTED"
 
         actions = {row["action"]: row for row in get_available_actions(self.car, self.office_pic)}
 

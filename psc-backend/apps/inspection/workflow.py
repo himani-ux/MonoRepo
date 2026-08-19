@@ -16,6 +16,24 @@ from .deficiency_models import CARStatus
 
 logger = logging.getLogger(__name__)
 
+LEGACY_CAR_STATUS_ALIASES = {
+    'SUBMITTED': CARStatus.SUBMITTED_TO_PIC,
+    'PIC_ACCEPTED': CARStatus.PIC_REVIEW,
+    'REWORK_REQUESTED': CARStatus.RETURNED_FOR_REWORK,
+    'DPA_CLOSED': CARStatus.CLOSED,
+}
+
+
+def _workflow_status(status):
+    """Normalize legacy CAR.status DB text to the current workflow enum."""
+    raw_status = str(status or '')
+    if raw_status in LEGACY_CAR_STATUS_ALIASES:
+        return LEGACY_CAR_STATUS_ALIASES[raw_status]
+    try:
+        return CARStatus(raw_status)
+    except ValueError:
+        return status
+
 # ============================================================================
 # Rank Classification
 # ============================================================================
@@ -395,6 +413,7 @@ def _transition_scope_error(car, action, transition, audit_context):
     """Prevent Audit NCs from falling through to PSC terminal transitions."""
     audit_scope = _audit_scope_for_context(audit_context)
     required_scope = transition.get('audit_scope')
+    current_status = _workflow_status(getattr(car, 'status', None))
 
     if required_scope and audit_scope != required_scope:
         if audit_scope == 'audit_non_nc':
@@ -402,9 +421,9 @@ def _transition_scope_error(car, action, transition, audit_context):
         return f'Action "{action}" is not valid for this Audit finding.'
 
     if audit_scope in (AUDIT_INTERNAL_NC_SCOPE, AUDIT_EXTERNAL_NC_SCOPE):
-        if action == WorkflowAction.SUBMIT_TO_DPA and car.status == CARStatus.PIC_REVIEW:
+        if action == WorkflowAction.SUBMIT_TO_DPA and current_status == CARStatus.PIC_REVIEW:
             return 'Audit NCs do not use the PSC SUBMITTED_TO_DPA path.'
-        if action == WorkflowAction.CLOSE_CAR and car.status == CARStatus.SUBMITTED_TO_DPA:
+        if action == WorkflowAction.CLOSE_CAR and current_status == CARStatus.SUBMITTED_TO_DPA:
             return 'Audit NCs do not use the PSC CLOSED terminal state.'
 
     return None
@@ -466,6 +485,7 @@ def _audit_gate_error(car, action, transition, audit_context):
 
     finding, audit_detail = audit_context
     audit_scope = _audit_scope_for_context(audit_context)
+    current_status = _workflow_status(getattr(car, 'status', None))
     if audit_scope == 'audit_non_nc':
         return 'Audit CAR workflow transitions are only valid for NC findings; Observations use their own closure state.'
 
@@ -474,7 +494,7 @@ def _audit_gate_error(car, action, transition, audit_context):
     if (
         audit_scope == AUDIT_INTERNAL_NC_SCOPE
         and action in (WorkflowAction.MARK_COMPLETED, WorkflowAction.SUBMIT_TO_PIC)
-        and car.status in (CARStatus.IN_PROGRESS, CARStatus.OFFICE_DRAFTED)
+        and current_status in (CARStatus.IN_PROGRESS, CARStatus.OFFICE_DRAFTED)
     ):
         has_master_signature = (
             bool(getattr(nc_record, 'master_immediate_sign_at', None))
@@ -606,12 +626,13 @@ def validate_workflow_transition(car, action, user, comment=None):
     Returns (transition_info, error_message).
     transition_info is the TRANSITIONS dict entry if valid, None otherwise.
     """
-    key = (car.status, action)
+    current_status = _workflow_status(getattr(car, 'status', None))
+    key = (current_status, action)
     transition = TRANSITIONS.get(key)
 
     # Idempotent START_WORK guard:
     # if client is stale and CAR already moved to IN_PROGRESS, treat as success.
-    if not transition and action == WorkflowAction.START_WORK and car.status == CARStatus.IN_PROGRESS:
+    if not transition and action == WorkflowAction.START_WORK and current_status == CARStatus.IN_PROGRESS:
         transition = {
             'target': CARStatus.IN_PROGRESS,
             'allowed_roles': ['owner', 'master'],
@@ -622,16 +643,16 @@ def validate_workflow_transition(car, action, user, comment=None):
     if (
         not transition
         and action == WorkflowAction.MARK_COMPLETED
-        and car.status in (CARStatus.PENDING_CE_REVIEW, CARStatus.PENDING_MASTER_REVIEW)
+        and current_status in (CARStatus.PENDING_CE_REVIEW, CARStatus.PENDING_MASTER_REVIEW)
     ):
         transition = {
-            'target': car.status,
+            'target': current_status,
             'allowed_roles': ['owner', 'master'],
             'comment_required': False,
         }
     # Idempotent START_PIC_REVIEW guard:
     # duplicate/stale client calls after PIC review has started should not fail.
-    if not transition and action == WorkflowAction.START_PIC_REVIEW and car.status == CARStatus.PIC_REVIEW:
+    if not transition and action == WorkflowAction.START_PIC_REVIEW and current_status == CARStatus.PIC_REVIEW:
         transition = {
             'target': CARStatus.PIC_REVIEW,
             'allowed_roles': ['pic'],
@@ -697,10 +718,11 @@ def get_available_actions(car, user):
     deficiency = getattr(car, 'deficiency', None)
     audit_context = _get_audit_workflow_context(deficiency)
     user_roles = _get_user_workflow_roles(user, deficiency)
+    current_status = _workflow_status(getattr(car, 'status', None))
 
     available = []
     for (status, action), transition in TRANSITIONS.items():
-        if status != car.status:
+        if status != current_status:
             continue
         if _transition_scope_error(car, action, transition, audit_context):
             continue
