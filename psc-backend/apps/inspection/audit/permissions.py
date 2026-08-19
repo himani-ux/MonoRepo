@@ -24,6 +24,8 @@ AUDIT_P_014 = "AUDIT_P_014"
 AUDIT_P_016 = "AUDIT_P_016"
 AUDIT_P_017 = "AUDIT_P_017"
 AUDIT_P_018 = "AUDIT_P_018"
+AUDIT_P_019 = "AUDIT_P_019"
+AUDIT_P_020 = "AUDIT_P_020"
 
 AUDIT_GATE_IDS = (
     AUDIT_P_001,
@@ -43,6 +45,8 @@ AUDIT_GATE_IDS = (
     AUDIT_P_016,
     AUDIT_P_017,
     AUDIT_P_018,
+    AUDIT_P_019,
+    AUDIT_P_020,
 )
 AUDIT_GATE_SET = frozenset(AUDIT_GATE_IDS)
 
@@ -55,6 +59,8 @@ SEQ_MANAGER_GATES = frozenset(
         AUDIT_P_010,
         AUDIT_P_011,
         AUDIT_P_012,
+        AUDIT_P_019,
+        AUDIT_P_020,
     }
 )
 DPA_GATES = frozenset(
@@ -508,6 +514,8 @@ CanWriteBackAuditCerts = HasAuditProcessPermission.requiring(AUDIT_P_014)
 CanAuthorizeActingHod = HasAuditProcessPermission.requiring(AUDIT_P_016)
 CanAcknowledgeAuditReport = HasAuditProcessPermission.requiring(AUDIT_P_017)
 CanValidateAuditScan = HasAuditProcessPermission.requiring(AUDIT_P_018)
+CanManageExternalAuditOrgs = HasAuditProcessPermission.requiring(AUDIT_P_019)
+CanManageVesselRoDelegations = HasAuditProcessPermission.requiring(AUDIT_P_020)
 
 __all__ = [
     "AUDIT_GATE_IDS",
@@ -529,6 +537,8 @@ __all__ = [
     "AUDIT_P_016",
     "AUDIT_P_017",
     "AUDIT_P_018",
+    "AUDIT_P_019",
+    "AUDIT_P_020",
     "CanAcknowledgeAuditReport",
     "CanApproveAuditExtension",
     "CanAuthorizeActingHod",
@@ -542,6 +552,8 @@ __all__ = [
     "CanManageAuditSlackChannels",
     "CanManageHodAssignment",
     "CanManageQualifiedAuditors",
+    "CanManageExternalAuditOrgs",
+    "CanManageVesselRoDelegations",
     "CanRegisterExternalAudit",
     "CanUseAuditCarWorkflow",
     "CanValidateAuditScan",

@@ -59,3 +59,13 @@ Without real vessel RO delegation rows, the system cannot reliably resolve which
 - Model/table exists: `psc-backend/apps/inspection/audit/models/masters.py`
 - Migration creates the table: `psc-backend/apps/inspection/migrations/0019_audit_master_tables.py`
 - Current DB observation: `vessel_audit_ro_delegation` has only demo data and no usable rows
+
+## Implementation Status (2026-08-19)
+
+The missing backend API surface has now been added locally using the existing tables and no database migration:
+
+- `master_audit_qualified_auditor`: `GET/POST` collection and `GET/PATCH` detail, gated by `AUDIT_P_009`
+- `master_external_audit_org`: `GET/POST` collection and `GET/PATCH` detail, gated by `AUDIT_P_019`
+- `vessel_audit_ro_delegation`: `GET/POST` collection and `GET/PATCH` detail, gated by `AUDIT_P_020`
+
+The implementation does not seed real operational data, add frontend screens, or create duplicate office-user or vessel-crew records. The tables still require approved operational data before the corresponding workflows can be fully exercised.

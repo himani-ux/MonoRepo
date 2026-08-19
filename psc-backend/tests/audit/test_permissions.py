@@ -24,6 +24,8 @@ from apps.inspection.audit.permissions import (
     AUDIT_P_016,
     AUDIT_P_017,
     AUDIT_P_018,
+    AUDIT_P_019,
+    AUDIT_P_020,
     CanUseAuditCarWorkflow,
     HasAuditProcessPermission,
     audit_assignment_process_ids_for_user,
@@ -78,6 +80,8 @@ class AuditPermissionTests(unittest.TestCase):
                 AUDIT_P_016,
                 AUDIT_P_017,
                 AUDIT_P_018,
+                AUDIT_P_019,
+                AUDIT_P_020,
             ),
         )
         self.assertNotIn("AUDIT_P_015", AUDIT_GATE_IDS)
@@ -85,7 +89,19 @@ class AuditPermissionTests(unittest.TestCase):
     def test_default_role_designation_mapping_matches_rbac(self) -> None:
         self.assertEqual(
             default_audit_gates_for_designation("OFFICE_SSQE"),
-            frozenset({AUDIT_P_001, AUDIT_P_005, AUDIT_P_006, AUDIT_P_009, AUDIT_P_010, AUDIT_P_011, AUDIT_P_012}),
+            frozenset(
+                {
+                    AUDIT_P_001,
+                    AUDIT_P_005,
+                    AUDIT_P_006,
+                    AUDIT_P_009,
+                    AUDIT_P_010,
+                    AUDIT_P_011,
+                    AUDIT_P_012,
+                    AUDIT_P_019,
+                    AUDIT_P_020,
+                }
+            ),
         )
         self.assertEqual(
             default_audit_gates_for_designation("DPA"),

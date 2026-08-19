@@ -1870,4 +1870,19 @@ backend/
 - Created: 2026-02-04
 - Updated: 2026-03-10
 - Author: System Generated
-- Database Version: 1.0
+ - Database Version: 1.0
+
+## 15. Audit Operational Master APIs
+
+The Audit module exposes authenticated, process-gated APIs for operational master data. These endpoints use the existing Audit tables and do not require a schema migration.
+
+| Method | Endpoint | Permission | Purpose |
+|---|---|---|---|
+| GET/POST | `/api/audit/masters/qualified-auditors/` | `AUDIT_P_009` | List or create qualified internal auditor records |
+| GET/PATCH | `/api/audit/masters/qualified-auditors/{id}/` | `AUDIT_P_009` | View or update a qualified auditor record |
+| GET/POST | `/api/audit/masters/external-audit-orgs/` | `AUDIT_P_019` | List or create external audit organisations |
+| GET/PATCH | `/api/audit/masters/external-audit-orgs/{id}/` | `AUDIT_P_019` | View or update an external audit organisation; deactivate with `is_active` |
+| GET/POST | `/api/audit/masters/ro-delegations/` | `AUDIT_P_020` | List or create vessel-level RO delegations |
+| GET/PATCH | `/api/audit/masters/ro-delegations/{id}/` | `AUDIT_P_020` | View or update a vessel-level RO delegation |
+
+The new gates are included in the Audit process-permission catalog and the SEQ Manager default gate set. RO delegation creation/update rejects inactive organisations and overlapping effective windows for the same vessel and standard. These APIs do not create duplicate office-user or vessel-crew identities.

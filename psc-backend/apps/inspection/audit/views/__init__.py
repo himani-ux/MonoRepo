@@ -12,6 +12,14 @@ from .notification import (
     AuditNotificationOfflineResolveView,
     AuditNotificationRetryView,
 )
+from .masters import (
+    ExternalAuditOrgDetailView,
+    ExternalAuditOrgListCreateView,
+    QualifiedAuditorDetailView,
+    QualifiedAuditorListCreateView,
+    VesselRoDelegationDetailView,
+    VesselRoDelegationListCreateView,
+)
 from .obs_closure import AuditFindingObsClosureView, AuditFindingObsPartView
 from .pdf import AuditFindingNcPdfView, AuditFindingObsPdfView, AuditPlanPdfView, AuditReportPdfView
 from .plan import (
@@ -45,6 +53,8 @@ __all__ = [
     "AuditFailedNotificationListView",
     "AuditNotificationOfflineResolveView",
     "AuditNotificationRetryView",
+    "ExternalAuditOrgDetailView",
+    "ExternalAuditOrgListCreateView",
     "AuditFindingObsClosureView",
     "AuditFindingObsPartView",
     "AuditFindingNcPdfView",
@@ -64,4 +74,8 @@ __all__ = [
     "AuditScorecardView",
     "AuditSubmitView",
     "AuditVesselOptionListView",
+    "QualifiedAuditorDetailView",
+    "QualifiedAuditorListCreateView",
+    "VesselRoDelegationDetailView",
+    "VesselRoDelegationListCreateView",
 ]

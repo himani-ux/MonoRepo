@@ -38,6 +38,12 @@ from apps.inspection.audit.views import (
     AuditScanValidationQueueView,
     AuditSubmitView,
     AuditVesselOptionListView,
+    ExternalAuditOrgDetailView,
+    ExternalAuditOrgListCreateView,
+    QualifiedAuditorDetailView,
+    QualifiedAuditorListCreateView,
+    VesselRoDelegationDetailView,
+    VesselRoDelegationListCreateView,
 )
 
 app_name = "audit"
@@ -171,6 +177,36 @@ urlpatterns = [
         "masters/rca-templates/",
         AuditRcaTemplateMasterView.as_view(),
         name="audit-master-rca-templates",
+    ),
+    path(
+        "masters/qualified-auditors/",
+        QualifiedAuditorListCreateView.as_view(),
+        name="audit-master-qualified-auditors",
+    ),
+    path(
+        "masters/qualified-auditors/<uuid:id>/",
+        QualifiedAuditorDetailView.as_view(),
+        name="audit-master-qualified-auditor-detail",
+    ),
+    path(
+        "masters/external-audit-orgs/",
+        ExternalAuditOrgListCreateView.as_view(),
+        name="audit-master-external-audit-orgs",
+    ),
+    path(
+        "masters/external-audit-orgs/<uuid:id>/",
+        ExternalAuditOrgDetailView.as_view(),
+        name="audit-master-external-audit-org-detail",
+    ),
+    path(
+        "masters/ro-delegations/",
+        VesselRoDelegationListCreateView.as_view(),
+        name="audit-master-ro-delegations",
+    ),
+    path(
+        "masters/ro-delegations/<uuid:id>/",
+        VesselRoDelegationDetailView.as_view(),
+        name="audit-master-ro-delegation-detail",
     ),
     path(
         "findings/<uuid:id>/car/workflow/",
