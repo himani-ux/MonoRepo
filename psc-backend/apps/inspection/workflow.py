@@ -629,6 +629,14 @@ def validate_workflow_transition(car, action, user, comment=None):
             'allowed_roles': ['owner', 'master'],
             'comment_required': False,
         }
+    # Idempotent START_PIC_REVIEW guard:
+    # duplicate/stale client calls after PIC review has started should not fail.
+    if not transition and action == WorkflowAction.START_PIC_REVIEW and car.status == CARStatus.PIC_REVIEW:
+        transition = {
+            'target': CARStatus.PIC_REVIEW,
+            'allowed_roles': ['pic'],
+            'comment_required': False,
+        }
 
     if not transition:
         return None, f'Action "{action}" is not allowed when CAR is in "{car.status}" status.'

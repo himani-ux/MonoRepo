@@ -4158,6 +4158,23 @@ class TestWorkflowStartPICReviewRules(SimpleTestCase):
         self.assertEqual(transition["target"], CARStatus.PIC_REVIEW)
         self.assertFalse(transition["comment_required"])
 
+    def test_start_pic_review_is_idempotent_after_review_has_started(self):
+        from apps.inspection.workflow import WorkflowAction, validate_workflow_transition
+
+        self.car.status = CARStatus.PIC_REVIEW
+
+        transition, error = validate_workflow_transition(
+            self.car,
+            WorkflowAction.START_PIC_REVIEW,
+            self.office_pic,
+            "",
+        )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(transition)
+        self.assertEqual(transition["target"], CARStatus.PIC_REVIEW)
+        self.assertFalse(transition["comment_required"])
+
     def test_available_actions_marks_start_pic_review_comment_optional(self):
         from apps.inspection.workflow import get_available_actions
 
