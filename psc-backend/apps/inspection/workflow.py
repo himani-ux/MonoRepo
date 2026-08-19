@@ -257,7 +257,7 @@ TRANSITIONS = {
     (CARStatus.SUBMITTED_TO_PIC, WorkflowAction.START_PIC_REVIEW): {
         'target': CARStatus.PIC_REVIEW,
         'allowed_roles': ['pic'],
-        'comment_required': True,
+        'comment_required': False,
     },
     # PIC requests rework
     (CARStatus.SUBMITTED_TO_PIC, WorkflowAction.REQUEST_REWORK): {

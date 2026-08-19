@@ -4131,6 +4131,42 @@ class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
         self.assertEqual(self.car.last_action_comment, comment)
 
 
+class TestWorkflowStartPICReviewRules(SimpleTestCase):
+    """START_PIC_REVIEW should be a comment-optional opening action."""
+
+    def setUp(self):
+        self.car = SimpleNamespace(status=CARStatus.SUBMITTED_TO_PIC)
+        self.office_pic = make_user(
+            role=RoleCodes.OFFICE_PIC,
+            user_type="OFFICE",
+            user_id="office-pic",
+            display_name="Office PIC",
+        )
+
+    def test_start_pic_review_accepts_empty_comment(self):
+        from apps.inspection.workflow import WorkflowAction, validate_workflow_transition
+
+        transition, error = validate_workflow_transition(
+            self.car,
+            WorkflowAction.START_PIC_REVIEW,
+            self.office_pic,
+            "",
+        )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(transition)
+        self.assertEqual(transition["target"], CARStatus.PIC_REVIEW)
+        self.assertFalse(transition["comment_required"])
+
+    def test_available_actions_marks_start_pic_review_comment_optional(self):
+        from apps.inspection.workflow import get_available_actions
+
+        actions = {row["action"]: row for row in get_available_actions(self.car, self.office_pic)}
+
+        self.assertIn("START_PIC_REVIEW", actions)
+        self.assertFalse(actions["START_PIC_REVIEW"]["comment_required"])
+
+
 class TestCARPICCommentResolution(BaseCARAPITestCase):
     """CAR detail/report should show the PIC review comment, not the submit-to-DPA comment."""
 
