@@ -34,8 +34,8 @@ The resolution identifies incorrect PRD wording claiming that some operational t
 
 ### ORB Security Confirmation
 
-The ORB `AllowAny` question is separate from Audit Gap 2. The resolution still requests a direct confirmation and unauthenticated-request evidence for the four ORB functions. It is not closed by the Audit master API implementation.
+ORB is not an active security blocker in the current configured application flow. ORB page and process access is governed through `msc_profiles` `form_ids` and `process_ids`, so users without the assigned ORB access cannot reach the relevant ORB screens or actions through the application. The earlier `AllowAny` concern should be treated as stale/unreachable review context unless a currently registered public route proves otherwise.
 
 ## Conclusion
 
-The backend implementation gap is addressed locally. Full operational closure still depends on formal approval, approved master data, official permission/profile configuration, the PRD correction, and the separate ORB security confirmation.
+The backend implementation gap is addressed locally. Full operational closure still depends on formal approval, approved master data, official permission/profile configuration, and the PRD correction.

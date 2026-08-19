@@ -42,6 +42,7 @@ from apps.accounts.models import RoleCodes  # noqa: E402
 from apps.inspection.models import Inspection  # noqa: E402
 from apps.inspection.audit.models import MasterAuditPlan  # noqa: E402
 from apps.inspection.audit.permissions import AUDIT_P_001, AUDIT_P_002, AUDIT_P_005, AUDIT_P_006  # noqa: E402
+from apps.inspection.audit.views import plan as plan_views  # noqa: E402
 from apps.inspection.audit.views import (  # noqa: E402
     AuditPlanAdditionalView,
     AuditPlanCancelView,
@@ -252,6 +253,29 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertEqual(plan.status, "CONFIRMED")
         self.assertEqual(plan.updated_by, "seq-1")
         self.assertIsNotNone(plan.updated_date)
+
+    def test_mssql_plan_lookup_casts_hyphenated_uuid_for_detail_routes(self) -> None:
+        plan = MasterAuditPlan(
+            id=uuid.UUID("a1170000-0000-0000-0000-000000000001"),
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="CONFIRMED",
+            created_by="seq-1",
+        )
+
+        with (
+            patch("apps.inspection.audit.views.plan.connection", SimpleNamespace(vendor="microsoft")),
+            patch.object(MasterAuditPlan.objects, "raw", return_value=[plan]) as mock_raw,
+        ):
+            fetched = plan_views._plan_by_id(plan.id)
+
+        sql, params = mock_raw.call_args.args
+        self.assertIs(fetched, plan)
+        self.assertIn("CAST(%s AS uniqueidentifier)", sql)
+        self.assertEqual(params, [str(plan.id)])
 
     @patch("apps.inspection.audit.views.plan._dispatch_plan_notification")
     def test_confirming_plan_dispatches_audit_scheduled_notification(self, mock_dispatch) -> None:

@@ -1,7 +1,9 @@
 """Audit plan register API views."""
 
+import uuid
+
+from django.db import connection, transaction
 from django.http import Http404
-from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -79,6 +81,26 @@ def _serialize_plans(plans: list[MasterAuditPlan]):
         many=True,
         context={"vessel_label_map": audit_vessel_label_map([plan.target_vessel_id for plan in plans])},
     ).data
+
+
+def _plan_by_id(plan_id) -> MasterAuditPlan:
+    plan_uuid = uuid.UUID(str(plan_id))
+    if connection.vendor == "microsoft":
+        rows = list(
+            MasterAuditPlan.objects.raw(
+                """
+                SELECT *
+                FROM dbo.master_audit_plan
+                WHERE id = CAST(%s AS uniqueidentifier)
+                  AND is_deleted = 0
+                """,
+                [str(plan_uuid)],
+            )
+        )
+        if rows:
+            return rows[0]
+        raise MasterAuditPlan.DoesNotExist
+    return MasterAuditPlan.objects.get(id=plan_uuid)
 
 
 class AuditPlanListCreateView(APIView):
@@ -161,7 +183,7 @@ class AuditPlanDetailView(APIView):
 
     def _get_plan(self, id):
         try:
-            return MasterAuditPlan.objects.get(id=id)
+            return _plan_by_id(id)
         except MasterAuditPlan.DoesNotExist as exc:
             raise Http404("Audit plan not found.") from exc
 
@@ -312,7 +334,7 @@ class AuditPlanAdditionalView(APIView):
 
 def _get_plan(id):
     try:
-        return MasterAuditPlan.objects.get(id=id)
+        return _plan_by_id(id)
     except MasterAuditPlan.DoesNotExist as exc:
         raise Http404("Audit plan not found.") from exc
 
