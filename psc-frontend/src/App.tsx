@@ -56,6 +56,8 @@ const ORBModulePage = lazy(() =>
 const CertsDashboardPage = lazy(() =>
   import('@/routes/certs').then((m) => ({ default: m.CertsDashboardStubPage }))
 );
+const AuditHomeRoute = lazy(() => import('@/routes/audit'));
+const AuditDashboardRoute = lazy(() => import('@/routes/audit/dashboard'));
 const AuditDetailRoute = lazy(() => import('@/routes/audit/audits/[auditId]'));
 const ExternalAuditRegistrationRoute = lazy(() => import('@/routes/audit/external/new'));
 const ExternalAuditDetailRoute = lazy(() => import('@/routes/audit/external/[auditId]'));
@@ -228,6 +230,52 @@ function AppShell() {
             <AuthGuard>
               <PermissionGuard requiredProcess={PROCESS_IDS.VIEW_INSPECTION_DETAIL}>
                 <InspectionDetailPage />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_EDIT,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                  PROCESS_IDS.AUDIT_CLOSE_NC,
+                  PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
+                  PROCESS_IDS.AUDIT_CANCEL_PLAN,
+                  PROCESS_IDS.AUDIT_REGISTER_EXTERNAL,
+                  PROCESS_IDS.AUDIT_ACTING_HOD_AUTHORIZE,
+                  PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT,
+                  PROCESS_IDS.AUDIT_SCAN_VALIDATION,
+                ]}
+              >
+                <AuditHomeRoute />
+              </PermissionGuard>
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/audit/dashboard"
+          element={
+            <AuthGuard>
+              <PermissionGuard
+                requiredAnyProcess={[
+                  PROCESS_IDS.AUDIT_CREATE,
+                  PROCESS_IDS.AUDIT_EDIT,
+                  PROCESS_IDS.AUDIT_CONDUCT,
+                  PROCESS_IDS.AUDIT_CLOSE_NC,
+                  PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
+                  PROCESS_IDS.AUDIT_CANCEL_PLAN,
+                  PROCESS_IDS.AUDIT_REGISTER_EXTERNAL,
+                  PROCESS_IDS.AUDIT_ACTING_HOD_AUTHORIZE,
+                  PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT,
+                  PROCESS_IDS.AUDIT_SCAN_VALIDATION,
+                ]}
+              >
+                <AuditDashboardRoute />
               </PermissionGuard>
             </AuthGuard>
           }

@@ -227,11 +227,14 @@ describe('Sidebar', () => {
     render(<Sidebar isOpen />);
 
     const auditButton = screen.getByRole('button', { name: /audit/i });
+    const auditDashboardLink = screen.getByRole('link', { name: 'Audit Dashboard' });
     const auditPlansLink = screen.getByRole('link', { name: 'Audit Plans' });
     const registerAuditLink = screen.getByRole('link', { name: 'Register Audit' });
 
     expect(auditButton).toHaveAttribute('aria-expanded', 'true');
     expect(auditButton.querySelector('svg')).toBeInTheDocument();
+    expect(auditDashboardLink).toHaveAttribute('href', '/audit/dashboard');
+    expect(auditDashboardLink.querySelector('svg')).toBeInTheDocument();
     expect(auditPlansLink).toHaveAttribute('href', '/audit/plans');
     expect(auditPlansLink.querySelector('svg')).toBeInTheDocument();
     expect(registerAuditLink).toHaveAttribute('href', '/inspections/new');

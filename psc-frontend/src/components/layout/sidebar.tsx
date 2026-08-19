@@ -145,6 +145,23 @@ const safetyNavItems: SafetyNavItem[] = [
 
 const auditNavItems: AuditNavItem[] = [
   {
+    href: '/audit/dashboard',
+    label: 'Audit Dashboard',
+    processIds: [
+      PROCESS_IDS.AUDIT_CREATE,
+      PROCESS_IDS.AUDIT_EDIT,
+      PROCESS_IDS.AUDIT_CONDUCT,
+      PROCESS_IDS.AUDIT_CLOSE_NC,
+      PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
+      PROCESS_IDS.AUDIT_CANCEL_PLAN,
+      PROCESS_IDS.AUDIT_REGISTER_EXTERNAL,
+      PROCESS_IDS.AUDIT_ACTING_HOD_AUTHORIZE,
+      PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT,
+      PROCESS_IDS.AUDIT_SCAN_VALIDATION,
+    ],
+    icon: LayoutDashboard,
+  },
+  {
     href: '/audit/plans',
     label: 'Audit Plans',
     processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_EDIT, PROCESS_IDS.AUDIT_CONDUCT],
@@ -446,6 +463,7 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                           {visibleAuditItems.map((item) => {
                             const Icon = item.icon;
                             const active = location.pathname === item.href ||
+                              (item.href === '/audit/dashboard' && location.pathname === '/audit') ||
                               (item.href === '/audit/plans' && location.pathname.startsWith('/audit/plans')) ||
                               (item.href === '/audit/external/new' && location.pathname.startsWith('/audit/external')) ||
                               (item.href === ROUTES.INSPECTION_NEW && location.pathname === ROUTES.INSPECTION_NEW);

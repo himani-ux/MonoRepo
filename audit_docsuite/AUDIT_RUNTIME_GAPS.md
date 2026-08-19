@@ -241,13 +241,16 @@ not modify the frozen SSOT.
 
 ### 3.1 Audit Dashboard Route Mismatch
 
-- `docs/APP_FLOW.md` documents `/audit` / `/audit/dashboard` as the Audit
-  dashboard entry.
-- The frontend route table currently registers Audit detail, checklist,
-  finding, external-audit, DPA queue, and plan routes, but no `/audit` or
-  `/audit/dashboard` route.
-- Impact: the sidebar should not link an Audit Dashboard until the route is
-  implemented or the docs are formally corrected.
+- Resolved locally on 2026-08-19 under `CR-149`.
+- `psc-frontend/src/App.tsx` now registers `/audit` and `/audit/dashboard`.
+- `/audit` redirects to `/audit/dashboard`.
+- `/audit/dashboard` renders a read-only Audit dashboard backed by the existing
+  audit-plan list query; no backend route, schema, or permission-ID change was
+  introduced.
+- The existing Audit sidebar group now exposes an `Audit Dashboard` child link
+  for users with Audit process access.
+- Remaining review note: route-level browser evidence should be included in the
+  next UAT report if this screen is part of the formal journey ledger.
 
 ### 3.2 Pre-Ship Review Not Executed
 

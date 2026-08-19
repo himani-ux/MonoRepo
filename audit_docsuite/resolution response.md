@@ -45,6 +45,54 @@ Direct code check on `psc-backend/modules/orb/orb/views.py` confirms the followi
 
 Conclusion: for these four ORB functions specifically, `AllowAny` is not currently active in the local `Complete_VIMS` code. Three of the four are not URL-registered, and the only registered function requires session login.
 
+## 08-19 Local Implementation Update
+
+### Audit Plan Edit UUID Error
+
+Resolved locally. The Audit plan detail/edit lookup now casts the incoming route ID as `uniqueidentifier` before querying `master_audit_plan`, which avoids the SQL Server conversion failure for hyphenated UUID route values.
+
+Evidence:
+
+- `psc-backend/apps/inspection/audit/views/plan.py`
+- `psc-backend/tests/audit/test_plan_api.py`
+- Test run: `python -m unittest tests.audit.test_plan_api -v` passed locally before this update.
+
+### Audit Dashboard Routes
+
+Resolved locally under `CR-149`.
+
+- `/audit` now redirects to `/audit/dashboard`.
+- `/audit/dashboard` now renders a read-only Audit dashboard using the existing Audit Plan Register API.
+- The existing Audit sidebar group now includes an `Audit Dashboard` child link for Audit-authorized users.
+- No backend endpoint, database table, migration, or new permission ID was added.
+
+Evidence:
+
+- `psc-frontend/src/App.tsx`
+- `psc-frontend/src/routes/audit/index.tsx`
+- `psc-frontend/src/routes/audit/dashboard.tsx`
+- `psc-frontend/src/routes/audit/dashboard.test.tsx`
+- `psc-frontend/src/components/layout/sidebar.tsx`
+- `psc-frontend/src/components/layout/sidebar.test.tsx`
+
+### Local Master Data Evidence
+
+Checked against the local database on 2026-08-19:
+
+- `master_audit_qualified_auditor`: 1 total row, 0 active rows. The only row is `DEMO.LEAD` and `is_active = 0`.
+- `master_external_audit_org`: 1 total row, 0 active rows. The only row is a demo external audit organisation and `is_active = 0`.
+- `vessel_audit_ro_delegation`: 1 total row. The table is effective-date based and has no `is_active` column.
+
+Conclusion: the API surfaces exist locally, but real approved master data is still not present locally.
+
+### Lead Auditor Selection And External Audit Registration
+
+Current local code stores Lead Auditor identity on the audit record via the registration payload. It does not automatically derive a selectable Lead Auditor list from active `master_audit_qualified_auditor` rows yet.
+
+External audit registration currently requires `external_audit_org_id` in the payload. The current registration service does not automatically resolve an organisation from `vessel_audit_ro_delegation`.
+
+These are implementation/data gaps to be addressed only after the required business/SSOT decision is clear.
+
 ## Conclusion
 
-The backend implementation gap is addressed locally. Full operational closure still depends on formal approval, approved master data, official permission/profile configuration, and the PRD correction.
+The backend implementation gap from 08-18 is addressed locally, the Audit plan UUID edit error is fixed locally, and the `/audit` plus `/audit/dashboard` route gap is implemented locally. Full operational closure still depends on formal approval, approved master data, official permission/profile configuration, and the PRD correction.
