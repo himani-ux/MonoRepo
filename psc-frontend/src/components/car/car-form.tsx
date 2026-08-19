@@ -782,9 +782,11 @@ export const CARForm: FC<CARFormProps> = ({
 
   const {
     register,
-    handleSubmit,
     watch,
     setValue,
+    setError,
+    clearErrors,
+    handleSubmit,
     formState: { errors, isDirty, dirtyFields },
   } = useForm<UpdateCarFormData>({
     resolver: zodResolver(updateCarSchema),
@@ -840,10 +842,6 @@ export const CARForm: FC<CARFormProps> = ({
   );
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleSaveDraft = handleSubmit(async (data) => {
-    await onSaveDraft(data);
-  });
-
   const buildDirtyUpdatePayload = useCallback(
     (data: UpdateCarFormData): UpdateCarFormData => {
       const payload: UpdateCarFormData = {};
@@ -865,6 +863,26 @@ export const CARForm: FC<CARFormProps> = ({
     },
     [dirtyFields]
   );
+
+  const handleSaveDraft = async () => {
+    const payload = buildDirtyUpdatePayload(watch());
+    const result = updateCarSchema.safeParse(payload);
+
+    clearErrors();
+    if (!result.success) {
+      result.error.issues.forEach((issue) => {
+        const fieldName = issue.path[0] as keyof UpdateCarFormData | undefined;
+        if (!fieldName) return;
+        setError(fieldName, {
+          type: 'manual',
+          message: issue.message,
+        });
+      });
+      return;
+    }
+
+    await onSaveDraft(result.data);
+  };
 
   const handleAddClcCode = useCallback(
     (code: string) => {

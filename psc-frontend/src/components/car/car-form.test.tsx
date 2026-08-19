@@ -201,29 +201,34 @@ describe('CARForm', () => {
     carFormMocks.deleteEvidenceMutateAsync.mockResolvedValue({});
   });
 
-  it('test_feat_car_002_happy_path_save_draft_calls_handler_with_form_payload', async () => {
+  it('test_feat_car_002_happy_path_save_draft_calls_handler_with_dirty_payload', async () => {
     const onSaveDraft = vi.fn().mockResolvedValue(undefined);
+    const updatedSummary =
+      'Updated root cause summary remains detailed enough to save without resending unchanged target date.';
 
     render(
       <CARForm
-        car={buildCar()}
+        car={buildCar({ target_date: '2000-01-01' })}
         onSaveDraft={onSaveDraft}
         onSubmit={vi.fn().mockResolvedValue(undefined)}
         onCancel={vi.fn()}
       />
     );
 
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        'Describe the root cause analysis in detail (minimum 50 characters)...'
+      ),
+      { target: { value: updatedSummary } }
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
 
     await waitFor(() => {
       expect(onSaveDraft).toHaveBeenCalledTimes(1);
     });
-    expect(onSaveDraft).toHaveBeenCalledWith(
-      expect.objectContaining({
-        root_cause_summary: expect.any(String),
-        clc_item_ids: ['CLC001'],
-      })
-    );
+    expect(onSaveDraft).toHaveBeenCalledWith({
+      root_cause_summary: updatedSummary,
+    });
   });
 
   it('test_feat_car_002_validation_submit_with_missing_requirements_shows_error_dialog_and_blocks_submit', () => {

@@ -451,3 +451,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-08-19 | MAINTAIN | T1 | Fixed CAR workflow Start Review so unchanged overdue target dates are not resent through Save Draft before PIC review transition | docs: none - bugfix restores existing CAR workflow behavior | exemptions: none
 2026-08-19 | MAINTAIN | T1 | Fixed CAR workflow Start Review so PIC can open review without a mandatory comment through the unified workflow endpoint | docs: none - bugfix restores existing CAR workflow behavior | exemptions: none
 2026-08-19 | MAINTAIN | T1 | Made CAR workflow Start Review idempotent after PIC review has already started so stale edit-page retries do not return 400 | docs: none - bugfix restores existing CAR workflow behavior | exemptions: none
+2026-08-19 | MAINTAIN | T1 | Fixed CAR Save Draft so unchanged overdue target dates are not revalidated when saving other edited fields | docs: none - bugfix restores existing CAR draft behavior | exemptions: none
