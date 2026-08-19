@@ -785,7 +785,7 @@ export const CARForm: FC<CARFormProps> = ({
     handleSubmit,
     watch,
     setValue,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, dirtyFields },
   } = useForm<UpdateCarFormData>({
     resolver: zodResolver(updateCarSchema),
     defaultValues: {
@@ -844,6 +844,28 @@ export const CARForm: FC<CARFormProps> = ({
     await onSaveDraft(data);
   });
 
+  const buildDirtyUpdatePayload = useCallback(
+    (data: UpdateCarFormData): UpdateCarFormData => {
+      const payload: UpdateCarFormData = {};
+
+      if (dirtyFields.root_cause_summary) {
+        payload.root_cause_summary = data.root_cause_summary;
+      }
+      if (dirtyFields.target_date) {
+        payload.target_date = data.target_date;
+      }
+      if (dirtyFields.clc_item_ids) {
+        payload.clc_item_ids = data.clc_item_ids;
+      }
+      if (dirtyFields.custom_cause_text) {
+        payload.custom_cause_text = data.custom_cause_text;
+      }
+
+      return payload;
+    },
+    [dirtyFields]
+  );
+
   const handleAddClcCode = useCallback(
     (code: string) => {
       const current = watchedClcIds;
@@ -887,9 +909,12 @@ export const CARForm: FC<CARFormProps> = ({
   };
 
   const handleConfirmSubmit = async () => {
-    // Save first, then submit
+    // Save only user-edited draft fields, then submit. This avoids resending
+    // unchanged overdue target dates when PIC only starts review.
     const data = watch();
-    await onSaveDraft(data);
+    if (isDirty) {
+      await onSaveDraft(buildDirtyUpdatePayload(data));
+    }
     if (onSubmit) {
       await onSubmit();
     }

@@ -256,7 +256,7 @@ describe('CARForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('test_feat_car_002_happy_path_submit_confirms_then_runs_save_and_submit', async () => {
+  it('test_feat_car_002_happy_path_submit_confirms_then_runs_save_and_submit_for_dirty_fields', async () => {
     const onSaveDraft = vi.fn().mockResolvedValue(undefined);
     const onSubmit = vi.fn().mockResolvedValue(undefined);
 
@@ -269,6 +269,17 @@ describe('CARForm', () => {
       />
     );
 
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        'Describe the root cause analysis in detail (minimum 50 characters)...'
+      ),
+      {
+        target: {
+          value:
+            'Updated root cause summary remains detailed enough to satisfy submission checks.',
+        },
+      }
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Submit CAR' }));
 
     expect(
@@ -279,9 +290,37 @@ describe('CARForm', () => {
     await waitFor(() => {
       expect(onSaveDraft).toHaveBeenCalledTimes(1);
     });
+    expect(onSaveDraft).toHaveBeenCalledWith({
+      root_cause_summary:
+        'Updated root cause summary remains detailed enough to satisfy submission checks.',
+    });
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('test_feat_car_002_start_review_does_not_resave_unchanged_overdue_target_date', async () => {
+    const onSaveDraft = vi.fn().mockResolvedValue(undefined);
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <CARForm
+        car={buildCar({ target_date: '2000-01-01' })}
+        onSaveDraft={onSaveDraft}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        submitLabel="Start Review"
+        submitDescription='This will perform "Start Review" on the CAR. Continue?'
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start Review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+    expect(onSaveDraft).not.toHaveBeenCalled();
   });
 
   it('test_feat_car_002_evidence_upload_buttons_trigger_before_and_after_callbacks', () => {
