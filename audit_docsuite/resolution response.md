@@ -36,6 +36,15 @@ The resolution identifies incorrect PRD wording claiming that some operational t
 
 ORB is not an active security blocker in the current configured application flow. ORB page and process access is governed through `msc_profiles` `form_ids` and `process_ids`, so users without the assigned ORB access cannot reach the relevant ORB screens or actions through the application. The earlier `AllowAny` concern should be treated as stale/unreachable review context unless a currently registered public route proves otherwise.
 
+Direct code check on `psc-backend/modules/orb/orb/views.py` confirms the following for the four named ORB functions:
+
+- `get_operations`: `@permission_classes([AllowAny])` is not present. Only `@api_view(['GET'])` is present. This function is not registered in `psc-backend/modules/orb/orb/urls.py`.
+- `list_for_chief`: `@permission_classes([AllowAny])` is not present. Only `@api_view(['GET'])` is present. This function is not registered in `psc-backend/modules/orb/orb/urls.py`.
+- `get_all_crew_onboarding_history`: `@permission_classes([AllowAny])` is not present. Only `@api_view(["GET"])` is present. This function is not registered in `psc-backend/modules/orb/orb/urls.py`.
+- `get_vessel_id_for_current_user`: `@permission_classes([AllowAny])` is not present. Only `@api_view(["GET"])` is present. This function is registered as `api/get-current-user-vessel/` and has an explicit session check that returns HTTP 401 when `request.session['logged_in']` is missing.
+
+Conclusion: for these four ORB functions specifically, `AllowAny` is not currently active in the local `Complete_VIMS` code. Three of the four are not URL-registered, and the only registered function requires session login.
+
 ## Conclusion
 
 The backend implementation gap is addressed locally. Full operational closure still depends on formal approval, approved master data, official permission/profile configuration, and the PRD correction.

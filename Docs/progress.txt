@@ -446,3 +446,4 @@ LAST UPDATED: 2026-04-30 17:29
 2026-08-19 | MAINTAIN | T1 | Added resolution response documenting implemented Audit Gap 2 APIs and remaining approval, data, permission, documentation, and ORB-security dependencies | docs: audit_docsuite/resolution response.md | exemptions: none
 2026-08-19 | MAINTAIN | T1 | Clarified in the Audit resolution response that ORB is not an active security blocker in the current msc_profiles-gated application flow | docs: audit_docsuite/resolution response.md | exemptions: none
 2026-08-19 | MAINTAIN | T1 | Fixed Audit plan detail/edit UUID lookup on SQL Server by casting hyphenated plan IDs before querying uniqueidentifier rows | docs: none - bugfix restores existing plan edit behavior | exemptions: none
+2026-08-19 | MAINTAIN | T1 | Added the direct ORB AllowAny code-check result for the four named ORB functions to the Audit resolution response | docs: audit_docsuite/resolution response.md | exemptions: none
