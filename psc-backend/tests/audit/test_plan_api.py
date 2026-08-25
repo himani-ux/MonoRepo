@@ -40,9 +40,10 @@ bootstrap_django()
 
 from apps.accounts.models import RoleCodes  # noqa: E402
 from apps.inspection.models import Inspection  # noqa: E402
-from apps.inspection.audit.models import MasterAuditPlan  # noqa: E402
+from apps.inspection.audit.models import MasterAuditPlan, MasterAuditQualifiedAuditor  # noqa: E402
 from apps.inspection.audit.permissions import AUDIT_P_001, AUDIT_P_002, AUDIT_P_005, AUDIT_P_006  # noqa: E402
 from apps.inspection.audit.views import plan as plan_views  # noqa: E402
+from apps.inspection.audit.serializers import plan as plan_serializers  # noqa: E402
 from apps.inspection.audit.views import (  # noqa: E402
     AuditPlanAdditionalView,
     AuditPlanCancelView,
@@ -56,7 +57,7 @@ from apps.inspection.audit.views import (  # noqa: E402
 from rest_framework.test import APIRequestFactory, force_authenticate  # noqa: E402
 
 
-SCHEMA_MODELS = [Inspection, MasterAuditPlan]
+SCHEMA_MODELS = [Inspection, MasterAuditPlan, MasterAuditQualifiedAuditor]
 
 
 def make_user(
@@ -75,6 +76,32 @@ def make_user(
         username="seq_manager",
         is_authenticated=True,
     )
+
+
+class RecordingCursor:
+    def __init__(self):
+        self.sql = ""
+        self.params = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def execute(self, sql, params=None):
+        self.sql = sql
+        self.params = list(params or [])
+
+
+class RecordingConnection:
+    vendor = "microsoft"
+
+    def __init__(self):
+        self.cursor_instance = RecordingCursor()
+
+    def cursor(self):
+        return self.cursor_instance
 
 
 class AuditPlanApiTests(unittest.TestCase):
@@ -117,6 +144,16 @@ class AuditPlanApiTests(unittest.TestCase):
             cursor.execute("DELETE FROM VesselData")
         self.factory = APIRequestFactory()
         self.vessel_id = uuid.uuid4()
+        MasterAuditQualifiedAuditor.objects.create(
+            user_id="lead-1",
+            qualification_text="ISM Lead Auditor",
+            qualification_date=date(2025, 1, 1),
+            expiry_date=date(2027, 1, 1),
+            scope_standards_csv="ISM,ISPS,MLC",
+            auditor_scope="INTERNAL",
+            qualified_for_seq=True,
+            created_by="seed",
+        )
         with connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO VesselData (id, vesselCode, vesselName, is_deleted) VALUES (%s, %s, %s, 0)",
@@ -179,6 +216,7 @@ class AuditPlanApiTests(unittest.TestCase):
             "target_office_dept": "",
             "audit_classification": "INTERNAL",
             "audit_standards_csv": "ISM,ISPS,MLC",
+            "lead_auditor_user_id": "lead-1",
             "planned_window_start": "2026-05-01",
             "planned_window_end": "2026-09-01",
             "status": "PLANNED",
@@ -187,8 +225,17 @@ class AuditPlanApiTests(unittest.TestCase):
     def test_create_routine_vessel_plan_and_list_register_rows(self) -> None:
         user = make_user(process_ids=[AUDIT_P_001])
 
-        create_response = self._post_plan(self._valid_payload(), user)
-        list_response = self._list_plans(user)
+        with patch(
+            "apps.inspection.audit.services.auditor_selection.resolve_user_identity",
+            return_value={
+                "name": "Capt. Harman Sandhu",
+                "designation": "SEQ Manager",
+                "company": "KSM",
+                "source": "OFFICE",
+            },
+        ):
+            create_response = self._post_plan(self._valid_payload(), user)
+            list_response = self._list_plans(user)
 
         self.assertEqual(create_response.status_code, 201)
         self.assertEqual(MasterAuditPlan.objects.count(), 1)
@@ -204,6 +251,40 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertEqual(list_response.data["data"]["results"][0]["id"], str(plan.id))
         self.assertEqual(list_response.data["data"]["results"][0]["target_label"], "EAT - EAST AYUTTHAYA")
         self.assertEqual(list_response.data["data"]["results"][0]["window_label"], "2026-05-01 -> 2026-09-01")
+        self.assertEqual(list_response.data["data"]["results"][0]["lead_auditor_name"], "Capt. Harman Sandhu")
+        self.assertEqual(list_response.data["data"]["results"][0]["lead_auditor_designation"], "SEQ Manager")
+        self.assertEqual(list_response.data["data"]["results"][0]["lead_auditor_company"], "KSM")
+        self.assertEqual(list_response.data["data"]["results"][0]["lead_auditor_qual"], "ISM Lead Auditor")
+
+    def test_plan_lead_auditor_snapshot_does_not_use_scope_as_designation(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_001])
+
+        with patch(
+            "apps.inspection.audit.services.auditor_selection.resolve_user_identity",
+            return_value={
+                "name": "Capt. Harman Sandhu",
+                "designation": "",
+                "company": "KSM",
+                "source": "OFFICE",
+            },
+        ):
+            response = self._post_plan(self._valid_payload(), user)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["lead_auditor_name"], "Capt. Harman Sandhu")
+        self.assertEqual(response.data["data"]["lead_auditor_designation"], "")
+
+    def test_confirmed_plan_requires_qualified_lead_auditor(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_001])
+        payload = self._valid_payload()
+        payload["status"] = "CONFIRMED"
+        payload["lead_auditor_user_id"] = ""
+
+        response = self._post_plan(payload, user)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("lead_auditor_user_id", response.data)
+        self.assertEqual(MasterAuditPlan.objects.count(), 0)
 
     def test_vessel_option_endpoint_returns_readable_labels_for_audit_forms(self) -> None:
         user = make_user(role="DPA", process_ids=[AUDIT_P_001])
@@ -240,6 +321,7 @@ class AuditPlanApiTests(unittest.TestCase):
                 "audit_standards_csv": "ISM,ISPS",
                 "planned_window_start": "2026-05-15",
                 "planned_window_end": "2026-09-15",
+                "lead_auditor_user_id": "lead-1",
                 "status": "CONFIRMED",
             },
             user,
@@ -277,6 +359,78 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertIn("CAST(%s AS uniqueidentifier)", sql)
         self.assertEqual(params, [str(plan.id)])
 
+    def test_mssql_plan_create_casts_uuid_insert_fields(self) -> None:
+        recording_connection = RecordingConnection()
+        expected_plan = MasterAuditPlan(
+            id=uuid.UUID("a1170000-0000-0000-0000-000000000001"),
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="CONFIRMED",
+            created_by="seq-1",
+        )
+
+        with (
+            patch("apps.inspection.audit.serializers.plan.connection", recording_connection),
+            patch(
+                "apps.inspection.audit.serializers.plan._master_audit_plan_column_types",
+                return_value={"created_by": "varchar"},
+            ),
+            patch("apps.inspection.audit.serializers.plan._fetch_sql_server_plan", return_value=expected_plan),
+        ):
+            created = plan_serializers._create_sql_server_plan(
+                {
+                    "target_vessel_id": self.vessel_id,
+                    "target_office_dept": None,
+                    "audit_classification": "INTERNAL",
+                    "audit_standards_csv": "ISM",
+                    "lead_auditor_user_id": "lead-1",
+                    "planned_window_start": date(2026, 5, 1),
+                    "planned_window_end": date(2026, 9, 1),
+                    "status": "CONFIRMED",
+                    "created_by": "seq-1",
+                }
+            )
+
+        self.assertIs(created, expected_plan)
+        self.assertIn("CAST(%s AS uniqueidentifier)", recording_connection.cursor_instance.sql)
+        self.assertEqual(recording_connection.cursor_instance.params[1], str(self.vessel_id))
+        self.assertIn("seq-1", recording_connection.cursor_instance.params)
+
+    def test_mssql_plan_update_casts_uuid_target_and_where_id(self) -> None:
+        recording_connection = RecordingConnection()
+        plan = MasterAuditPlan(
+            id=uuid.UUID("a1170000-0000-0000-0000-000000000001"),
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM,ISPS",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="CONFIRMED",
+            updated_by="seq-1",
+        )
+
+        with (
+            patch("apps.inspection.audit.serializers.plan.connection", recording_connection),
+            patch(
+                "apps.inspection.audit.serializers.plan._master_audit_plan_column_types",
+                return_value={"updated_by": "varchar"},
+            ),
+            patch("apps.inspection.audit.serializers.plan._fetch_sql_server_plan", return_value=plan),
+        ):
+            updated = plan_serializers._update_sql_server_plan(
+                plan,
+                ["updated_by", "target_vessel_id", "status"],
+            )
+
+        self.assertIs(updated, plan)
+        self.assertIn("target_vessel_id = CAST(%s AS uniqueidentifier)", recording_connection.cursor_instance.sql)
+        self.assertIn("WHERE id = CAST(%s AS uniqueidentifier)", recording_connection.cursor_instance.sql)
+        self.assertIn(str(self.vessel_id), recording_connection.cursor_instance.params)
+        self.assertEqual(recording_connection.cursor_instance.params[-1], str(plan.id))
+
     @patch("apps.inspection.audit.views.plan._dispatch_plan_notification")
     def test_confirming_plan_dispatches_audit_scheduled_notification(self, mock_dispatch) -> None:
         user = make_user(process_ids=[AUDIT_P_001, AUDIT_P_002])
@@ -288,6 +442,7 @@ class AuditPlanApiTests(unittest.TestCase):
             planned_window_end=date(2026, 9, 1),
             status="PLANNED",
             created_by="seq-1",
+            lead_auditor_user_id="lead-1",
         )
 
         response = self._patch_plan(plan.id, {"status": "CONFIRMED"}, user)
@@ -296,6 +451,53 @@ class AuditPlanApiTests(unittest.TestCase):
         mock_dispatch.assert_called_once()
         self.assertEqual(mock_dispatch.call_args.args[0].id, plan.id)
         self.assertEqual(mock_dispatch.call_args.args[1], "AUDIT_SCHEDULED")
+
+    @patch(
+        "apps.inspection.audit.views.plan._dispatch_plan_notification",
+        side_effect=RuntimeError("notification relay failed"),
+    )
+    def test_confirmed_plan_create_does_not_rollback_when_notification_dispatch_fails(self, mock_dispatch) -> None:
+        user = make_user(process_ids=[AUDIT_P_001])
+        payload = self._valid_payload()
+        payload["status"] = "CONFIRMED"
+
+        with self.assertLogs("apps.inspection.audit.views.plan", level="ERROR") as logs:
+            response = self._post_plan(payload, user)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(MasterAuditPlan.objects.count(), 1)
+        plan = MasterAuditPlan.objects.get()
+        self.assertEqual(plan.status, "CONFIRMED")
+        self.assertEqual(response.data["data"]["id"], str(plan.id))
+        mock_dispatch.assert_called_once()
+        self.assertIn("Audit plan notification dispatch failed after plan save", logs.output[0])
+
+    @patch(
+        "apps.inspection.audit.views.plan._dispatch_plan_notification",
+        side_effect=RuntimeError("notification relay failed"),
+    )
+    def test_confirmed_plan_edit_does_not_rollback_when_notification_dispatch_fails(self, mock_dispatch) -> None:
+        user = make_user(process_ids=[AUDIT_P_001, AUDIT_P_002])
+        plan = MasterAuditPlan.objects.create(
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="PLANNED",
+            created_by="seq-1",
+            lead_auditor_user_id="lead-1",
+        )
+
+        with self.assertLogs("apps.inspection.audit.views.plan", level="ERROR") as logs:
+            response = self._patch_plan(plan.id, {"status": "CONFIRMED"}, user)
+
+        self.assertEqual(response.status_code, 200)
+        plan.refresh_from_db()
+        self.assertEqual(plan.status, "CONFIRMED")
+        self.assertEqual(response.data["data"]["id"], str(plan.id))
+        mock_dispatch.assert_called_once()
+        self.assertIn("Audit plan notification dispatch failed after plan save", logs.output[0])
 
     def test_plan_requires_exactly_one_target(self) -> None:
         user = make_user(process_ids=[AUDIT_P_001])
@@ -423,6 +625,133 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertEqual(plan.status, "EXTENSION_REQUESTED")
         self.assertEqual(plan.extended_due_date, date(2026, 11, 30))
         self.assertEqual(plan.extension_requested_by, "seq-1")
+
+    def test_mssql_extension_request_uses_sql_server_safe_update(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_001])
+        plan = MasterAuditPlan.objects.create(
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="OVERDUE",
+            created_by="seq-1",
+        )
+
+        def fake_update(instance, update_fields):
+            self.assertIn("extension_requested_by", update_fields)
+            self.assertIn("updated_by", update_fields)
+            return instance
+
+        with (
+            patch("apps.inspection.audit.services.plan_persistence.connection", SimpleNamespace(vendor="microsoft")),
+            patch(
+                "apps.inspection.audit.services.plan_persistence._update_sql_server_plan",
+                side_effect=fake_update,
+            ) as mock_update,
+            patch.object(MasterAuditPlan, "save", side_effect=AssertionError("direct save should not run")),
+        ):
+            response = self._post_extension(
+                plan.id,
+                {
+                    "extension_requested_reason": "Delay caused by drydock overrun and auditor availability conflict.",
+                    "proposed_new_target_date": "2026-11-30",
+                },
+                user,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["status"], "EXTENSION_REQUESTED")
+        mock_update.assert_called_once()
+
+    @patch("apps.inspection.audit.views.plan._dispatch_plan_notification")
+    def test_mssql_plan_workflow_followups_use_sql_server_safe_update(self, mock_dispatch) -> None:
+        dpa_user = make_user(role="DPA", user_id="dpa-1", process_ids=[AUDIT_P_005, AUDIT_P_006])
+        extension_plan = MasterAuditPlan.objects.create(
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            extended_due_date=date(2026, 11, 30),
+            extension_requested_reason="Delay caused by drydock overrun and auditor availability conflict.",
+            status="EXTENSION_REQUESTED",
+            created_by="seq-1",
+        )
+        flag_plan = MasterAuditPlan.objects.create(
+            target_vessel_id=uuid.uuid4(),
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            extended_due_date=date(2026, 11, 30),
+            status="EXTENDED",
+            created_by="seq-1",
+        )
+        cancel_plan = MasterAuditPlan.objects.create(
+            target_office_dept="SEQ",
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="OVERDUE",
+            created_by="seq-1",
+        )
+        MasterAuditPlan.objects.create(
+            target_office_dept="SEQ",
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 9, 16),
+            planned_window_end=date(2026, 12, 15),
+            status="PLANNED",
+            created_by="dpa-1",
+        )
+
+        def fake_update(instance, update_fields):
+            self.assertIn("updated_by", update_fields)
+            return instance
+
+        with (
+            patch("apps.inspection.audit.services.plan_persistence.connection", SimpleNamespace(vendor="microsoft")),
+            patch(
+                "apps.inspection.audit.services.plan_persistence._update_sql_server_plan",
+                side_effect=fake_update,
+            ) as mock_update,
+            patch.object(MasterAuditPlan, "save", side_effect=AssertionError("direct save should not run")),
+        ):
+            approve_response = self._post_extension_decision(
+                extension_plan.id,
+                {
+                    "decision": "APPROVE",
+                    "extension_approved_reason": "DPA reviewed the drydock evidence and accepts the proposed date.",
+                },
+                dpa_user,
+            )
+            flag_response = self._post_flag_notify(
+                flag_plan.id,
+                {
+                    "flag_notification_date": "2026-09-10",
+                    "flag_notification_ref": "FLAG-EXT-2026-09",
+                    "flag_notification_attachment": "attachments/flag-extension.pdf",
+                },
+                dpa_user,
+            )
+            cancel_response = self._post_cancel(
+                cancel_plan.id,
+                {
+                    "cancellation_reason": "Vessel entered extended repair and DPA authorised full replanning.",
+                    "next_planned_date": "2026-12-15",
+                    "today": "2026-09-01",
+                },
+                dpa_user,
+            )
+
+        self.assertEqual(approve_response.status_code, 200)
+        self.assertEqual(flag_response.status_code, 200)
+        self.assertEqual(cancel_response.status_code, 200)
+        self.assertEqual(mock_update.call_count, 3)
+        mock_dispatch.assert_any_call(extension_plan, "AUDIT_EXTENSION_APPROVED")
+        mock_dispatch.assert_any_call(cancel_plan, "AUDIT_CANCELLED")
 
     @patch("apps.inspection.audit.views.plan._dispatch_plan_notification")
     def test_dpa_approves_and_rejects_extension_with_opm_numbering(self, mock_dispatch) -> None:

@@ -22,6 +22,11 @@ export interface AuditPlan {
   target_label: string;
   audit_classification: 'INTERNAL' | string;
   audit_standards_csv: string;
+  lead_auditor_user_id: string | null;
+  lead_auditor_name: string;
+  lead_auditor_designation: string;
+  lead_auditor_company: string;
+  lead_auditor_qual: string;
   planned_window_start: string | null;
   planned_window_end: string | null;
   window_label: string;
@@ -62,6 +67,7 @@ export interface AuditPlanFormData {
   target_office_dept: string;
   audit_classification: 'INTERNAL';
   audit_standards_csv: string;
+  lead_auditor_user_id: string;
   planned_window_start: string;
   planned_window_end: string;
   status: AuditPlanWritableStatus;
@@ -99,6 +105,7 @@ export const emptyAuditPlanForm: AuditPlanFormData = {
   target_office_dept: '',
   audit_classification: 'INTERNAL',
   audit_standards_csv: 'ISM',
+  lead_auditor_user_id: '',
   planned_window_start: '',
   planned_window_end: '',
   status: 'PLANNED',
@@ -138,6 +145,7 @@ export function auditPlanFormFromPlan(plan: AuditPlan): AuditPlanFormData {
     target_office_dept: plan.target_office_dept || '',
     audit_classification: 'INTERNAL',
     audit_standards_csv: plan.audit_standards_csv || 'ISM',
+    lead_auditor_user_id: plan.lead_auditor_user_id || '',
     planned_window_start: plan.planned_window_start || '',
     planned_window_end: plan.planned_window_end || '',
     status: plan.status === 'CONFIRMED' ? 'CONFIRMED' : 'PLANNED',

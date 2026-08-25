@@ -17,6 +17,9 @@ The items below were added or changed later on after the original guide baseline
 - CAR workflow now uses the unified operational statuses shown in the status section at the end of this guide
 - Audit plan and registration forms show vessel dropdowns; users select the vessel name/code and the system saves the correct vessel ID behind the scenes
 - Audit plan Standards are selected from fixed options, so users no longer type comma-separated standard codes
+- Register Audit shows a Selected Audit Plan picker. Choose the exact plan by `PLAN-XXXXXXXX`, target vessel/department, standards, status, audit window, and planned lead auditor before saving the audit.
+- After a selected audit plan is registered, that plan becomes `IN_PROGRESS` and cannot be selected again for another audit registration.
+- Qualified Auditors maintenance uses dropdowns for Employee/User ID and Qualifying Body. Qualifying Body choices come from active master rows in `aud_master_qual_body`, and the screen does not ask users to manually enter attachment UUIDs.
 
 ---
 
@@ -75,6 +78,19 @@ Reports access:
 4. Optionally add inspector name, authority, report reference
 5. Upload the inspection report (PDF, JPG, or JPEG, max 3MB)
 6. Click **Save** to create in DRAFT status
+
+### Register an Internal Audit
+
+Office users register internal audits from **Register Audit**.
+
+1. Select the exact audit plan first.
+2. Check the plan reference, target, standards, status, and audit window shown on screen.
+3. If two plans are for the same vessel, use the plan reference and window to choose the correct one.
+4. Complete the common header, team, attendees, dates, scope, and plan blocks. The Lead Auditor fields are filled from the selected audit plan and cannot be edited during planned audit registration.
+5. Click **Register Audit**.
+
+When registerable audit plans exist, the screen requires a selected plan before saving.
+The server also checks the plan status and previous usage, so a stale browser session cannot reuse or submit the wrong plan.
 
 ### Add Deficiencies
 

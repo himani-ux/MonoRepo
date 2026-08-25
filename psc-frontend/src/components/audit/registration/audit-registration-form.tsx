@@ -1,4 +1,4 @@
-import { useEffect, type FC } from 'react';
+import { useEffect, useMemo, type FC } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
@@ -19,11 +19,35 @@ export interface AuditVesselOption {
   vessel_name?: string;
 }
 
+export interface AuditRegistrationPlanOption {
+  id: string;
+  target_vessel_id: string | null;
+  target_office_dept: string | null;
+  target_label: string;
+  audit_standards_csv: string;
+  lead_auditor_user_id: string | null;
+  lead_auditor_name?: string | null;
+  lead_auditor_designation?: string | null;
+  lead_auditor_company?: string | null;
+  lead_auditor_qual?: string | null;
+  planned_window_start: string | null;
+  planned_window_end: string | null;
+  window_label: string;
+  extended_due_date: string | null;
+  extension_form_ref: string | null;
+  is_additional: boolean;
+  additional_reason: string | null;
+  trigger_event_type: string | null;
+  trigger_event_ref: string | null;
+  status: string;
+}
+
 export interface AuditRegistrationFormProps {
   onSubmit: (data: AuditRegistrationFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   vesselOptions?: AuditVesselOption[];
+  auditPlanOptions?: AuditRegistrationPlanOption[];
   defaultVesselId?: string | null;
   defaultLeadAuditorName?: string;
 }
@@ -36,6 +60,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
   onCancel,
   isSubmitting = false,
   vesselOptions = [],
+  auditPlanOptions = [],
   defaultVesselId,
   defaultLeadAuditorName,
 }) => {
@@ -45,6 +70,8 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
     handleSubmit,
     watch,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<AuditRegistrationFormData>({
     resolver: zodResolver(auditRegistrationSchema),
@@ -62,6 +89,13 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
   const auditeeType = watch('auditee_type');
   const standards = watch('standards');
   const selectedVesselId = watch('vessel_id');
+  const selectedAuditPlanId = watch('audit_plan_id') || '';
+  const requiresAuditPlanSelection = auditPlanOptions.length > 0;
+  const selectedAuditPlan = useMemo(
+    () => auditPlanOptions.find((plan) => plan.id === selectedAuditPlanId) ?? null,
+    [auditPlanOptions, selectedAuditPlanId]
+  );
+  const lockLeadAuditorFields = Boolean(selectedAuditPlan);
 
   useEffect(() => {
     if (!selectedVesselId && vesselOptions[0]?.id) {
@@ -76,8 +110,124 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
     setValue('standards', next, { shouldValidate: true });
   };
 
+  const applyAuditPlan = (planId: string) => {
+    setValue('audit_plan_id', planId, { shouldValidate: true });
+    clearErrors('audit_plan_id');
+
+    const plan = auditPlanOptions.find((item) => item.id === planId);
+    if (!plan) {
+      return;
+    }
+
+    if (plan.target_vessel_id) {
+      setValue('auditee_type', 'VESSEL', { shouldValidate: true });
+      setValue('vessel_id', plan.target_vessel_id, { shouldValidate: true });
+      setValue('auditee_office_dept', '', { shouldValidate: true });
+    }
+    if (plan.target_office_dept) {
+      setValue('auditee_type', 'OFFICE_DEPT', { shouldValidate: true });
+      setValue('auditee_office_dept', plan.target_office_dept as AuditRegistrationFormData['auditee_office_dept'], {
+        shouldValidate: true,
+      });
+    }
+    if (plan.lead_auditor_user_id) {
+      setValue('lead_auditor_user_id', plan.lead_auditor_user_id, { shouldValidate: true });
+    }
+    setValue('lead_auditor_name', plan.lead_auditor_name || plan.lead_auditor_user_id || '', { shouldValidate: true });
+    setValue('lead_auditor_designation', plan.lead_auditor_designation || '', { shouldValidate: true });
+    setValue('lead_auditor_company', plan.lead_auditor_company || 'KSM', { shouldValidate: true });
+    setValue('lead_auditor_qual', plan.lead_auditor_qual || '', { shouldValidate: true });
+    clearErrors(['lead_auditor_name', 'lead_auditor_company']);
+
+    const planStandards = parsePlanStandards(plan.audit_standards_csv);
+    if (planStandards.length > 0) {
+      setValue('standards', planStandards, { shouldValidate: true });
+    }
+  };
+
+  const clearAuditPlan = () => {
+    setValue('audit_plan_id', '', { shouldValidate: true });
+    setValue('lead_auditor_user_id', '', { shouldValidate: true });
+    setValue('lead_auditor_name', defaultLeadAuditorName || '', { shouldValidate: true });
+    setValue('lead_auditor_designation', '', { shouldValidate: true });
+    setValue('lead_auditor_company', 'KSM', { shouldValidate: true });
+    setValue('lead_auditor_qual', '', { shouldValidate: true });
+  };
+
+  const submitRegistration = (data: AuditRegistrationFormData) => {
+    if (requiresAuditPlanSelection && !data.audit_plan_id) {
+      setError('audit_plan_id', {
+        type: 'manual',
+        message: 'Select the exact audit plan before registering.',
+      });
+      return;
+    }
+    onSubmit(data);
+  };
+
   return (
-    <form className="space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
+    <form className="space-y-6" onSubmit={handleSubmit(submitRegistration)} noValidate>
+      <section className="space-y-4 rounded-md border border-neutral-200 bg-white p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 flex-1 space-y-2">
+            <Label htmlFor="audit_plan_id">
+              Selected Audit Plan
+              {requiresAuditPlanSelection && <span className="text-error-500"> *</span>}
+            </Label>
+            <Controller
+              control={control}
+              name="audit_plan_id"
+              render={({ field }) => (
+                <Select
+                  value={field.value || undefined}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    applyAuditPlan(value);
+                  }}
+                  disabled={isSubmitting || auditPlanOptions.length === 0}
+                >
+                  <SelectTrigger id="audit_plan_id" error={!!errors.audit_plan_id}>
+                    <SelectValue placeholder={auditPlanOptions.length > 0 ? 'Select audit plan' : 'No registerable plans available'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {auditPlanOptions.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id}>
+                        {formatAuditPlanOption(plan)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.audit_plan_id && <p className="text-sm text-error-500">{errors.audit_plan_id.message}</p>}
+            {!requiresAuditPlanSelection && (
+              <p className="text-sm text-neutral-500">
+                No registerable audit plans are available. Register only an approved ad-hoc audit from here.
+              </p>
+            )}
+          </div>
+          {selectedAuditPlan && (
+            <Button type="button" variant="outline" onClick={clearAuditPlan} disabled={isSubmitting}>
+              Clear Plan
+            </Button>
+          )}
+        </div>
+
+        {selectedAuditPlan && (
+          <dl className="grid gap-3 rounded-md border border-primary-100 bg-primary-50 p-3 text-sm md:grid-cols-3">
+            <SummaryItem label="Plan Ref" value={shortAuditPlanRef(selectedAuditPlan.id)} />
+            <SummaryItem label="Target" value={selectedAuditPlan.target_label || '-'} />
+            <SummaryItem label="Status" value={selectedAuditPlan.status || '-'} />
+            <SummaryItem label="Standards" value={selectedAuditPlan.audit_standards_csv || '-'} />
+            <SummaryItem label="Window" value={formatAuditPlanWindow(selectedAuditPlan)} />
+            <SummaryItem label="OPM F 713" value={selectedAuditPlan.extension_form_ref || '-'} />
+            {selectedAuditPlan.is_additional && (
+              <SummaryItem label="Additional Reason" value={selectedAuditPlan.additional_reason || '-'} className="md:col-span-3" />
+            )}
+          </dl>
+        )}
+      </section>
+
       <section className="space-y-4">
         <h2 className={sectionTitleClass}>Common Header</h2>
         <div className={gridClass}>
@@ -87,7 +237,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
               control={control}
               name="vessel_id"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting || vesselOptions.length === 0}>
+                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting || vesselOptions.length === 0 || Boolean(selectedAuditPlan)}>
                   <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
                     <SelectValue placeholder={vesselOptions.length > 0 ? 'Select vessel' : 'No vessels available'} />
                   </SelectTrigger>
@@ -152,7 +302,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
               control={control}
               name="auditee_type"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting}>
+                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting || Boolean(selectedAuditPlan)}>
                   <SelectTrigger id="auditee_type">
                     <SelectValue />
                   </SelectTrigger>
@@ -172,7 +322,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
                 control={control}
                 name="auditee_office_dept"
                 render={({ field }) => (
-                  <Select value={field.value || ''} onValueChange={field.onChange} disabled={isSubmitting}>
+                  <Select value={field.value || ''} onValueChange={field.onChange} disabled={isSubmitting || Boolean(selectedAuditPlan)}>
                     <SelectTrigger id="auditee_office_dept" error={!!errors.auditee_office_dept}>
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
@@ -199,7 +349,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
                 <Checkbox
                   checked={standards.includes(standard)}
                   onCheckedChange={(checked) => toggleStandard(standard, Boolean(checked))}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || Boolean(selectedAuditPlan)}
                 />
                 {standard}
               </label>
@@ -214,21 +364,21 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
         <div className={gridClass}>
           <div className="space-y-2">
             <Label htmlFor="lead_auditor_name">Name <span className="text-error-500">*</span></Label>
-            <Input id="lead_auditor_name" disabled={isSubmitting} {...register('lead_auditor_name')} />
+            <Input id="lead_auditor_name" readOnly={lockLeadAuditorFields} disabled={isSubmitting} {...register('lead_auditor_name')} />
             {errors.lead_auditor_name && <p className="text-sm text-error-500">{errors.lead_auditor_name.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="lead_auditor_designation">Designation</Label>
-            <Input id="lead_auditor_designation" disabled={isSubmitting} {...register('lead_auditor_designation')} />
+            <Input id="lead_auditor_designation" readOnly={lockLeadAuditorFields} disabled={isSubmitting} {...register('lead_auditor_designation')} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="lead_auditor_company">Company <span className="text-error-500">*</span></Label>
-            <Input id="lead_auditor_company" disabled={isSubmitting} {...register('lead_auditor_company')} />
+            <Input id="lead_auditor_company" readOnly={lockLeadAuditorFields} disabled={isSubmitting} {...register('lead_auditor_company')} />
             {errors.lead_auditor_company && <p className="text-sm text-error-500">{errors.lead_auditor_company.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="lead_auditor_qual">Qualification</Label>
-            <Input id="lead_auditor_qual" disabled={isSubmitting} {...register('lead_auditor_qual')} />
+            <Input id="lead_auditor_qual" readOnly={lockLeadAuditorFields} disabled={isSubmitting} {...register('lead_auditor_qual')} />
           </div>
         </div>
       </section>
@@ -404,4 +554,60 @@ function formatVesselOption(vessel: AuditVesselOption): string {
     return `${vessel.vessel_code} - ${vessel.vessel_name}`;
   }
   return vessel.vessel_name || vessel.vessel_code || vessel.id;
+}
+
+function SummaryItem({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-xs font-semibold uppercase text-primary-700">{label}</dt>
+      <dd className="mt-1 break-words text-neutral-800">{value}</dd>
+    </div>
+  );
+}
+
+export function shortAuditPlanRef(id: string): string {
+  return `PLAN-${id.slice(0, 8).toUpperCase()}`;
+}
+
+export function parsePlanStandards(csv: string): (typeof AUDIT_STANDARDS)[number][] {
+  const allowed = new Set<string>(AUDIT_STANDARDS);
+  return csv
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value): value is (typeof AUDIT_STANDARDS)[number] => allowed.has(value));
+}
+
+export function formatAuditPlanWindow(plan: AuditRegistrationPlanOption): string {
+  if (plan.window_label) {
+    return plan.window_label;
+  }
+  if (plan.planned_window_start && plan.planned_window_end) {
+    return `${plan.planned_window_start} -> ${plan.planned_window_end}`;
+  }
+  if (plan.extended_due_date) {
+    return `Extended due ${plan.extended_due_date}`;
+  }
+  return '-';
+}
+
+export function formatAuditPlanOption(plan: AuditRegistrationPlanOption): string {
+  const parts = [
+    shortAuditPlanRef(plan.id),
+    plan.target_label || 'Target not set',
+    plan.audit_standards_csv || 'Standards not set',
+    formatAuditPlanWindow(plan),
+    plan.status || 'Status not set',
+  ];
+  if (plan.is_additional) {
+    parts.push('Additional');
+  }
+  return parts.join(' | ');
 }

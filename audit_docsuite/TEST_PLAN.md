@@ -65,7 +65,13 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 | A-07 | Submit with empty `equipment_tested`. | Hard-block. | D-071 |
 | A-08 | All 4 gates satisfied → Submit. | Status → `REPORT_FINALIZED`; findings list freezes. | D-071/080 |
 | A-09 | Master clicks "Vessel Acknowledge Audit Report". | Status → `VESSEL_ACKNOWLEDGED`; NC SLA clocks start. | D-254 |
-| A-10 | Edit `audit_classification` after a finding exists. | Read-only; banner shown. | D-078 |
+| A-10 | Register Audit with a selected plan in `PLANNED` or already-used state. | Backend rejects with `audit_plan_id` validation error and no audit is created. | D-108 |
+| A-11 | Register Audit with a valid selected plan. | Audit is created and source `master_audit_plan.status` becomes `IN_PROGRESS`. | D-108 |
+| A-12 | First successful NC `START_PIC_REVIEW` after vessel acknowledgement. | `audit_detail.pic_user_id_resolved` is set and audit status becomes `CLOSURE_IN_PROGRESS`. | D-109/254 |
+| A-13 | First successful Observation closure save after vessel acknowledgement. | Audit status becomes `CLOSURE_IN_PROGRESS`. | D-254 |
+| A-14 | Audit detail contains NC and OBS findings created at the same timestamp. | API returns findings in deterministic NC/OBS order, not UUID-dependent order. | D-080 |
+| A-15 | Edit `audit_classification` after a finding exists. | Read-only; banner shown. | D-078 |
+| A-16 | Select a registerable audit plan during Register Audit. | Lead Auditor fields are populated from the selected plan and rendered read-only; submitted payload keeps the plan auditor snapshot. | D-108 |
 
 ---
 
