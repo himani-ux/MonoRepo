@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import unittest
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import UUID
@@ -19,7 +19,7 @@ from apps.inspection.audit.serializers.masters import (
     VesselRoDelegationSerializer,
 )
 from apps.inspection.audit.services.auditor_selection import resolve_user_identity
-from apps.inspection.audit.permissions import AUDIT_P_009
+from apps.inspection.audit.permissions import AUDIT_P_009, AUDIT_P_013
 from apps.inspection.audit.views.masters import (
     AuditQualifyingBodyListCreateView,
     ExternalAuditOrgListCreateView,
@@ -47,6 +47,46 @@ class AuditMasterApiContractTests(unittest.TestCase):
         )
         force_authenticate(request, user=user)
         denied = view(request)
+        self.assertEqual(denied.status_code, 403)
+
+    @patch.object(ExternalAuditOrgListCreateView, "get_queryset")
+    def test_external_audit_registration_permission_can_read_active_external_orgs(self, get_queryset):
+        get_queryset.return_value = [
+            SimpleNamespace(
+                id=UUID("44444444-4444-4444-8444-444444444444"),
+                name="DNV",
+                org_type="CLASS_SOCIETY",
+                country="Norway",
+                linked_class_society_ref=None,
+                is_active=True,
+                created_by="seed",
+                created_date=datetime(2026, 8, 19, 12, 0),
+            )
+        ]
+        factory = APIRequestFactory()
+        view = ExternalAuditOrgListCreateView.as_view()
+        user = SimpleNamespace(
+            is_authenticated=True,
+            id="external-register",
+            role="DPA",
+            process_ids=[AUDIT_P_013],
+        )
+
+        request = factory.get("/api/audit/masters/external-audit-orgs/")
+        force_authenticate(request, user=user)
+        response = view(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["count"], 1)
+        self.assertEqual(response.data["data"]["results"][0]["name"], "DNV")
+
+        create_request = factory.post(
+            "/api/audit/masters/external-audit-orgs/",
+            {"name": "New RO", "org_type": "RO"},
+            format="json",
+        )
+        force_authenticate(create_request, user=user)
+        denied = view(create_request)
         self.assertEqual(denied.status_code, 403)
 
     def test_qualifying_body_api_uses_audit_master_permission_gate(self):

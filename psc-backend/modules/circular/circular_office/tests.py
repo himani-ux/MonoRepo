@@ -13,6 +13,8 @@ from PyPDF2.errors import DependencyError
 from .views import (
     ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP,
     MAX_CIRCULAR_ATTACHMENT_FILES,
+    MAX_CIRCULAR_ATTACHMENT_SIZE_BYTES,
+    MAX_CIRCULAR_ATTACHMENT_SIZE_MB,
     CircularAttachmentValidationError,
     _build_delivery_status_records,
     _extract_uploaded_pdf_attachments_from_request_files,
@@ -442,6 +444,26 @@ class CircularAttachmentValidationTests(SimpleTestCase):
             _extract_uploaded_pdf_attachments_from_request_files(request_files)
 
         self.assertIn('only pdf', str(exc_info.exception).lower())
+
+    def test_extract_uploaded_pdf_attachments_rejects_pdf_above_size_limit(self):
+        request_files = MultiValueDict(
+            {
+                'attachment': [
+                    SimpleNamespace(
+                        name='large.pdf',
+                        content_type='application/pdf',
+                        size=MAX_CIRCULAR_ATTACHMENT_SIZE_BYTES + 1,
+                    ),
+                ]
+            }
+        )
+
+        with self.assertRaises(CircularAttachmentValidationError) as exc_info:
+            _extract_uploaded_pdf_attachments_from_request_files(request_files)
+
+        message = str(exc_info.exception)
+        self.assertIn(str(MAX_CIRCULAR_ATTACHMENT_SIZE_MB), message)
+        self.assertIn('large.pdf', message)
 
     @patch(
         'modules.circular.circular_office.views.PdfReader',

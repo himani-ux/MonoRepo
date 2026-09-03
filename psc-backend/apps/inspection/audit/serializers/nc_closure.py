@@ -40,6 +40,12 @@ class AuditNcPartCSerializer(serializers.Serializer):
         allow_empty=True,
     )
     root_cause_summary = serializers.CharField(required=False, allow_blank=True)
+    clc_item_ids = serializers.ListField(
+        child=serializers.CharField(max_length=10),
+        required=False,
+        allow_empty=True,
+    )
+    custom_cause_text = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
 
 class AuditNcDraftSerializer(AuditNcPartBSerializer, AuditNcPartCSerializer):

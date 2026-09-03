@@ -1666,6 +1666,47 @@ Issued Description of Statutory Memoranda
         self.assertEqual(fields["expiry_date"].value, "11 July 2030")
         self.assertEqual(fields["issue_date"].value, "11 August 2025")
 
+    def test_certificate_parser_recovers_kr_issue_year_from_nearby_full_date(self):
+        fields = _parse_fields_from_text(
+            (
+                "KOREAN REGISTER\n"
+                "Name of Ship: EAST AYUTTHAYA. Class No. : 1000010\n"
+                "Completion date of the testing and thorough examination on which this certificate is based : 27 February 2026\n"
+                "This certificate is valid until 26 Fe\n"
+                "Date of issue : 27 February\n"
+                "Issued at Hochiminh\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issuing_authority"].value, "Korean Register")
+        self.assertEqual(fields["issue_date"].value, "27 February 2026")
+
+    def test_certificate_parser_uses_printed_on_as_issue_date_fallback(self):
+        fields = _parse_fields_from_text(
+            (
+                "Certificate No.: PRINT-2026-001\n"
+                "Certificate for Annual Survey\n"
+                "Printed on: 7 July 2026\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["certificate_number"].value, "PRINT-2026-001")
+        self.assertEqual(fields["issue_date"].value, "7 July 2026")
+
+    def test_certificate_parser_keeps_date_of_issue_before_printed_on(self):
+        fields = _parse_fields_from_text(
+            (
+                "Certificate No.: ISSUE-2026-001\n"
+                "Date of issue: 6 July 2026\n"
+                "Printed on: 7 July 2026\n"
+            ),
+            0.95,
+        )
+
+        self.assertEqual(fields["issue_date"].value, "6 July 2026")
+
     def test_certificate_parser_reads_ordinal_valid_until_dates(self):
         fields = _parse_fields_from_text(
             (

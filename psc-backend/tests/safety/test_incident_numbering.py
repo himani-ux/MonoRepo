@@ -11,6 +11,7 @@ bootstrap_django()
 
 from apps.safety.models import Incident
 from apps.safety.repositories import IncidentRepository
+from apps.safety.services.near_miss_numbering import formalize_near_miss_number_for_office
 
 
 class IncidentNumberingTests(unittest.TestCase):
@@ -70,6 +71,49 @@ class IncidentNumberingTests(unittest.TestCase):
 
         self.assertEqual(next_number, "ABC/2026/002")
         self.assertEqual(reset_number, "ABC/2027/001")
+
+    def test_formalize_near_miss_number_uses_formal_sequence_idempotently(self) -> None:
+        Incident.objects.create(
+            incident_number="ABC/2026/001",
+            vessel_id="7",
+            state="PHASE_2",
+            created_by="master-7",
+            schema_version=1,
+        )
+        near_miss = Incident.objects.create(
+            incident_number="DRAFT-ABC/2026/T099",
+            vessel_id="7",
+            record_type=Incident.RecordType.NEAR_MISS,
+            state=Incident.State.READY_FOR_OFFICE_COMMENTS,
+            created_by="crew-7",
+            schema_version=1,
+        )
+
+        changed = formalize_near_miss_number_for_office(near_miss, repository=self.repository)
+
+        self.assertTrue(changed)
+        self.assertEqual(near_miss.incident_number, "ABC/2026/002")
+
+        near_miss.save(update_fields=("incident_number",))
+        changed_again = formalize_near_miss_number_for_office(near_miss, repository=self.repository)
+
+        self.assertFalse(changed_again)
+        self.assertEqual(near_miss.incident_number, "ABC/2026/002")
+
+    def test_formalize_near_miss_number_leaves_vessel_review_draft_unchanged(self) -> None:
+        near_miss = Incident.objects.create(
+            incident_number="DRAFT-ABC/2026/T001",
+            vessel_id="7",
+            record_type=Incident.RecordType.NEAR_MISS,
+            state=Incident.State.PENDING_VESSEL_REVIEW,
+            created_by="crew-7",
+            schema_version=1,
+        )
+
+        changed = formalize_near_miss_number_for_office(near_miss, repository=self.repository)
+
+        self.assertFalse(changed)
+        self.assertEqual(near_miss.incident_number, "DRAFT-ABC/2026/T001")
 
     def test_create_retries_when_auto_draft_reference_collides(self) -> None:
         Incident.objects.create(

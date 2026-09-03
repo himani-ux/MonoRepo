@@ -108,6 +108,7 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
     vessel_name = serializers.SerializerMethodField()
     vessel_display_name = serializers.SerializerMethodField()
     rework_summary = serializers.SerializerMethodField()
+    hod_review_summary = serializers.SerializerMethodField()
     vessel_review_summary = serializers.SerializerMethodField()
     office_comment = serializers.SerializerMethodField()
     evidence_attachments = serializers.SerializerMethodField()
@@ -165,6 +166,7 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "updated_date",
             "office_comment",
             "rework_summary",
+            "hod_review_summary",
             "vessel_review_summary",
             "evidence_attachments",
         )
@@ -200,12 +202,18 @@ class NearMissSerializer(AnonymityMixin, VesselDisplayMixin, serializers.ModelSe
             "requested_by_role": phase_log.actor_role_code,
         }
 
+    def get_hod_review_summary(self, obj: Incident) -> dict[str, object] | None:
+        return self._get_review_summary(obj, field_name="near_miss_hod_review_signature")
+
     def get_vessel_review_summary(self, obj: Incident) -> dict[str, object] | None:
+        return self._get_review_summary(obj, field_name="near_miss_vessel_review_signature")
+
+    def _get_review_summary(self, obj: Incident, *, field_name: str) -> dict[str, object] | None:
         history_row = (
             SafetyFieldHistory.objects.filter(
                 parent_table=obj._meta.db_table,
                 parent_id=obj.pk,
-                field_name="near_miss_vessel_review_signature",
+                field_name=field_name,
             )
             .order_by("-changed_at", "-id")
             .first()

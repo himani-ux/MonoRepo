@@ -151,13 +151,16 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.READY_FOR_OFFICE_COMMENTS)
+        self.assertEqual(self.near_miss.incident_number, "ABC/2026/001")
+        self.assertEqual(response.data["incident_number"], "ABC/2026/001")
         phase_log = IncidentPhaseLog.objects.get(incident_id=self.near_miss.pk)
         self.assertEqual(phase_log.device_fingerprint, "bridge-review-7")
         self.assertTrue(phase_log.signature_valid)
-        self.assertIn(
-            "state",
-            set(SafetyFieldHistory.objects.filter(parent_id=self.near_miss.pk).values_list("field_name", flat=True)),
+        changed_fields = set(
+            SafetyFieldHistory.objects.filter(parent_id=self.near_miss.pk).values_list("field_name", flat=True)
         )
+        self.assertIn("state", changed_fields)
+        self.assertIn("incident_number", changed_fields)
         signature_row = SafetyFieldHistory.objects.get(
             parent_id=self.near_miss.pk,
             field_name="near_miss_vessel_review_signature",
@@ -177,6 +180,7 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         detail_response = self.detail_view(detail_request, id=self.near_miss.pk)
 
         self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.data["incident_number"], "ABC/2026/001")
         self.assertEqual(
             detail_response.data["vessel_review_summary"]["comment"],
             "Reviewed onboard and ready for DPA triage.",
@@ -220,7 +224,13 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(ce_response.status_code, 200)
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.PENDING_VESSEL_REVIEW)
+        self.assertEqual(self.near_miss.incident_number, "DRAFT-ABC/2026/T099")
         self.assertEqual(ce_response.data["next_required_review"], "MASTER")
+        self.assertEqual(
+            ce_response.data["hod_review_summary"]["comment"],
+            "Engine HOD reviewed.",
+        )
+        self.assertEqual(ce_response.data["hod_review_summary"]["reviewed_by_role"], "CHIEF ENGINEER")
         self.assertTrue(
             SafetyFieldHistory.objects.filter(
                 parent_id=self.near_miss.pk,
@@ -245,6 +255,15 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(master_response.status_code, 200)
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.READY_FOR_OFFICE_COMMENTS)
+        self.assertEqual(self.near_miss.incident_number, "ABC/2026/001")
+        self.assertEqual(
+            master_response.data["hod_review_summary"]["comment"],
+            "Engine HOD reviewed.",
+        )
+        self.assertEqual(
+            master_response.data["vessel_review_summary"]["comment"],
+            "Master reviewed after CE.",
+        )
 
     def test_master_can_send_back_and_reporter_can_resubmit_rework(self) -> None:
         request = self.factory.post(
@@ -268,6 +287,7 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         )
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.REWORK_REQUIRED)
+        self.assertEqual(self.near_miss.incident_number, "DRAFT-ABC/2026/T099")
 
         detail_request = self.factory.get(f"/api/safety/near-miss/{self.near_miss.pk}/")
         force_authenticate(
@@ -298,6 +318,7 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(rework_response.status_code, 200)
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.PENDING_VESSEL_REVIEW)
+        self.assertEqual(self.near_miss.incident_number, "DRAFT-ABC/2026/T099")
         self.assertEqual(self.near_miss.near_miss_immediate_action, "Access platform isolated and duty officer informed immediately.")
         self.assertIsNone(self.near_miss.near_miss_mscat_subcode_id)
         self.assertIn("immediate_option_id", self.near_miss.near_miss_factor_causes)
@@ -327,9 +348,40 @@ class NearMissReviewWorkflowTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.near_miss.refresh_from_db()
         self.assertEqual(self.near_miss.state, Incident.State.READY_FOR_OFFICE_COMMENTS)
+        self.assertEqual(self.near_miss.incident_number, "ABC/2026/001")
+        self.assertEqual(response.data["incident_number"], "ABC/2026/001")
         self.assertEqual(
             response.data["rework_summary"]["comment"],
             "Master corrected the rejected near miss.",
+        )
+
+    def test_master_submit_keeps_existing_formal_near_miss_number(self) -> None:
+        self.near_miss.incident_number = "ABC/2026/007"
+        self.near_miss.save(update_fields=("incident_number",))
+
+        request = self.factory.post(
+            f"/api/safety/near-miss/{self.near_miss.pk}/review/",
+            {
+                "decision": "SUBMIT_TO_OFFICE",
+                "comment": "Already has the formal number from a previous retry.",
+                "typed_name": "Master Seven",
+                "device_fingerprint": "bridge-review-7",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=build_user(role_name="MASTER", user_id="master-7"))
+
+        response = self.review_view(request, id=self.near_miss.pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.near_miss.refresh_from_db()
+        self.assertEqual(self.near_miss.state, Incident.State.READY_FOR_OFFICE_COMMENTS)
+        self.assertEqual(self.near_miss.incident_number, "ABC/2026/007")
+        self.assertFalse(
+            SafetyFieldHistory.objects.filter(
+                parent_id=self.near_miss.pk,
+                field_name="incident_number",
+            ).exists()
         )
 
     def test_engine_rework_requires_fresh_hod_review_after_resubmission(self) -> None:

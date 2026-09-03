@@ -118,7 +118,34 @@ class NearMissCreateAnyRankTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["record_type"], "NEAR_MISS")
         self.assertEqual(response.data["state"], "PENDING_VESSEL_REVIEW")
+        self.assertTrue(str(response.data["incident_number"]).startswith("DRAFT-ABC/"))
         self.assertEqual(response.data["reporter_name"], "wiper-7")
+
+    def test_master_create_assigns_formal_number_when_office_ready(self) -> None:
+        request = self.factory.post(
+            "/api/safety/near-miss/",
+            build_payload(
+                narrative=(
+                    "Master observed an unsecured accommodation ladder pin during rounds and "
+                    "recorded the near miss before personnel used the access. The ladder was "
+                    "isolated, the duty officer was informed, and the securing point was checked."
+                )
+            ),
+            format="json",
+        )
+        force_authenticate(
+            request,
+            user=build_user(role_name="MASTER", process_ids=["SAF_P_001"], user_id="master-7"),
+        )
+
+        response = self.view(request)
+
+        expected_prefix = f"ABC/{timezone.now().year}/"
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["state"], "READY_FOR_OFFICE_COMMENTS")
+        self.assertEqual(response.data["incident_number"], f"{expected_prefix}001")
+        self.assertNotIn("DRAFT-", response.data["incident_number"])
+        self.assertNotIn("/T", response.data["incident_number"])
 
     def test_vessel_user_create_uses_authenticated_vessel_context(self) -> None:
         request = self.factory.post(

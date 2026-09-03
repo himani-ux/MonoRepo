@@ -5,11 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
+from apps.car.models import CarClcMapping
+from apps.inspection.audit.finding_types import normalize_nc_category
 from apps.inspection.audit.models import AuditDetail, AuditFinding, AuditFindingNC
 from apps.inspection.audit.services.car_workflow import (
     AuditCarWorkflowContext,
@@ -88,14 +90,12 @@ def update_nc_part(
     if part == "part-b":
         _update_part_b(context=context, nc=nc, data=data)
     elif part == "part-c":
-        _update_part_c(nc=nc, data=data)
+        _update_part_c(context=context, nc=nc, data=data, user=user)
     elif part == "part-d":
         _update_part_d(nc=nc, data=data)
     elif part == "part-e":
-        _update_certificates_at_risk(context=context, data=data)
         _update_part_e(context=context, nc=nc, data=data, user=user)
     elif part == "part-f":
-        _update_certificates_at_risk(context=context, data=data)
         _update_part_f(nc=nc, data=data)
     elif part == "part-g":
         _update_part_g(nc=nc, data=data)
@@ -121,7 +121,7 @@ def draft_nc_for_vessel(
     actor_id = _user_id(user)
 
     _update_part_b(context=context, nc=nc, data=data)
-    _update_part_c(nc=nc, data=data)
+    _update_part_c(context=context, nc=nc, data=data, user=user)
     nc.drafted_by_user_id = actor_id
     nc.updated_by = actor_id
     nc.updated_date = timezone.now()
@@ -203,7 +203,7 @@ def serialize_nc_closure_bundle(bundle: AuditNcClosureBundle) -> dict[str, Any]:
             "nc_issued_date": _date_value(getattr(finding, "created_date", None)),
             "required_closure_deadline": _date_value(finding.original_due_date or deficiency.target_date),
             "certificates_at_risk": finding.certificates_at_risk or "",
-            "nc_classification": finding.nc_category,
+            "nc_classification": normalize_nc_category(finding.nc_category),
             "description": finding.description or deficiency.description,
         },
         "part_b": {
@@ -225,6 +225,8 @@ def serialize_nc_closure_bundle(bundle: AuditNcClosureBundle) -> dict[str, Any]:
             "why_5": nc.why_5 or "",
             "root_cause_categories": _csv_to_list(nc.root_cause_categories),
             "root_cause_summary": nc.root_cause_summary or "",
+            "clc_item_ids": _car_clc_item_ids(car),
+            "custom_cause_text": _car_custom_cause_text(car),
         },
         "part_d": {
             "corrective_action_text": nc.corrective_action_text or "",
@@ -267,11 +269,65 @@ def serialize_nc_closure_bundle(bundle: AuditNcClosureBundle) -> dict[str, Any]:
 
 
 def _ensure_nc_record(context: AuditCarWorkflowContext, *, user: object | None) -> AuditFindingNC:
+    if connection.vendor == "microsoft":
+        existing = _get_sql_server_nc_record(context.finding.id)
+        if existing:
+            return existing
+
+        nc_id = uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO dbo.{AuditFindingNC._meta.db_table} (
+                    [id],
+                    [audit_finding_id],
+                    [created_by],
+                    [created_date],
+                    [sms_amendment_required],
+                    [effectiveness_overdue]
+                )
+                VALUES (
+                    CAST(%s AS uniqueidentifier),
+                    CAST(%s AS uniqueidentifier),
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+                """,
+                [
+                    str(nc_id),
+                    str(context.finding.id),
+                    _user_id(user),
+                    timezone.now(),
+                    False,
+                    False,
+                ],
+            )
+        created = _get_sql_server_nc_record(context.finding.id)
+        if created:
+            return created
+        raise AuditFindingNC.DoesNotExist("Audit NC closure record was saved but could not be reloaded.")
+
     nc, _created = AuditFindingNC.objects.get_or_create(
         audit_finding_id=context.finding.id,
         defaults={"created_by": _user_id(user)},
     )
     return nc
+
+
+def _get_sql_server_nc_record(finding_id: UUID) -> AuditFindingNC | None:
+    rows = list(
+        AuditFindingNC.objects.raw(
+            f"""
+            SELECT *
+            FROM dbo.{AuditFindingNC._meta.db_table}
+            WHERE audit_finding_id = CAST(%s AS uniqueidentifier)
+            """,
+            [str(finding_id)],
+        )
+    )
+    return rows[0] if rows else None
 
 
 def _bundle(*, context: AuditCarWorkflowContext, nc: AuditFindingNC) -> AuditNcClosureBundle:
@@ -285,10 +341,50 @@ def _bundle(*, context: AuditCarWorkflowContext, nc: AuditFindingNC) -> AuditNcC
     )
 
 
+def _car_clc_item_ids(car: CAR) -> list[str]:
+    return [
+        str(code)
+        for code in CarClcMapping.objects.filter(car=car)
+        .order_by("created_date")
+        .values_list("clc_item_id", flat=True)
+    ]
+
+
+def _car_custom_cause_text(car: CAR) -> str:
+    mapping = (
+        CarClcMapping.objects.filter(car=car)
+        .exclude(custom_cause_text__isnull=True)
+        .exclude(custom_cause_text="")
+        .order_by("created_date")
+        .first()
+    )
+    return mapping.custom_cause_text if mapping else ""
+
+
+def _normalize_clc_item_ids(value: Any) -> list[str]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, str):
+        raw_values = value.split(",")
+    else:
+        raw_values = list(value)
+
+    normalized: list[str] = []
+    for item in raw_values:
+        code = str(item or "").strip()
+        if not code:
+            continue
+        if len(code) > 10:
+            raise AuditNcClosureError("clc_item_ids contains an invalid CLC code.")
+        if code not in normalized:
+            normalized.append(code)
+    return normalized
+
+
 def _update_part_b(*, context: AuditCarWorkflowContext, nc: AuditFindingNC, data: dict[str, Any]) -> None:
     text = _clean(data.get("immediate_action_text"))
     completed_at = data.get("immediate_action_completed_at")
-    if context.finding.nc_category == "MAJOR_NC":
+    if normalize_nc_category(context.finding.nc_category) == "MAJOR_NC":
         if completed_at is not None:
             if not text:
                 raise AuditNcClosureError("Part B immediate action is required for Major NC.")
@@ -302,7 +398,7 @@ def _update_part_b(*, context: AuditCarWorkflowContext, nc: AuditFindingNC, data
     nc.master_immediate_sign_at = data.get("master_immediate_sign_at")
 
 
-def _update_part_c(*, nc: AuditFindingNC, data: dict[str, Any]) -> None:
+def _update_part_c(*, context: AuditCarWorkflowContext, nc: AuditFindingNC, data: dict[str, Any], user: object) -> None:
     rca_method = _choice_or_blank(data.get("rca_method"), RCA_METHODS, "rca_method")
     categories = data.get("root_cause_categories") or []
     unknown = sorted(set(categories) - ROOT_CAUSE_CATEGORIES)
@@ -313,6 +409,8 @@ def _update_part_c(*, nc: AuditFindingNC, data: dict[str, Any]) -> None:
         raise AuditNcClosureError("root_cause_summary must be at least 50 characters.")
     if rca_method == "OTHER" and not _clean(data.get("rca_method_other")):
         raise AuditNcClosureError("rca_method_other is required when rca_method is OTHER.")
+    clc_item_ids = _normalize_clc_item_ids(data.get("clc_item_ids"))
+    custom_cause_text = _clean(data.get("custom_cause_text"))
 
     nc.rca_method = rca_method
     nc.rca_method_other = _clean(data.get("rca_method_other"))
@@ -325,6 +423,19 @@ def _update_part_c(*, nc: AuditFindingNC, data: dict[str, Any]) -> None:
     nc.why_5 = _clean(data.get("why_5"))
     nc.root_cause_categories = ",".join(categories) if categories else None
     nc.root_cause_summary = summary
+
+    context.car.root_cause_summary = summary or None
+    context.car.updated_by = _user_id(user)
+    context.car.save(update_fields=["root_cause_summary", "updated_by", "updated_date"])
+    if "clc_item_ids" in data or "custom_cause_text" in data:
+        CarClcMapping.objects.filter(car=context.car).delete()
+        for clc_item_id in clc_item_ids:
+            CarClcMapping.objects.create(
+                car=context.car,
+                clc_item_id=clc_item_id,
+                custom_cause_text=custom_cause_text,
+                created_by=_user_id(user),
+            )
 
 
 def _update_part_d(*, nc: AuditFindingNC, data: dict[str, Any]) -> None:

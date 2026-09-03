@@ -11,18 +11,17 @@ import {
   useDraftAuditNcForVessel,
   useUpdateAuditNcPart,
 } from '@/hooks/audit/use-audit-finding';
+import { useCLCHierarchy } from '@/hooks/use-masters';
 import { getErrorMessage } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
 import { useToast } from '@/hooks/use-toast';
 import {
   ACCEPTANCE_DECISIONS,
   CERTIFICATE_ENDORSEMENT_TYPES,
-  CERTIFICATES_AT_RISK,
   EFFECTIVENESS_OUTCOMES,
   EFFECTIVENESS_REVIEW_METHODS,
   FINAL_CLOSURE_STATUSES,
-  RCA_METHODS,
-  ROOT_CAUSE_CATEGORIES,
   VERIFICATION_METHODS,
   type AuditNcPartB,
   type AuditNcPartC,
@@ -34,6 +33,7 @@ import {
   type AuditNcPartPayload,
   type AuditNcWorkflowAction,
 } from '@/schemas/audit/nc-closure';
+import type { CLCHierarchyCategory } from '@/types';
 
 interface AuditNcClosurePageProps {
   findingId: string;
@@ -65,6 +65,7 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
   const updatePart = useUpdateAuditNcPart(findingId);
   const draftForVessel = useDraftAuditNcForVessel(findingId);
   const carWorkflow = useAuditFindingCarWorkflow(findingId);
+  const { data: clcHierarchy, isLoading: isClcLoading } = useCLCHierarchy();
   const [partB, setPartB] = useState<AuditNcPartB | null>(null);
   const [partC, setPartC] = useState<AuditNcPartC | null>(null);
   const [partD, setPartD] = useState<AuditNcPartD | null>(null);
@@ -80,7 +81,11 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
       immediate_action_completed_at: toInputDate(closure.part_b.immediate_action_completed_at),
       master_immediate_sign_at: toInputDateTime(closure.part_b.master_immediate_sign_at),
     });
-    setPartC(closure.part_c);
+    setPartC({
+      ...closure.part_c,
+      clc_item_ids: closure.part_c.clc_item_ids || [],
+      custom_cause_text: closure.part_c.custom_cause_text || '',
+    });
     setPartD({
       ...closure.part_d,
       target_completion_date: toInputDate(closure.part_d.target_completion_date),
@@ -143,7 +148,7 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
   const runWorkflowAction = async (action: AuditNcWorkflowAction, comment?: string) => {
     try {
       await carWorkflow.mutateAsync({ action, comment });
-      toast({ title: `CAR ${action.replaceAll('_', ' ').toLowerCase()} complete` });
+      toast({ title: `CAR ${formatEnumLabel(action).toLowerCase()} complete` });
     } catch (workflowError) {
       toast({
         variant: 'destructive',
@@ -201,9 +206,9 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
                   {closure.part_a.nc_reference_no}
                 </h1>
                 <Badge variant={closure.part_a.nc_classification === 'MAJOR_NC' ? 'destructive' : 'warning'}>
-                  {closure.part_a.nc_classification || 'NC'}
+                  {formatEnumLabel(closure.part_a.nc_classification) || 'NC'}
                 </Badge>
-                <Badge variant="secondary">{closure.car.status}</Badge>
+                <Badge variant="secondary">{getStatusLabel(closure.car.status)}</Badge>
               </div>
               <p className="mt-1 text-sm text-neutral-500">{closure.part_a.description}</p>
             </div>
@@ -278,25 +283,17 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
         </SectionCard>
 
         <SectionCard title="Part C - Root Cause Analysis">
-          <SelectField
-            id="rca_method"
-            label="RCA Method"
-            value={partC.rca_method}
-            options={RCA_METHODS}
-            onChange={(value) => setPartC({ ...partC, rca_method: value })}
-            eid="MOCKUP-NC-WIZ-05:nc_wizard_step2.rca_method"
+          <ClcRootCauseSelect
+            selectedCodes={partC.clc_item_ids || []}
+            hierarchy={clcHierarchy?.root_causes}
+            isLoading={isClcLoading}
+            onChange={(clc_item_ids) => setPartC({ ...partC, clc_item_ids })}
           />
-          <FieldInput id="rca_method_other" label="RCA Method Other" value={partC.rca_method_other} onChange={(value) => setPartC({ ...partC, rca_method_other: value })} />
-          <FieldTextarea id="problem_statement" label="Problem Statement" value={partC.problem_statement} onChange={(value) => setPartC({ ...partC, problem_statement: value })} />
-          <FieldTextarea id="why_1" label="Why 1" value={partC.why_1} onChange={(value) => setPartC({ ...partC, why_1: value })} eid="MOCKUP-NC-WIZ-05:nc_wizard_step3.why_inputs" />
-          <FieldTextarea id="why_2" label="Why 2" value={partC.why_2} onChange={(value) => setPartC({ ...partC, why_2: value })} />
-          <FieldTextarea id="why_3" label="Why 3" value={partC.why_3} onChange={(value) => setPartC({ ...partC, why_3: value })} />
-          <CheckboxGroup
-            label="Root Cause Categories"
-            values={partC.root_cause_categories}
-            options={ROOT_CAUSE_CATEGORIES}
-            onChange={(values) => setPartC({ ...partC, root_cause_categories: values })}
-            eid="MOCKUP-NC-WIZ-05:nc_wizard_step3.rc_categories"
+          <FieldInput
+            id="custom_cause_text"
+            label="Custom Cause"
+            value={partC.custom_cause_text || ''}
+            onChange={(value) => setPartC({ ...partC, custom_cause_text: value })}
           />
           <FieldTextarea
             id="root_cause_summary"
@@ -334,12 +331,11 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
         </SectionCard>
 
         <SectionCard title="Part E - Effectiveness Review">
-          <CheckboxGroup label="Certificates at Risk" values={partE.certificates_at_risk || []} options={CERTIFICATES_AT_RISK} onChange={(values) => setPartE({ ...partE, certificates_at_risk: values })} />
           <FieldInput id="effectiveness_review_date" label="Review Date" type="date" value={partE.effectiveness_review_date || ''} onChange={(value) => setPartE({ ...partE, effectiveness_review_date: value })} eid="MOCKUP-NC-04:nc_partE.effrev" />
           <SelectField id="effectiveness_review_method" label="Review Method" value={partE.effectiveness_review_method} options={EFFECTIVENESS_REVIEW_METHODS} onChange={(value) => setPartE({ ...partE, effectiveness_review_method: value })} />
           <SelectField id="effectiveness_outcome" label="Outcome" value={partE.effectiveness_outcome} options={EFFECTIVENESS_OUTCOMES} onChange={(value) => setPartE({ ...partE, effectiveness_outcome: value })} />
           <FieldTextarea id="effectiveness_assessment_text" label="Assessment" value={partE.effectiveness_assessment_text} onChange={(value) => setPartE({ ...partE, effectiveness_assessment_text: value })} />
-          <FieldTextarea id="effectiveness_further_action_text" label="Further Action" value={partE.effectiveness_further_action_text} onChange={(value) => setPartE({ ...partE, effectiveness_further_action_text: value })} eid="MOCKUP-NC-04:nc_partE.further_action" />
+          <FieldTextarea id="effectiveness_further_action_text" label="Further Action, If any" value={partE.effectiveness_further_action_text} onChange={(value) => setPartE({ ...partE, effectiveness_further_action_text: value })} eid="MOCKUP-NC-04:nc_partE.further_action" />
           <FieldInput id="effectiveness_signer_name" label="Signer" value={partE.effectiveness_signer_name} onChange={(value) => setPartE({ ...partE, effectiveness_signer_name: value })} eid="MOCKUP-NC-04:nc_partE.signer" />
           <FieldInput id="effectiveness_signer_at" label="Signer Time" type="datetime-local" value={partE.effectiveness_signer_at || ''} onChange={(value) => setPartE({ ...partE, effectiveness_signer_at: value })} />
           <SaveRow onSave={() => savePart('part-e', {
@@ -350,7 +346,6 @@ export function AuditNcClosurePage({ findingId }: AuditNcClosurePageProps) {
         </SectionCard>
 
         <SectionCard title="Part F - Closure Acceptance">
-          <CheckboxGroup label="Certificates at Risk" values={partF.certificates_at_risk || []} options={CERTIFICATES_AT_RISK} onChange={(values) => setPartF({ ...partF, certificates_at_risk: values })} />
           <FieldInput id="acceptance_review_date" label="Review Date" type="date" value={partF.acceptance_review_date || ''} onChange={(value) => setPartF({ ...partF, acceptance_review_date: value })} eid="MOCKUP-NC-04:nc_partF.acceptance" />
           <SelectField id="acceptance_decision" label="Decision" value={partF.acceptance_decision} options={ACCEPTANCE_DECISIONS} onChange={(value) => setPartF({ ...partF, acceptance_decision: value })} />
           <FieldTextarea id="acceptance_rca_adequacy_text" label="RCA Adequacy" value={partF.acceptance_rca_adequacy_text} onChange={(value) => setPartF({ ...partF, acceptance_rca_adequacy_text: value })} />
@@ -434,7 +429,7 @@ function WorkflowActionPanel({
       </CardHeader>
       <CardContent className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-600">
-          <Badge variant="secondary">{status}</Badge>
+          <Badge variant="secondary">{getStatusLabel(status)}</Badge>
           {effRevDate && (
             <Badge variant={effRevOverdue ? 'destructive' : 'outline'}>
               EffRev due {effRevDate}
@@ -581,49 +576,85 @@ function SelectField<T extends readonly string[]>({
       >
         <option value="">Not set</option>
         {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
+          <option key={option} value={option}>{formatEnumLabel(option)}</option>
         ))}
       </select>
     </div>
   );
 }
 
-function CheckboxGroup<T extends readonly string[]>({
-  label,
-  values,
-  options,
+type ClcRootCauseHierarchy = {
+  personal_factors: Record<string, CLCHierarchyCategory>;
+  job_factors: Record<string, CLCHierarchyCategory>;
+};
+
+function ClcRootCauseSelect({
+  selectedCodes,
+  hierarchy,
+  isLoading,
   onChange,
-  eid,
 }: {
-  label: string;
-  values: string[];
-  options: T;
-  onChange: (values: string[]) => void;
-  eid?: string;
+  selectedCodes: string[];
+  hierarchy: ClcRootCauseHierarchy | undefined;
+  isLoading: boolean;
+  onChange: (codes: string[]) => void;
 }) {
-  const selected = useMemo(() => new Set(values), [values]);
+  const selected = useMemo(() => new Set(selectedCodes), [selectedCodes]);
+  const toggleCode = (code: string, checked: boolean) => {
+    if (checked) {
+      onChange(selectedCodes.includes(code) ? selectedCodes : [...selectedCodes, code]);
+      return;
+    }
+    onChange(selectedCodes.filter((selectedCode) => selectedCode !== code));
+  };
+
+  const sections = hierarchy
+    ? [
+        { label: 'Personal Factors', categories: hierarchy.personal_factors },
+        { label: 'Job Factors', categories: hierarchy.job_factors },
+      ]
+    : [];
+
   return (
-    <fieldset className="space-y-2 rounded-md border border-neutral-200 p-3" data-eid={eid}>
-      <legend className="px-1 text-sm font-medium text-neutral-700">{label}</legend>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {options.map((option) => (
-          <label key={option} className="flex items-center gap-2 text-sm text-neutral-700">
-            <input
-              type="checkbox"
-              checked={selected.has(option)}
-              onChange={(event) => {
-                if (event.target.checked) {
-                  onChange([...values, option]);
-                } else {
-                  onChange(values.filter((value) => value !== option));
-                }
-              }}
-              className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-            />
-            {option}
-          </label>
-        ))}
-      </div>
+    <fieldset className="space-y-3 rounded-md border border-neutral-200 p-3">
+      <legend className="px-1 text-sm font-medium text-neutral-700">CLC Root Cause Codes</legend>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-neutral-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading CLC codes
+        </div>
+      ) : !hierarchy ? (
+        <p className="text-sm text-neutral-500">CLC codes are unavailable.</p>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {sections.map((section) => (
+            <div key={section.label} className="space-y-2">
+              <p className="text-xs font-semibold uppercase text-neutral-500">{section.label}</p>
+              {Object.entries(section.categories).map(([categoryCode, category]) => (
+                <div key={categoryCode} className="rounded-md border border-neutral-100 bg-white p-2">
+                  <p className="text-xs font-medium text-neutral-700">{category.name}</p>
+                  <div className="mt-2 space-y-1">
+                    {Object.entries(category.items).map(([code, name]) => (
+                      <label key={code} className="flex items-start gap-2 text-sm text-neutral-700">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(code)}
+                          onChange={(event) => toggleCode(code, event.target.checked)}
+                          className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span>
+                          <span className="font-mono text-xs">{code}</span> {name}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="text-xs text-neutral-500">{selectedCodes.length} selected</div>
     </fieldset>
   );
 }

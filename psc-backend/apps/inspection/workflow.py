@@ -658,6 +658,16 @@ def validate_workflow_transition(car, action, user, comment=None):
             'allowed_roles': ['pic'],
             'comment_required': False,
         }
+    # Idempotent CLOSE_CAR guard:
+    # duplicate/stale DPA close requests after the CAR is already closed should
+    # not surface as a 400 or replay closure side effects.
+    if not transition and action == WorkflowAction.CLOSE_CAR and current_status == CARStatus.CLOSED:
+        transition = {
+            'target': CARStatus.CLOSED,
+            'allowed_roles': ['dpa'],
+            'comment_required': False,
+            'noop': True,
+        }
 
     if not transition:
         return None, f'Action "{action}" is not allowed when CAR is in "{car.status}" status.'

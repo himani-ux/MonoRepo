@@ -17,6 +17,7 @@ from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.repositories import IncidentRepository
 from apps.safety.serializers import NearMissCreateSerializer, NearMissListSerializer, NearMissSerializer
 from apps.safety.services import NotificationWriter, PhaseStateMachine
+from apps.safety.services.near_miss_numbering import formalize_near_miss_number_for_office
 from apps.safety.services.near_miss_photo_evidence import store_near_miss_photo_evidence
 
 
@@ -218,6 +219,8 @@ class NearMissListCreateView(NearMissViewMixin, generics.ListCreateAPIView):
             reporter_email=reporter_identity["reporter_email"],
             reporter_department=reporter_identity["reporter_department"],
         )
+        if formalize_near_miss_number_for_office(near_miss, repository=self.get_incident_repository()):
+            near_miss.save(update_fields=("incident_number",))
         if serializer.validated_data.get("near_miss_severity") == "HIGH" and uploaded_file is not None:
             store_near_miss_photo_evidence(
                 near_miss=near_miss,

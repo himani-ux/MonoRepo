@@ -8,6 +8,7 @@ from apps.car.views import CARWorkflowView
 from apps.inspection.audit.permissions import CanUseAuditCarWorkflow
 from apps.inspection.audit.services.car_workflow import (
     AuditCarWorkflowError,
+    apply_successful_audit_car_transition,
     resolve_audit_car_workflow_context,
     validate_audit_proxy_preconditions,
 )
@@ -39,6 +40,12 @@ class AuditFindingCarWorkflowView(APIView):
             )
 
         response = CARWorkflowView().post(request, id=context.car.id, *args, **kwargs)
+        if response.status_code < 400:
+            apply_successful_audit_car_transition(
+                context,
+                action=request.data.get("action"),
+                user=request.user,
+            )
         if response.status_code < 400 and request.data.get("action") == WorkflowAction.LEAD_AUDITOR_CLOSE:
             context.car.refresh_from_db()
             schedule_effectiveness_review(

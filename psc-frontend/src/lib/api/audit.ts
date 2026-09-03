@@ -4,7 +4,7 @@ import type { AuditChecklist } from '@/schemas/audit/checklist';
 import type { AuditDetail, AuditDetailEditableFields, AuditScorecardRow } from '@/schemas/audit/detail';
 import type {
   AuditClauseMaster,
-  AuditFindingCreateFormData,
+  AuditFindingCreatePayload,
   AuditFindingCreateResponse,
   AuditIssueCircularResponse,
 } from '@/schemas/audit/finding';
@@ -53,10 +53,127 @@ export interface AuditRegistrationResponse {
   auditee_type: string;
 }
 
+export interface RegisteredAudit {
+  id: string;
+  audit_plan_id: string | null;
+  target_label: string;
+  vessel_id: string | null;
+  audit_classification: string;
+  auditee_type: string;
+  auditee_office_dept: string | null;
+  audit_subtype: string;
+  lead_auditor_name: string;
+  lead_auditor_designation: string;
+  audit_start_date: string;
+  audit_end_date: string | null;
+  status: string;
+  created_date: string | null;
+}
+
+export interface RegisteredAuditList {
+  count: number;
+  results: RegisteredAudit[];
+}
+
 export interface AuditVesselOption {
   id: string;
   vessel_code: string;
   vessel_name: string;
+  top_rank_personnel?: AuditVesselPersonnelOption[];
+}
+
+export interface AuditVesselPersonnelOption {
+  crew_id?: string | null;
+  crew_name: string;
+  rank_code: string;
+  rank_name: string;
+}
+
+export interface AuditQualifiedAuditor {
+  id: string;
+  user_id: string;
+  display_name: string;
+  designation: string;
+  company: string;
+  identity_source: string;
+  qualification_text: string;
+  qualification_date: string;
+  expiry_date: string;
+  scope_standards_csv: string;
+  qualifying_body: string | null;
+  certificate_attachment_id?: string | null;
+  auditor_scope: string;
+  qualified_for_seq: boolean;
+  is_active: boolean;
+}
+
+export interface AuditQualifiedAuditorPayload {
+  user_id: string;
+  qualification_text: string;
+  qualification_date: string;
+  expiry_date: string;
+  scope_standards_csv: string;
+  qualifying_body?: string | null;
+  certificate_attachment_id?: string | null;
+  auditor_scope: string;
+  qualified_for_seq: boolean;
+  is_active: boolean;
+}
+
+export interface AuditQualifyingBody {
+  id: string;
+  body_name: string;
+  is_active: boolean;
+  is_deleted: boolean;
+}
+
+export interface AuditQualifyingBodyPayload {
+  body_name: string;
+  is_active: boolean;
+  is_deleted?: boolean;
+}
+
+export interface AuditOfficeUserOption {
+  employee_id: string;
+  display_name: string | null;
+  employee_name: string | null;
+  username: string | null;
+  employee_role: string | null;
+  department: string | null;
+  role_name: string | null;
+}
+
+export interface AuditMasterList<T> {
+  count: number;
+  results: T[];
+}
+
+export interface AuditHodAssignment {
+  id: string;
+  dept: string;
+  user_id: string;
+  display_name: string;
+  designation: string;
+  company: string;
+  is_acting: boolean;
+  effective_from: string;
+  effective_to: string | null;
+}
+
+export interface AuditHodAssignmentPayload {
+  dept: string;
+  user_id: string;
+  effective_from: string;
+  effective_to: string;
+}
+
+export interface AuditExternalAuditOrg {
+  id: string;
+  name: string;
+  org_type: 'CLASS_SOCIETY' | 'FLAG_STATE' | 'RO' | 'OTHER' | string;
+  country: string | null;
+  linked_class_society_ref: string | null;
+  is_active: boolean;
 }
 
 export interface ExternalAuditCloseoutPayload {
@@ -74,8 +191,12 @@ export interface ExternalCertLinkPayload {
 }
 
 function cleanAuditRegistrationPayload(data: AuditRegistrationPayload) {
+  const { external_report_file: _externalReportFile, ...registrationData } = data as AuditRegistrationPayload & {
+    external_report_file?: File;
+  };
+
   return {
-    ...data,
+    ...registrationData,
     audit_plan_id: 'audit_plan_id' in data ? data.audit_plan_id || null : null,
     audit_end_date: data.audit_end_date || null,
     opening_meeting_at: 'opening_meeting_at' in data ? data.opening_meeting_at || null : null,
@@ -101,11 +222,44 @@ function cleanAuditRegistrationPayload(data: AuditRegistrationPayload) {
         : [],
     ...(data.audit_classification === 'EXTERNAL'
       ? {
+          external_audit_org_id: data.external_audit_org_id || null,
           cycle_year: data.cycle_year || null,
           external_report_file_size: data.external_report_file_size || null,
         }
       : {}),
   };
+}
+
+function getExternalReportFile(data: AuditRegistrationPayload): File | undefined {
+  if (data.audit_classification !== 'EXTERNAL' || !('external_report_file' in data)) {
+    return undefined;
+  }
+  return data.external_report_file;
+}
+
+function buildAuditRegistrationFormData(data: AuditRegistrationPayload, externalReportFile: File): FormData {
+  const formData = new FormData();
+  const payload = cleanAuditRegistrationPayload(data);
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null) {
+          formData.append(key, typeof item === 'object' ? JSON.stringify(item) : String(item));
+        }
+      });
+      return;
+    }
+
+    formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+  });
+
+  formData.append('external_report_file', externalReportFile);
+  return formData;
 }
 
 function cleanAuditPlanPayload(data: AuditPlanFormData) {
@@ -130,9 +284,28 @@ function cleanAuditPlanAdditionalPayload(data: AuditPlanAdditionalData) {
 export async function createAuditRegistration(
   data: AuditRegistrationPayload
 ): Promise<AuditRegistrationResponse> {
+  const externalReportFile = getExternalReportFile(data);
+  if (externalReportFile) {
+    const response = await apiClient.post<AuditApiResponse<AuditRegistrationResponse>>(
+      `${API_BASE_URL}/api/audit/audits/`,
+      buildAuditRegistrationFormData(data, externalReportFile),
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    );
+    return response.data.data;
+  }
+
   const response = await apiClient.post<AuditApiResponse<AuditRegistrationResponse>>(
     `${API_BASE_URL}/api/audit/audits/`,
     cleanAuditRegistrationPayload(data)
+  );
+  return response.data.data;
+}
+
+export async function getRegisteredAudits(): Promise<RegisteredAuditList> {
+  const response = await apiClient.get<AuditApiResponse<RegisteredAuditList>>(
+    `${API_BASE_URL}/api/audit/audits/`
   );
   return response.data.data;
 }
@@ -148,6 +321,114 @@ export async function getAuditPlans(isAdditional?: boolean): Promise<AuditPlanLi
 export async function getAuditVessels(): Promise<AuditVesselOption[]> {
   const response = await apiClient.get<AuditApiResponse<AuditVesselOption[]>>(
     `${API_BASE_URL}/api/audit/vessels/`
+  );
+  return response.data.data;
+}
+
+export async function getAuditQualifiedAuditors(params?: {
+  standards?: string;
+  target_office_dept?: string;
+  eligible?: boolean;
+  include_inactive?: boolean;
+}): Promise<AuditMasterList<AuditQualifiedAuditor>> {
+  const response = await apiClient.get<AuditApiResponse<AuditMasterList<AuditQualifiedAuditor>>>(
+    `${API_BASE_URL}/api/audit/masters/qualified-auditors/`,
+    {
+      params: {
+        ...params,
+        eligible: params?.eligible ? 'true' : undefined,
+        include_inactive: params?.include_inactive ? 'true' : undefined,
+      },
+    }
+  );
+  return response.data.data;
+}
+
+export async function getAuditOfficeUsers(): Promise<AuditMasterList<AuditOfficeUserOption>> {
+  const response = await apiClient.get<AuditApiResponse<AuditMasterList<AuditOfficeUserOption>>>(
+    `${API_BASE_URL}/api/audit/masters/office-users/`
+  );
+  return response.data.data;
+}
+
+export async function getAuditQualifyingBodies(
+  includeInactive = false
+): Promise<AuditMasterList<AuditQualifyingBody>> {
+  const response = await apiClient.get<AuditApiResponse<AuditMasterList<AuditQualifyingBody>>>(
+    `${API_BASE_URL}/api/audit/masters/qualifying-bodies/`,
+    { params: includeInactive ? { include_inactive: 'true' } : undefined }
+  );
+  return response.data.data;
+}
+
+export async function createAuditQualifyingBody(
+  data: AuditQualifyingBodyPayload
+): Promise<AuditQualifyingBody> {
+  const response = await apiClient.post<AuditApiResponse<AuditQualifyingBody>>(
+    `${API_BASE_URL}/api/audit/masters/qualifying-bodies/`,
+    data
+  );
+  return response.data.data;
+}
+
+export async function updateAuditQualifyingBody(
+  id: string,
+  data: Partial<AuditQualifyingBodyPayload>
+): Promise<AuditQualifyingBody> {
+  const response = await apiClient.patch<AuditApiResponse<AuditQualifyingBody>>(
+    `${API_BASE_URL}/api/audit/masters/qualifying-bodies/${id}/`,
+    data
+  );
+  return response.data.data;
+}
+
+export async function createAuditQualifiedAuditor(
+  data: AuditQualifiedAuditorPayload
+): Promise<AuditQualifiedAuditor> {
+  const response = await apiClient.post<AuditApiResponse<AuditQualifiedAuditor>>(
+    `${API_BASE_URL}/api/audit/masters/qualified-auditors/`,
+    data
+  );
+  return response.data.data;
+}
+
+export async function updateAuditQualifiedAuditor(
+  id: string,
+  data: Partial<AuditQualifiedAuditorPayload>
+): Promise<AuditQualifiedAuditor> {
+  const response = await apiClient.patch<AuditApiResponse<AuditQualifiedAuditor>>(
+    `${API_BASE_URL}/api/audit/masters/qualified-auditors/${id}/`,
+    data
+  );
+  return response.data.data;
+}
+
+export async function getAuditHodCoverage(): Promise<AuditMasterList<AuditHodAssignment>> {
+  const response = await apiClient.get<AuditApiResponse<AuditMasterList<AuditHodAssignment>>>(
+    `${API_BASE_URL}/api/audit/admin/hod-coverage/`
+  );
+  return response.data.data;
+}
+
+export async function getAuditExternalAuditOrgs(): Promise<AuditMasterList<AuditExternalAuditOrg>> {
+  const response = await apiClient.get<AuditApiResponse<AuditMasterList<AuditExternalAuditOrg>>>(
+    `${API_BASE_URL}/api/audit/masters/external-audit-orgs/`
+  );
+  return response.data.data;
+}
+
+export async function createAuditHodAssignment(data: AuditHodAssignmentPayload): Promise<AuditHodAssignment> {
+  const response = await apiClient.post<AuditApiResponse<AuditHodAssignment>>(
+    `${API_BASE_URL}/api/audit/admin/hod-coverage/`,
+    data
+  );
+  return response.data.data;
+}
+
+export async function expireAuditHodAssignment(id: string): Promise<AuditHodAssignment> {
+  const response = await apiClient.post<AuditApiResponse<AuditHodAssignment>>(
+    `${API_BASE_URL}/api/audit/admin/hod-coverage/${id}/expire/`,
+    {}
   );
   return response.data.data;
 }
@@ -283,22 +564,41 @@ export async function getAuditChecklist(id: string): Promise<AuditChecklist> {
   return response.data.data;
 }
 
-function cleanFindingPayload(data: AuditFindingCreateFormData) {
+function cleanFindingPayload(data: AuditFindingCreatePayload) {
+  const { evidence_files: _evidenceFiles, ...payloadData } = data;
   return {
-    ...data,
-    nc_category: data.finding_type === 'NC' ? data.nc_category : '',
-    observation_category: data.finding_type === 'OBSERVATION' ? data.observation_category : '',
-    checklist_item_id: data.checklist_item_id || null,
-    certificate_impact: data.certificate_impact || '',
-    certificates_at_risk: data.finding_type === 'NC' ? data.certificates_at_risk || '' : '',
-    is_fleetwide_relevance: data.finding_type === 'NC' ? data.is_fleetwide_relevance : false,
-    clauses: data.clauses.map((clause) => ({
+    ...payloadData,
+    nc_category: payloadData.finding_type === 'NC' ? payloadData.nc_category : '',
+    observation_category: payloadData.finding_type === 'OBSERVATION' ? payloadData.observation_category : '',
+    checklist_item_id: payloadData.checklist_item_id || null,
+    original_due_date: payloadData.original_due_date || null,
+    certificates_at_risk: payloadData.certificates_at_risk || '',
+    is_fleetwide_relevance: payloadData.finding_type === 'NC' ? payloadData.is_fleetwide_relevance : false,
+    clauses: payloadData.clauses.map((clause) => ({
       ...clause,
       rule_clause_id: clause.rule_clause_id || null,
       clause_ref_text: clause.clause_ref_text || '',
       clause_subref_text: clause.clause_subref_text || '',
     })),
   };
+}
+
+function buildAuditFindingFormData(data: AuditFindingCreatePayload): FormData {
+  const formData = new FormData();
+  const payload = cleanFindingPayload(data);
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+    formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+  });
+
+  (data.evidence_files || []).forEach((file) => {
+    formData.append('evidence_files', file);
+  });
+
+  return formData;
 }
 
 export async function issueAuditFindingCircular(findingId: string): Promise<AuditIssueCircularResponse> {
@@ -311,8 +611,19 @@ export async function issueAuditFindingCircular(findingId: string): Promise<Audi
 
 export async function createAuditFinding(
   id: string,
-  data: AuditFindingCreateFormData
+  data: AuditFindingCreatePayload
 ): Promise<AuditFindingCreateResponse> {
+  if (data.evidence_files?.length) {
+    const response = await apiClient.post<AuditApiResponse<AuditFindingCreateResponse>>(
+      `${API_BASE_URL}/api/audit/audits/${id}/findings/`,
+      buildAuditFindingFormData(data),
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    );
+    return response.data.data;
+  }
+
   const response = await apiClient.post<AuditApiResponse<AuditFindingCreateResponse>>(
     `${API_BASE_URL}/api/audit/audits/${id}/findings/`,
     cleanFindingPayload(data)
@@ -462,20 +773,30 @@ export const auditApi = {
   createAdditionalAuditPlan,
   createAuditPlan,
   createAuditFinding,
+  createAuditHodAssignment,
+  createAuditQualifyingBody,
+  createAuditQualifiedAuditor,
   createAuditRegistration,
   confirmExternalAuditCloseout,
   draftAuditNcForVessel,
   editExternalAuditCertLinks,
+  expireAuditHodAssignment,
+  getRegisteredAudits,
   getAuditClauseMaster,
   getAuditChecklist,
   getAuditNcClosure,
   getAuditObsClosure,
   getAuditPlan,
   getAuditPlans,
+  getAuditQualifyingBodies,
+  getAuditQualifiedAuditors,
+  getAuditOfficeUsers,
+  getAuditHodCoverage,
   getAuditVessels,
   getAuditRcaTemplates,
   issueAuditFindingCircular,
   getAuditDetail,
+  getAuditExternalAuditOrgs,
   getFailedAuditNotifications,
   getAuditScanValidationQueue,
   markAuditNotificationOffline,
@@ -490,5 +811,7 @@ export const auditApi = {
   updateAuditObsPart,
   updateAuditDetail,
   updateAuditPlan,
+  updateAuditQualifyingBody,
+  updateAuditQualifiedAuditor,
   updateAuditScorecard,
 };

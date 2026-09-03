@@ -134,7 +134,8 @@ describe('ExternalAuditCloseoutPage', () => {
     render(<ExternalAuditCloseoutPage auditId="11111111-1111-4111-8111-111111111111" />);
 
     expect(screen.getByRole('heading', { name: 'External Audit' })).toBeInTheDocument();
-    expect(screen.getByText(/CLASS_SOCIETY - SMC_RENEWAL/i)).toBeInTheDocument();
+    expect(screen.getByText(/Class Society - SMC Renewal/i)).toBeInTheDocument();
+    expect(screen.queryByText(/CLASS_SOCIETY - SMC_RENEWAL/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/certificate impact/i), { target: { value: 'SUSPENDED' } });
     fireEvent.change(screen.getByLabelText(/typed certificate number/i), { target: { value: 'SMC-2026-001' } });

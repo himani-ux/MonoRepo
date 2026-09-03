@@ -4,6 +4,7 @@ import os
 import unittest
 import uuid
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import django
@@ -156,13 +157,153 @@ class AuditFindingServiceTests(unittest.TestCase):
         self.assertEqual(CAR.objects.count(), 1)
         self.assertEqual(result.finding.psc_deficiency_id, result.deficiency.id.hex)
         self.assertEqual(result.deficiency.car_id, result.car.id)
-        self.assertTrue(result.car.car_number.startswith(f"TST-PSC-{timezone.now().year}-"))
+        self.assertEqual(result.deficiency.def_code_id, "00000")
+        self.assertEqual(result.deficiency.def_code, "00000")
+        self.assertIsNone(result.deficiency.action_code_id)
+        self.assertIsNone(result.deficiency.action_code)
+        self.assertTrue(result.car.car_number.startswith(f"TST-AUDIT-{timezone.now().year}-"))
         self.assertEqual(result.car.status, "ALLOTTED")
         self.assertEqual(ActivityHistory.objects.filter(event_type="CAR_CREATED").count(), 1)
         self.assertEqual(AuditFindingClause.objects.count(), 1)
         self.assertEqual(result.finding.rule_book_type, "ISM")
         self.assertEqual(result.finding.rule_clause_id, self.ism_clause.id)
         self.assertEqual(result.finding.clause_ref_text, "ISM 10.2")
+
+    def test_sql_server_clause_lookup_casts_rule_clause_id(self) -> None:
+        raw_calls = []
+
+        def raw_clause_lookup(sql, params):
+            raw_calls.append((sql, params))
+            return [self.ism_clause]
+
+        unsafe_lookup = AssertionError("Rule clause lookup must cast UUID values for SQL Server.")
+        with (
+            patch(
+                "apps.inspection.audit.services.finding.connection",
+                SimpleNamespace(vendor="microsoft"),
+                create=True,
+            ),
+            patch.object(MasterIsmClause.objects, "filter", side_effect=unsafe_lookup),
+            patch.object(MasterIsmClause.objects, "get", side_effect=unsafe_lookup),
+            patch.object(MasterIsmClause.objects, "raw", side_effect=raw_clause_lookup),
+            patch(
+                "apps.inspection.audit.services.finding._create_audit_finding_row",
+                side_effect=lambda **values: AuditFinding.objects.create(**values),
+            ),
+            patch(
+                "apps.inspection.audit.services.finding._create_audit_finding_clause_row",
+                side_effect=lambda **values: AuditFindingClause.objects.create(**values),
+            ),
+        ):
+            result = create_audit_finding(
+                audit_detail_id=self.audit_detail.id,
+                finding_type="NC",
+                nc_category="MINOR_NC",
+                description="Fire door self-closing device was not functioning.",
+                objective_evidence="Observed at deck 3 during accommodation round.",
+                def_code_id="10101",
+                clauses=[
+                    {
+                        "rule_book_type": "ISM",
+                        "rule_clause_id": self.ism_clause.id,
+                        "is_primary": True,
+                    }
+                ],
+                created_by="auditor-1",
+            )
+
+        self.assertTrue(result.created)
+        self.assertEqual(len(raw_calls), 1)
+        sql, params = raw_calls[0]
+        self.assertIn(f"FROM dbo.{MasterIsmClause._meta.db_table}", sql)
+        self.assertIn("id = CAST(%s AS uniqueidentifier)", sql)
+        self.assertEqual(params, [str(self.ism_clause.id)])
+        self.assertEqual(result.finding.clause_ref_text, "ISM 10.2")
+
+    def test_sql_server_finding_and_clause_insert_cast_uuid_columns(self) -> None:
+        cursor_calls = []
+
+        class RecordingConnection:
+            vendor = "microsoft"
+
+            def cursor(self):
+                return RecordingCursor()
+
+        class RecordingCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def execute(self, sql, params=None):
+                cursor_calls.append((sql, params or []))
+
+        legacy_deficiency_key = None
+
+        def raw_finding_lookup(sql, params):
+            nonlocal legacy_deficiency_key
+            finding_id = uuid.UUID(params[0])
+            legacy_deficiency_key = legacy_deficiency_key or uuid.uuid4().hex
+            return [
+                AuditFinding(
+                    id=finding_id,
+                    psc_deficiency_id=legacy_deficiency_key,
+                    audit_detail_id=self.audit_detail.id,
+                    audit_classification=self.audit_detail.audit_classification,
+                    finding_type="NC",
+                    nc_category="MINOR_NC",
+                    rule_book_type="ISM",
+                    rule_clause_id=self.ism_clause.id,
+                    clause_ref_text="ISM 10.2",
+                    description="Fire door self-closing device was not functioning.",
+                    priority="MEDIUM",
+                    created_by="auditor-1",
+                    created_date=timezone.now(),
+                    is_deleted=False,
+                )
+            ]
+
+        unsafe_create = AssertionError("SQL Server Audit finding inserts must cast UUID values.")
+        with (
+            patch(
+                "apps.inspection.audit.services.finding.connection",
+                RecordingConnection(),
+            ),
+            patch.object(MasterIsmClause.objects, "raw", return_value=[self.ism_clause]),
+            patch.object(AuditFinding.objects, "create", side_effect=unsafe_create),
+            patch.object(AuditFindingClause.objects, "create", side_effect=unsafe_create),
+            patch.object(AuditFinding.all_objects, "raw", side_effect=raw_finding_lookup),
+        ):
+            result = create_audit_finding(
+                audit_detail_id=self.audit_detail.id,
+                finding_type="NC",
+                nc_category="MINOR_NC",
+                description="Fire door self-closing device was not functioning.",
+                objective_evidence="Observed at deck 3 during accommodation round.",
+                def_code_id="10101",
+                clauses=[
+                    {
+                        "rule_book_type": "ISM",
+                        "rule_clause_id": self.ism_clause.id,
+                        "is_primary": True,
+                    }
+                ],
+                created_by="auditor-1",
+            )
+
+        self.assertTrue(result.created)
+        insert_sql = "\n".join(sql for sql, _params in cursor_calls)
+        self.assertIn("INSERT INTO dbo.audit_finding", insert_sql)
+        self.assertIn("INSERT INTO dbo.audit_finding_clause", insert_sql)
+        self.assertIn("[audit_detail_id]", insert_sql)
+        self.assertIn("[audit_finding_id]", insert_sql)
+        self.assertIn("[rule_clause_id]", insert_sql)
+        self.assertGreaterEqual(insert_sql.count("CAST(%s AS uniqueidentifier)"), 5)
+
+        flattened_params = [str(param) for _sql, params in cursor_calls for param in params if param is not None]
+        self.assertIn(str(self.audit_detail.id), flattened_params)
+        self.assertIn(str(self.ism_clause.id), flattened_params)
 
     def test_create_finding_persists_multi_clause_with_one_primary_mirror(self) -> None:
         result = create_audit_finding(

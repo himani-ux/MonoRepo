@@ -203,7 +203,7 @@ The source contains the controls expected by JOURNEY-3, but the rerun report rec
 Source evidence:
 
 ```text
-psc-frontend/src/components/audit/audit-detail/audit-detail-page.tsx:259:Submit Report
+psc-frontend/src/components/audit/audit-detail/audit-detail-page.tsx:259:Submit Audit Report
 psc-frontend/src/components/audit/audit-detail/audit-detail-page.tsx:265:Vessel Acknowledge Audit Report
 psc-frontend/src/components/audit/audit-detail/audit-detail-page.tsx:341:data-eid="MOCKUP-AUDIT-02:detail.scorecard_grid"
 psc-frontend/src/components/audit/audit-detail/audit-detail-page.tsx:361:Save Scorecard

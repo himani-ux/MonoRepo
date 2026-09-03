@@ -1,4 +1,27 @@
-const CIRCULAR_FILE_BASE_URL = "";
+import { API_BASE_URL } from '@/lib/utils/constants';
+
+const DEFAULT_LOCAL_API_BASE_URL = "http://localhost:8000";
+
+const getCircularFileBaseUrl = () => {
+  const apiBaseUrl = API_BASE_URL.replace(/\/+$/, "");
+
+  if (typeof window === "undefined") {
+    return apiBaseUrl;
+  }
+
+  const currentOrigin = window.location.origin.replace(/\/+$/, "");
+  const currentHost = window.location.hostname;
+
+  if (
+    apiBaseUrl === DEFAULT_LOCAL_API_BASE_URL &&
+    currentHost !== "localhost" &&
+    currentHost !== "127.0.0.1"
+  ) {
+    return "";
+  }
+
+  return apiBaseUrl === currentOrigin ? "" : apiBaseUrl;
+};
 
 export const buildCircularAttachmentUrl = (attachmentUrl) => {
   if (!attachmentUrl) {
@@ -14,8 +37,8 @@ export const buildCircularAttachmentUrl = (attachmentUrl) => {
     .replace(/^\/+/, "/");
 
   if (normalizedPath.startsWith("/")) {
-    return `${CIRCULAR_FILE_BASE_URL}${normalizedPath}`;
+    return `${getCircularFileBaseUrl()}${normalizedPath}`;
   }
 
-  return `${CIRCULAR_FILE_BASE_URL}/${normalizedPath}`;
+  return `${getCircularFileBaseUrl()}/${normalizedPath}`;
 };

@@ -1,5 +1,6 @@
 """Audit plan register API views."""
 
+import logging
 import uuid
 
 from django.db import connection, transaction
@@ -20,6 +21,7 @@ from apps.inspection.audit.permissions import (
     HasAnyAuditProcessPermission,
     audit_process_ids_for_request,
     is_office_user,
+    is_vessel_user,
     normalized_audit_role,
 )
 from apps.inspection.audit.serializers.plan import (
@@ -42,6 +44,9 @@ from apps.inspection.audit.services.notification_dispatcher import dispatch_audi
 from apps.inspection.audit.services.vessels import audit_vessel_label_map
 
 
+logger = logging.getLogger(__name__)
+
+
 def _forbidden(message: str) -> Response:
     return Response(
         {
@@ -60,12 +65,73 @@ def _user_id(user: object) -> str:
     return str(getattr(user, "id", "") or getattr(user, "username", "") or "system")
 
 
+def _user_vessel_uuid(user: object) -> uuid.UUID | None:
+    vessel_id = getattr(user, "vessel_id", None)
+    if vessel_id in (None, ""):
+        return None
+    try:
+        return uuid.UUID(str(vessel_id))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
 def _is_dpa_user(user: object) -> bool:
     return normalized_audit_role(user) == "DPA"
 
 
 def _plan_queryset():
     return MasterAuditPlan.objects.order_by("planned_window_end", "planned_window_start", "id")
+
+
+def _plan_status_filter(request) -> str | None:
+    status_filter = request.query_params.get("status")
+    return status_filter.strip().upper() if status_filter else None
+
+
+def _plan_additional_filter(request) -> bool | None:
+    additional_filter = request.query_params.get("is_additional")
+    if additional_filter is None:
+        return None
+    return additional_filter.strip().lower() in {"1", "true", "yes"}
+
+
+def _apply_plan_list_filters(queryset, *, status_filter: str | None, additional_filter: bool | None):
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+    if additional_filter is not None:
+        queryset = queryset.filter(is_additional=additional_filter)
+    return queryset
+
+
+def _sql_server_vessel_plan_rows(
+    *,
+    vessel_uuid: uuid.UUID,
+    status_filter: str | None,
+    additional_filter: bool | None,
+) -> list[MasterAuditPlan]:
+    where_clauses = [
+        "target_vessel_id = CAST(%s AS uniqueidentifier)",
+        "is_deleted = 0",
+    ]
+    params: list[object] = [str(vessel_uuid)]
+    if status_filter:
+        where_clauses.append("status = %s")
+        params.append(status_filter)
+    if additional_filter is not None:
+        where_clauses.append("is_additional = %s")
+        params.append(1 if additional_filter else 0)
+
+    return list(
+        MasterAuditPlan.objects.raw(
+            f"""
+            SELECT *
+            FROM dbo.master_audit_plan
+            WHERE {' AND '.join(where_clauses)}
+            ORDER BY planned_window_end, planned_window_start, id
+            """,
+            params,
+        )
+    )
 
 
 def _serialize_plan(plan: MasterAuditPlan):
@@ -109,18 +175,37 @@ class AuditPlanListCreateView(APIView):
     permission_classes = [IsAuthenticated, HasAnyAuditProcessPermission.requiring_any(*AUDIT_GATE_IDS)]
 
     def get(self, request):
-        if not is_office_user(request.user):
-            return _forbidden("Audit plan register is restricted to office users.")
+        status_filter = _plan_status_filter(request)
+        additional_filter = _plan_additional_filter(request)
 
-        queryset = _plan_queryset()
-        status_filter = request.query_params.get("status")
-        if status_filter:
-            queryset = queryset.filter(status=status_filter.strip().upper())
-        additional_filter = request.query_params.get("is_additional")
-        if additional_filter is not None:
-            queryset = queryset.filter(is_additional=additional_filter.strip().lower() in {"1", "true", "yes"})
+        if is_vessel_user(request.user):
+            vessel_uuid = _user_vessel_uuid(request.user)
+            if vessel_uuid is None:
+                plans = []
+            elif connection.vendor == "microsoft":
+                plans = _sql_server_vessel_plan_rows(
+                    vessel_uuid=vessel_uuid,
+                    status_filter=status_filter,
+                    additional_filter=additional_filter,
+                )
+            else:
+                queryset = _apply_plan_list_filters(
+                    _plan_queryset().filter(target_vessel_id=vessel_uuid),
+                    status_filter=status_filter,
+                    additional_filter=additional_filter,
+                )
+                plans = list(queryset)
+        elif not is_office_user(request.user):
+            return _forbidden("Audit plan register is available only to office users or vessel users.")
+        else:
+            queryset = _apply_plan_list_filters(
+                _plan_queryset(),
+                status_filter=status_filter,
+                additional_filter=additional_filter,
+            )
+            plans = list(queryset)
 
-        rows = _serialize_plans(list(queryset))
+        rows = _serialize_plans(plans)
         return Response({"data": {"count": len(rows), "results": rows}})
 
     def post(self, request):
@@ -134,7 +219,7 @@ class AuditPlanListCreateView(APIView):
         with transaction.atomic():
             plan = serializer.save(created_by=_user_id(request.user))
             if plan.status == "CONFIRMED":
-                _dispatch_plan_notification(plan, "AUDIT_SCHEDULED")
+                _dispatch_plan_notification_after_commit(plan, "AUDIT_SCHEDULED")
         return Response(
             {
                 "data": _serialize_plan(plan),
@@ -178,7 +263,7 @@ class AuditPlanDetailView(APIView):
                 updated_date=timezone.now(),
             )
             if previous_status != "CONFIRMED" and updated_plan.status == "CONFIRMED":
-                _dispatch_plan_notification(updated_plan, "AUDIT_SCHEDULED")
+                _dispatch_plan_notification_after_commit(updated_plan, "AUDIT_SCHEDULED")
         return Response({"data": _serialize_plan(updated_plan)})
 
     def _get_plan(self, id):
@@ -359,3 +444,17 @@ def _dispatch_plan_notification(plan: MasterAuditPlan, notification_type: str) -
         vessel_id=plan.target_vessel_id,
         office_dept=plan.target_office_dept,
     )
+
+
+def _dispatch_plan_notification_after_commit(plan: MasterAuditPlan, notification_type: str) -> None:
+    def dispatch() -> None:
+        try:
+            _dispatch_plan_notification(plan, notification_type)
+        except Exception:
+            logger.exception(
+                "Audit plan notification dispatch failed after plan save. plan_id=%s notification_type=%s",
+                plan.id,
+                notification_type,
+            )
+
+    transaction.on_commit(dispatch)

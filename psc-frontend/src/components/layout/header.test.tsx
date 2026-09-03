@@ -103,6 +103,7 @@ describe('Header', () => {
 
     expect(screen.getByRole('banner')).toHaveClass('shadow-sm');
     expect(screen.getByLabelText('VIMS Home')).toHaveClass('rounded-xl');
+    expect(screen.getByLabelText('VIMS Home').querySelector('img[src="/icons/ksm-icon-192x192.png"]')).toBeTruthy();
     expect(screen.getByText('Vessel Inspection Management System')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /notifications/i })).toHaveClass('rounded-full');
   });

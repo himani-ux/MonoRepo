@@ -445,8 +445,9 @@ class PSCAuthenticationBackend(BaseBackend):
             role = self._determine_vessel_role(rank_name)
 
             # Permissions from msc_profiles (ship-side)
-            from .utils import get_profile_permissions
+            from .utils import get_profile_permissions, merge_audit_default_process_ids
             form_ids, process_ids = get_profile_permissions(rank_name, work_side=True)
+            process_ids = merge_audit_default_process_ids(process_ids, rank_name, role)
 
             # 🔹 Step 4: Get latest onboarding record
             onboarding = CrewOnboardingHistory.objects.filter(
@@ -574,7 +575,12 @@ class PSCAuthenticationBackend(BaseBackend):
                 profile_name=user.employee_role,
             )
 
-            from .utils import get_profile_permissions, get_office_permissions_by_mapping, get_office_profile_id_by_mapping
+            from .utils import (
+                get_profile_permissions,
+                get_office_permissions_by_mapping,
+                get_office_profile_id_by_mapping,
+                merge_audit_default_process_ids,
+            )
             form_ids, process_ids = get_office_permissions_by_mapping(
                 username=username,
                 employee_id=user.employee_id,
@@ -589,6 +595,8 @@ class PSCAuthenticationBackend(BaseBackend):
                 employee_id=user.employee_id,
                 profile_name=user.employee_role,
             )
+            role_default = role if role == RoleCodes.DPA else None
+            process_ids = merge_audit_default_process_ids(process_ids, user.employee_role, role_default)
 
             authenticated_user = AuthenticatedUser(
                 user_id=str(user.employee_id),
@@ -668,7 +676,7 @@ class PSCAuthenticationBackend(BaseBackend):
 
         rank = rank_name.strip().upper()
 
-        if rank in ["MASTER", "CAPTAIN"]:
+        if rank in ["MASTER", "CAPTAIN", "ACTING MASTER"]:
             return RoleCodes.VESSEL_MASTER
 
         return RoleCodes.VESSEL_CREW

@@ -111,7 +111,11 @@ class AuditPermissionTests(unittest.TestCase):
         self.assertEqual(default_audit_gates_for_designation("Conductor"), frozenset())
         self.assertEqual(default_audit_gates_for_designation("Office Supt"), frozenset({AUDIT_P_004, AUDIT_P_007}))
         self.assertEqual(default_audit_gates_for_designation("Fleet Manager"), frozenset({AUDIT_P_016}))
-        self.assertEqual(default_audit_gates_for_designation("Master"), frozenset({AUDIT_P_008, AUDIT_P_017}))
+        self.assertEqual(default_audit_gates_for_designation("Master"), frozenset({AUDIT_P_008, AUDIT_P_013, AUDIT_P_017}))
+        self.assertEqual(
+            default_audit_gates_for_designation("Acting Master"),
+            frozenset({AUDIT_P_008, AUDIT_P_013, AUDIT_P_017}),
+        )
         self.assertEqual(default_audit_gates_for_designation("HoD"), frozenset())
 
     def test_process_permission_reads_user_auth_and_json_claims(self) -> None:
@@ -144,6 +148,11 @@ class AuditPermissionTests(unittest.TestCase):
         unmapped_user = make_user(role="PHYSICAL_VERIFIER", role_name="PHYSICAL_VERIFIER", process_ids=[])
         self.assertFalse(has_audit_process_id(unmapped_user, AUDIT_P_018))
         self.assertFalse(HasAuditProcessPermission.requiring(AUDIT_P_018)().has_permission(make_request(unmapped_user), None))
+
+        master_user = make_user(role="VESSEL_MASTER", user_type="VESSEL", role_name="MASTER", process_ids=[])
+        self.assertTrue(has_audit_process_id(master_user, AUDIT_P_013))
+        self.assertTrue(HasAuditProcessPermission.requiring(AUDIT_P_013)().has_permission(make_request(master_user), None))
+        self.assertFalse(HasAuditProcessPermission.requiring(AUDIT_P_014)().has_permission(make_request(master_user), None))
 
     def test_per_audit_assignments_grant_only_assigned_record_gates(self) -> None:
         assigned_audit = SimpleNamespace(

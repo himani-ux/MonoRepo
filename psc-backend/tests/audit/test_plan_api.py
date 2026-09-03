@@ -42,6 +42,7 @@ from apps.accounts.models import RoleCodes  # noqa: E402
 from apps.inspection.models import Inspection  # noqa: E402
 from apps.inspection.audit.models import MasterAuditPlan, MasterAuditQualifiedAuditor  # noqa: E402
 from apps.inspection.audit.permissions import AUDIT_P_001, AUDIT_P_002, AUDIT_P_005, AUDIT_P_006  # noqa: E402
+from apps.inspection.audit.services import vessels as vessel_service  # noqa: E402
 from apps.inspection.audit.views import plan as plan_views  # noqa: E402
 from apps.inspection.audit.serializers import plan as plan_serializers  # noqa: E402
 from apps.inspection.audit.views import (  # noqa: E402
@@ -256,6 +257,35 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertEqual(list_response.data["data"]["results"][0]["lead_auditor_company"], "KSM")
         self.assertEqual(list_response.data["data"]["results"][0]["lead_auditor_qual"], "ISM Lead Auditor")
 
+    def test_vessel_master_can_list_own_vessel_plans_for_dashboard(self) -> None:
+        own_plan = MasterAuditPlan.objects.create(
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="CONFIRMED",
+            created_by="seq-1",
+        )
+        MasterAuditPlan.objects.create(
+            target_vessel_id=uuid.uuid4(),
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 6, 1),
+            planned_window_end=date(2026, 10, 1),
+            status="CONFIRMED",
+            created_by="seq-1",
+        )
+        master = make_user(role=RoleCodes.VESSEL_MASTER, user_type="VESSEL", process_ids=[])
+        master.role_name = "MASTER"
+        master.vessel_id = str(self.vessel_id)
+
+        response = self._list_plans(master)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["count"], 1)
+        self.assertEqual(response.data["data"]["results"][0]["id"], str(own_plan.id))
+
     def test_plan_lead_auditor_snapshot_does_not_use_scope_as_designation(self) -> None:
         user = make_user(process_ids=[AUDIT_P_001])
 
@@ -299,9 +329,37 @@ class AuditPlanApiTests(unittest.TestCase):
                     "id": str(self.vessel_id),
                     "vessel_code": "EAT",
                     "vessel_name": "EAST AYUTTHAYA",
+                    "top_rank_personnel": [],
                 }
             ],
         )
+
+    def test_vessel_option_endpoint_includes_top_rank_personnel_for_registration(self) -> None:
+        user = make_user(role="DPA", process_ids=[AUDIT_P_001])
+        personnel = [
+            {
+                "crew_id": "MASTER-1",
+                "crew_name": "Capt. Arun Rao",
+                "rank_code": "MASTER",
+                "rank_name": "Master",
+            },
+            {
+                "crew_id": "CO-1",
+                "crew_name": "Priya Menon",
+                "rank_code": "CO",
+                "rank_name": "Chief Officer",
+            },
+        ]
+
+        with patch.object(
+            vessel_service,
+            "_lookup_top_rank_personnel",
+            return_value={str(self.vessel_id).lower(): personnel},
+        ):
+            response = self._list_vessels(user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"][0]["top_rank_personnel"], personnel)
 
     def test_patch_plan_updates_editable_register_fields(self) -> None:
         user = make_user(process_ids=[AUDIT_P_001, AUDIT_P_002])
@@ -358,6 +416,35 @@ class AuditPlanApiTests(unittest.TestCase):
         self.assertIs(fetched, plan)
         self.assertIn("CAST(%s AS uniqueidentifier)", sql)
         self.assertEqual(params, [str(plan.id)])
+
+    def test_mssql_vessel_plan_list_casts_vessel_uuid_filter(self) -> None:
+        plan = MasterAuditPlan(
+            id=uuid.UUID("a1170000-0000-0000-0000-000000000001"),
+            target_vessel_id=self.vessel_id,
+            audit_classification="INTERNAL",
+            audit_standards_csv="ISM",
+            planned_window_start=date(2026, 5, 1),
+            planned_window_end=date(2026, 9, 1),
+            status="CONFIRMED",
+            created_by="seq-1",
+        )
+        master = make_user(role=RoleCodes.VESSEL_MASTER, user_type="VESSEL", process_ids=[])
+        master.role_name = "MASTER"
+        master.vessel_id = str(self.vessel_id)
+
+        with (
+            patch("apps.inspection.audit.views.plan.connection", SimpleNamespace(vendor="microsoft")),
+            patch.object(MasterAuditPlan.objects, "raw", return_value=[plan]) as mock_raw,
+        ):
+            response = self._list_plans(master, "?status=confirmed&is_additional=false")
+
+        sql, params = mock_raw.call_args.args
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("target_vessel_id = CAST(%s AS uniqueidentifier)", sql)
+        self.assertIn("status = %s", sql)
+        self.assertIn("is_additional = %s", sql)
+        self.assertEqual(params, [str(self.vessel_id), "CONFIRMED", 0])
+        self.assertEqual(response.data["data"]["results"][0]["id"], str(plan.id))
 
     def test_mssql_plan_create_casts_uuid_insert_fields(self) -> None:
         recording_connection = RecordingConnection()

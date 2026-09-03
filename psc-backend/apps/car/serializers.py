@@ -120,36 +120,21 @@ def _resolve_pic_review_comment_value(
     """
     Resolve the correct PIC review comment for detail/report output.
 
-    Prefer the dedicated CAR.pic_comment field unless it was clearly overwritten
-    by a later workflow action. Activity-history comments are capped by the
-    500-char event_description column, so they can be truncated for long input.
+    Prefer the dedicated CAR.pic_comment field. For legacy rows created before
+    SUBMIT_TO_DPA wrote pic_comment, fall back to the submit action comment.
+    Activity-history comments are capped by the 500-char event_description
+    column, so they can be truncated and are the final fallback.
     """
     stored = (stored_comment or '').strip()
     review = (review_comment or '').strip()
-    if not review:
-        return stored or None
-    if not stored:
-        return review
-    if stored == review:
-        return stored
-
-    # Long comments can be truncated in psc_activity_history.event_description.
-    if stored.startswith(review) and len(stored) > len(review):
-        return stored
-    if review.startswith(stored) and len(review) > len(stored):
-        return review
-
+    latest = (last_action_comment or '').strip()
     normalized_last_action = str(last_action or '').strip().upper()
-    latest_comment = (last_action_comment or '').strip()
-    if (
-        normalized_last_action
-        and normalized_last_action != 'START_PIC_REVIEW'
-        and latest_comment
-        and latest_comment == stored
-    ):
-        return review
 
-    return stored
+    if stored:
+        return stored
+    if normalized_last_action == 'SUBMIT_TO_DPA' and latest:
+        return latest
+    return review or None
 
 
 def _lookup_def_code_title(def_code_id: str | None) -> str | None:
@@ -836,7 +821,7 @@ class CARDetailSerializer(serializers.ModelSerializer):
         return None
 
     def get_pic_comment(self, obj):
-        """Return the PIC review comment, not the later submit-to-DPA note."""
+        """Return the dedicated PIC comment, falling back to legacy history."""
         review_comment = ''
         review_events = ActivityHistory.objects.filter(
             entity_type='CAR',

@@ -66,6 +66,14 @@ interface NearMissRecord {
     requested_by?: string | null;
     requested_by_role?: string | null;
   } | null;
+  hod_review_summary?: {
+    comment?: string | null;
+    decision?: string | null;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    reviewed_by_role?: string | null;
+    typed_name?: string | null;
+  } | null;
   vessel_review_summary?: {
     comment?: string | null;
     decision?: string | null;
@@ -1279,6 +1287,7 @@ function extractNearMiss(payload: unknown): NearMissRecord | null {
 }
 
 function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
+  const hodReview = nearMiss.hod_review_summary;
   const vesselReview = nearMiss.vessel_review_summary;
   const officeComment = nearMiss.office_comment?.trim();
   const closureComment = nearMiss.closure_reason?.trim();
@@ -1350,17 +1359,8 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
           <HighRiskDetail label="Lessons learned" value={nearMiss.near_miss_lessons_learned} />
         </div>
       ) : null}
-      {vesselReview?.comment ? (
-        <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Vessel review comment</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{vesselReview.comment}</p>
-          <p className="mt-3 text-xs font-medium text-sky-800">
-            Reviewed by {vesselReview.reviewed_by_role || "vessel reviewer"}
-            {vesselReview.typed_name ? ` (${vesselReview.typed_name})` : ""}
-            {vesselReview.reviewed_at ? ` on ${formatDisplayDateTime(vesselReview.reviewed_at)}` : ""}
-          </p>
-        </div>
-      ) : null}
+      <NearMissReviewCommentBlock label="HOD / CE / CO review comment" review={hodReview} />
+      <NearMissReviewCommentBlock label="Vessel review comment" review={vesselReview} />
       {officeComment ? (
         <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Office comments</p>
@@ -1377,6 +1377,30 @@ function NearMissSummary({ nearMiss }: { nearMiss: NearMissRecord }) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+function NearMissReviewCommentBlock({
+  label,
+  review,
+}: {
+  label: string;
+  review?: NearMissRecord["hod_review_summary"] | NearMissRecord["vessel_review_summary"];
+}) {
+  if (!review?.comment) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">{review.comment}</p>
+      <p className="mt-3 text-xs font-medium text-sky-800">
+        Reviewed by {review.reviewed_by_role || "vessel reviewer"}
+        {review.typed_name ? ` (${review.typed_name})` : ""}
+        {review.reviewed_at ? ` on ${formatDisplayDateTime(review.reviewed_at)}` : ""}
+      </p>
+    </div>
   );
 }
 

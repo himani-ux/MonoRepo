@@ -39,7 +39,7 @@ def bootstrap_django() -> None:
 bootstrap_django()
 
 from apps.accounts.models import RoleCodes  # noqa: E402
-from apps.car.models import ActivityHistory  # noqa: E402
+from apps.car.models import ActivityHistory, CarClcMapping  # noqa: E402
 from apps.inspection.audit.models import (  # noqa: E402
     AuditDetail,
     AuditFinding,
@@ -64,6 +64,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate  # noqa: E
 SCHEMA_MODELS = [
     Inspection,
     CAR,
+    CarClcMapping,
     Deficiency,
     ActivityHistory,
     AuditDetail,
@@ -205,7 +206,108 @@ class AuditNcClosureApiTests(unittest.TestCase):
         self.assertEqual(response.data["data"]["finding_id"], str(finding.id))
         self.assertEqual(response.data["data"]["part_a"]["auditor_name"], audit_detail.lead_auditor_name)
         self.assertEqual(response.data["data"]["part_a"]["nc_classification"], "MINOR_NC")
-        self.assertTrue(response.data["data"]["car"]["car_number"].startswith("TST-PSC-2026-"))
+        self.assertTrue(response.data["data"]["car"]["car_number"].startswith("TST-AUDIT-2026-"))
+
+    def test_sql_server_nc_closure_open_casts_finding_and_nc_record_ids(self) -> None:
+        audit_detail, finding = self._create_finding(nc_category="MINOR_NC")
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        raw_finding_calls = []
+        raw_detail_calls = []
+        raw_nc_calls = []
+        cursor_calls = []
+        nc_saved = False
+
+        class RecordingCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def execute(self, sql, params=None):
+                nonlocal nc_saved
+                cursor_calls.append((sql, params or []))
+                if "INSERT INTO dbo.audit_finding_nc" in sql:
+                    nc_saved = True
+
+        class RecordingConnection:
+            vendor = "microsoft"
+
+            def cursor(self):
+                return RecordingCursor()
+
+        def raw_finding_lookup(sql, params):
+            raw_finding_calls.append((sql, params))
+            return [finding]
+
+        def raw_detail_lookup(sql, params):
+            raw_detail_calls.append((sql, params))
+            return [audit_detail]
+
+        def raw_nc_lookup(sql, params):
+            raw_nc_calls.append((sql, params))
+            if not nc_saved:
+                return []
+            return [
+                AuditFindingNC(
+                    id=uuid.uuid4(),
+                    audit_finding_id=finding.id,
+                    created_by="audit_user",
+                    created_date=datetime(2026, 8, 1, tzinfo=timezone.utc),
+                )
+            ]
+
+        unsafe_filter = AssertionError("NC closure must cast finding UUIDs on SQL Server.")
+        unsafe_get_or_create = AssertionError("NC closure must cast audit_finding_id on SQL Server.")
+        with (
+            patch(
+                "apps.inspection.audit.services.detail.connection",
+                SimpleNamespace(vendor="microsoft"),
+                create=True,
+            ),
+            patch(
+                "apps.inspection.audit.services.nc_closure.connection",
+                RecordingConnection(),
+                create=True,
+            ),
+            patch.object(AuditFinding.all_objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditFinding.all_objects, "raw", side_effect=raw_finding_lookup),
+            patch.object(AuditDetail.objects, "raw", side_effect=raw_detail_lookup),
+            patch.object(AuditFindingNC.objects, "get_or_create", side_effect=unsafe_get_or_create),
+            patch.object(AuditFindingNC.objects, "raw", side_effect=raw_nc_lookup),
+        ):
+            response = self._get_nc(finding.id, user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(raw_finding_calls), 1)
+        finding_sql, finding_params = raw_finding_calls[0]
+        self.assertIn(f"FROM dbo.{AuditFinding._meta.db_table}", finding_sql)
+        self.assertIn("id = CAST(%s AS uniqueidentifier)", finding_sql)
+        self.assertEqual(finding_params, [str(finding.id)])
+        self.assertEqual(len(raw_detail_calls), 1)
+        detail_sql, detail_params = raw_detail_calls[0]
+        self.assertIn("FROM dbo.audit_detail", detail_sql)
+        self.assertIn("id = CAST(%s AS uniqueidentifier)", detail_sql)
+        self.assertEqual(detail_params, [str(audit_detail.id)])
+        self.assertEqual(len(raw_nc_calls), 2)
+        for sql, params in raw_nc_calls:
+            self.assertIn(f"FROM dbo.{AuditFindingNC._meta.db_table}", sql)
+            self.assertIn("audit_finding_id = CAST(%s AS uniqueidentifier)", sql)
+            self.assertEqual(params, [str(finding.id)])
+        insert_sql = "\n".join(sql for sql, _params in cursor_calls)
+        self.assertIn("INSERT INTO dbo.audit_finding_nc", insert_sql)
+        self.assertIn("[audit_finding_id]", insert_sql)
+        self.assertIn("CAST(%s AS uniqueidentifier)", insert_sql)
+
+    def test_get_nc_normalizes_legacy_seed_nc_category(self) -> None:
+        _audit_detail, finding = self._create_finding(nc_category="MAJOR_NC")
+        AuditFinding.objects.filter(id=finding.id).update(nc_category="MAJOR")
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+
+        response = self._get_nc(finding.id, user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["part_a"]["nc_classification"], "MAJOR_NC")
 
     def test_part_b_c_d_save_dense_form_fields(self) -> None:
         _audit_detail, finding = self._create_finding(nc_category="MAJOR_NC")
@@ -224,10 +326,8 @@ class AuditNcClosureApiTests(unittest.TestCase):
             finding.id,
             "part-c",
             {
-                "rca_method": "FIVE_WHY",
-                "problem_statement": "Fire door failed to close during accommodation round.",
-                "why_1": "Closer arm was loose.",
-                "root_cause_categories": ["EQUIPMENT_FAILURE", "SUPERVISION_FAILURE"],
+                "clc_item_ids": ["P1", "J7"],
+                "custom_cause_text": "Weekly accommodation checks did not include closer-arm torque verification.",
                 "root_cause_summary": "The door closer inspection was missed during routine rounds and the loose arm was not detected before the audit.",
             },
             user,
@@ -249,8 +349,13 @@ class AuditNcClosureApiTests(unittest.TestCase):
         self.assertEqual(part_c.status_code, 200)
         self.assertEqual(part_d.status_code, 200)
         nc = AuditFindingNC.objects.get(audit_finding_id=finding.id)
-        self.assertEqual(nc.rca_method, "FIVE_WHY")
-        self.assertEqual(nc.root_cause_categories, "EQUIPMENT_FAILURE,SUPERVISION_FAILURE")
+        car = CAR.objects.get(deficiency__id=uuid.UUID(str(finding.psc_deficiency_id)))
+        self.assertEqual(car.root_cause_summary, nc.root_cause_summary)
+        self.assertEqual(
+            list(CarClcMapping.objects.filter(car=car).order_by("clc_item_id").values_list("clc_item_id", flat=True)),
+            ["J7", "P1"],
+        )
+        self.assertEqual(part_c.data["data"]["part_c"]["clc_item_ids"], ["P1", "J7"])
         self.assertTrue(nc.sms_amendment_required)
         self.assertEqual(part_d.data["data"]["part_d"]["sms_amendment_doc_ref"], "SMS-A-20")
 
@@ -410,7 +515,7 @@ class AuditNcClosureApiTests(unittest.TestCase):
         nc = AuditFindingNC.objects.get(audit_finding_id=finding.id)
         self.assertIsNone(nc.drafted_by_user_id)
 
-    def test_parts_e_f_g_require_audit_p004_and_persist_lead_auditor_fields(self) -> None:
+    def test_parts_e_f_g_require_audit_p004_and_keep_finding_certificate_scope(self) -> None:
         _audit_detail, finding = self._create_finding()
         conductor = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
         lead = make_user(user_id="lead-1", process_ids=[AUDIT_P_004], vessel_ids=[str(self.vessel_id)])
@@ -454,7 +559,7 @@ class AuditNcClosureApiTests(unittest.TestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(part_g.status_code, 200)
         finding.refresh_from_db()
-        self.assertEqual(finding.certificates_at_risk, "DOC,SMC")
+        self.assertEqual(finding.certificates_at_risk, "DOC")
         nc = AuditFindingNC.objects.get(audit_finding_id=finding.id)
         self.assertEqual(nc.acceptance_decision, "ACCEPTED")
         self.assertEqual(nc.final_closure_status, "CLOSED")
@@ -500,7 +605,7 @@ class AuditNcClosureApiTests(unittest.TestCase):
         nc.refresh_from_db()
         self.assertTrue(nc.effectiveness_overdue)
 
-    def test_office_nc_rejects_vessel_certificate_at_risk(self) -> None:
+    def test_part_f_ignores_certificate_at_risk_changes(self) -> None:
         _audit_detail, finding = self._create_finding(auditee_type="OFFICE_DEPT")
         lead = make_user(process_ids=[AUDIT_P_004])
 
@@ -514,8 +619,7 @@ class AuditNcClosureApiTests(unittest.TestCase):
             lead,
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["error"], "AUDIT_NC_CLOSURE_VALIDATION")
+        self.assertEqual(response.status_code, 200)
         finding.refresh_from_db()
         self.assertEqual(finding.certificates_at_risk, "DOC")
 

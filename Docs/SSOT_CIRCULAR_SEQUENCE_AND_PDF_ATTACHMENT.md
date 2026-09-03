@@ -41,6 +41,7 @@ Code changes in backend or frontend must follow this document.
 
 - Allowed file type: **PDF only**.
 - Maximum attachments per request: **3 files**.
+- Maximum attachment size: **50 MB per PDF file**.
 - Applies to circular create and draft update flows.
 - Backend is final authority; frontend is validation convenience.
 
@@ -50,6 +51,8 @@ Code changes in backend or frontend must follow this document.
   - Reject those files with validation message.
 - If user selects more than 3 PDFs:
   - Accept only up to 3; extra files are rejected with message.
+- If user selects a PDF larger than 50 MB:
+  - Reject that file with validation message.
 - Uploaded PDFs are merged into a single attachment stream after generated cover pages.
 
 ### Backend Enforcement
@@ -58,6 +61,7 @@ Code changes in backend or frontend must follow this document.
   - `psc-backend/modules/circular/circular_office/views.py`
 - Constants/helpers:
   - `MAX_CIRCULAR_ATTACHMENT_FILES = 3`
+  - `MAX_CIRCULAR_ATTACHMENT_SIZE_MB = 50`
   - `_extract_uploaded_pdf_attachments_from_request_files(...)`
   - `_store_circular_generated_pdf(...)`
 
@@ -74,4 +78,3 @@ Code changes in backend or frontend must follow this document.
 ## Change Control
 
 If rules change, update this document first, then update backend and frontend code in the same task.
-

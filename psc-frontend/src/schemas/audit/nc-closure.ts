@@ -105,6 +105,8 @@ export interface AuditNcPartC {
   why_5: string;
   root_cause_categories: string[];
   root_cause_summary: string;
+  clc_item_ids: string[];
+  custom_cause_text: string;
 }
 
 export interface AuditNcPartD {

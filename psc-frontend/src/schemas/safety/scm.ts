@@ -138,6 +138,11 @@ const safetyScmBaseSchema = z.object({
   voyage_no: z.string().default(""),
 });
 
+const coordinateFormatMessages = {
+  latitude: "Latitude must be in decimal degrees, e.g. 1.290270. Use a minus sign for south; do not enter N/S letters.",
+  longitude: "Longitude must be in decimal degrees, e.g. 103.851959. Use a minus sign for west; do not enter E/W letters.",
+} as const;
+
 function enforceLocationOrCoordinates(
   value: z.infer<typeof safetyScmBaseSchema>,
   context: z.RefinementCtx,
@@ -151,11 +156,38 @@ function enforceLocationOrCoordinates(
   }
 }
 
-export const safetyScmSchema = safetyScmBaseSchema.superRefine(enforceLocationOrCoordinates);
+function enforceNumericCoordinate(
+  value: string,
+  context: z.RefinementCtx,
+  path: "latitude" | "longitude",
+) {
+  const rawValue = value.trim();
+  if (!rawValue) {
+    return;
+  }
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawValue)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: coordinateFormatMessages[path],
+      path: [path],
+    });
+  }
+}
+
+function enforceScmCoordinates(
+  value: z.infer<typeof safetyScmBaseSchema>,
+  context: z.RefinementCtx,
+) {
+  enforceLocationOrCoordinates(value, context);
+  enforceNumericCoordinate(value.latitude, context, "latitude");
+  enforceNumericCoordinate(value.longitude, context, "longitude");
+}
+
+export const safetyScmSchema = safetyScmBaseSchema.superRefine(enforceScmCoordinates);
 
 export const safetyScmSubmitSchema = safetyScmBaseSchema
   .superRefine((value, context) => {
-    enforceLocationOrCoordinates(value, context);
+    enforceScmCoordinates(value, context);
     if (value.meeting_type === "AD_HOC" && value.ad_hoc_trigger_reason.trim().length < 20) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

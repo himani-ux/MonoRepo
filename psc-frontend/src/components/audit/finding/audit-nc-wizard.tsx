@@ -9,6 +9,7 @@ import { useAuditNcClosure, useAuditRcaTemplates, useUpdateAuditNcPart } from '@
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
 import { ROOT_CAUSE_CATEGORIES, type AuditNcClosure, type AuditNcPartB, type AuditNcPartC, type AuditRcaTemplate } from '@/schemas/audit/nc-closure';
 import { useNcWizardStore } from '@/stores/audit/use-nc-wizard-store';
 
@@ -163,9 +164,9 @@ export function AuditNcWizard({ findingId }: AuditNcWizardProps) {
             <CardContent className="space-y-3 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={closure.part_a.nc_classification === 'MAJOR_NC' ? 'destructive' : 'warning'}>
-                  {closure.part_a.nc_classification || 'NC'}
+                  {formatEnumLabel(closure.part_a.nc_classification) || 'NC'}
                 </Badge>
-                <Badge variant="secondary">{closure.car.status}</Badge>
+                <Badge variant="secondary">{getStatusLabel(closure.car.status)}</Badge>
               </div>
               <div>
                 <p className="text-sm font-medium text-neutral-500">Step {stepIndex + 1} of {steps.length}</p>
@@ -242,7 +243,7 @@ export function AuditNcWizard({ findingId }: AuditNcWizardProps) {
             <CardContent className="space-y-3 text-sm">
               <ContextRow label="Immediate Action" value={partB.immediate_action_text || '-'} />
               <ContextRow label="Completed" value={partB.immediate_action_completed_at || '-'} />
-              <ContextRow label="RCA Method" value={partC.rca_method || '-'} />
+              <ContextRow label="RCA Method" value={formatEnumLabel(partC.rca_method) || '-'} />
               <ContextRow label="Template" value={selectedTemplate?.title || '-'} />
               <ContextRow label="Summary" value={partC.root_cause_summary || '-'} />
             </CardContent>
@@ -361,7 +362,7 @@ function WizardStep({
                 )}
               >
                 <span className="block font-medium">{template.title}</span>
-                <span className="mt-1 block text-xs text-neutral-500">{template.category}</span>
+                <span className="mt-1 block text-xs text-neutral-500">{formatEnumLabel(template.category)}</span>
               </button>
             ))}
           </div>
@@ -403,7 +404,7 @@ function WizardStep({
                   }}
                   className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                 />
-                {category}
+                {formatEnumLabel(category)}
               </label>
             ))}
           </div>

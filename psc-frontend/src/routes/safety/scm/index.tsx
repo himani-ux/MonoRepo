@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useSafetyAuth } from "../../../hooks/safety/use-auth";
-import { useSafetyScmMeetings } from "../../../hooks/use-safety";
+import { useSafetyIncidentRegisterVessels, useSafetyScmMeetings } from "../../../hooks/use-safety";
 import { getErrorMessage } from "../../../lib/api/client";
 import { formatScmState } from "../../../lib/safety/scm-status";
 
@@ -26,16 +26,42 @@ function isRole(role: string | null, ...values: string[]) {
   return values.some((value) => normalizedRole === value);
 }
 
+function buildVesselOptionLabel(vessel: {
+  id: string;
+  vessel_code?: string | null;
+  vessel_name?: string | null;
+}) {
+  return [vessel.vessel_code, vessel.vessel_name].filter(Boolean).join(" - ") || vessel.id;
+}
+
 export default function SafetyScmIndexRoute() {
   const auth = useSafetyAuth();
   const canHostScm = auth.hasProcess("SAF_P_001") && isRole(auth.role, "CO", "MASTER");
   const [hostMeetingType, setHostMeetingType] = useState<"REGULAR" | "AD_HOC">("REGULAR");
   const [meetingType, setMeetingType] = useState("");
   const [state, setState] = useState("");
+  const [selectedVesselId, setSelectedVesselId] = useState("");
+  const vesselOptionsQuery = useSafetyIncidentRegisterVessels();
+  const authVesselOptions = useMemo(
+    () =>
+      auth.vesselIds.map((vesselId, index) => ({
+        id: String(vesselId),
+        vessel_code: "",
+        vessel_name: auth.vesselNames[index] ?? String(vesselId),
+      })),
+    [auth.vesselIds, auth.vesselNames]
+  );
+  const vesselOptions =
+    vesselOptionsQuery.data && vesselOptionsQuery.data.length > 0
+      ? vesselOptionsQuery.data
+      : authVesselOptions;
+  const effectiveVesselId = auth.isGlobal
+    ? selectedVesselId || undefined
+    : auth.vesselIds[0] ? String(auth.vesselIds[0]) : undefined;
   const meetingsQuery = useSafetyScmMeetings({
     meeting_type: meetingType || undefined,
     state: state || undefined,
-    vessel_id: auth.isGlobal ? undefined : auth.vesselIds[0],
+    vessel_id: effectiveVesselId,
   });
 
   return (
@@ -83,6 +109,22 @@ export default function SafetyScmIndexRoute() {
               <h2 className="text-lg font-semibold text-slate-900">Meeting register</h2>
             </div>
             <div className="flex flex-wrap gap-3">
+              {auth.isGlobal ? (
+                <select
+                  aria-label="SCM vessel filter"
+                  className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900"
+                  disabled={vesselOptionsQuery.isLoading && vesselOptions.length === 0}
+                  onChange={(event) => setSelectedVesselId(event.target.value)}
+                  value={selectedVesselId}
+                >
+                  <option value="">All vessels</option>
+                  {vesselOptions.map((vessel) => (
+                    <option key={vessel.id} value={vessel.id}>
+                      {buildVesselOptionLabel(vessel)}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
               <select
                 aria-label="SCM meeting type filter"
                 className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900"

@@ -57,7 +57,12 @@ The following endpoints were added later and are part of the current implementat
 - `GET /api/psc/auth/crew/?vessel_id=<uuid>`
 - `GET /api/psc/auth/company-logo/`
 - `POST /api/psc/auth/company-logo/`
-- `GET /api/audit/vessels/` - returns readable vessel options (`id`, `vessel_code`, `vessel_name`) for Audit forms while preserving UUID IDs in saved payloads
+- `GET /api/audit/vessels/` - returns readable vessel options (`id`, `vessel_code`, `vessel_name`) for Audit forms while preserving UUID IDs in saved payloads; vessel rows may include `top_rank_personnel` suggestions for Master, Chief Officer, Chief Engineer, and Second Engineer attendee selection
+- `GET /api/audit/audits/` - returns registered audit summaries visible to the authenticated user, using the same audit-detail access rules as `GET /api/audit/audits/<id>/`
+- `POST /api/audit/audits/` - registers internal audits from JSON and external audits from either JSON metadata or multipart `external_report_file`; multipart external registration saves the PDF under media storage and derives `external_report_file_name`, `external_report_file_path`, `external_report_mime_type`, and `external_report_file_size`
+- `GET /api/audit/audits/<id>/` and `PUT /api/audit/audits/<id>/scorecard/` return the fixed 14 operational audit scorecard areas; extra/demo `master_audit_area` rows are ignored by the detail response, scorecard validation, and submit gates
+- `POST /api/audit/findings/` accepts JSON or multipart finding creation. Multipart files posted as `evidence_files` are saved as `AuditAttachment` rows with category `FINDING_OBJECTIVE_EVIDENCE`; accepted file extensions are image types, PDF, DOCX, and XLSX, with a 20MB per-file limit.
+- Audit finding creation no longer accepts user-selected PSC DefCode or Action Code values. The compatibility `psc_deficiency` bridge row is created with sentinel DefCode `00000` and null Action Code, and the CAR generator creates Audit CAR numbers as `{SCOPE}-AUDIT-{YYYY}-{NNN}` where scope is the vessel code or `KSM` for office audits.
 
 ## 1. Database Overview
 
@@ -827,6 +832,8 @@ CREATE INDEX [IX_psc_notification_created_date] ON [psc_notification]([created_d
 ## 8. Triggers
 
 ### 8.1 Auto-Create CAR on Deficiency Insert
+
+This v1.0 trigger sample documents the PSC baseline only. Current Audit finding CARs are generated in the Django service layer and use `{SCOPE}-AUDIT-{YYYY}-{NNN}`, not the PSC trigger format below.
 
 ```sql
 CREATE TRIGGER [trg_psc_deficiency_auto_create_car]
@@ -1874,15 +1881,19 @@ backend/
 
 ## 15. Audit Operational Master APIs
 
-The Audit module exposes authenticated, process-gated APIs for operational master data. These endpoints use the existing Audit tables and do not require a schema migration.
+The Audit module exposes authenticated, process-gated APIs for operational master data. Qualified-auditor qualifying bodies are maintained in `aud_master_qual_body`, added by migration `0026_audit_qualifying_body_master`; the selected body name remains stored as text in `master_audit_qualified_auditor.qualifying_body`.
 
 | Method | Endpoint | Permission | Purpose |
 |---|---|---|---|
+| GET | `/api/audit/masters/office-users/` | `AUDIT_P_009` | List active office users from `users` for Qualified Auditor selection only when they have an active mapped `master_role`; returns employee ID for storage plus name, username, department, `users.employee_role`, and mapped `master_role.role_name` for display |
 | GET/POST | `/api/audit/masters/qualified-auditors/` | `AUDIT_P_009` | List or create qualified internal auditor records |
 | GET/PATCH | `/api/audit/masters/qualified-auditors/{id}/` | `AUDIT_P_009` | View or update a qualified auditor record |
-| GET/POST | `/api/audit/masters/external-audit-orgs/` | `AUDIT_P_019` | List or create external audit organisations |
+| GET/POST | `/api/audit/masters/qualifying-bodies/` | `AUDIT_P_009` | List or create active, non-deleted Qualifying Body master rows from `aud_master_qual_body` |
+| GET/PATCH | `/api/audit/masters/qualifying-bodies/{id}/` | `AUDIT_P_009` | View or update a Qualifying Body master row; deactivate with `is_active` or hide with `is_deleted` |
+| GET | `/api/audit/masters/external-audit-orgs/` | Any of `AUDIT_P_001`, `AUDIT_P_003`, `AUDIT_P_013`, `AUDIT_P_019` | List active external audit organisations for audit registration and master maintenance |
+| POST | `/api/audit/masters/external-audit-orgs/` | `AUDIT_P_019` | Create external audit organisations |
 | GET/PATCH | `/api/audit/masters/external-audit-orgs/{id}/` | `AUDIT_P_019` | View or update an external audit organisation; deactivate with `is_active` |
 | GET/POST | `/api/audit/masters/ro-delegations/` | `AUDIT_P_020` | List or create vessel-level RO delegations |
 | GET/PATCH | `/api/audit/masters/ro-delegations/{id}/` | `AUDIT_P_020` | View or update a vessel-level RO delegation |
 
-The new gates are included in the Audit process-permission catalog and the SEQ Manager default gate set. RO delegation creation/update rejects inactive organisations and overlapping effective windows for the same vessel and standard. These APIs do not create duplicate office-user or vessel-crew identities.
+The new gates are included in the Audit process-permission catalog, the SEQ Manager default gate set, and role-derived runtime permission defaults. Authentication snapshots merge Audit defaults into returned `process_ids` by resolved profile, rank, or DPA role: vessel Master and Acting Master receive `AUDIT_P_008`, `AUDIT_P_013`, and `AUDIT_P_017` for vessel-side Audit actions, while generic office fallback roles do not receive Audit gates unless their mapped profile or DPA role grants them. RO delegation creation/update rejects inactive organisations and overlapping effective windows for the same vessel and standard. These APIs do not create duplicate office-user or vessel-crew identities; the office-user lookup reads existing `users` rows, resolves the user's actual mapped role through `mapping_role_user` -> `master_role`, and qualified-auditor records continue to store only the selected `employee_id` plus the selected Qualifying Body name snapshot.

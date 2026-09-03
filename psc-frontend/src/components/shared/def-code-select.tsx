@@ -25,6 +25,8 @@ import type { PSCDefCode } from '@/types';
  */
 
 export interface DefCodeSelectProps {
+  /** Trigger id for label association */
+  id?: string;
   /** Selected DefCode value */
   value?: string;
   /** Change handler */
@@ -37,17 +39,21 @@ export interface DefCodeSelectProps {
   disabled?: boolean;
   /** Error state */
   error?: boolean;
+  /** Accessible label for the combobox trigger */
+  ariaLabel?: string;
   /** Additional class names */
   className?: string;
 }
 
 export const DefCodeSelect: FC<DefCodeSelectProps> = ({
+  id,
   value,
   onChange,
   placeholder = 'Select deficiency code...',
   categoryCode,
   disabled,
   error,
+  ariaLabel,
   className,
 }) => {
   const [open, setOpen] = useState(false);
@@ -123,12 +129,14 @@ export const DefCodeSelect: FC<DefCodeSelectProps> = ({
       {/* Trigger Button */}
       <Button
         ref={triggerRef}
+        id={id}
         type="button"
         variant="outline"
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
+        aria-label={ariaLabel}
         disabled={disabled}
         onClick={() => (open ? closeDropdown() : setOpen(true))}
         className={cn(

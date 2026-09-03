@@ -38,8 +38,13 @@ from apps.inspection.audit.views import (
     AuditScanValidationQueueView,
     AuditSubmitView,
     AuditVesselOptionListView,
+    AuditQualifyingBodyDetailView,
+    AuditQualifyingBodyListCreateView,
     ExternalAuditOrgDetailView,
     ExternalAuditOrgListCreateView,
+    HodCoverageExpireView,
+    HodCoverageListCreateView,
+    OfficeUserLookupView,
     QualifiedAuditorDetailView,
     QualifiedAuditorListCreateView,
     VesselRoDelegationDetailView,
@@ -62,6 +67,16 @@ urlpatterns = [
         "dpa/scan-validation-queue/",
         AuditScanValidationQueueView.as_view(),
         name="audit-scan-validation-queue",
+    ),
+    path(
+        "admin/hod-coverage/",
+        HodCoverageListCreateView.as_view(),
+        name="audit-hod-coverage",
+    ),
+    path(
+        "admin/hod-coverage/<uuid:id>/expire/",
+        HodCoverageExpireView.as_view(),
+        name="audit-hod-coverage-expire",
     ),
     path(
         "notifications/<uuid:id>/retry/",
@@ -179,6 +194,11 @@ urlpatterns = [
         name="audit-master-rca-templates",
     ),
     path(
+        "masters/office-users/",
+        OfficeUserLookupView.as_view(),
+        name="audit-master-office-users",
+    ),
+    path(
         "masters/qualified-auditors/",
         QualifiedAuditorListCreateView.as_view(),
         name="audit-master-qualified-auditors",
@@ -187,6 +207,16 @@ urlpatterns = [
         "masters/qualified-auditors/<uuid:id>/",
         QualifiedAuditorDetailView.as_view(),
         name="audit-master-qualified-auditor-detail",
+    ),
+    path(
+        "masters/qualifying-bodies/",
+        AuditQualifyingBodyListCreateView.as_view(),
+        name="audit-master-qualifying-bodies",
+    ),
+    path(
+        "masters/qualifying-bodies/<uuid:id>/",
+        AuditQualifyingBodyDetailView.as_view(),
+        name="audit-master-qualifying-body-detail",
     ),
     path(
         "masters/external-audit-orgs/",

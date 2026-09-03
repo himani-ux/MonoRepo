@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardCheck, FileText, Plus, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Eye, FileText, Plus, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
 import { RootLayout } from '@/components/layout/root-layout';
@@ -8,8 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuditPlans } from '@/hooks/audit/use-audit-plan';
+import { useRegisteredAudits } from '@/hooks/audit/use-audit-registration';
 import { useAuth } from '@/hooks/use-auth';
 import { PROCESS_IDS } from '@/lib/utils/permission-ids';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
+import type { RegisteredAudit } from '@/lib/api/audit';
 import type { AuditPlan } from '@/schemas/audit/plan';
 
 const ACTIVE_STATUSES = new Set(['CONFIRMED', 'IN_PROGRESS']);
@@ -17,13 +20,17 @@ const ATTENTION_STATUSES = new Set(['EXTENSION_REQUESTED', 'OVERDUE', 'CRITICAL_
 
 export default function AuditDashboardRoute() {
   const { data, isLoading, error, refetch } = useAuditPlans();
+  const registeredAuditsQuery = useRegisteredAudits();
   const { hasProcess } = useAuth();
   const plans = data?.results ?? [];
+  const registeredAudits = registeredAuditsQuery.data?.results ?? [];
   const summary = useAuditDashboardSummary(plans, data?.count ?? plans.length);
   const upcomingPlans = useMemo(() => plans.slice(0, 6), [plans]);
+  const recentRegisteredAudits = useMemo(() => registeredAudits.slice(0, 8), [registeredAudits]);
 
   const canCreateAudit = hasProcess(PROCESS_IDS.AUDIT_CREATE) || hasProcess(PROCESS_IDS.AUDIT_CONDUCT);
   const canRegisterExternal = hasProcess(PROCESS_IDS.AUDIT_REGISTER_EXTERNAL);
+  const canManageQualifiedAuditors = hasProcess(PROCESS_IDS.AUDIT_MANAGE_QUALIFIED_AUDITORS);
   const canViewQueues =
     hasProcess(PROCESS_IDS.AUDIT_NOTIFY) ||
     hasProcess(PROCESS_IDS.AUDIT_APPROVE_EXTENSION) ||
@@ -43,9 +50,9 @@ export default function AuditDashboardRoute() {
                   Audit Plans
                 </Link>
               </Button>
-              {canCreateAudit ? (
+              {canCreateAudit || canRegisterExternal ? (
                 <Button asChild>
-                  <Link to="/inspections/new">
+                  <Link to="/audit/register">
                     <Plus className="mr-2 h-4 w-4" />
                     Register Audit
                   </Link>
@@ -95,6 +102,14 @@ export default function AuditDashboardRoute() {
                 tone="info"
               />
             </section>
+
+            <RegisteredAuditsCard
+              audits={recentRegisteredAudits}
+              totalCount={registeredAuditsQuery.data?.count ?? registeredAudits.length}
+              isLoading={registeredAuditsQuery.isLoading}
+              error={registeredAuditsQuery.error}
+              onRetry={() => registeredAuditsQuery.refetch()}
+            />
 
             <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
               <Card>
@@ -148,8 +163,11 @@ export default function AuditDashboardRoute() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <QuickAction href="/audit/plans" title="Audit Plan Register" caption="Create, edit, extend, or cancel plan rows." />
-                  {canRegisterExternal ? (
-                    <QuickAction href="/audit/external/new" title="External Audit Registration" caption="Register vessel-side external audit records." />
+                  {canCreateAudit || canRegisterExternal ? (
+                    <QuickAction href="/audit/register" title="Register Audit" caption="Choose internal or external audit registration." />
+                  ) : null}
+                  {canManageQualifiedAuditors ? (
+                    <QuickAction href="/audit/masters/qualified-auditors" title="Qualified Auditors" caption="Maintain Lead Auditor qualification rows." />
                   ) : null}
                   {canViewQueues ? (
                     <QuickAction href="/dpa/notifications/failed" title="Failed Notifications" caption="Review audit notifications that need attention." />
@@ -162,6 +180,90 @@ export default function AuditDashboardRoute() {
         )}
       </div>
     </RootLayout>
+  );
+}
+
+function RegisteredAuditsCard({
+  audits,
+  totalCount,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  audits: RegisteredAudit[];
+  totalCount: number;
+  isLoading: boolean;
+  error: Error | null;
+  onRetry: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle>Registered Audits</CardTitle>
+          <p className="mt-1 text-sm text-neutral-500">
+            {totalCount ? `${totalCount} audit${totalCount === 1 ? '' : 's'} available to open.` : 'Open audit records appear here after registration.'}
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/audit/register">
+            <Plus className="mr-2 h-4 w-4" />
+            Register Audit
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <SectionSkeleton />
+        ) : error ? (
+          <ErrorState
+            title="Unable to load registered audits"
+            message={error.message || 'Registered audit records could not be loaded.'}
+            onRetry={onRetry}
+          />
+        ) : audits.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
+                <tr>
+                  <th className="py-2 pr-4 font-medium">Target</th>
+                  <th className="py-2 pr-4 font-medium">Audit Period</th>
+                  <th className="py-2 pr-4 font-medium">Type</th>
+                  <th className="py-2 pr-4 font-medium">Lead Auditor</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 text-right font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100">
+                {audits.map((audit) => (
+                  <tr key={audit.id}>
+                    <td className="py-3 pr-4 font-medium text-neutral-800">{audit.target_label || 'Not set'}</td>
+                    <td className="py-3 pr-4 text-neutral-600">{formatDateRange(audit.audit_start_date, audit.audit_end_date)}</td>
+                    <td className="py-3 pr-4 text-neutral-600">{formatAuditType(audit)}</td>
+                    <td className="py-3 pr-4 text-neutral-600">{audit.lead_auditor_name || 'Not set'}</td>
+                    <td className="py-3 pr-4">
+                      <StatusBadge status={audit.status} />
+                    </td>
+                    <td className="py-3 text-right">
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={registeredAuditOpenPath(audit)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Open
+                        </Link>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-neutral-300 p-6 text-sm text-neutral-500">
+            No registered audits are available yet.
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -183,10 +285,33 @@ function formatWindow(plan: AuditPlan) {
   return `${start} -> ${end}`;
 }
 
+function formatDateRange(start: string, end: string | null) {
+  return `${formatDate(start)} -> ${formatDate(end)}`;
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return 'Not set';
+  }
+  return value;
+}
+
+function formatAuditType(audit: RegisteredAudit) {
+  const classification = formatEnumLabel(audit.audit_classification);
+  const subtype = formatEnumLabel(audit.audit_subtype);
+  return [classification, subtype].filter(Boolean).join(' / ') || 'Not set';
+}
+
+function registeredAuditOpenPath(audit: RegisteredAudit) {
+  return String(audit.audit_classification || '').toUpperCase() === 'EXTERNAL'
+    ? `/audit/external/${audit.id}`
+    : `/audit/audits/${audit.id}`;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const normalized = String(status || '').toUpperCase();
   const variant = ATTENTION_STATUSES.has(normalized) ? 'warning' : ACTIVE_STATUSES.has(normalized) ? 'success' : 'secondary';
-  return <Badge variant={variant}>{normalized || 'UNKNOWN'}</Badge>;
+  return <Badge variant={variant}>{getStatusLabel(normalized || 'UNKNOWN')}</Badge>;
 }
 
 function MetricCard({

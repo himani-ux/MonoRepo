@@ -376,6 +376,8 @@ Buttons:
 
 Use this screen to manage certificate master list.
 
+Catalog add, edit, and deprecate buttons are available to DPA, SEQ Manager, Marine Superintendent, Technical Superintendent, Admin, Super Admin, and System Admin users when their profile includes the catalog edit permission.
+
 Left side:
 
 - All sections: show all catalog rows.

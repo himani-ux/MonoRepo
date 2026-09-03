@@ -35,9 +35,15 @@ NOTIFICATION_CONFIG_FORM_ID = "CERT_F_006"
 CATALOG_WRITER_ROLES = {
     "ADMIN",
     "DPA",
+    "MARINE SUPERINTENDENT",
+    "MARINE SUP'TT",
+    "MARINE SUPT",
     "SEQ MANAGER",
     "SUPER ADMIN",
     "SYSTEM ADMIN",
+    "TECHNICAL SUPERINTENDENT",
+    "TECH SUP'TT",
+    "TECH SUPT",
 }
 RECONCILIATION_REVIEWER_ROLES = {
     "ADMIN",
@@ -158,8 +164,23 @@ def _normalized_role(user) -> str:
     return ""
 
 
+def _normalized_role_candidates(user) -> set[str]:
+    candidates: set[str] = set()
+    for attr_name in ("role_name", "safety_role_name", "role"):
+        value = getattr(user, attr_name, None)
+        if value:
+            normalized = str(value).strip().upper()
+            if normalized:
+                candidates.add(normalized)
+    return candidates
+
+
 def normalized_role(user) -> str:
     return _normalized_role(user)
+
+
+def _has_catalog_writer_role(user) -> bool:
+    return bool(_normalized_role_candidates(user) & CATALOG_WRITER_ROLES)
 
 
 def has_certs_perm(user, form_id: str, process_id: str | None = None) -> bool:
@@ -370,18 +391,18 @@ class HasCertsProcessPermission(BasePermission):
 
 
 class IsCatalogWriter(BasePermission):
-    message = "Only DPA or System Admin may modify the Certs catalog."
+    message = "You do not have access to modify the Certs catalog."
 
     def has_permission(self, request, view) -> bool:
         form_ids = _request_permission_ids(request, "form_ids")
         process_ids = _request_permission_ids(request, "process_ids")
         if CATALOG_FORM_ID not in form_ids or CATALOG_EDIT_PROCESS_ID not in process_ids:
             return False
-        return _normalized_role(getattr(request, "user", None)) in CATALOG_WRITER_ROLES
+        return _has_catalog_writer_role(getattr(request, "user", None))
 
 
 class IsCatalogBulkActionWriter(BasePermission):
-    message = "Only DPA or System Admin may run Certs catalog bulk actions."
+    message = "You do not have access to run Certs catalog bulk actions."
     required_process_ids: tuple[str, ...] = (CATALOG_BULK_PROCESS_ID,)
 
     def has_permission(self, request, view) -> bool:
@@ -391,7 +412,7 @@ class IsCatalogBulkActionWriter(BasePermission):
             return False
         if not all(process_id in process_ids for process_id in self.required_process_ids):
             return False
-        return _normalized_role(getattr(request, "user", None)) in CATALOG_WRITER_ROLES
+        return _has_catalog_writer_role(getattr(request, "user", None))
 
 
 class IsCatalogHardPurgeWriter(IsCatalogBulkActionWriter):

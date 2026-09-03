@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import unittest
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -190,7 +190,115 @@ class AuditObsClosureApiTests(unittest.TestCase):
         self.assertEqual(response.data["data"]["state"], "NOT_STARTED")
         self.assertEqual(response.data["data"]["part_a"]["auditor_name"], audit_detail.lead_auditor_name)
         self.assertEqual(response.data["data"]["part_a"]["observation_category"], "OFI")
-        self.assertTrue(response.data["data"]["car"]["car_number"].startswith("TST-PSC-2026-"))
+        self.assertTrue(response.data["data"]["car"]["car_number"].startswith("TST-AUDIT-2026-"))
+
+    def test_get_obs_accepts_legacy_seed_observation_enums(self) -> None:
+        _audit_detail, finding = self._create_finding()
+        AuditFinding.objects.filter(id=finding.id).update(
+            finding_type="OBS",
+            observation_category="IMPROVEMENT",
+        )
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+
+        response = self._get_obs(finding.id, user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AuditFindingOBS.objects.count(), 1)
+        self.assertEqual(
+            response.data["data"]["part_a"]["observation_category"],
+            "IMPROVEMENT_SUGGESTION",
+        )
+
+    def test_sql_server_obs_open_casts_finding_and_obs_record_ids(self) -> None:
+        audit_detail, finding = self._create_finding()
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        raw_finding_calls = []
+        raw_detail_calls = []
+        raw_obs_calls = []
+        cursor_calls = []
+        obs_saved = False
+
+        class RecordingCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def execute(self, sql, params=None):
+                nonlocal obs_saved
+                cursor_calls.append((sql, params or []))
+                if "INSERT INTO dbo.audit_finding_obs" in sql:
+                    obs_saved = True
+
+        class RecordingConnection:
+            vendor = "microsoft"
+
+            def cursor(self):
+                return RecordingCursor()
+
+        def raw_finding_lookup(sql, params):
+            raw_finding_calls.append((sql, params))
+            return [finding]
+
+        def raw_detail_lookup(sql, params):
+            raw_detail_calls.append((sql, params))
+            return [audit_detail]
+
+        def raw_obs_lookup(sql, params):
+            raw_obs_calls.append((sql, params))
+            if not obs_saved:
+                return []
+            return [
+                AuditFindingOBS(
+                    id=uuid.uuid4(),
+                    audit_finding_id=finding.id,
+                    created_by="audit_user",
+                    created_date=datetime(2026, 8, 1, tzinfo=timezone.utc),
+                )
+            ]
+
+        unsafe_filter = AssertionError("OBS closure must cast finding UUIDs on SQL Server.")
+        unsafe_get_or_create = AssertionError("OBS closure must cast audit_finding_id on SQL Server.")
+        with (
+            patch(
+                "apps.inspection.audit.services.detail.connection",
+                SimpleNamespace(vendor="microsoft"),
+                create=True,
+            ),
+            patch(
+                "apps.inspection.audit.services.obs_closure.connection",
+                RecordingConnection(),
+                create=True,
+            ),
+            patch.object(AuditFinding.all_objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditFinding.all_objects, "raw", side_effect=raw_finding_lookup),
+            patch.object(AuditDetail.objects, "raw", side_effect=raw_detail_lookup),
+            patch.object(AuditFindingOBS.objects, "get_or_create", side_effect=unsafe_get_or_create),
+            patch.object(AuditFindingOBS.objects, "raw", side_effect=raw_obs_lookup),
+        ):
+            response = self._get_obs(finding.id, user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(raw_finding_calls), 1)
+        finding_sql, finding_params = raw_finding_calls[0]
+        self.assertIn(f"FROM dbo.{AuditFinding._meta.db_table}", finding_sql)
+        self.assertIn("id = CAST(%s AS uniqueidentifier)", finding_sql)
+        self.assertEqual(finding_params, [str(finding.id)])
+        self.assertEqual(len(raw_detail_calls), 1)
+        detail_sql, detail_params = raw_detail_calls[0]
+        self.assertIn("FROM dbo.audit_detail", detail_sql)
+        self.assertIn("id = CAST(%s AS uniqueidentifier)", detail_sql)
+        self.assertEqual(detail_params, [str(audit_detail.id)])
+        self.assertEqual(len(raw_obs_calls), 2)
+        for sql, params in raw_obs_calls:
+            self.assertIn(f"FROM dbo.{AuditFindingOBS._meta.db_table}", sql)
+            self.assertIn("audit_finding_id = CAST(%s AS uniqueidentifier)", sql)
+            self.assertEqual(params, [str(finding.id)])
+        insert_sql = "\n".join(sql for sql, _params in cursor_calls)
+        self.assertIn("INSERT INTO dbo.audit_finding_obs", insert_sql)
+        self.assertIn("[audit_finding_id]", insert_sql)
+        self.assertIn("CAST(%s AS uniqueidentifier)", insert_sql)
 
     def test_obs_endpoint_rejects_nc_finding(self) -> None:
         _audit_detail, finding = self._create_finding(finding_type="NC")
@@ -259,6 +367,30 @@ class AuditObsClosureApiTests(unittest.TestCase):
             ).count(),
             1,
         )
+
+    def test_part_b_starts_closure_progress_after_vessel_acknowledgement(self) -> None:
+        audit_detail, finding = self._create_finding()
+        audit_detail.status = "VESSEL_ACKNOWLEDGED"
+        audit_detail.save(update_fields=["status"])
+        master = make_user(
+            role=RoleCodes.VESSEL_MASTER,
+            user_type="VESSEL",
+            user_id="master-1",
+            process_ids=[AUDIT_P_008],
+            vessel_id=self.vessel_id,
+            rank="Master",
+        )
+
+        response = self._put_part(
+            finding.id,
+            "part-b",
+            {"immediate_action_text": "Crew briefed on the observation."},
+            master,
+        )
+
+        audit_detail.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(audit_detail.status, "CLOSURE_IN_PROGRESS")
 
     def test_part_b_requires_master_gate_for_terminal_signature(self) -> None:
         _audit_detail, finding = self._create_finding()

@@ -1026,3 +1026,27 @@ Audit Lead Auditor, Conductor, and office HoD permissions are now resolved from 
 Triggering discovery: live `msc_profiles` review confirmed that per-audit responsibilities are not stable profile rows, and granting Lead Auditor/Conductor/HoD gates globally would over-grant actions across unrelated audits.
 
 Implementation boundary: no database schema change is introduced. Existing columns `AuditDetail.lead_auditor_user_id`, `AuditDetail.conductor_user_id`, and existing `MasterHodAssignment` rows are the source of assignment-scoped permission. Stable profile gates from `msc_profiles` continue to cover DPA, SEQ, Fleet Manager, Master, Admin, Super Admin, and office superintendent responsibilities. Shared CAR workflow changes are limited to Audit-linked CARs and do not change normal PSC CAR behavior.
+
+## Amendment 32 - 2026-08-20
+
+The Audit resolution package dated 2026-08-20 registers `D-AUDRS-138` and `D-AUDRS-139` and confirms Acting HoD coverage as build-now. This amendment supersedes Amendment 31 only where it said no database schema change is introduced for assignment-scoped permissions.
+
+Triggering discovery: the approved resolution requires plan-level Lead Auditor assignment before audit registration, with `AuditDetail` storing read-only snapshots from the selected qualified auditor. It also confirms external audit organisation defaulting from vessel RO delegation with manual override, and confirms `/admin/hod-coverage` as the Acting HoD coverage route.
+
+Implementation boundary: `master_audit_plan.lead_auditor_user_id` is added as an additive nullable column and is copied into `audit_detail.lead_auditor_user_id` during internal audit registration. Existing Audit master APIs remain the source for qualified auditors, external audit organisations, and vessel RO delegations. External audit registration may default `external_audit_org_id` from active vessel RO delegation, but the field remains manually overridable and mandatory by the time the audit is saved. Acting HoD coverage uses existing `MasterHodAssignment` data and `AUDIT_P_016` authorization.
+
+## Amendment 33 - 2026-08-24
+
+Audit Qualified Auditor qualifying bodies are now maintained from a dedicated master table named `aud_master_qual_body` instead of a hardcoded frontend list. This amendment supersedes the temporary Maintain Mode dropdown behavior that kept the Qualifying Body choices only in frontend code.
+
+Triggering discovery: while wiring the Qualified Auditors maintenance screen, Qualifying Body was identified as controlled master data rather than a free-text or hardcoded frontend value. The required table shape is UUID primary key, `body_name`, `is_active`, and `is_deleted`.
+
+Implementation boundary: `aud_master_qual_body` is added as an additive table and exposed through the existing Audit master-data permission gate `AUDIT_P_009`. Existing `master_audit_qualified_auditor.qualifying_body` remains a text snapshot of the selected body name, so current qualified-auditor records are not destructively rewritten and no foreign-key conversion is introduced in this amendment.
+
+## Amendment 34 - 2026-09-03
+
+The Audit resolution package dated 2026-09-02 is now the governing implementation contract for Audit finding capture, Audit CAR numbering, NC/OBS closure presentation, OPM F 713 generation/display, actor attribution, digital signatures, and additive print-build fields. This amendment supersedes earlier Audit module assumptions where they allowed PSC DefCode input on Audit findings, selectable NC closure presentation modes, dense OBS presentation, manual internal signer attribution, uploaded signed Audit forms, or PSC-literal Audit CAR numbers.
+
+Triggering discovery: `AUDIT-GAPS-RESOLUTION_2026-09-02` registered D-AUDRS-140..149 and approved `MOCK-AUD-15..19` plus the five `print-templates/` layouts as reference contracts. The package confirms that the ten Audit feedback items are real build deviations or documentation gaps, with section 9 rulings governing any conflict with earlier section 2 wording.
+
+Implementation boundary: changes are limited to the Audit module and the shared CAR/physical-verification surfaces only where D-AUDRS-142, D-AUDRS-145, and D-AUDRS-147 require them. PSC CAR numbering remains the ratified CR-134 vessel-aware format. Finding attachments must use the existing evidence/attachment infrastructure unless the D-AUDRS-140 storage-convention proposal explicitly authorizes a different storage path. D-AUDRS-149 schema changes are additive only; existing Audit and PSC records must not be destructively rewritten.

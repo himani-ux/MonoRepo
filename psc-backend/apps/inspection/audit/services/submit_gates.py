@@ -13,14 +13,13 @@ from apps.inspection.audit.models import (
     AuditDetail,
     AuditFinding,
     AuditMeetingAttendee,
-    MasterAuditArea,
 )
+from apps.inspection.audit.services.detail import REQUIRED_SCORECARD_ROW_COUNT, required_audit_area_codes
 
 
 REPORT_OPEN_STATUS = "IN_PROGRESS"
 REPORT_FINALIZED_STATUS = "REPORT_FINALIZED"
 VESSEL_ACKNOWLEDGED_STATUS = "VESSEL_ACKNOWLEDGED"
-SUBMIT_READY_SCORECARD_ROWS = 14
 SUMMARY_MIN_CHARS = 100
 
 
@@ -121,8 +120,8 @@ def _meeting_errors(audit_detail: AuditDetail, *, field_name: str) -> dict[str, 
 
 
 def _scorecard_errors(audit_detail: AuditDetail) -> dict[str, str]:
-    required_codes = set(MasterAuditArea.objects.values_list("area_code", flat=True))
-    if len(required_codes) != SUBMIT_READY_SCORECARD_ROWS:
+    required_codes = required_audit_area_codes()
+    if len(required_codes) != REQUIRED_SCORECARD_ROW_COUNT:
         return {"area_count": "The 14 master audit areas must be available before submit."}
 
     populated_codes = set(

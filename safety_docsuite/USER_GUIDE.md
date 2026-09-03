@@ -135,6 +135,7 @@ Step-by-step:
    - **Factor causes** — select Immediate Cause and Root Cause for Human Factors, Vessel Factors, Management Factors, and Other Factors. Use `Not Applicable` where a factor does not apply. Use `Other` only when no dropdown option fits, then type the custom text.
 2. There is no daily Near Miss submission cap. While submission is running, the button shows **Processing** so users do not click multiple times and create duplicates.
 3. Tap **Submit**. System routes to `/safety/near-miss/:id/` with confirmation and the Near Miss reference number.
+4. While the Near Miss is still waiting for vessel-side review, the reference can show as `DRAFT-{VslCode}/{YYYY}/T{nnn}`. Once the Master submits it to office, the system automatically changes it to the official `{VslCode}/{YYYY}/{NNN}` number without the `DRAFT-` prefix or `/T` marker.
 
 ### 3.4 Reporter Identity (D-GAP-J1 revised)
 
@@ -419,6 +420,7 @@ Incident and SOI signature type: typed name + ISO-8601 timestamp + device finger
 2. Enter:
    - **Trigger reason** — free text (e.g., "RED-band fall-from-height incident 2026-04-17 — crew brief before full investigation completes").
    - **Scheduled date/time** — when the meeting will run.
+   - **Location / coordinates** - enter Location for port or anchorage meetings; for at-sea meetings enter Latitude and Longitude in decimal degrees, e.g. `1.290270` and `103.851959`. Use a minus sign for south or west instead of N/S/E/W letters.
    - **Agenda** — draft items (you can edit until office adds Office Comment).
    - **Attendee picklist** — pre-populated from CMS crew roster, WRH-checked.
 3. Check the **WRH readiness** card. The SCM can be hosted only when ship time is configured and every roster crew member has available, compliant WRH data.
@@ -430,7 +432,7 @@ Incident and SOI signature type: typed name + ISO-8601 timestamp + device finger
 
 ### 6.4 Regular SCM Chairing (SSQE §9)
 
-1. Master or CO prepares the draft at `/safety/scm/create-regular/` using the **Meeting type** selector (D-RBAC-06). Confirm the **WRH readiness** card is clear before hosting; missing ship time, missing WRH rows, or non-compliant crew blocks SCM creation.
+1. Master or CO prepares the draft at `/safety/scm/create-regular/` using the **Meeting type** selector (D-RBAC-06). Enter Location for port or anchorage meetings; use Latitude and Longitude only for at-sea meetings, and type them in decimal degrees if provided, e.g. `1.290270` and `103.851959`. Use a minus sign for south or west instead of N/S/E/W letters. Confirm the **WRH readiness** card is clear before hosting; missing ship time, missing WRH rows, or non-compliant crew blocks SCM creation.
 2. You attend the scheduled meeting. The system auto-assembles on `/safety/scm/:id/` after the meeting is created:
    - **Closed-Since-Last-SCM** block — SOI findings + Near Miss + Incident records closed since prior SCM closure timestamp (`/safety/scm/:id/closed-since-last/`, D-GAP-M22).
    - **Safety Observations** — auto-filled from open SOI findings (FEAT-SAF-SOI-020 / `/api/safety/soi/open-findings/`).
@@ -511,11 +513,12 @@ Entry point: Safety sidebar → **Near Miss** → click a LOW-triage item → `/
 2. Read the reporter's identity where vessel scope and Safety permission allow.
 3. Set priority LOW or HIGH (D-GAP-R22). If HIGH, proceed to fleet alert at `/safety/near-miss/:id/fleet-alert/`.
 4. Add Office Comments and accept, or send the report back for rework with a reason.
-5. After Office Comments are completed, the saved Vessel review comment, Office Comments, and Closure comment stay visible at the end of the Near Miss workspace summary, after Immediate action and Preventive action / suggestion.
-6. In the Near Miss PDF, Vessel review comment and Office comments print as separate full-width blocks so long comments stay readable and continue onto the next page when needed.
-7. Fleet alert payload auto-drafts with vessel + crew names anonymised per D-GAP-M08. Review and edit the alert text and fleet-learning text.
-8. Use **Issue Circular/Alert** when you want the same alert prepared in the Circular module. The Circular page opens with only the title and body prefilled; complete recipients, category, priority, attachments, and publish there as normal (FEAT-SAF-NM-006 / D-CFG-04).
-9. Use **Issue fleet alert** in Near Miss to record and dispatch the HIGH-priority fleet-alert requirement. The system sends in-app notifications plus one selected-vessel email batch using `VesselData.Email`, with `HSSEQ@kaizenship.net` in CC. The email attaches the Near Miss PDF and keeps the body short: recipients are told that the event happened, to review the PDF, and to take preventive action. This remains separate from the Circular module publish action.
+5. In the Near Miss register, priority badges are colour-coded: HIGH red, MEDIUM amber, LOW green, and missing priority as neutral `Pending office comments`.
+6. After Office Comments are completed, the saved HOD/CE/CO review comment, Master vessel-review comment, Office Comments, and Closure comment stay visible at the end of the Near Miss workspace summary, after Immediate action and Preventive action / suggestion.
+7. In the Near Miss PDF, Master vessel-review comment and Office comments print as separate full-width blocks so long comments stay readable and continue onto the next page when needed.
+8. Fleet alert payload auto-drafts with vessel + crew names anonymised per D-GAP-M08. Review and edit the alert text and fleet-learning text.
+9. Use **Issue Circular/Alert** when you want the same alert prepared in the Circular module. The Circular page opens with only the title and body prefilled; complete recipients, category, priority, attachments, and publish there as normal (FEAT-SAF-NM-006 / D-CFG-04).
+10. Use **Issue fleet alert** in Near Miss to record and dispatch the HIGH-priority fleet-alert requirement. The system sends in-app notifications plus one selected-vessel email batch using `VesselData.Email`, with `HSSEQ@kaizenship.net` in CC. The email attaches the Near Miss PDF and keeps the body short: recipients are told that the event happened, to review the PDF, and to take preventive action. This remains separate from the Circular module publish action.
 
 ### 7.4 Reporter Identity View (D-GAP-J1 revised)
 
@@ -572,8 +575,10 @@ You are the override authority for guard #5 (blame-fixation) via `SAF_P_006`. Us
 | `/safety/dashboard/` | Fleet-wide Safety Dashboard. Overall status, total-count cards, simple filters, open-work pie chart, ranked score breakdown, and export controls show first; hover on the main cards to see a short explanation; repeat issues, top causes, action age, and SOI Compliance % open from **Show details**. |
 | `/safety/incidents/:id/phase-5/` | Office Review acceptance or rework for any risk band |
 | `/safety/incidents/:id/fleet-alert/` | Incident Fleet Alert selected-ship in-app/email dispatch |
+| `/safety/near-miss/` | Near Miss register with Vessel, Priority, and State filters for global office scope; priority badges are colour-coded. |
 | `/safety/near-miss/:id/triage/` | LOW / HIGH triage |
 | `/safety/near-miss/:id/fleet-alert/` | Prepare Circular/Alert handoff and issue Near Miss fleet-alert in-app/email dispatch (HIGH) |
+| `/safety/scm/` | SCM meeting register with Vessel, Meeting type, and State filters for global office scope. |
 | `/safety/soi/:id/applicability/approve/` | Approve Master's area-applicability request |
 | `/safety/admin/auditor-export/` | Auditor Bundle Export with date range, record type checkboxes, and Vessel filter dropdown populated from active ships. |
 | `/safety/search/` | Cross-record FTS search (archive toggle) |

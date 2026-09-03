@@ -11,7 +11,7 @@
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, BellRing, ChevronDown, CircleUserRound, LogOut, PanelLeft, Ship } from 'lucide-react';
+import { Bell, BellRing, ChevronDown, CircleUserRound, LogOut, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -83,8 +83,13 @@ export function Header({ onMenuClick, showMenuButton = true, className }: Header
           className="group flex min-w-0 items-center gap-3 rounded-xl px-1.5 py-1 transition-colors hover:bg-neutral-50"
           aria-label="VIMS Home"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm ring-1 ring-primary-400/30 transition-colors group-hover:bg-primary-700">
-            <Ship className="h-5 w-5" aria-hidden="true" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white p-1 shadow-sm ring-1 ring-neutral-100 transition-colors group-hover:border-primary-200">
+            <img
+              src="/icons/ksm-icon-192x192.png"
+              alt=""
+              className="h-full w-full object-contain"
+              aria-hidden="true"
+            />
           </div>
           <div className="hidden min-w-0 leading-tight sm:block" aria-hidden="true">
             <p className="text-base font-semibold text-neutral-900 md:text-lg">VIMS</p>

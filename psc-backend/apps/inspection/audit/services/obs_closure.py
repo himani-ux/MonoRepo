@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.inspection.audit.models import (
@@ -15,7 +15,9 @@ from apps.inspection.audit.models import (
     AuditFindingOBS,
     AuditFindingSignEvent,
 )
+from apps.inspection.audit.finding_types import is_observation_finding, normalize_observation_category
 from apps.inspection.audit.services.car_workflow import AuditCarWorkflowError
+from apps.inspection.audit.services.detail import get_audit_detail_by_id, get_audit_finding_by_id
 from apps.inspection.deficiency_models import CAR, Deficiency
 from apps.inspection.models import Inspection
 
@@ -79,6 +81,7 @@ def update_obs_part(
     else:
         raise AuditObsClosureError("Unknown Observation closure part.")
 
+    _promote_audit_closure_progress(context=context, user=user)
     obs.updated_by = _user_id(user)
     obs.updated_date = timezone.now()
     obs.save()
@@ -91,12 +94,14 @@ def resolve_audit_obs_context(finding_id: UUID | str) -> AuditObsClosureContext:
     except (TypeError, ValueError, AttributeError):
         raise AuditCarWorkflowError("Audit finding not found.", error="NOT_FOUND", status_code=404)
 
-    finding = AuditFinding.all_objects.filter(id=finding_uuid, is_deleted=False).first()
-    if not finding:
+    try:
+        finding = get_audit_finding_by_id(finding_uuid)
+    except AuditFinding.DoesNotExist:
         raise AuditCarWorkflowError("Audit finding not found.", error="NOT_FOUND", status_code=404)
 
-    audit_detail = AuditDetail.objects.filter(id=finding.audit_detail_id).first()
-    if not audit_detail:
+    try:
+        audit_detail = get_audit_detail_by_id(finding.audit_detail_id)
+    except AuditDetail.DoesNotExist:
         raise AuditCarWorkflowError(
             "Audit detail not found for finding.",
             error="AUDIT_DETAIL_NOT_FOUND",
@@ -133,7 +138,7 @@ def resolve_audit_obs_context(finding_id: UUID | str) -> AuditObsClosureContext:
             error="AUDIT_INSPECTION_MISMATCH",
             status_code=400,
         )
-    if finding.finding_type != "OBSERVATION":
+    if not is_observation_finding(finding.finding_type):
         raise AuditCarWorkflowError(
             "Observation closure is valid only for Observation findings; NC findings use the NC closure flow.",
             error="NOT_OBSERVATION_FINDING",
@@ -180,7 +185,7 @@ def serialize_obs_closure_bundle(bundle: AuditObsClosureBundle) -> dict[str, Any
             "objective_evidence": finding.objective_evidence or "",
             "observation_issued_date": _date_value(getattr(finding, "created_date", None)),
             "required_closure_deadline": _date_value(finding.original_due_date or deficiency.target_date),
-            "observation_category": finding.observation_category,
+            "observation_category": normalize_observation_category(finding.observation_category),
             "description": finding.description or deficiency.description,
         },
         "part_b": {
@@ -239,11 +244,62 @@ def observation_state(obs: AuditFindingOBS) -> str:
 
 
 def _ensure_obs_record(context: AuditObsClosureContext, *, user: object | None) -> AuditFindingOBS:
+    if connection.vendor == "microsoft":
+        existing = _get_sql_server_obs_record(context.finding.id)
+        if existing:
+            return existing
+
+        obs_id = uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                INSERT INTO dbo.{AuditFindingOBS._meta.db_table} (
+                    [id],
+                    [audit_finding_id],
+                    [created_by],
+                    [created_date],
+                    [sms_amendment_required]
+                )
+                VALUES (
+                    CAST(%s AS uniqueidentifier),
+                    CAST(%s AS uniqueidentifier),
+                    %s,
+                    %s,
+                    %s
+                )
+                """,
+                [
+                    str(obs_id),
+                    str(context.finding.id),
+                    _user_id(user),
+                    timezone.now(),
+                    False,
+                ],
+            )
+        created = _get_sql_server_obs_record(context.finding.id)
+        if created:
+            return created
+        raise AuditFindingOBS.DoesNotExist("Audit OBS closure record was saved but could not be reloaded.")
+
     obs, _created = AuditFindingOBS.objects.get_or_create(
         audit_finding_id=context.finding.id,
         defaults={"created_by": _user_id(user)},
     )
     return obs
+
+
+def _get_sql_server_obs_record(finding_id: UUID) -> AuditFindingOBS | None:
+    rows = list(
+        AuditFindingOBS.objects.raw(
+            f"""
+            SELECT *
+            FROM dbo.{AuditFindingOBS._meta.db_table}
+            WHERE audit_finding_id = CAST(%s AS uniqueidentifier)
+            """,
+            [str(finding_id)],
+        )
+    )
+    return rows[0] if rows else None
 
 
 def _bundle(*, context: AuditObsClosureContext, obs: AuditFindingOBS) -> AuditObsClosureBundle:
@@ -326,6 +382,16 @@ def _record_master_signature(*, context: AuditObsClosureContext, user: object, s
         actual_entered_at=timezone.now(),
         created_by=_user_id(user),
     )
+
+
+def _promote_audit_closure_progress(*, context: AuditObsClosureContext, user: object) -> None:
+    audit_detail = get_audit_detail_by_id(context.audit_detail.id, for_update=True)
+    if audit_detail.status != "VESSEL_ACKNOWLEDGED":
+        return
+    audit_detail.status = "CLOSURE_IN_PROGRESS"
+    audit_detail.updated_by = _user_id(user)
+    audit_detail.updated_date = timezone.now()
+    audit_detail.save(update_fields=["status", "updated_by", "updated_date"])
 
 
 def _choice_or_blank(value: Any, allowed: set[str], field_name: str) -> str | None:

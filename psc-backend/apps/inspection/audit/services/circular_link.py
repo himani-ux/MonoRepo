@@ -9,6 +9,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.inspection.audit.models import AuditDetail, AuditFinding
+from apps.inspection.audit.services.detail import get_audit_detail_by_id, get_audit_finding_by_id
 from apps.inspection.deficiency_models import Deficiency
 
 
@@ -30,7 +31,7 @@ class AuditCircularLinkResult:
 
 @transaction.atomic
 def issue_circular_from_finding(*, finding_id: uuid.UUID | str, user: object) -> AuditCircularLinkResult:
-    finding = AuditFinding.objects.select_for_update().get(id=_coerce_uuid(finding_id))
+    finding = get_audit_finding_by_id(finding_id, for_update=True)
     _validate_issue_circular(finding)
 
     if finding.linked_circular_id:
@@ -40,7 +41,7 @@ def issue_circular_from_finding(*, finding_id: uuid.UUID | str, user: object) ->
             payload={"source_record_id": str(finding.id)},
         )
 
-    audit_detail = AuditDetail.objects.select_for_update().get(id=finding.audit_detail_id)
+    audit_detail = get_audit_detail_by_id(finding.audit_detail_id, for_update=True)
     deficiency = Deficiency.objects.select_related("car").get(id=uuid.UUID(hex=finding.psc_deficiency_id))
     circular_id = uuid.uuid4()
     payload = _build_circular_payload(
@@ -52,8 +53,7 @@ def issue_circular_from_finding(*, finding_id: uuid.UUID | str, user: object) ->
     )
     _insert_circular_draft(payload)
 
-    finding.linked_circular_id = circular_id
-    finding.save(update_fields=["linked_circular_id"])
+    _mark_finding_linked_circular(finding, circular_id)
 
     return _result(status="DRAFT_CREATED", circular_id=circular_id, payload=payload)
 
@@ -133,6 +133,23 @@ def _insert_circular_draft(payload: dict[str, object]) -> None:
         )
 
 
+def _mark_finding_linked_circular(finding: AuditFinding, circular_id: uuid.UUID) -> None:
+    finding.linked_circular_id = circular_id
+    if connection.vendor != "microsoft":
+        finding.save(update_fields=["linked_circular_id"])
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE dbo.{AuditFinding._meta.db_table}
+            SET linked_circular_id = CAST(%s AS uniqueidentifier)
+            WHERE id = CAST(%s AS uniqueidentifier)
+            """,
+            [str(circular_id), str(finding.id)],
+        )
+
+
 def _result(*, status: str, circular_id: uuid.UUID, payload: dict[str, object]) -> AuditCircularLinkResult:
     return AuditCircularLinkResult(
         status=status,
@@ -140,12 +157,6 @@ def _result(*, status: str, circular_id: uuid.UUID, payload: dict[str, object]) 
         detail_url=f"/circular/office?draft_id={circular_id}&source=audit_finding",
         payload=payload,
     )
-
-
-def _coerce_uuid(value: uuid.UUID | str) -> uuid.UUID:
-    if isinstance(value, uuid.UUID):
-        return value
-    return uuid.UUID(str(value))
 
 
 def _user_id(user: object) -> str:

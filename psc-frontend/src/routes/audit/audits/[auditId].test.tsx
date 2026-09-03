@@ -5,6 +5,7 @@ import type { AuditDetail } from '@/schemas/audit/detail';
 const auditDetailMocks = vi.hoisted(() => ({
   useParams: vi.fn(),
   useAuditDetail: vi.fn(),
+  useAuditVessels: vi.fn(),
   useSubmitAuditReport: vi.fn(),
   useAcknowledgeAuditReport: vi.fn(),
   useUpdateAuditDetail: vi.fn(),
@@ -20,19 +21,31 @@ const auditDetailMocks = vi.hoisted(() => ({
 
 vi.mock('react-router-dom', () => ({
   useParams: () => auditDetailMocks.useParams(),
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
+    <div data-testid="navigate" data-replace={String(Boolean(replace))} data-to={to} />
+  ),
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 
 vi.mock('@/hooks/audit/use-audit-registration', () => ({
-  useAuditDetail: (id: string | undefined) => auditDetailMocks.useAuditDetail(id),
-  useSubmitAuditReport: (id: string | undefined) => auditDetailMocks.useSubmitAuditReport(id),
-  useAcknowledgeAuditReport: (id: string | undefined) => auditDetailMocks.useAcknowledgeAuditReport(id),
-  useUpdateAuditDetail: (id: string | undefined) => auditDetailMocks.useUpdateAuditDetail(id),
-  useUpdateAuditScorecard: (id: string | undefined) => auditDetailMocks.useUpdateAuditScorecard(id),
+  useAuditDetail: (id: string | undefined) =>
+    auditDetailMocks.useAuditDetail(id),
+  useAuditVessels: () => auditDetailMocks.useAuditVessels(),
+  useSubmitAuditReport: (id: string | undefined) =>
+    auditDetailMocks.useSubmitAuditReport(id),
+  useAcknowledgeAuditReport: (id: string | undefined) =>
+    auditDetailMocks.useAcknowledgeAuditReport(id),
+  useUpdateAuditDetail: (id: string | undefined) =>
+    auditDetailMocks.useUpdateAuditDetail(id),
+  useUpdateAuditScorecard: (id: string | undefined) =>
+    auditDetailMocks.useUpdateAuditScorecard(id),
 }));
 
 vi.mock('@/hooks/audit/use-audit-finding', () => ({
-  useIssueAuditCircular: (id: string | undefined) => auditDetailMocks.useIssueAuditCircular(id),
+  useIssueAuditCircular: (id: string | undefined) =>
+    auditDetailMocks.useIssueAuditCircular(id),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -40,11 +53,19 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 vi.mock('@/components/layout/root-layout', () => ({
-  RootLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  RootLayout: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock('@/components/layout/page-header', () => ({
-  PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => (
+  PageHeader: ({
+    title,
+    actions,
+  }: {
+    title: string;
+    actions?: React.ReactNode;
+  }) => (
     <header>
       <h1>{title}</h1>
       {actions}
@@ -96,6 +117,7 @@ function sampleAudit(overrides: Partial<AuditDetail> = {}): AuditDetail {
     prev_internal_ca_verified: '',
     prev_external_ca_verified: '',
     status: 'IN_PROGRESS',
+    effective_permissions: ['AUDIT_P_002', 'AUDIT_P_003', 'AUDIT_P_017'],
     standards: ['ISM', 'ISPS', 'MLC', 'EMS'],
     team_members: [
       {
@@ -167,6 +189,7 @@ describe('AuditDetailRoute', () => {
   beforeEach(() => {
     auditDetailMocks.useParams.mockReset();
     auditDetailMocks.useAuditDetail.mockReset();
+    auditDetailMocks.useAuditVessels.mockReset();
     auditDetailMocks.useSubmitAuditReport.mockReset();
     auditDetailMocks.useAcknowledgeAuditReport.mockReset();
     auditDetailMocks.useUpdateAuditDetail.mockReset();
@@ -180,8 +203,17 @@ describe('AuditDetailRoute', () => {
     auditDetailMocks.toast.mockReset();
 
     auditDetailMocks.useParams.mockReturnValue({ auditId: 'audit-1' });
-    auditDetailMocks.submitAudit.mockResolvedValue(sampleAudit({ status: 'REPORT_FINALIZED' }));
-    auditDetailMocks.acknowledgeAudit.mockResolvedValue(sampleAudit({ status: 'VESSEL_ACKNOWLEDGED' }));
+    auditDetailMocks.useAuditVessels.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+    auditDetailMocks.submitAudit.mockResolvedValue(
+      sampleAudit({ status: 'REPORT_FINALIZED' })
+    );
+    auditDetailMocks.acknowledgeAudit.mockResolvedValue(
+      sampleAudit({ status: 'VESSEL_ACKNOWLEDGED' })
+    );
     auditDetailMocks.updateDetail.mockResolvedValue(sampleAudit());
     auditDetailMocks.updateScorecard.mockResolvedValue(sampleAudit());
     auditDetailMocks.issueCircular.mockResolvedValue({
@@ -224,28 +256,84 @@ describe('AuditDetailRoute', () => {
 
     expect(await screen.findByText('vessel-1')).toBeInTheDocument();
     expect(screen.getByText('Singapore')).toBeInTheDocument();
+    expect(screen.getAllByText('In Progress').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('IN_PROGRESS')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Allotted').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('14-Area Inspection Summary')).toBeInTheDocument();
     expect(screen.getByText('0/14 populated')).toBeInTheDocument();
     expect(screen.getByText('AUDIT-2026-001')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /dense/i })).toHaveAttribute(
+    expect(screen.getByLabelText('Prev Internal CAR Verified')).toBeInTheDocument();
+    expect(screen.getByLabelText('Prev External CAR Verified')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /nc closure/i })).toHaveAttribute(
       'href',
       '/audit/findings/finding-1/nc'
     );
-    expect(screen.getByRole('link', { name: /wizard/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /observation closure/i })).toHaveAttribute(
       'href',
-      '/audit/findings/finding-1/nc/wizard'
+      '/audit/findings/finding-2/obs/wizard'
     );
-    expect(screen.getByRole('link', { name: /observation/i })).toHaveAttribute(
-      'href',
-      '/audit/findings/finding-2/obs'
-    );
+    expect(screen.queryByRole('link', { name: /dense/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^wizard$/i })).not.toBeInTheDocument();
     expect(screen.getByText('NCs Raised')).toBeInTheDocument();
     expect(screen.getByText('Observations Raised')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /walk checklist/i })).toHaveAttribute(
-      'href',
-      '/audit/audits/audit-1/checklist'
-    );
-    expect(screen.getByRole('button', { name: /submit report/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /walk checklist/i })
+    ).toHaveAttribute('href', '/audit/audits/audit-1/checklist');
+    expect(
+      screen.getByRole('button', { name: /submit audit report/i })
+    ).toBeInTheDocument();
+  });
+
+  it('redirects external audit records to external close-out instead of internal F602 detail', () => {
+    auditDetailMocks.useAuditDetail.mockReturnValue({
+      data: sampleAudit({
+        audit_classification: 'EXTERNAL',
+        status: 'SUBMITTED',
+        audit_subtype: 'SMC_RENEWAL',
+      }),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AuditDetailRoute />);
+
+    expect(screen.getByTestId('navigate')).toHaveAttribute('data-to', '/audit/external/audit-1');
+    expect(screen.getByTestId('navigate')).toHaveAttribute('data-replace', 'true');
+    expect(screen.queryByText('F602 Detail')).not.toBeInTheDocument();
+  });
+
+  it('renders the vessel label instead of the internal vessel UUID in the audit header', async () => {
+    const vesselId = 'a282a51b-0183-ee11-b02e-782b4610c006';
+    auditDetailMocks.useAuditDetail.mockReturnValue({
+      data: sampleAudit({
+        inspection: {
+          ...sampleAudit().inspection,
+          vessel_id: vesselId,
+        },
+      }),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    auditDetailMocks.useAuditVessels.mockReturnValue({
+      data: [
+        {
+          id: vesselId.replace(/-/g, ''),
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    render(<AuditDetailRoute />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'EAT - EAST AYUTTHAYA' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(vesselId)).not.toBeInTheDocument();
   });
 
   it('saves edited summary and equipment fields through the detail mutation', async () => {
@@ -305,6 +393,60 @@ describe('AuditDetailRoute', () => {
     });
   });
 
+  it('keeps the saved scorecard editable and hides non-required demo areas', async () => {
+    const scorecard: AuditDetail['scorecard'] = [
+      ...Array.from({ length: 14 }, (_item, index) => {
+        const sequenceNo = index + 1;
+        return {
+          area_code: `AREA_${String(sequenceNo).padStart(2, '0')}`,
+          display_name: `Area ${String(sequenceNo).padStart(2, '0')}`,
+          is_vessel_only: sequenceNo > 8,
+          sequence_no: sequenceNo,
+          status: 'SATISFACTORY' as const,
+          remarks: 'Checked',
+        };
+      }),
+      {
+        area_code: 'DEMO_999',
+        display_name: 'Demo Audit Area',
+        is_vessel_only: false,
+        sequence_no: 999,
+        status: 'SATISFACTORY',
+        remarks: 'Demo row',
+      },
+    ];
+    auditDetailMocks.useAuditDetail.mockReturnValue({
+      data: sampleAudit({ scorecard }),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AuditDetailRoute />);
+
+    expect(await screen.findByText('14/14 populated')).toBeInTheDocument();
+    expect(screen.queryByText('15/14 populated')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo Audit Area')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Area 01 status')).toBeEnabled();
+    fireEvent.change(screen.getByLabelText('Area 01 remarks'), {
+      target: { value: 'Updated after save' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save scorecard/i }));
+
+    await waitFor(() => {
+      expect(auditDetailMocks.updateScorecard).toHaveBeenCalled();
+    });
+    const savedRows = auditDetailMocks.updateScorecard.mock.calls[0][0];
+    expect(savedRows).toHaveLength(14);
+    expect(savedRows[0]).toMatchObject({
+      area_code: 'AREA_01',
+      remarks: 'Updated after save',
+    });
+    expect(
+      savedRows.some((row: { area_code: string }) => row.area_code === 'DEMO_999')
+    ).toBe(false);
+  });
+
   it('shows structured submit gate failures returned by the backend', async () => {
     auditDetailMocks.submitAudit.mockRejectedValue({
       response: {
@@ -312,7 +454,8 @@ describe('AuditDetailRoute', () => {
           message: 'Audit cannot be submitted until all D-071 gates pass.',
           gates: {
             scorecard: {
-              missing_rows: 'Populate all 14 scorecard rows before submit: AREA_14.',
+              missing_rows:
+                'Populate all 14 scorecard rows before submit: AREA_14.',
             },
           },
         },
@@ -327,11 +470,15 @@ describe('AuditDetailRoute', () => {
 
     render(<AuditDetailRoute />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /submit report/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /submit audit report/i })
+    );
 
     await waitFor(() => {
       expect(auditDetailMocks.submitAudit).toHaveBeenCalled();
-      expect(screen.getByText('Submit gates blocked finalization')).toBeInTheDocument();
+      expect(
+        screen.getByText('Submit gates blocked finalization')
+      ).toBeInTheDocument();
       expect(screen.getByText(/AREA_14/)).toBeInTheDocument();
     });
   });
@@ -346,7 +493,11 @@ describe('AuditDetailRoute', () => {
 
     render(<AuditDetailRoute />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /vessel acknowledge audit report/i }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /vessel acknowledge audit report/i,
+      })
+    );
 
     await waitFor(() => {
       expect(auditDetailMocks.acknowledgeAudit).toHaveBeenCalled();
@@ -383,11 +534,15 @@ describe('AuditDetailRoute', () => {
 
     render(<AuditDetailRoute />);
 
-    fireEvent.click(await screen.findByRole('button', { name: /issue circular/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /issue circular/i })
+    );
 
     await waitFor(() => {
       expect(auditDetailMocks.issueCircular).toHaveBeenCalledWith('finding-1');
-      expect(auditDetailMocks.toast).toHaveBeenCalledWith({ title: 'Circular draft created' });
+      expect(auditDetailMocks.toast).toHaveBeenCalledWith({
+        title: 'Circular draft created',
+      });
     });
   });
 });

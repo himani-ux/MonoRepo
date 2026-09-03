@@ -4099,7 +4099,7 @@ class TestWorkflowMarkCompletedRouting(BaseCARAPITestCase):
 
 
 class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
-    """SUBMIT_TO_DPA comment should not overwrite the PIC review comment."""
+    """SUBMIT_TO_DPA should store the final PIC comment in the PIC column."""
 
     def setUp(self):
         super().setUp()
@@ -4107,7 +4107,7 @@ class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
         self.inspection, self.deficiency, self.car = self.create_car_with_deficiency(
             status=CARStatus.PIC_REVIEW
         )
-        self.car.pic_comment = "PIC review comment that must stay visible."
+        self.car.pic_comment = "Initial PIC review note."
         self.car.save(update_fields=["pic_comment"])
 
     def _submit_to_dpa(self, user, comment: str):
@@ -4119,15 +4119,15 @@ class TestWorkflowPICSubmitToDPACommentPersistence(BaseCARAPITestCase):
         force_authenticate(request, user=user)
         return self.view(request, id=self.car.id)
 
-    def test_submit_to_dpa_keeps_pic_review_comment_and_stores_forwarding_comment_as_last_action(self):
-        comment = "Forwarding this CAR to DPA with final office notes."
+    def test_submit_to_dpa_stores_comment_as_pic_and_last_action_comment(self):
+        comment = "PIC final review complete; forwarding this CAR to DPA."
 
         response = self._submit_to_dpa(self.office_pic, comment)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CARStatus.SUBMITTED_TO_DPA)
-        self.assertEqual(self.car.pic_comment, "PIC review comment that must stay visible.")
+        self.assertEqual(self.car.pic_comment, comment)
         self.assertEqual(self.car.last_action_comment, comment)
 
 
@@ -4228,8 +4228,37 @@ class TestWorkflowStartPICReviewRules(SimpleTestCase):
         self.assertFalse(actions["START_PIC_REVIEW"]["comment_required"])
 
 
+class TestWorkflowCloseCarIdempotenceRules(SimpleTestCase):
+    """CLOSE_CAR should tolerate stale duplicate DPA requests after closure."""
+
+    def setUp(self):
+        self.car = SimpleNamespace(status=CARStatus.CLOSED)
+        self.dpa = make_user(
+            role=RoleCodes.DPA,
+            user_type="OFFICE",
+            user_id="dpa-user",
+            display_name="DPA User",
+        )
+
+    def test_close_car_is_noop_after_car_is_already_closed(self):
+        from apps.inspection.workflow import WorkflowAction, validate_workflow_transition
+
+        transition, error = validate_workflow_transition(
+            self.car,
+            WorkflowAction.CLOSE_CAR,
+            self.dpa,
+            "",
+        )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(transition)
+        self.assertEqual(transition["target"], CARStatus.CLOSED)
+        self.assertTrue(transition["noop"])
+        self.assertFalse(transition["comment_required"])
+
+
 class TestCARPICCommentResolution(BaseCARAPITestCase):
-    """CAR detail/report should show the PIC review comment, not the submit-to-DPA comment."""
+    """CAR detail/report should show the dedicated PIC comment."""
 
     def setUp(self):
         super().setUp()
@@ -4285,12 +4314,12 @@ class TestCARPICCommentResolution(BaseCARAPITestCase):
         merged = TestCARReportPrintFormatting._flatten_flowable_text(elements)
         self.assertIn("Tail marker for full comment visibility", merged)
 
-    def test_serializer_and_report_prefer_pic_review_comment_over_submit_to_dpa_comment(self):
+    def test_serializer_and_report_show_submit_to_dpa_pic_comment(self):
         review_comment = (
             "PIC review approved the corrective actions and confirmed the full narrative "
             "must remain visible in the report output."
         )
-        submit_to_dpa_comment = "Forwarding to DPA after final office review."
+        submit_to_dpa_comment = "PIC final review complete; forwarding to DPA."
 
         self.car.pic_comment = submit_to_dpa_comment
         self.car.last_action = "SUBMIT_TO_DPA"
@@ -4322,7 +4351,7 @@ class TestCARPICCommentResolution(BaseCARAPITestCase):
 
         payload = CARDetailSerializer(self.car).data
 
-        self.assertEqual(payload["pic_comment"], review_comment)
+        self.assertEqual(payload["pic_comment"], submit_to_dpa_comment)
         self.assertEqual(payload["last_action_comment"], submit_to_dpa_comment)
 
         styles = car_reports._build_styles()
@@ -4332,8 +4361,25 @@ class TestCARPICCommentResolution(BaseCARAPITestCase):
 
         merged = TestCARReportPrintFormatting._flatten_flowable_text(elements)
         self.assertIn("Comment:", merged)
-        self.assertIn(review_comment, merged)
-        self.assertNotIn(submit_to_dpa_comment, merged)
+        self.assertIn(submit_to_dpa_comment, merged)
+
+    def test_serializer_falls_back_to_submit_to_dpa_comment_for_legacy_rows(self):
+        submit_to_dpa_comment = "PIC final review from existing server row."
+
+        self.car.pic_comment = None
+        self.car.last_action = "SUBMIT_TO_DPA"
+        self.car.last_action_comment = submit_to_dpa_comment
+        self.car.save(
+            update_fields=[
+                "pic_comment",
+                "last_action",
+                "last_action_comment",
+            ]
+        )
+
+        payload = CARDetailSerializer(self.car).data
+
+        self.assertEqual(payload["pic_comment"], submit_to_dpa_comment)
 
 
 class TestWorkflowCloseAutoCreatesPV(BaseCARAPITestCase):
@@ -4428,6 +4474,45 @@ class TestWorkflowCloseAutoCreatesPV(BaseCARAPITestCase):
             entity_id=self.car.id,
         )
         self.assertEqual(pv_notifications.count(), 1)
+
+    @patch("apps.notifications.signals._get_vessel_master_crew_ids", return_value=["MASTER-001"])
+    def test_duplicate_close_car_after_closed_is_successful_noop(self, _mock_master_ids):
+        first_response = self._close(self.dpa, comment="First DPA close should complete the CAR.")
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CARStatus.CLOSED)
+
+        activity_count = ActivityHistory.objects.filter(
+            entity_type="CAR",
+            entity_id=self.car.id,
+            event_type="CAR_WORKFLOW_CLOSE_CAR",
+        ).count()
+        open_pv_count = PhysicalVerification.objects.filter(
+            car=self.car,
+            status=PVStatus.OPEN,
+            is_deleted=False,
+        ).count()
+
+        duplicate_response = self._close(self.dpa, comment="")
+
+        self.assertEqual(duplicate_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(duplicate_response.data["data"]["status"], CARStatus.CLOSED)
+        self.assertEqual(
+            ActivityHistory.objects.filter(
+                entity_type="CAR",
+                entity_id=self.car.id,
+                event_type="CAR_WORKFLOW_CLOSE_CAR",
+            ).count(),
+            activity_count,
+        )
+        self.assertEqual(
+            PhysicalVerification.objects.filter(
+                car=self.car,
+                status=PVStatus.OPEN,
+                is_deleted=False,
+            ).count(),
+            open_pv_count,
+        )
 
 
 class TestCARListPVDue(BaseCARAPITestCase):

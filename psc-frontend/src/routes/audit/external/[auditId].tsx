@@ -13,6 +13,7 @@ import {
 } from '@/hooks/audit/use-audit-registration';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/api/client';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
 
 const certificateImpacts = ['CERT_VALID', 'RENEWAL_AT_RISK', 'SUSPENDED', 'WITHDRAWN', 'NONE'] as const;
 
@@ -114,11 +115,11 @@ export function ExternalAuditCloseoutPage({ auditId }: { auditId: string }) {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-semibold text-neutral-900">External Audit Close-out</h1>
                 <Badge variant={audit.status === 'DPA_CLOSED' ? 'success' : 'secondary'}>
-                  {audit.external_closure_status || audit.status}
+                  {getStatusLabel(audit.external_closure_status || audit.status)}
                 </Badge>
               </div>
               <p className="mt-1 text-sm text-neutral-500">
-                {audit.external_audit_org_type || 'External org'} - {audit.external_audit_subtypes?.join(', ') || audit.audit_subtype}
+                {formatExternalAuditDefinition(audit)}
               </p>
             </div>
             <HeaderDatum label="Vessel" value={audit.inspection.vessel_id} />
@@ -153,18 +154,18 @@ export function ExternalAuditCloseoutPage({ auditId }: { auditId: string }) {
                   className="h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                 >
                   {certificateImpacts.map((impact) => (
-                    <option key={impact} value={impact}>{impact}</option>
+                    <option key={impact} value={impact}>{formatEnumLabel(impact)}</option>
                   ))}
                 </select>
               </div>
-              <ReadOnlyField label="External close-out letter" value="Required attachment: EXTERNAL_CLOSE_OUT_LETTER" />
+              <ReadOnlyField label="External close-out letter" value={`Required attachment: ${formatEnumLabel('EXTERNAL_CLOSE_OUT_LETTER')}`} />
             </div>
 
             {suspended && (
               <div className="rounded-md border border-warning-100 bg-warning-50 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-warning-700">
                   <AlertTriangle className="h-4 w-4" />
-                  SUSPENDED requires cert confirmation and flag notification.
+                  Suspended requires cert confirmation and flag notification.
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
                   <Field label="Typed certificate number" value={typedCertNumber} onChange={setTypedCertNumber} />
@@ -230,6 +231,19 @@ function HeaderDatum({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-sm font-semibold text-neutral-800">{value || '-'}</p>
     </div>
   );
+}
+
+function formatExternalAuditDefinition(audit: {
+  external_audit_org_type?: string | null;
+  external_audit_subtypes?: string[] | null;
+  audit_subtype?: string | null;
+}) {
+  const orgType = formatEnumLabel(audit.external_audit_org_type) || 'External org';
+  const subtypes = audit.external_audit_subtypes?.length
+    ? audit.external_audit_subtypes.map(formatEnumLabel).join(', ')
+    : formatEnumLabel(audit.audit_subtype);
+
+  return [orgType, subtypes].filter(Boolean).join(' - ') || 'External audit';
 }
 
 function ReadOnlyField({ label, value }: { label: string; value: string }) {

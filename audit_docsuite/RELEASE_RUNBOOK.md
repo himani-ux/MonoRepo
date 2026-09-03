@@ -218,7 +218,7 @@ owed by KSM India under D-AUDRS-453 (`closure_data` ②③④) and is deliberate
 | 1 | `python manage.py audit_schema_fingerprint --capture pre --out checks/reports/audit-fingerprint-pre.json` | **Pre-migration schema fingerprint** of the 9 protected tables (`sys.columns` + `sys.check_constraints` + `sys.indexes`) — D-AUDRS-290, `MIGRATION.md §10`. |
 | 2 | `python manage.py audit_assert_no_car_check_constraint` | **D-AUDRS-294 — P0, fail-closed.** `psc_car` must carry **0** CHECK constraints. **If one IS found: the build FAILS `BLOCKED`, the crossing stops, and Prince is consulted. The migration MUST NOT self-authorize a schema change.** |
 | 3 | `python manage.py audit_legacy_discovery_probe --out checks/reports/audit-legacy-discovery.json` | **READ-ONLY** pre-deploy discovery: `SELECT COUNT(*) FROM psc_inspection WHERE inspection_type IN ('AUDIT','RS')` (D-AUDRS-291; verified **0** on the restored snapshot — production may drift, so it is still run). |
-| 4 | `python manage.py migrate inspection` | Creates the **43 Audit-owned tables** + indexes/constraints. The `CARStatus` **`choices`** extension emits a Django `AlterField` that generates **no SQL** (D-AUDRS-289). |
+| 4 | `python manage.py migrate inspection` | Creates the **44 Audit-owned tables** + indexes/constraints, including `aud_master_qual_body`. The `CARStatus` **`choices`** extension emits a Django `AlterField` that generates **no SQL** (D-AUDRS-289). |
 | 5 | `python manage.py audit_verify_pk_standard` | **PK-standard verification** (D-AUDRS-137/271/299②): every Audit-owned table has `id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWSEQUENTIALID()`; `INT IDENTITY` anywhere = FAIL. **Any violation FAILS the build.** Sole exception: `char(32)` **FK columns** to legacy `psc_*` tables — never a new table's `id` PK. |
 | 6 | `python manage.py audit_legacy_tag_load` | Conditional on step 3. Writes **only** `audit_legacy_inspection_tag` rows — **never a write of any kind to `psc_inspection`** (D-AUDRS-288/291). No-op when the probe returned 0. Idempotent (unique index on `psc_inspection_id`). |
 | 7 | `python manage.py load_audit_seeds` | Idempotent seed load, FK order per `MIGRATION.md §5`. Regulatory-source seeds load **only after human review** (D-AUDRS-098/267). |
@@ -277,7 +277,7 @@ proceed to authorization.
 
 | # | Probe | Proves |
 |---|---|---|
-| 1 | `python manage.py audit_verify_tables` | Every expected **Audit-owned table + its constraints/indexes** exists (43 tables incl. `audit_legacy_inspection_tag`; `DATA_MODEL.md §12`). |
+| 1 | `python manage.py audit_verify_tables` | Every expected **Audit-owned table + its constraints/indexes** exists (44 tables incl. `audit_legacy_inspection_tag` and `aud_master_qual_body`; `DATA_MODEL.md §12`). |
 | 2 | `python manage.py audit_verify_pk_standard` | **Module PK compliance** — `UNIQUEIDENTIFIER` + `NEWSEQUENTIALID()` (D-AUDRS-137/271). |
 | 3 | `python manage.py audit_schema_fingerprint --capture post --compare checks/reports/audit-fingerprint-pre.json --exceptions-must-be-empty` | **Exactly the approved legacy exceptions — and the list is EMPTY.** i.e. **zero shared-table mutation** across the 9 protected tables (D-AUDRS-290/299③). |
 | 4 | `python manage.py audit_verify_seed_counts --provenance docs/SEEDS_PROVENANCE.md` | **Seed/provenance counts** match `SEEDS_PROVENANCE.md`. |

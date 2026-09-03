@@ -1,15 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { RegisteredAudit, RegisteredAuditList } from '@/lib/api/audit';
 import type { AuditPlan, AuditPlanList } from '@/schemas/audit/plan';
 
 const dashboardMocks = vi.hoisted(() => ({
   useAuditPlans: vi.fn(),
+  useRegisteredAudits: vi.fn(),
   hasProcess: vi.fn(),
 }));
 
 vi.mock('@/hooks/audit/use-audit-plan', () => ({
   useAuditPlans: () => dashboardMocks.useAuditPlans(),
+}));
+
+vi.mock('@/hooks/audit/use-audit-registration', () => ({
+  useRegisteredAudits: () => dashboardMocks.useRegisteredAudits(),
 }));
 
 vi.mock('@/hooks/use-auth', () => ({
@@ -72,11 +78,45 @@ function sampleList(results: AuditPlan[]): AuditPlanList {
   };
 }
 
+function sampleRegisteredAudit(overrides: Partial<RegisteredAudit> = {}): RegisteredAudit {
+  return {
+    id: '34cfabc1-01c3-49ad-9516-5de5bdd7073d',
+    audit_plan_id: '11111111-1111-4111-8111-111111111111',
+    target_label: 'SFC - SF CHALISA',
+    vessel_id: '22222222222242228222222222222222',
+    audit_classification: 'INTERNAL',
+    auditee_type: 'VESSEL',
+    auditee_office_dept: null,
+    audit_subtype: 'ANNUAL_INTERNAL',
+    lead_auditor_name: 'Capt. Harman Sandhu',
+    lead_auditor_designation: 'SEQ Manager',
+    audit_start_date: '2026-08-25',
+    audit_end_date: '2026-08-26',
+    status: 'IN_PROGRESS',
+    created_date: '2026-08-25T10:00:00+05:30',
+    ...overrides,
+  };
+}
+
+function sampleRegisteredAuditList(results: RegisteredAudit[]): RegisteredAuditList {
+  return {
+    count: results.length,
+    results,
+  };
+}
+
 describe('AuditDashboardRoute', () => {
   beforeEach(() => {
     dashboardMocks.useAuditPlans.mockReset();
+    dashboardMocks.useRegisteredAudits.mockReset();
     dashboardMocks.hasProcess.mockReset();
     dashboardMocks.hasProcess.mockReturnValue(true);
+    dashboardMocks.useRegisteredAudits.mockReturnValue({
+      data: sampleRegisteredAuditList([]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   it('renders audit dashboard summary from audit plans', () => {
@@ -94,6 +134,12 @@ describe('AuditDashboardRoute', () => {
       error: null,
       refetch: vi.fn(),
     });
+    dashboardMocks.useRegisteredAudits.mockReturnValue({
+      data: sampleRegisteredAuditList([sampleRegisteredAudit()]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
 
     render(
       <MemoryRouter>
@@ -104,8 +150,52 @@ describe('AuditDashboardRoute', () => {
     expect(screen.getByRole('heading', { name: 'Audit Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('EAST AYUTTHAYA')).toBeInTheDocument();
     expect(screen.getByText('Office - SEQ')).toBeInTheDocument();
+    expect(screen.getByText('Registered Audits')).toBeInTheDocument();
+    expect(screen.getByText('SFC - SF CHALISA')).toBeInTheDocument();
+    expect(screen.getByText('Capt. Harman Sandhu')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
+    expect(screen.queryByText('IN_PROGRESS')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^open$/i })).toHaveAttribute(
+      'href',
+      '/audit/audits/34cfabc1-01c3-49ad-9516-5de5bdd7073d'
+    );
     expect(screen.getByText('Need Attention')).toBeInTheDocument();
     expect(screen.getAllByText('1')).toHaveLength(3);
+  });
+
+  it('opens external registered audits on the external close-out route', () => {
+    dashboardMocks.useAuditPlans.mockReturnValue({
+      data: sampleList([]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    dashboardMocks.useRegisteredAudits.mockReturnValue({
+      data: sampleRegisteredAuditList([
+        sampleRegisteredAudit({
+          id: '982df453-4aa8-411c-9330-b6ff357fb897',
+          audit_plan_id: null,
+          target_label: 'YCF - YC FORTITUDE',
+          audit_classification: 'EXTERNAL',
+          audit_subtype: 'SMC_RENEWAL',
+          status: 'SUBMITTED',
+        }),
+      ]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <AuditDashboardRoute />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('link', { name: /^open$/i })).toHaveAttribute(
+      'href',
+      '/audit/external/982df453-4aa8-411c-9330-b6ff357fb897'
+    );
   });
 
   it('redirects /audit to /audit/dashboard', () => {

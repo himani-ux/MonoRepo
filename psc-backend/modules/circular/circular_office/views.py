@@ -72,6 +72,8 @@ pdfmetrics.registerFont(TTFont("bookos", font_path))
 
 CIRCULAR_SR_LOCK_TIMEOUT_MS = 15000
 MAX_CIRCULAR_ATTACHMENT_FILES = 3
+MAX_CIRCULAR_ATTACHMENT_SIZE_MB = 50
+MAX_CIRCULAR_ATTACHMENT_SIZE_BYTES = MAX_CIRCULAR_ATTACHMENT_SIZE_MB * 1024 * 1024
 ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES = ("Available", "On Board", "On Leave")
 ALLOWED_CIRCULAR_DELIVERY_CREW_STATUS_LOOKUP = tuple(
     status_name.lower() for status_name in ALLOWED_CIRCULAR_DELIVERY_CREW_STATUSES
@@ -1045,6 +1047,13 @@ def _is_pdf_attachment_upload(uploaded_file):
     return file_name.endswith(".pdf") or content_type in {"application/pdf", "application/x-pdf"}
 
 
+def _uploaded_file_size(uploaded_file):
+    try:
+        return int(getattr(uploaded_file, "size", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _extract_uploaded_pdf_attachments_from_request_files(request_files):
     if request_files is None:
         return []
@@ -1077,6 +1086,17 @@ def _extract_uploaded_pdf_attachments_from_request_files(request_files):
         raise CircularAttachmentValidationError(
             "Only PDF attachments are allowed. Invalid files: "
             + ", ".join(invalid_file_names)
+        )
+
+    oversized_file_names = [
+        str(getattr(uploaded_file, "name", "Unknown file"))
+        for uploaded_file in deduped_uploaded_files
+        if _uploaded_file_size(uploaded_file) > MAX_CIRCULAR_ATTACHMENT_SIZE_BYTES
+    ]
+    if oversized_file_names:
+        raise CircularAttachmentValidationError(
+            f"Each PDF attachment must not exceed {MAX_CIRCULAR_ATTACHMENT_SIZE_MB} MB. Oversized files: "
+            + ", ".join(oversized_file_names)
         )
 
     return deduped_uploaded_files

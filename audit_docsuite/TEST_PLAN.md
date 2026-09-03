@@ -61,6 +61,7 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 | A-03 | Harmonised standards multi-select ISM+ISPS+MLC+EMS. | All persisted to `audit_standards`. | D-016 |
 | A-04 | Submit with opening meeting unset. | Hard-block, inline error on the opening-meeting field. | D-071 |
 | A-05 | Submit with a 14-area scorecard row blank. | Hard-block; office audit with N/A on the 6 vessel-only rows passes. | D-071/105 |
+| A-05A | Master-area seed contains an extra demo/non-required scorecard row. | Audit Detail still shows `14/14 populated` when the 14 operational rows are complete, hides the demo row from the editable grid and save payload, and submit gates ignore the extra row. | D-071/105 |
 | A-06 | Submit with `audit_summary` < 100 chars. | Hard-block. | D-071 |
 | A-07 | Submit with empty `equipment_tested`. | Hard-block. | D-071 |
 | A-08 | All 4 gates satisfied → Submit. | Status → `REPORT_FINALIZED`; findings list freezes. | D-071/080 |
@@ -72,6 +73,11 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 | A-14 | Audit detail contains NC and OBS findings created at the same timestamp. | API returns findings in deterministic NC/OBS order, not UUID-dependent order. | D-080 |
 | A-15 | Edit `audit_classification` after a finding exists. | Read-only; banner shown. | D-078 |
 | A-16 | Select a registerable audit plan during Register Audit. | Lead Auditor fields are populated from the selected plan and rendered read-only; submitted payload keeps the plan auditor snapshot. | D-108 |
+| A-17 | Open the Audit Dashboard after one audit has been registered, including as a vessel Master. | Registered Audits lists accessible `audit_detail` rows, the Open action routes to `/audit/audits/:id`, and vessel users receive only their assigned vessel's plan rows from the dashboard plan feed. | D-037/039/084/086 |
+| A-18 | Open Walk Checklist and review an item status control. | Row status is shown as radio choices: Not reviewed, Compliant, and Findings; choosing Findings enables Add Finding for that row. The Create Audit Finding modal does not expose PSC DefCode or Action Code input. | D-020/301/D-AUDRS-141 |
+| A-19 | Add Personnel Present for a vessel audit with top-rank crew data available. | Name control offers Master, Chief Officer, Chief Engineer, and Second Engineer personnel for the selected vessel; choosing a person fills the adjacent Rank field. | D-MAINT-CR176 |
+| A-20 | Open Audit Detail F602 fields. | Previous verification labels display as `Prev Internal CAR Verified` and `Prev External CAR Verified`. | D-MAINT-CR176 |
+| A-21 | Open Register Audit from sidebar, dashboard, or quick actions. | User lands on the Internal / External chooser; each option is shown only when the authenticated process gates allow it. | D-084/D-AUDRS-149 |
 
 ---
 
@@ -79,13 +85,15 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 
 | ID | Case | Expect | D- |
 |----|------|--------|----|
-| B-01 | Add an NC finding. | One CAR auto-created (`AUDIT-YYYY-NNN`), CAR at `ALLOTTED`. | D-002/008 |
-| B-02 | Add a finding with `objective_evidence` blank, then submit. | Submit blocked — objective evidence mandatory. | D-007 |
+| B-01 | Add an NC finding. | One CAR auto-created with `{SCOPE}-AUDIT-{YYYY}-{NNN}`, CAR at `ALLOTTED`; no Audit CAR contains literal `PSC`. | D-002/008/D-AUDRS-142 |
+| B-02 | Add a finding with `objective_evidence` blank, then submit. | Submit blocked because typed objective evidence remains mandatory. | D-007/D-AUDRS-140 |
 | B-03 | Polymorphic clause ref — pick ISM clause; pick `OTHER` + free text. | OTHER requires 5–200 char `clause_ref_text`. | D-068/077 |
 | B-04 | Multi-clause: add 2 clauses, mark one `is_primary`. | Exactly one `is_primary=1`; mirror columns on `audit_finding` match. | D-226 |
 | B-05 | Add a finding to a `SUBMITTED` audit. | HTTP 409. | D-080 |
-| B-06 | Major NC + `certificate_impact=SUSPENDED`. | `priority` auto-escalates to CRITICAL. | D-232 |
+| B-06 | Legacy API payload includes `certificate_impact=SUSPENDED`. | Backward-compatible priority auto-escalation still works, but the current UI no longer collects `certificate_impact`. | D-232/D-AUDRS-140 |
 | B-07 | Office NC — `certificates_at_risk` UI. | Only DOC + NONE offered; SMC/ISSC/MLC_DMLC rejected (HTTP 400). | D-103 |
+| B-08 | Create an audit finding with objective-evidence files attached. | Multipart payload saves each accepted image/PDF/DOCX/XLSX file as `AuditAttachment` category `FINDING_OBJECTIVE_EVIDENCE`; oversize or unsupported files are rejected before the finding is created. | D-AUDRS-140 |
+| B-09 | Create an audit finding without PSC DefCode or Action Code. | Backend creates the legacy bridge deficiency with DefCode `00000` and null Action Code. | D-AUDRS-141 |
 
 ---
 
@@ -93,9 +101,9 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 
 | ID | Case | Expect | D- |
 |----|------|--------|----|
-| C-01 | Crew fills Part B/C via the mobile wizard. | Single-question-per-screen; draft saved each advance; resume from last screen. | D-116 |
-| C-02 | Wizard on desktop ≥1024px. | 2-column layout with persistent context panel. | D-120 |
-| C-03 | RCA wizard — pick an `master_rca_template`. | RCA field pre-filled; editable; ≥50-char rule applies after edit. | D-074/117 |
+| C-01 | Vessel user fills NC Parts B/C/D. | Dense NC form remains the only active NC closure presentation; drafts can be saved and resumed. | D-116/D-AUDRS-145 |
+| C-02 | Open the legacy `/audit/findings/:id/nc/wizard` URL. | Compatibility route renders the dense NC closure form; no separate NC wizard is presented to the user. | D-120/D-AUDRS-145 |
+| C-03 | NC Part C root cause selection. | User selects PSC CAR CLC category/item rows and writes a root-cause summary; the >=50-character rule applies to the summary. | D-074/117/D-AUDRS-145 |
 | C-04 | Office-led drafting — Supt drafts B+C. | CAR → `OFFICE_DRAFTED`; Master notified; both names on PDF Part B footer. | D-118 |
 | C-05 | Transition without a signature scan. | Hard-block "Signature missing for {phase}". | D-072 |
 | C-06 | PIC review pickup by first scoped office user. | That user becomes PIC of record; `pic_user_id_resolved` set. | D-107/109 |
@@ -105,6 +113,8 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 | C-10 | EffRev incomplete at T+90. | `effectiveness_overdue=1`; DPA/SEQ escalation. | D-082 |
 | C-11 | NC overdue past due date. | Soft — banner + escalation; transitions still work. | D-073 |
 | C-12 | Master signature backdated 25 days with reason. | Accepted; `audit_finding_sign_event` records claimed vs actual. Backdate >30d hard-blocks. | D-255 |
+| C-13 | Open NC closure Part E. | Follow-up textarea label displays as `Further Action, If any`. | D-MAINT-CR176 |
+| C-14 | Save NC Parts E or F with certificate-at-risk values in a legacy payload. | Existing finding-level `certificates_at_risk` value is preserved; E/F no longer overwrite it. | D-AUDRS-140 |
 
 ---
 
@@ -114,7 +124,8 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 |----|------|--------|----|
 | D-01 | Master fills Part B and signs. | State → `MASTER_CLOSED` (terminal). | D-040/043 |
 | D-02 | DPA Part C / Auditor Part D entered. | Recorded as timestamps; state stays `MASTER_CLOSED` (not gated). | D-040 |
-| D-03 | Observation wizard (3 questions) on mobile + desktop. | Adaptive layout per D-120. | D-116/120 |
+| D-03 | Observation closure opens from Audit Detail. | The row exposes a single Observation Closure action and routes to `/audit/findings/:id/obs/wizard`; no dense/wizard choice is shown. | D-116/120/D-AUDRS-145 |
+| D-04 | Legacy `/audit/findings/:id/obs` URL is opened directly. | Compatibility route renders the Observation wizard; no dense OBS form is presented. | D-116/120/D-AUDRS-145 |
 
 ---
 
@@ -126,7 +137,7 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 | E-02 | T-90 tick. | SEQ Manager notified; draft PLANNED entry auto-created. | D-050 |
 | E-03 | T-0 / T+90 ticks. | `OVERDUE` / `CRITICAL_OVERDUE`; cert-at-risk flag at T+90. | D-050 |
 | E-04 | OPM F 713 extension — reason < 50 chars. | Rejected. Valid request → `EXTENSION_REQUESTED`. | D-051 |
-| E-05 | DPA approves extension. | `extended_due_date` set; auto-numbered `OPM-F-713-YYYY-NNN`; status `EXTENDED`. | D-051 |
+| E-05 | DPA approves extension. | `extended_due_date` set; auto-numbered `OPM-F-713-YYYY-NNN`; status `EXTENDED`; register display shows readable OPM F 713 reference/date text instead of raw database values. | D-051/D-AUDRS-144 |
 | E-06 | DPA cancels audit. | `cancellation_reason` ≥50 + future `next_planned_date` enforced; new PLANNED entry auto-created at −90d. | D-064 |
 | E-07 | Create an additional audit. | `is_additional=1`; excluded from cadence math; no alert ladder. | D-121 |
 | E-08 | Additional audit trigger = PSC_INSPECTION. | FK picker resolves; PSC inspection gets the back-reference annotation. | D-122/123 |
@@ -138,7 +149,10 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 
 | ID | Case | Expect | D- |
 |----|------|--------|----|
-| F-01 | Master registers an external SMC audit post-facto. | Created at `status=SUBMITTED`; no PLANNED lifecycle. | D-200 |
+| F-01 | Master registers an external SMC audit post-facto. | Created at `status=SUBMITTED`; no PLANNED lifecycle; Master default RBAC grants `AUDIT_P_013` even when the shared profile row does not store it. | D-200/206 |
+| F-01A | Master registers an external SMC audit with the report PDF attached. | UI shows a PDF attachment control instead of report path/size fields; backend derives file name, path, MIME type, and size and creates `EXTERNAL_AUDIT_REPORT`. | D-200/201 |
+| F-01B | Master registers an external audit without certificate linking fields. | UI does not show Linked Certificate UUIDs or Linked Certificates controls; no certificate IDs are submitted from registration. Report reference can be blank. | D-200/201/202 |
+| F-01C | External audit registration user opens the organisation dropdown. | Users with audit registration permissions can read active external audit organisations; if none exist, the dropdown is disabled with a no-active-organisation message and registration can still be submitted without an organisation. | D-200/201 |
 | F-02 | Register with a missing mandatory field. | HTTP 400. | D-201 |
 | F-03 | Register >30 days after completion. | Hard-block unless DPA override with `late_registration_reason` ≥50. | D-217 |
 | F-04 | DOC audit without `flag_state_code`. | Rejected — flag mandatory for DOC subtypes. | D-213 |
@@ -172,6 +186,7 @@ Desktop: Chrome 120+, Edge 120+, Safari 17+, Firefox 121+. Mobile: iOS 16+ Safar
 | ID | Case | Expect | D- |
 |----|------|--------|----|
 | H-01 | Each `AUDIT_P_*` gate against each role per `RBAC.md §4/§7`. | Mapping holds; ungated calls 403. | D-083/206 |
+| H-01A | Vessel Master and Acting Master auth snapshots are built from shared profile rows that may lack newer Audit gates. | Returned `process_ids` include `AUDIT_P_008`, `AUDIT_P_013`, and `AUDIT_P_017`; they do not include office-only `AUDIT_P_014`. | D-083/206 |
 | H-02 | Office-audit visibility. | All office users with read gates see it; `master_RoleByVessel` bypassed. | D-101 |
 | H-03 | Vessel-audit visibility. | Filtered by `master_RoleByVessel`. | D-086 |
 | H-04 | SEQ-dept audit, Lead Auditor = DPA. | HTTP 422. | D-256 |
@@ -220,7 +235,7 @@ CMS/HRM501/PSC/Circular are same-DB reads (D-135) — exercised by ordinary inte
 | K-04 | Soft-delete an audit with a CAR past `ALLOTTED`. | Blocked — must use `CANCELLED`. | D-079 |
 | K-05 | Attachment >10 MB or disallowed mime. | Rejected with inline error. | D-076 |
 | K-06 | Attachment versioning. | Re-upload of FINAL marks the prior `SUPERSEDED`. | D-218 |
-| K-07 | DB Table Creation Standard verification grep. | Zero violations across all 43 new tables. | D-271 |
+| K-07 | DB Table Creation Standard verification grep. | Zero violations across all 44 new tables. | D-271 |
 | K-08 | Legacy AUDIT/RS rows post-deploy — **tag resolved via `audit_legacy_inspection_tag`** (re-pointed 2026-07-14; formerly asserted the `psc_inspection.legacy` column). | An inspection with a tag row (`is_legacy=1`) renders read-only with the "Legacy — read only" banner; edit / add-finding / state-transition are all blocked. **`psc_inspection` has NO `legacy` column.** | D-097 (substance) · **D-288** |
 | K-09 | **Absence of a tag row.** | Inspection is treated as **not legacy** — fully editable, no banner. (Absence = not legacy; no per-row write needed for the 0 existing rows.) | D-288 |
 | K-10 | **Pre-deploy discovery probe** on a DB with **0** AUDIT/RS rows (the live-verified case). | Probe returns 0; **no tag rows written; `psc_inspection` untouched (zero writes)**. | D-291 |

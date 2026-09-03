@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
 import uuid
@@ -8,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import django
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.apps import apps
 from django.db import connection
 
@@ -42,6 +44,7 @@ from apps.accounts.models import RoleCodes  # noqa: E402
 from apps.car.models import ActivityHistory  # noqa: E402
 from apps.inspection.audit.models import (  # noqa: E402
     AuditAreaSummary,
+    AuditAttachment,
     AuditDetail,
     AuditFinding,
     AuditFindingClause,
@@ -52,6 +55,7 @@ from apps.inspection.audit.models import (  # noqa: E402
     MasterIsmClause,
 )
 from apps.inspection.audit.permissions import AUDIT_P_001, AUDIT_P_002, AUDIT_P_003, AUDIT_P_007, AUDIT_P_017  # noqa: E402
+from apps.inspection.audit.services import detail as detail_service  # noqa: E402
 from apps.inspection.audit.views import (  # noqa: E402
     AuditAcknowledgeView,
     AuditDetailView,
@@ -79,6 +83,7 @@ SCHEMA_MODELS = [
     MasterAuditArea,
     MasterIsmClause,
     AuditAreaSummary,
+    AuditAttachment,
 ]
 
 
@@ -295,6 +300,24 @@ class AuditDetailApiTests(unittest.TestCase):
             description="Fire door issue",
             created_by="auditor-1",
         )
+        obs_car = CAR.objects.create(car_number="AUDIT-2026-002", status="OPEN")
+        obs_deficiency = Deficiency.objects.create(
+            inspection=self.inspection,
+            def_code_id="10102",
+            def_code="10102",
+            description="Legacy observation issue",
+            car=obs_car,
+            created_by="auditor-1",
+        )
+        AuditFinding.objects.create(
+            audit_detail_id=self.audit_detail.id,
+            psc_deficiency_id=obs_deficiency.id.hex,
+            audit_classification="INTERNAL",
+            finding_type="OBS",
+            observation_category="IMPROVEMENT",
+            description="Legacy observation issue",
+            created_by="auditor-1",
+        )
         user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
 
         response = self._get_detail(user)
@@ -305,10 +328,87 @@ class AuditDetailApiTests(unittest.TestCase):
         self.assertEqual(data["inspection"]["port_place"], "Singapore")
         self.assertEqual(data["standards"], ["ISM", "ISPS", "MLC", "EMS"])
         self.assertEqual(data["counts"]["nc"], 1)
-        self.assertEqual(data["counts"]["observations"], 0)
+        self.assertEqual(data["counts"]["observations"], 1)
         self.assertEqual(len(data["scorecard"]), 14)
         self.assertEqual(data["scorecard"][0]["area_code"], "AREA_01")
         self.assertEqual(data["findings"][0]["car_number"], "AUDIT-2026-001")
+        self.assertEqual(data["findings"][1]["finding_type"], "OBSERVATION")
+        self.assertEqual(data["findings"][1]["observation_category"], "IMPROVEMENT_SUGGESTION")
+
+    def test_get_detail_ignores_non_required_master_audit_area_rows(self) -> None:
+        MasterAuditArea.objects.create(
+            area_code="DEMO_999",
+            display_name="Demo Audit Area",
+            is_vessel_only=False,
+            sequence_no=999,
+        )
+        AuditAreaSummary.objects.create(
+            audit_detail_id=self.audit_detail.id,
+            area_code="DEMO_999",
+            status="SATISFACTORY",
+            remarks="Demo row should not appear",
+            created_by="seed",
+        )
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+
+        response = self._get_detail(user)
+
+        self.assertEqual(response.status_code, 200)
+        scorecard = response.data["data"]["scorecard"]
+        self.assertEqual(len(scorecard), 14)
+        self.assertNotIn("DEMO_999", {row["area_code"] for row in scorecard})
+        self.assertNotIn("Demo Audit Area", {row["display_name"] for row in scorecard})
+
+    def test_registered_audit_detail_lookup_casts_uuid_for_sql_server(self) -> None:
+        with patch(
+            "apps.inspection.audit.services.detail.connection",
+            SimpleNamespace(vendor="microsoft"),
+            create=True,
+        ):
+            with patch.object(AuditDetail.objects, "raw", return_value=[self.audit_detail]) as raw:
+                result = AuditDetailView()._get_audit_detail(str(self.audit_detail.id))
+
+        self.assertEqual(result.id, self.audit_detail.id)
+        raw.assert_called_once()
+        sql, params = raw.call_args.args
+        self.assertIn("FROM dbo.audit_detail", sql)
+        self.assertIn("id = CAST(%s AS uniqueidentifier)", sql)
+        self.assertEqual(params, [str(self.audit_detail.id)])
+
+    def test_sql_server_detail_bundle_child_queries_cast_audit_detail_id(self) -> None:
+        raw_calls = []
+
+        def raw_rows(sql, params=None):
+            raw_calls.append((sql, params or []))
+            return []
+
+        unsafe_filter = AssertionError("SQL Server child audit_detail_id lookups must use CAST.")
+        with (
+            patch.object(detail_service, "connection", SimpleNamespace(vendor="microsoft")),
+            patch.object(detail_service, "get_audit_detail_by_id", return_value=self.audit_detail),
+            patch.object(detail_service, "_inspection_for_detail", return_value=self.inspection),
+            patch.object(AuditStandard.objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditTeamMember.objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditMeetingAttendee.objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditAreaSummary.objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditFinding.objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditStandard.objects, "raw", side_effect=raw_rows),
+            patch.object(AuditTeamMember.objects, "raw", side_effect=raw_rows),
+            patch.object(AuditMeetingAttendee.objects, "raw", side_effect=raw_rows),
+            patch.object(AuditAreaSummary.objects, "raw", side_effect=raw_rows),
+            patch.object(AuditFinding.objects, "raw", side_effect=raw_rows),
+        ):
+            bundle = detail_service.get_audit_detail_bundle(str(self.audit_detail.id))
+
+        self.assertEqual(bundle.standards, [])
+        self.assertEqual(bundle.team_members, [])
+        self.assertEqual(bundle.attendees, [])
+        self.assertEqual(bundle.score_rows, {})
+        self.assertEqual(bundle.findings, [])
+        self.assertEqual(len(raw_calls), 5)
+        for sql, params in raw_calls:
+            self.assertIn("audit_detail_id = CAST(%s AS uniqueidentifier)", sql)
+            self.assertEqual(params, [str(self.audit_detail.id)])
 
     def test_patch_detail_updates_editable_summary_and_equipment_fields(self) -> None:
         user = make_user(process_ids=[AUDIT_P_002, AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
@@ -352,6 +452,29 @@ class AuditDetailApiTests(unittest.TestCase):
         self.assertEqual(AuditAreaSummary.objects.get(area_code="AREA_01").status, "NC_RAISED")
         self.assertEqual(AuditAreaSummary.objects.get(area_code="AREA_09").status, "N_A")
 
+    def test_sql_server_scorecard_create_uses_casted_insert_helper(self) -> None:
+        user = make_user(user_id="auditor-1", process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        row = {"area_code": "AREA_01", "status": "SATISFACTORY", "remarks": "Good"}
+
+        with (
+            patch.object(detail_service, "connection", SimpleNamespace(vendor="microsoft")),
+            patch.object(detail_service, "_audit_detail_rows", return_value=[]),
+            patch.object(AuditAreaSummary.objects, "create", side_effect=AssertionError("SQL Server scorecard inserts must cast UUID columns")),
+            patch.object(detail_service, "_insert_sql_server_row", return_value=uuid.uuid4(), create=True) as insert_row,
+        ):
+            detail_service.upsert_scorecard_rows(audit_detail=self.audit_detail, rows=[row], user=user)
+
+        insert_row.assert_called_once_with(
+            "audit_area_summary",
+            {
+                "audit_detail_id": self.audit_detail.id,
+                "area_code": "AREA_01",
+                "status": "SATISFACTORY",
+                "remarks": "Good",
+                "created_by": "auditor-1",
+            },
+        )
+
     def test_detail_requires_audit_scope_permission(self) -> None:
         user = make_user(process_ids=[])
 
@@ -385,7 +508,6 @@ class AuditDetailApiTests(unittest.TestCase):
                 "standard_code": "ISM",
                 "description": "Fire door self-closing device was not functioning.",
                 "objective_evidence": "Observed during accommodation walk.",
-                "def_code_id": "10101",
                 "clauses": [
                     {
                         "rule_book_type": "ISM",
@@ -405,7 +527,136 @@ class AuditDetailApiTests(unittest.TestCase):
         self.assertEqual(data["finding_type"], "NC")
         self.assertEqual(data["rule_book_type"], "ISM")
         self.assertEqual(data["clause_ref_text"], "ISM 10.2")
-        self.assertTrue(data["car_number"].startswith("TST-PSC-2026-"))
+        self.assertTrue(data["car_number"].startswith("TST-AUDIT-2026-"))
+        deficiency = Deficiency.objects.get()
+        self.assertEqual(deficiency.def_code_id, "00000")
+        self.assertIsNone(deficiency.action_code_id)
+
+    def test_post_finding_saves_objective_evidence_attachment(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        payload = {
+            "finding_type": "NC",
+            "nc_category": "MINOR_NC",
+            "standard_code": "ISM",
+            "description": "Fire door self-closing device was not functioning.",
+            "objective_evidence": "Observed during accommodation walk.",
+            "clauses": json.dumps(
+                [
+                    {
+                        "rule_book_type": "ISM",
+                        "rule_clause_id": str(self.ism_clause.id),
+                        "is_primary": True,
+                    }
+                ]
+            ),
+            "evidence_files": SimpleUploadedFile(
+                "evidence.pdf",
+                b"%PDF-1.4 audit evidence",
+                content_type="application/pdf",
+            ),
+        }
+        request = self.factory.post(
+            f"/api/audit/audits/{self.audit_detail.id}/findings/",
+            payload,
+            format="multipart",
+        )
+        force_authenticate(request, user=user)
+
+        with patch("apps.inspection.audit.views.finding._save_uploaded_file") as save_file:
+            response = AuditFindingCreateView.as_view()(request, id=self.audit_detail.id)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(AuditAttachment.objects.count(), 1)
+        attachment = AuditAttachment.objects.get()
+        self.assertEqual(attachment.category, "FINDING_OBJECTIVE_EVIDENCE")
+        self.assertEqual(attachment.file_name, "evidence.pdf")
+        self.assertEqual(attachment.audit_finding_id, AuditFinding.objects.get().id)
+        save_file.assert_called_once()
+
+    def test_post_finding_uses_sql_server_safe_audit_detail_lookup(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        payload = {
+            "finding_type": "NC",
+            "nc_category": "MINOR_NC",
+            "standard_code": "ISM",
+            "description": "Fire door self-closing device was not functioning.",
+            "objective_evidence": "Observed during accommodation walk.",
+            "def_code_id": "10101",
+            "clauses": [
+                {
+                    "rule_book_type": "ISM",
+                    "rule_clause_id": str(self.ism_clause.id),
+                    "is_primary": True,
+                }
+            ],
+        }
+        request = self.factory.post(f"/api/audit/audits/{self.audit_detail.id}/findings/", payload, format="json")
+        force_authenticate(request, user=user)
+        unsafe_get = AssertionError("Finding save must use UUID-safe audit_detail lookup on SQL Server.")
+
+        with (
+            patch(
+                "apps.inspection.audit.views.finding.get_audit_detail_by_id",
+                return_value=self.audit_detail,
+                create=True,
+            ) as view_lookup,
+            patch(
+                "apps.inspection.audit.services.finding.get_audit_detail_by_id",
+                return_value=self.audit_detail,
+                create=True,
+            ) as service_lookup,
+            patch.object(AuditDetail.objects, "get", side_effect=unsafe_get),
+            patch.object(AuditDetail.objects, "select_for_update", side_effect=unsafe_get),
+        ):
+            response = AuditFindingCreateView.as_view()(request, id=str(self.audit_detail.id))
+
+        self.assertEqual(response.status_code, 201)
+        view_lookup.assert_called_once_with(str(self.audit_detail.id))
+        service_lookup.assert_called_once_with(self.audit_detail.id, for_update=True)
+        self.assertEqual(AuditFinding.objects.count(), 1)
+
+    def test_post_finding_response_clause_lookup_casts_finding_id_for_sql_server(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        payload = {
+            "finding_type": "NC",
+            "nc_category": "MINOR_NC",
+            "standard_code": "ISM",
+            "description": "Fire door self-closing device was not functioning.",
+            "objective_evidence": "Observed during accommodation walk.",
+            "def_code_id": "10101",
+            "clauses": [
+                {
+                    "rule_book_type": "ISM",
+                    "rule_clause_id": str(self.ism_clause.id),
+                    "is_primary": True,
+                }
+            ],
+        }
+        raw_calls = []
+
+        def raw_clause_lookup(sql, params):
+            raw_calls.append((sql, params))
+            return list(AuditFindingClause.objects.all())
+
+        unsafe_filter = AssertionError("Finding response must cast audit_finding_id on SQL Server.")
+        with (
+            patch(
+                "apps.inspection.audit.serializers.finding.connection",
+                SimpleNamespace(vendor="microsoft"),
+                create=True,
+            ),
+            patch.object(AuditFindingClause.objects, "filter", side_effect=unsafe_filter),
+            patch.object(AuditFindingClause.objects, "raw", side_effect=raw_clause_lookup),
+        ):
+            response = self._post_finding(payload, user)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(raw_calls), 1)
+        sql, params = raw_calls[0]
+        self.assertIn(f"FROM dbo.{AuditFindingClause._meta.db_table}", sql)
+        self.assertIn("audit_finding_id = CAST(%s AS uniqueidentifier)", sql)
+        self.assertEqual(params, [str(AuditFinding.objects.get().id)])
+        self.assertEqual(response.data["data"]["clauses"][0]["clause_ref_text"], "ISM 10.2")
 
     def test_post_finding_rejects_after_report_finalized_with_no_car_side_effect(self) -> None:
         self.audit_detail.status = "REPORT_FINALIZED"
@@ -582,6 +833,94 @@ class AuditDetailApiTests(unittest.TestCase):
             cursor.execute("SELECT COUNT(*) FROM msc_data")
             self.assertEqual(cursor.fetchone()[0], 1)
 
+    def test_sql_server_issue_circular_casts_finding_detail_and_link_ids(self) -> None:
+        conductor = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        create_response = self._post_finding(
+            {
+                "finding_type": "NC",
+                "nc_category": "MAJOR_NC",
+                "standard_code": "ISM",
+                "description": "Fleetwide NC requires circular issue.",
+                "objective_evidence": "Same condition sampled across sister vessels.",
+                "def_code_id": "10101",
+                "priority": "HIGH",
+                "is_fleetwide_relevance": True,
+                "clauses": [
+                    {
+                        "rule_book_type": "ISM",
+                        "rule_clause_id": str(self.ism_clause.id),
+                        "is_primary": True,
+                    }
+                ],
+            },
+            conductor,
+        )
+        finding_id = create_response.data["data"]["id"]
+        finding = AuditFinding.objects.get(id=finding_id)
+        dpa = make_user(role="DPA", process_ids=[AUDIT_P_007], vessel_ids=[str(self.vessel_id)])
+        raw_finding_calls = []
+        raw_detail_calls = []
+        cursor_calls = []
+
+        class RecordingCursor:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def execute(self, sql, params=None):
+                cursor_calls.append((sql, params or []))
+
+        class RecordingConnection:
+            vendor = "microsoft"
+
+            def cursor(self):
+                return RecordingCursor()
+
+        def raw_finding_lookup(sql, params):
+            raw_finding_calls.append((sql, params))
+            return [finding]
+
+        def raw_detail_lookup(sql, params):
+            raw_detail_calls.append((sql, params))
+            return [self.audit_detail]
+
+        unsafe_get = AssertionError("Issue Circular must cast finding UUIDs on SQL Server.")
+        with (
+            patch(
+                "apps.inspection.audit.services.detail.connection",
+                SimpleNamespace(vendor="microsoft"),
+                create=True,
+            ),
+            patch(
+                "apps.inspection.audit.services.circular_link.connection",
+                RecordingConnection(),
+                create=True,
+            ),
+            patch.object(AuditFinding.objects, "get", side_effect=unsafe_get),
+            patch.object(AuditFinding.all_objects, "raw", side_effect=raw_finding_lookup),
+            patch.object(AuditDetail.objects, "raw", side_effect=raw_detail_lookup),
+        ):
+            response = self._post_issue_circular(finding_id, dpa)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(raw_finding_calls), 2)
+        for sql, params in raw_finding_calls:
+            self.assertIn(f"FROM dbo.{AuditFinding._meta.db_table}", sql)
+            self.assertIn("id = CAST(%s AS uniqueidentifier)", sql)
+            self.assertEqual(params, [str(finding.id)])
+        self.assertEqual(len(raw_detail_calls), 2)
+        for sql, params in raw_detail_calls:
+            self.assertIn("FROM dbo.audit_detail", sql)
+            self.assertIn("id = CAST(%s AS uniqueidentifier)", sql)
+            self.assertEqual(params, [str(self.audit_detail.id)])
+        joined_sql = "\n".join(sql for sql, _params in cursor_calls)
+        self.assertIn("INSERT INTO msc_data", joined_sql)
+        self.assertIn(f"UPDATE dbo.{AuditFinding._meta.db_table}", joined_sql)
+        self.assertIn("linked_circular_id = CAST(%s AS uniqueidentifier)", joined_sql)
+        self.assertIn("WHERE id = CAST(%s AS uniqueidentifier)", joined_sql)
+
     def test_issue_circular_requires_fleetwide_nc(self) -> None:
         conductor = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
         create_response = self._post_finding(
@@ -632,8 +971,22 @@ class AuditDetailApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("scorecard", response.data["gates"])
+
+    def test_submit_ignores_non_required_master_audit_area_rows(self) -> None:
+        self._make_submit_ready()
+        MasterAuditArea.objects.create(
+            area_code="DEMO_999",
+            display_name="Demo Audit Area",
+            is_vessel_only=False,
+            sequence_no=999,
+        )
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+
+        response = self._submit(user)
+
+        self.assertEqual(response.status_code, 200)
         self.audit_detail.refresh_from_db()
-        self.assertEqual(self.audit_detail.status, "IN_PROGRESS")
+        self.assertEqual(self.audit_detail.status, "REPORT_FINALIZED")
 
     def test_submit_blocks_when_summary_is_too_short_or_equipment_empty(self) -> None:
         self._make_submit_ready()

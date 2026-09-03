@@ -37,6 +37,29 @@ def parse_standards_csv(value: object) -> list[str]:
     return standards
 
 
+def get_external_org_by_id(org_id: object) -> MasterExternalAuditOrg | None:
+    try:
+        org_uuid = UUID(str(org_id))
+    except (TypeError, ValueError):
+        return None
+
+    if connection.vendor == "microsoft":
+        rows = list(
+            MasterExternalAuditOrg.objects.raw(
+                """
+                SELECT *
+                FROM dbo.master_external_audit_org
+                WHERE id = CAST(%s AS uniqueidentifier)
+                  AND is_active = 1
+                """,
+                [str(org_uuid)],
+            )
+        )
+        return rows[0] if rows else None
+
+    return MasterExternalAuditOrg.objects.filter(id=org_uuid, is_active=True).first()
+
+
 def qualified_auditor_queryset(
     *,
     standards: object = None,
@@ -234,6 +257,27 @@ def resolve_external_org_for_vessel_standard(
         return None
 
     current_date = effective_on or timezone.localdate()
+    if connection.vendor == "microsoft":
+        standard_placeholders = ", ".join(["%s"] * len(parsed_standards))
+        rows = list(
+            MasterExternalAuditOrg.objects.raw(
+                f"""
+                SELECT TOP 1 org.*
+                FROM dbo.master_external_audit_org org
+                INNER JOIN dbo.vessel_audit_ro_delegation delegation
+                    ON delegation.master_external_audit_org_id = org.id
+                WHERE delegation.target_vessel_id = CAST(%s AS uniqueidentifier)
+                  AND delegation.standard_code IN ({standard_placeholders})
+                  AND delegation.effective_from <= %s
+                  AND (delegation.effective_to IS NULL OR delegation.effective_to >= %s)
+                  AND org.is_active = 1
+                ORDER BY delegation.effective_from DESC, delegation.standard_code
+                """,
+                [str(normalized_vessel_id), *parsed_standards, current_date, current_date],
+            )
+        )
+        return rows[0] if rows else None
+
     delegation = (
         VesselAuditRoDelegation.objects.filter(
             target_vessel_id=normalized_vessel_id,
@@ -246,7 +290,4 @@ def resolve_external_org_for_vessel_standard(
     )
     if delegation is None:
         return None
-    return MasterExternalAuditOrg.objects.filter(
-        id=delegation.master_external_audit_org_id,
-        is_active=True,
-    ).first()
+    return get_external_org_by_id(delegation.master_external_audit_org_id)

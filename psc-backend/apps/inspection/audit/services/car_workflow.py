@@ -3,7 +3,10 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from django.utils import timezone
+
 from apps.inspection.audit.models import AuditDetail, AuditFinding
+from apps.inspection.audit.services.detail import get_audit_detail_by_id, get_audit_finding_by_id
 from apps.inspection.deficiency_models import CAR, Deficiency
 from apps.inspection.workflow import WorkflowAction
 
@@ -43,12 +46,13 @@ def resolve_audit_car_workflow_context(finding_id: uuid.UUID | str) -> AuditCarW
     except (TypeError, ValueError, AttributeError):
         raise AuditCarWorkflowError("Audit finding not found.", error="NOT_FOUND", status_code=404)
 
-    finding = AuditFinding.all_objects.filter(id=finding_uuid, is_deleted=False).first()
+    finding = _get_audit_finding_for_workflow(finding_uuid)
     if not finding:
         raise AuditCarWorkflowError("Audit finding not found.", error="NOT_FOUND", status_code=404)
 
-    audit_detail = AuditDetail.objects.filter(id=finding.audit_detail_id).first()
-    if not audit_detail:
+    try:
+        audit_detail = get_audit_detail_by_id(finding.audit_detail_id)
+    except AuditDetail.DoesNotExist:
         raise AuditCarWorkflowError(
             "Audit detail not found for finding.",
             error="AUDIT_DETAIL_NOT_FOUND",
@@ -102,6 +106,13 @@ def resolve_audit_car_workflow_context(finding_id: uuid.UUID | str) -> AuditCarW
     )
 
 
+def _get_audit_finding_for_workflow(finding_uuid: uuid.UUID) -> AuditFinding | None:
+    try:
+        return get_audit_finding_by_id(finding_uuid)
+    except AuditFinding.DoesNotExist:
+        return None
+
+
 def validate_audit_proxy_preconditions(context: AuditCarWorkflowContext, *, action: str | None, user) -> None:
     if action == WorkflowAction.START_PIC_REVIEW:
         if _identity_matches(getattr(user, "id", None), context.audit_detail.lead_auditor_user_id):
@@ -110,3 +121,30 @@ def validate_audit_proxy_preconditions(context: AuditCarWorkflowContext, *, acti
                 error="LEAD_AUDITOR_PIC_DENIED",
                 status_code=403,
             )
+
+
+def apply_successful_audit_car_transition(context: AuditCarWorkflowContext, *, action: str | None, user) -> None:
+    if action != WorkflowAction.START_PIC_REVIEW:
+        return
+
+    audit_detail = AuditDetail.objects.select_for_update().get(id=context.audit_detail.id)
+    update_fields: list[str] = []
+    actor_id = _user_id(user)
+
+    if not audit_detail.pic_user_id_resolved:
+        audit_detail.pic_user_id_resolved = actor_id
+        update_fields.append("pic_user_id_resolved")
+
+    if audit_detail.status == "VESSEL_ACKNOWLEDGED":
+        audit_detail.status = "CLOSURE_IN_PROGRESS"
+        update_fields.append("status")
+
+    if update_fields:
+        audit_detail.updated_by = actor_id
+        audit_detail.updated_date = timezone.now()
+        update_fields.extend(["updated_by", "updated_date"])
+        audit_detail.save(update_fields=update_fields)
+
+
+def _user_id(user: object) -> str:
+    return str(getattr(user, "id", "") or getattr(user, "username", "") or "system")

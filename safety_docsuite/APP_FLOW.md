@@ -598,7 +598,7 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 - `GET /api/safety/near-miss/?vessel_id={id}` — query key `['safety','nearMiss', vesselId]`.
 **Signature transition:** n/a.
 **States:**
-- **Loaded:** Table `Ref | Vessel | Date | Priority (LOW/MEDIUM/HIGH) | Reporter | State`. Reporter cell shows the reporter name/rank where available.
+- **Loaded:** Vessel, Priority, and State filters above the register for global office users; ship/scoped users stay limited to their assigned vessel. Table `Ref | Vessel | Date | Priority (LOW/MEDIUM/HIGH) | Reporter | State`. Priority badges are colour-coded: HIGH red, MEDIUM amber, LOW green, and missing priority as neutral `Pending office comments`. Reporter cell shows the reporter name/rank where available.
 - **Loading:** Skeleton rows.
 - **Empty:** `"No near miss records. Any crew member may create one — click New Near Miss."`
 - **Error — network / auth:** standard.
@@ -616,6 +616,7 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 - `GET /api/safety/near-miss/cause-options/` for Human/Vessel/Management/Other factor cause dropdowns.
 **Signature transition:**
 - On submit, **Reporter** identity and device fingerprint are stored on record.
+- Numbering: normal vessel-side submission keeps `DRAFT-{VslCode}/{YYYY}/T{nnn}` while the Near Miss waits for vessel review. Direct Master-created Near Miss records enter `READY_FOR_OFFICE_COMMENTS` and receive the formal `{VslCode}/{YYYY}/{NNN}` number immediately.
 **Field controls:** place is one of `At Anchor`, `At Sea`, `At Port`; Category combines the previous Category and Possible Loss Type dropdown options into a single flat dropdown; Near Miss Type is removed; Category allows up to 3 selections and has one custom option `Other - Specify`. Cause analysis is four cards: Human Factors, Vessel Factors, Management Factors, and Other Factors. Each card has Immediate Cause and Root Cause dropdowns. Every dropdown includes `Other` and `Not Applicable`; selecting `Other` opens a required text field.
 **States:**
 - **Loaded:** Single-page form — what happened (≥100 chars, D-GAP-M38) · severity · place · category · factor causes · Immediate Action · suggestion/preventive action.
@@ -642,8 +643,9 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 - Reporter identity/signature data captured at submit.
 - LOW → PIC review → closure signature (DESIGN_SYSTEM §8.2 role-varied signature block).
 - HIGH → Master / HOD vessel-side review signature captured with typed name + device fingerprint before Office Comments / fleet-alert approval.
+- Master submit-to-office and Master rework resubmit move the Near Miss to `READY_FOR_OFFICE_COMMENTS` and assign the formal `{VslCode}/{YYYY}/{NNN}` number in the same backend transaction as the state change. The final number has no `DRAFT-` prefix or `/T` draft marker.
 **States:**
-- **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3). When available, Vessel review comments, completed Office Comments, and Closure comment are shown as read-only note blocks at the end of the summary after the Immediate action and Preventive action / suggestion boxes.
+- **Loaded:** Card layout — What happened · Suggestion · Immediate action · Priority pill (LOW amber / HIGH red per DESIGN_SYSTEM §3). When available, HOD/CE/CO review comment, Master vessel-review comment, completed Office Comments, and Closure comment are shown as read-only note blocks at the end of the summary after the Immediate action and Preventive action / suggestion boxes.
 - **Loading:** Skeleton card.
 - **Empty:** n/a.
 - **Error — network / auth:** standard.
@@ -683,7 +685,7 @@ Near Miss uses the same `vims_safety_incident` table via `record_type='near_miss
 **Role gate:** `PermissionGate(SAF_F_002) + ActionGate(SAF_P_007)`.
 **Data loaded on mount:** `GET /api/safety/near-miss/:id/pdf/`.
 **Signature transition:** n/a (rendering).
-**Review comment layout:** Vessel review comment and Office comments render as full-width labelled text blocks under Review Comments, preserving line breaks and paginating normally for long comments.
+**Review comment layout:** Master vessel-review comment and Office comments render as full-width labelled text blocks under Review Comments, preserving line breaks and paginating normally for long comments.
 **States:** Loading spinner → Loaded inline viewer → Error "Generation failed — retry".
 **Navigation:** Download link.
 **Decisions:** D-PDF-03a, D-GAP-J1 revised 2026-06-09.
@@ -702,7 +704,7 @@ SCM aligns with KSM SSQE Manual Rev 01 Feb 2026 §9. Regular monthly + Ad-Hoc me
 - `GET /api/safety/scm/?vessel_id={id}` — list both types; cadence indicator (next due 30 days from last closure, D-GAP-M22).
 **Signature transition:** n/a.
 **States:**
-- **Loaded:** Rows `Meeting type (pill) | Date | Chair | State | Overdue flag`. State labels are user-friendly: `DRAFT` = Draft, `SUBMITTED` = Submitted to Office, `CLOSED` = Closed. Cadence card shows `"Next Regular SCM due: 12-May-2026 (25 days)"`.
+- **Loaded:** Vessel, Meeting type, and State filters above the meeting register for global office users; ship/scoped users stay limited to their assigned vessel. Rows `Meeting type (pill) | Date | Chair | State | Overdue flag`. State labels are user-friendly: `DRAFT` = Draft, `SUBMITTED` = Submitted to Office, `CLOSED` = Closed. Cadence card shows `"Next Regular SCM due: 12-May-2026 (25 days)"`.
 - **Loading:** Skeleton.
 - **Empty:** `"No SCM records. Master or CO can host the first SCM."`
 - **Error:** standard.

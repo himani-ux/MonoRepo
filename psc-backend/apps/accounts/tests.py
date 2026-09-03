@@ -21,7 +21,8 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from apps.accounts.backends import AuthenticatedUser, PSCJWTAuthentication
 from apps.accounts.models import RoleCodes
 from apps.accounts.serializers import generate_tokens_for_user
-from apps.accounts.utils import resolve_current_office_permission_snapshot
+from apps.accounts.utils import resolve_current_office_permission_snapshot, resolve_current_vessel_permission_snapshot
+from apps.inspection.audit.permissions import AUDIT_P_008, AUDIT_P_013, AUDIT_P_017
 from apps.accounts.views import CurrentUserView, LoginView, LogoutView, TokenRefreshView
 from apps.inspection.models import Inspection, InspectionStatus
 from apps.inspection.views import InspectionCreateView, InspectionDetailView, InspectionPICReviewView
@@ -315,6 +316,32 @@ class TestFEAT_AUTH_001_UserAuthentication(BaseAuthAPITestCase):
         self.assertEqual(snapshot["role_name"], "Chief Accounting Officer")
         self.assertEqual(snapshot["safety_role_name"], "CHIEF ACCOUNTING OFFICER")
         self.assertTrue(snapshot["has_global_vessel_access"])
+
+    @patch("apps.accounts.utils.get_profile_permissions")
+    def test_feat_auth_001_current_vessel_snapshot_adds_master_audit_defaults(self, profile_permissions):
+        """Master profile snapshots should include documented Audit vessel-side gates."""
+        profile_permissions.return_value = (["SAF_F_003"], ["SAF_P_004"])
+
+        snapshot = resolve_current_vessel_permission_snapshot(
+            user_type="VESSEL",
+            role=RoleCodes.VESSEL_MASTER,
+            rank="MASTER",
+            full_name="Vessel Master",
+        )
+
+        self.assertEqual(snapshot["role_name"], "MASTER")
+        self.assertEqual(snapshot["safety_role_name"], "MASTER")
+        self.assertEqual(snapshot["form_ids"], ["SAF_F_003"])
+        self.assertIn("SAF_P_004", snapshot["process_ids"])
+        self.assertIn(AUDIT_P_008, snapshot["process_ids"])
+        self.assertIn(AUDIT_P_013, snapshot["process_ids"])
+        self.assertIn(AUDIT_P_017, snapshot["process_ids"])
+
+    def test_feat_auth_001_acting_master_resolves_to_vessel_master_role(self):
+        """Acting Master logins should receive vessel Master authority."""
+        backend = PSCAuthenticationBackend()
+
+        self.assertEqual(backend._determine_vessel_role("ACTING MASTER"), RoleCodes.VESSEL_MASTER)
 
     def test_feat_auth_001_psc_jwt_authentication_refreshes_vessel_permissions_from_profile_mapping(self):
         """Authenticated Safety requests should not rely on stale vessel permission claims."""

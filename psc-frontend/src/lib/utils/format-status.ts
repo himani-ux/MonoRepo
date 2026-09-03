@@ -3,6 +3,47 @@ import type { InspectionStatus, OperationalStatus, CARStatus, DefStatus } from '
 
 export type StatusType = InspectionStatus | OperationalStatus | CARStatus | DefStatus | 'OVERDUE' | 'DETENTION';
 
+const enumAcronyms = new Set([
+  'CAR',
+  'CE',
+  'CO',
+  'DOC',
+  'DPA',
+  'EMS',
+  'HOD',
+  'IMO',
+  'ISM',
+  'ISPS',
+  'KSM',
+  'MLC',
+  'NC',
+  'OBS',
+  'OFI',
+  'OPM',
+  'PIC',
+  'PSC',
+  'RCA',
+  'SEQ',
+  'SMC',
+  'SMS',
+]);
+
+const enumLowercaseWords = new Set(['and', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'to', 'with']);
+
+const enumLabelMap: Record<string, string> = {
+  CERT_VALID: 'Certificate Valid',
+  CLASS_SOCIETY: 'Class Society',
+  DPA_CLOSED: 'Closed',
+  EXTERNAL_CLOSE_OUT_LETTER: 'External Close-Out Letter',
+  FISHBONE_ISHIKAWA: 'Fishbone / Ishikawa',
+  FIVE_WHY: '5 Why',
+  N_A: 'N/A',
+  NA: 'N/A',
+  OFFICE_DEPT: 'Office Department',
+  PENDING_EXTERNAL_CLOSE: 'Pending External Close',
+  RENEWAL_AT_RISK: 'Renewal at Risk',
+};
+
 const statusVariantMap: Record<string, BadgeProps['variant']> = {
   // Inspection statuses (legacy)
   DRAFT: 'draft',
@@ -60,13 +101,52 @@ const statusLabelMap: Record<string, string> = {
 /**
  * Utility function to get badge variant for a status
  */
-export function getStatusVariant(status: StatusType): BadgeProps['variant'] {
-  return statusVariantMap[status] || 'default';
+export function getStatusVariant(status: StatusType | string | null | undefined): BadgeProps['variant'] {
+  const normalized = String(status || '').trim().toUpperCase();
+  return statusVariantMap[normalized] || 'default';
 }
 
 /**
  * Utility function to get display label for a status
  */
-export function getStatusLabel(status: StatusType): string {
-  return statusLabelMap[status] || status;
+export function getStatusLabel(status: StatusType | string | null | undefined): string {
+  const normalized = String(status || '').trim().toUpperCase();
+  return statusLabelMap[normalized] || formatEnumLabel(normalized);
+}
+
+/**
+ * Converts enum-like API values into user-facing labels without changing submitted values.
+ */
+export function formatEnumLabel(value: string | null | undefined): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  const upperValue = normalized.toUpperCase();
+  const mapped = enumLabelMap[upperValue];
+  if (mapped) {
+    return mapped;
+  }
+
+  return normalized
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map((part, index) => formatEnumPart(part, index))
+    .join(' ');
+}
+
+function formatEnumPart(part: string, index: number): string {
+  const upper = part.toUpperCase();
+  const lower = part.toLowerCase();
+  if (enumAcronyms.has(upper)) {
+    return upper;
+  }
+  if (index > 0 && enumLowercaseWords.has(lower)) {
+    return lower;
+  }
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }

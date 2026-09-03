@@ -1,0 +1,274 @@
+SOI FINDINGS USER GUIDE
+
+This guide is for vessel users who record and close Safety Officer Inspection
+findings in VIMS.
+
+SOI means Safety Officer Inspection.
+Finding means a safety problem found during the SOI round.
+
+
+1. Who Uses SOI Findings
+
+Safety Officer:
+Creates SOI findings after the paper SOI checklist is completed.
+
+Chief Officer:
+Usually acts as Safety Officer.
+
+Second Engineer:
+Can act as alternate Safety Officer only when assigned in the system.
+
+Master:
+Reviews and closes SOI findings after the Safety Officer marks them ready for
+closure.
+
+DPA:
+Can reopen a closed SOI finding if follow-up evidence shows the closure is not
+acceptable.
+
+
+2. Before Adding a Finding
+
+Do these steps first:
+
+1. Create the SOI record.
+2. Select the SOI areas.
+3. Download the SOI paper checklist.
+4. Print the checklist.
+5. Complete the inspection on board.
+6. Write the findings on the paper checklist.
+7. Keep the signed paper checklist safely on board.
+
+Important:
+SOI is paper-first. The paper checklist is the main inspection record.
+The system stores only the formal findings and closure details.
+Do not scan or upload the paper checklist.
+
+
+3. How To Open SOI Findings
+
+Open VIMS.
+Go to Safety.
+Open Safety Officer Inspection.
+Open the required SOI record.
+Open Findings.
+
+You will see the SOI Findings Register.
+
+If the paper checklist has not been downloaded yet, use Download paper first.
+The Add Finding button appears only after the paper checklist is generated.
+
+
+4. How To Add A Finding
+
+Click Add Finding.
+
+Fill the fields carefully.
+
+Area:
+Select the area where the problem was found.
+Only areas selected for this SOI can be used.
+
+Checklist item:
+Select the checklist item related to the problem.
+This helps connect the finding to the paper checklist item.
+
+Severity:
+Select how serious the problem is.
+
+LOW means small issue with low safety impact.
+MED means important issue that needs action.
+HIGH means serious issue or strong safety risk.
+
+Priority:
+Select how quickly the action should be handled.
+
+LOW means routine action.
+MED means action should be followed up soon.
+HIGH means action should be treated urgently.
+
+Root cause:
+Select the main reason for the problem.
+Use the closest available option.
+
+Category tag:
+Select the type of finding, such as Safety, Security, Environment, MLC,
+Training, Operational, Management, or Others.
+
+Person Responsible:
+Select the person who will make sure the action is completed.
+This is responsibility for follow-up, not blame.
+If no person is selected, it defaults to the Safety Officer.
+
+Title:
+Write a short name for the finding.
+
+Good title:
+Emergency marker faded
+
+Bad title:
+Problem
+
+Description:
+Write clearly what was seen, where it was seen, and why it matters.
+
+Good description:
+Emergency escape marker near the bridge exit is faded and not clearly visible
+in low light.
+
+Bad description:
+Marker issue.
+
+Photo evidence:
+Attach a photo when useful.
+For HIGH severity, photo evidence is required.
+Allowed photo types are JPG, JPEG, or PNG.
+Maximum photo size is 3 MB.
+
+Click Save finding.
+
+
+5. Important Save Rules
+
+The SOI paper checklist must be downloaded before findings can be saved.
+
+The checklist unique ID must match the ID printed on the paper checklist.
+
+The selected area must be one of the areas selected for this SOI.
+
+HIGH severity findings require a photo.
+
+If the finding looks incident-worthy, the system may ask whether to create an
+Incident or keep it in SOI only.
+
+If you keep a HIGH severity item in SOI only, write a clear reason.
+
+If the text suggests a life-threatening issue, the system will require
+escalation through Incident or Near Miss before saving can continue.
+
+
+6. After Saving A Finding
+
+The finding appears in the SOI Findings Register.
+
+New findings start as Open.
+
+Check that the title, severity, priority, responsible person, due date, and
+photo evidence are correct.
+
+If there are more paper findings for the same SOI area, add them one by one.
+
+
+7. Submitting An SOI Area
+
+After all findings for an area are entered in VIMS, submit that area.
+
+In the SOI Findings Register, look for the pending area card.
+Click Submit Area.
+
+Submit an area only after all paper findings for that area are entered.
+
+When all selected areas are submitted, the SOI can move toward Master closure.
+
+
+8. Closing An SOI Finding
+
+The normal closure flow is:
+
+1. Safety Officer confirms the action is completed.
+2. Safety Officer opens the finding closure page.
+3. Safety Officer enters typed name and closure note.
+4. Safety Officer clicks Mark pending closure.
+5. Master reviews the finding.
+6. Master enters typed name and closure note.
+7. Master clicks Approve closure.
+8. The finding becomes Closed.
+
+If Master is not satisfied, Master clicks Reject to Open and enters a reason.
+The finding returns to Open and must be corrected again.
+
+
+9. Finding Status Meaning
+
+Open:
+The finding is active and action is still required.
+
+Carried forward:
+The finding is still open from an earlier SOI cycle.
+
+Pending Closure:
+Safety Officer has signed the handoff and the finding is waiting for Master
+review.
+
+Master Approved:
+Master approval has been recorded during the closure process.
+
+Closed:
+The finding closure is complete.
+
+
+10. Paper And Digital Signature Rule
+
+Safety Officer and Assistant signatures remain on the paper SOI checklist.
+
+Master closure approval is recorded digitally in VIMS.
+
+The digital signature records typed name, time, and device reference.
+
+
+11. Repeat Findings
+
+If the same or similar issue appears again, VIMS may show a repeat-finding
+badge.
+
+Do not ignore repeat findings.
+Repeat findings should be reviewed carefully because they may show that the
+previous corrective action was not strong enough.
+
+
+12. Common Problems
+
+Add Finding button not visible:
+The paper checklist may not be downloaded yet, the SOI may be closed, or your
+login may not have the required permission.
+
+Finding not saving:
+Check the checklist unique ID, selected area, required fields, and photo
+requirement for HIGH severity.
+
+HIGH severity not saving:
+Upload a JPG, JPEG, or PNG photo under 3 MB.
+
+Life-threat warning shown:
+Create or link the required Incident or Near Miss before continuing.
+
+Master closure button not visible:
+The finding may not be in Pending Closure, or the logged-in user may not be the
+Master.
+
+DPA reopen button not visible:
+Only DPA can reopen a closed SOI finding.
+
+
+13. Simple Checklist For Users
+
+Before saving:
+Area is correct.
+Checklist item is selected if available.
+Title is short and clear.
+Description says what, where, and why.
+Severity is correct.
+Priority is correct.
+Responsible person is correct.
+HIGH severity has photo.
+Life-threatening issue is escalated.
+
+Before submitting area:
+All paper findings for that area are entered.
+No finding is missing from the paper checklist.
+
+Before closure:
+Corrective action is completed.
+Evidence is enough.
+Safety Officer has added closure note.
+Master has reviewed and approved.

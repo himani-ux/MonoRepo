@@ -129,6 +129,10 @@ def _target_office_permissions(normalized: str) -> PermissionBundle:
         )
 
     if normalized in OFFICE_TECH_SUPT_PROFILES:
+        process_ids = [PROCESS["CREATE"], PROCESS["PRINT"]]
+        if normalized == "TECHNICAL SUPERINTENDENT":
+            process_ids.append(PROCESS["CATALOG_EDIT"])
+
         return PermissionBundle(
             form_ids=(
                 FORM["CATALOG"],
@@ -137,10 +141,7 @@ def _target_office_permissions(normalized: str) -> PermissionBundle:
                 FORM["PRINT_EXPORT"],
                 FORM["AUDIT_LOG"],
             ),
-            process_ids=(
-                PROCESS["CREATE"],
-                PROCESS["PRINT"],
-            ),
+            process_ids=tuple(process_ids),
         )
 
     if normalized in OFFICE_MARINE_SUPT_PROFILES:
@@ -158,6 +159,7 @@ def _target_office_permissions(normalized: str) -> PermissionBundle:
                 PROCESS["SUBMIT"],
                 PROCESS["PRINT"],
                 PROCESS["PROVISION_AUDITOR"],
+                PROCESS["CATALOG_EDIT"],
                 PROCESS["ROLLBACK"],
             ),
         )
@@ -207,4 +209,3 @@ def _target_ship_permissions(normalized: str) -> PermissionBundle:
         )
 
     return PermissionBundle(form_ids=(FORM["TRACKED_ITEMS"],))
-

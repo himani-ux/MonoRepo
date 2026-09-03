@@ -12,6 +12,7 @@ import { useChecklistWalkStore } from '@/stores/audit/use-checklist-walk-store';
 import type { AuditChecklist, AuditChecklistItem, AuditChecklistWalkStatus } from '@/schemas/audit/checklist';
 import { ROUTES } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils';
+import { formatEnumLabel } from '@/lib/utils/format-status';
 import { AuditFindingCreateModal } from './audit-finding-create-modal';
 
 interface AuditChecklistWalkPageProps {
@@ -21,7 +22,7 @@ interface AuditChecklistWalkPageProps {
 const statusOptions: Array<{ value: AuditChecklistWalkStatus; label: string }> = [
   { value: 'NOT_REVIEWED', label: 'Not reviewed' },
   { value: 'COMPLIANT', label: 'Compliant' },
-  { value: 'ADD_FINDING', label: 'Add Finding' },
+  { value: 'ADD_FINDING', label: 'Findings' },
 ];
 
 export function AuditChecklistWalkPage({ auditId }: AuditChecklistWalkPageProps) {
@@ -181,7 +182,7 @@ function ChecklistHeader({
             {data.checklist?.checklist_code ?? 'No checklist'} - {data.checklist?.code_version ?? 'version not recorded'}
           </p>
           {data.item_filter_applied ? (
-            <p className="mt-1 text-sm text-neutral-500">Ship type: {data.ship_type_filter}</p>
+            <p className="mt-1 text-sm text-neutral-500">Ship type: {formatEnumLabel(data.ship_type_filter)}</p>
           ) : null}
         </div>
         <HeaderCount icon={<ListChecks className="h-4 w-4" />} label="Rows" value={String(data.items.length)} />
@@ -231,7 +232,7 @@ function ChecklistItemRow({
             <span className="font-mono">{item.sequence_no}</span>
             {item.location_code ? <span>{item.location_code}</span> : null}
             <span>{item.item_code}</span>
-            {item.ship_type ? <Badge variant="secondary">{item.ship_type}</Badge> : null}
+            {item.ship_type ? <Badge variant="secondary">{formatEnumLabel(item.ship_type)}</Badge> : null}
           </div>
           <p className="mt-2 text-sm font-medium text-neutral-900">{item.question}</p>
           {item.guideline ? <p className="mt-2 text-sm text-neutral-600">{item.guideline}</p> : null}
@@ -242,23 +243,37 @@ function ChecklistItemRow({
         </div>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor={statusId}>Item status</Label>
-            <select
-              id={statusId}
+            <div id={statusId} className="text-sm font-medium text-neutral-700">
+              Item status
+            </div>
+            <div
+              role="radiogroup"
               aria-label={`${item.item_code} status`}
-              className={cn(
-                'h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2'
-              )}
-              value={status}
-              onChange={(event) => onStatusChange(event.target.value as AuditChecklistWalkStatus)}
+              className="grid gap-2"
             >
               {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <label
+                  key={option.value}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
+                    status === option.value
+                      ? 'border-primary-500 bg-primary-50 text-primary-800'
+                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name={`checklist-status-${item.id}`}
+                    value={option.value}
+                    checked={status === option.value}
+                    aria-label={`${item.item_code} ${option.label}`}
+                    className="h-4 w-4 border-neutral-300 text-primary-600 focus:ring-primary-500"
+                    onChange={() => onStatusChange(option.value)}
+                  />
+                  <span>{option.label}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor={remarksId}>Remarks</Label>

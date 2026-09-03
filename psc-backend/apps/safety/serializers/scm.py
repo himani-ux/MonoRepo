@@ -503,6 +503,16 @@ class SCMMeetingListSerializer(VesselDisplayMixin, serializers.ModelSerializer):
         return [{} for _ in range(count)]
 
 
+SCM_LATITUDE_FORMAT_ERROR = (
+    "Latitude must be in decimal degrees, e.g. 1.290270. "
+    "Use a minus sign for south; do not enter N/S letters."
+)
+SCM_LONGITUDE_FORMAT_ERROR = (
+    "Longitude must be in decimal degrees, e.g. 103.851959. "
+    "Use a minus sign for west; do not enter E/W letters."
+)
+
+
 class SCMMeetingCreateSerializer(serializers.ModelSerializer):
     attendance_rows = SCMAttendanceRowWriteSerializer(many=True, required=False)
     sections = SCMSectionSerializer(many=True, required=False)
@@ -546,6 +556,26 @@ class SCMMeetingCreateSerializer(serializers.ModelSerializer):
             "ship_position": {"required": False},
             "comm_time": {"required": False},
             "comp_time": {"required": False},
+            "latitude": {
+                "required": False,
+                "allow_null": True,
+                "error_messages": {
+                    "invalid": SCM_LATITUDE_FORMAT_ERROR,
+                    "max_digits": SCM_LATITUDE_FORMAT_ERROR,
+                    "max_decimal_places": SCM_LATITUDE_FORMAT_ERROR,
+                    "max_whole_digits": SCM_LATITUDE_FORMAT_ERROR,
+                },
+            },
+            "longitude": {
+                "required": False,
+                "allow_null": True,
+                "error_messages": {
+                    "invalid": SCM_LONGITUDE_FORMAT_ERROR,
+                    "max_digits": SCM_LONGITUDE_FORMAT_ERROR,
+                    "max_decimal_places": SCM_LONGITUDE_FORMAT_ERROR,
+                    "max_whole_digits": SCM_LONGITUDE_FORMAT_ERROR,
+                },
+            },
         }
 
     def to_internal_value(self, data):

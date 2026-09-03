@@ -154,6 +154,7 @@ const auditNavItems: AuditNavItem[] = [
       PROCESS_IDS.AUDIT_CLOSE_NC,
       PROCESS_IDS.AUDIT_APPROVE_EXTENSION,
       PROCESS_IDS.AUDIT_CANCEL_PLAN,
+      PROCESS_IDS.AUDIT_MANAGE_QUALIFIED_AUDITORS,
       PROCESS_IDS.AUDIT_REGISTER_EXTERNAL,
       PROCESS_IDS.AUDIT_ACTING_HOD_AUTHORIZE,
       PROCESS_IDS.AUDIT_ACKNOWLEDGE_REPORT,
@@ -168,16 +169,16 @@ const auditNavItems: AuditNavItem[] = [
     icon: ClipboardList,
   },
   {
-    href: ROUTES.INSPECTION_NEW,
-    label: 'Register Audit',
-    processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_CONDUCT],
-    icon: ClipboardCheck,
+    href: '/audit/masters/qualified-auditors',
+    label: 'Qualified Auditors',
+    processIds: [PROCESS_IDS.AUDIT_MANAGE_QUALIFIED_AUDITORS],
+    icon: UsersRound,
   },
   {
-    href: '/audit/external/new',
-    label: 'External Audit',
-    processIds: [PROCESS_IDS.AUDIT_REGISTER_EXTERNAL],
-    icon: ShipWheel,
+    href: '/audit/register',
+    label: 'Register Audit',
+    processIds: [PROCESS_IDS.AUDIT_CREATE, PROCESS_IDS.AUDIT_CONDUCT, PROCESS_IDS.AUDIT_REGISTER_EXTERNAL],
+    icon: ClipboardCheck,
   },
   {
     href: '/dpa/notifications/failed',
@@ -465,8 +466,12 @@ export function Sidebar({ isOpen, onClose, className }: SidebarProps) {
                             const active = location.pathname === item.href ||
                               (item.href === '/audit/dashboard' && location.pathname === '/audit') ||
                               (item.href === '/audit/plans' && location.pathname.startsWith('/audit/plans')) ||
-                              (item.href === '/audit/external/new' && location.pathname.startsWith('/audit/external')) ||
-                              (item.href === ROUTES.INSPECTION_NEW && location.pathname === ROUTES.INSPECTION_NEW);
+                              (item.href === '/audit/masters/qualified-auditors' && location.pathname.startsWith('/audit/masters/qualified-auditors')) ||
+                              (item.href === '/audit/register' && (
+                                location.pathname === '/audit/register' ||
+                                location.pathname === ROUTES.INSPECTION_NEW ||
+                                location.pathname.startsWith('/audit/external')
+                              ));
 
                             return (
                               <li key={`${item.href}-${item.label}`}>

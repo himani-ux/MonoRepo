@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from django.db import connection
 from django.db.models import Q
 
 from apps.inspection.audit.models import (
@@ -12,6 +13,7 @@ from apps.inspection.audit.models import (
     MasterAuditChecklist,
     MasterAuditChecklistItem,
 )
+from apps.inspection.audit.services.detail import get_audit_detail_by_id
 
 
 @dataclass(frozen=True)
@@ -28,7 +30,7 @@ def get_audit_checklist_bundle(
     audit_detail_id: UUID,
     ship_type: str | None = None,
 ) -> AuditChecklistBundle:
-    audit_detail = AuditDetail.objects.get(id=audit_detail_id)
+    audit_detail = get_audit_detail_by_id(audit_detail_id)
     checklist = select_checklist_for_audit(audit_detail)
     normalized_ship_type = _clean_text(ship_type) or None
     items = checklist_items_for(checklist, ship_type=normalized_ship_type)
@@ -66,7 +68,34 @@ def checklist_items_for(
     if checklist is None:
         return []
 
-    query = MasterAuditChecklistItem.objects.filter(master_audit_checklist_id=checklist.id)
+    checklist_id = _uuid_value(checklist.id)
+    if connection.vendor == "microsoft":
+        params = [str(checklist_id)]
+        ship_type_clause = ""
+        if ship_type:
+            ship_type_clause = """
+              AND (
+                ship_type IS NULL
+                OR ship_type = ''
+                OR LOWER(ship_type) = LOWER(%s)
+                OR LOWER(ship_type) = LOWER(%s)
+              )
+            """
+            params.extend(["Common", ship_type])
+        return list(
+            MasterAuditChecklistItem.objects.raw(
+                f"""
+                SELECT *
+                FROM dbo.master_audit_checklist_item
+                WHERE master_audit_checklist_id = CAST(%s AS uniqueidentifier)
+                  {ship_type_clause}
+                ORDER BY [sequence_no], [item_code], [id]
+                """,
+                params,
+            )
+        )
+
+    query = MasterAuditChecklistItem.objects.filter(master_audit_checklist_id=checklist_id)
     if ship_type:
         query = query.filter(
             Q(ship_type__isnull=True)
@@ -79,3 +108,9 @@ def checklist_items_for(
 
 def _clean_text(value: object) -> str:
     return str(value or "").strip()
+
+
+def _uuid_value(value: object) -> UUID:
+    if isinstance(value, UUID):
+        return value
+    return UUID(str(value))

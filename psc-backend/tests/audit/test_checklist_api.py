@@ -5,6 +5,7 @@ import unittest
 import uuid
 from datetime import date
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import django
 from django.apps import apps
@@ -44,6 +45,7 @@ from apps.inspection.audit.models import (  # noqa: E402
     MasterAuditChecklistItem,
 )
 from apps.inspection.audit.permissions import AUDIT_P_001, AUDIT_P_003  # noqa: E402
+from apps.inspection.audit.services.checklist import checklist_items_for  # noqa: E402
 from apps.inspection.audit.views import AuditChecklistMasterView  # noqa: E402
 from apps.inspection.models import Inspection  # noqa: E402
 from rest_framework.test import APIRequestFactory, force_authenticate  # noqa: E402
@@ -273,6 +275,53 @@ class AuditChecklistApiTests(unittest.TestCase):
         response = self._get_checklist(user)
 
         self.assertEqual(response.status_code, 403)
+
+    def test_sql_server_checklist_lookup_casts_audit_id(self) -> None:
+        user = make_user(process_ids=[AUDIT_P_003], vessel_ids=[str(self.vessel_id)])
+        unsafe_get = AssertionError("Checklist audit lookup must cast route/query UUIDs on SQL Server.")
+
+        with (
+            patch(
+                "apps.inspection.audit.services.detail.connection",
+                SimpleNamespace(vendor="microsoft"),
+            ),
+            patch.object(AuditDetail.objects, "get", side_effect=unsafe_get),
+            patch.object(AuditDetail.objects, "raw", return_value=[self.audit_detail]) as raw,
+        ):
+            response = self._get_checklist(user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(raw.call_count, 2)
+        for call in raw.call_args_list:
+            sql, params = call.args
+            self.assertIn("FROM dbo.audit_detail", sql)
+            self.assertIn("id = CAST(%s AS uniqueidentifier)", sql)
+            self.assertEqual(params, [str(self.audit_detail.id)])
+
+    def test_sql_server_checklist_item_lookup_casts_checklist_id(self) -> None:
+        unsafe_filter = AssertionError("Checklist item lookup must cast checklist UUIDs on SQL Server.")
+        raw_calls = []
+
+        def raw_items(sql, params=None):
+            raw_calls.append((sql, params or []))
+            return []
+
+        with (
+            patch(
+                "apps.inspection.audit.services.checklist.connection",
+                SimpleNamespace(vendor="microsoft"),
+            ),
+            patch.object(MasterAuditChecklistItem.objects, "filter", side_effect=unsafe_filter),
+            patch.object(MasterAuditChecklistItem.objects, "raw", side_effect=raw_items),
+        ):
+            items = checklist_items_for(self.f605, ship_type="Bulk Carrier")
+
+        self.assertEqual(items, [])
+        self.assertEqual(len(raw_calls), 1)
+        sql, params = raw_calls[0]
+        self.assertIn("FROM dbo.master_audit_checklist_item", sql)
+        self.assertIn("master_audit_checklist_id = CAST(%s AS uniqueidentifier)", sql)
+        self.assertEqual(params, [str(self.f605.id), "Common", "Bulk Carrier"])
 
 
 if __name__ == "__main__":

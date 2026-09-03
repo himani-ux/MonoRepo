@@ -1371,6 +1371,273 @@ describe('safety routes', () => {
     });
   });
 
+  it('filters_the_near_miss_register_by_selected_vessel', async () => {
+    safetyQueryMocks.useSafetyIncidentRegisterVessels.mockReturnValue({
+      data: [
+        {
+          id: 'vessel-ycf',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'vessel-eat',
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      error: null,
+      isLoading: false,
+    });
+
+    renderSafetyRoute('/safety/near-miss', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-near-miss',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    await screen.findByText('Near Miss Register');
+
+    fireEvent.change(screen.getByLabelText('Near miss vessel filter'), {
+      target: { value: 'vessel-eat' },
+    });
+
+    await waitFor(() => {
+      expect(safetyQueryMocks.useSafetyNearMisses).toHaveBeenLastCalledWith({
+        priority: undefined,
+        state: undefined,
+        vessel_id: 'vessel-eat',
+      });
+    });
+  });
+
+  it('shows_all_current_near_miss_workflow_states_in_the_register_filter', async () => {
+    renderSafetyRoute('/safety/near-miss', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-near-miss',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    await screen.findByText('Near Miss Register');
+
+    const stateFilter = screen.getByLabelText(
+      'Near miss state filter'
+    ) as HTMLSelectElement;
+
+    expect(
+      Array.from(stateFilter.options).map((option) => ({
+        label: option.textContent,
+        value: option.value,
+      }))
+    ).toEqual([
+      { label: 'All states', value: '' },
+      { label: 'Draft', value: 'DRAFT' },
+      { label: 'Pending Vessel Review', value: 'PENDING_VESSEL_REVIEW' },
+      {
+        label: 'Ready for Office Comments',
+        value: 'READY_FOR_OFFICE_COMMENTS',
+      },
+      { label: 'Rework Required', value: 'REWORK_REQUIRED' },
+      { label: 'Rejected', value: 'REJECTED' },
+      {
+        label: 'Office Comments Completed',
+        value: 'OFFICE_COMMENTS_COMPLETED',
+      },
+      { label: 'Superseded', value: 'SUPERSEDED' },
+      { label: 'Closed', value: 'CLOSED' },
+    ]);
+  });
+
+  it('filters_the_near_miss_register_by_selected_workflow_state', async () => {
+    renderSafetyRoute('/safety/near-miss', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-near-miss',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    await screen.findByText('Near Miss Register');
+
+    fireEvent.change(screen.getByLabelText('Near miss state filter'), {
+      target: { value: 'REWORK_REQUIRED' },
+    });
+
+    await waitFor(() => {
+      expect(safetyQueryMocks.useSafetyNearMisses).toHaveBeenLastCalledWith({
+        priority: undefined,
+        state: 'REWORK_REQUIRED',
+        vessel_id: undefined,
+      });
+    });
+  });
+
+  it('filters_the_near_miss_register_draft_option_by_draft_number_prefix', async () => {
+    safetyQueryMocks.useSafetyNearMisses.mockReturnValue({
+      data: [
+        {
+          id: 'draft-prefix-near-miss',
+          incident_number: 'DRAFT-YCF/2026/T008',
+          near_miss_priority: null,
+          occurred_at: '2026-08-04T06:25:00Z',
+          reporter_name: 'Pending Reporter',
+          state: 'PENDING_VESSEL_REVIEW',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'formal-near-miss',
+          incident_number: 'YCF/2026/005',
+          near_miss_priority: 'LOW',
+          occurred_at: '2026-08-05T06:25:00Z',
+          reporter_name: 'Office Reporter',
+          state: 'READY_FOR_OFFICE_COMMENTS',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+      ],
+      error: null,
+      isLoading: false,
+    });
+
+    renderSafetyRoute('/safety/near-miss', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-near-miss',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    await screen.findByText('DRAFT-YCF/2026/T008');
+
+    fireEvent.change(screen.getByLabelText('Near miss state filter'), {
+      target: { value: 'DRAFT' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('DRAFT-YCF/2026/T008')).toBeInTheDocument();
+      expect(screen.queryByText('YCF/2026/005')).toBeNull();
+    });
+    expect(safetyQueryMocks.useSafetyNearMisses).toHaveBeenLastCalledWith({
+      priority: undefined,
+      state: undefined,
+      vessel_id: undefined,
+    });
+  });
+
+  it('shows_near_miss_priorities_with_distinct_badge_colours', async () => {
+    safetyQueryMocks.useSafetyNearMisses.mockReturnValue({
+      data: [
+        {
+          id: 'pending-near-miss',
+          incident_number: 'DRAFT-YCF/2026/T008',
+          near_miss_priority: null,
+          occurred_at: '2026-08-04T06:25:00Z',
+          reporter_name: 'Pending Reporter',
+          state: 'PENDING_VESSEL_REVIEW',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'low-near-miss',
+          incident_number: 'NM-LOW',
+          near_miss_priority: 'LOW',
+          occurred_at: '2026-08-05T06:25:00Z',
+          reporter_name: 'Low Reporter',
+          state: 'SUBMITTED',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'medium-near-miss',
+          incident_number: 'NM-MEDIUM',
+          near_miss_priority: 'MEDIUM',
+          occurred_at: '2026-08-06T06:25:00Z',
+          reporter_name: 'Medium Reporter',
+          state: 'SUBMITTED',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'high-near-miss',
+          incident_number: 'NM-HIGH',
+          near_miss_priority: 'HIGH',
+          occurred_at: '2026-08-07T06:25:00Z',
+          reporter_name: 'High Reporter',
+          state: 'SUBMITTED',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+      ],
+      error: null,
+      isLoading: false,
+    });
+
+    renderSafetyRoute('/safety/near-miss', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-near-miss',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    expect(await screen.findByText('Pending office comments')).toHaveClass(
+      'bg-slate-100',
+      'text-slate-600'
+    );
+    const lowBadge = screen.getAllByText('Low').find((element) =>
+      element.classList.contains('bg-emerald-50')
+    );
+    const highBadge = screen.getAllByText('High').find((element) =>
+      element.classList.contains('bg-rose-50')
+    );
+
+    expect(lowBadge).toHaveClass('text-emerald-700');
+    expect(screen.getByText('Medium')).toHaveClass('bg-amber-50', 'text-amber-700');
+    expect(highBadge).toHaveClass('text-rose-700');
+  });
+
+  it('keeps_the_near_miss_register_scrollable_for_long_result_sets', async () => {
+    safetyQueryMocks.useSafetyNearMisses.mockReturnValue({
+      data: Array.from({ length: 24 }, (_, index) => ({
+        id: `near-miss-${index}`,
+        incident_number: `DRAFT-YCF/2026/T${String(index + 1).padStart(3, '0')}`,
+        near_miss_priority: index % 2 === 0 ? 'LOW' : 'HIGH',
+        occurred_at: '2026-08-04T06:25:00Z',
+        reporter_name: `Reporter ${index + 1}`,
+        state: 'PENDING_VESSEL_REVIEW',
+        vessel_code: 'YCF',
+        vessel_name: 'YC FORTITUDE',
+      })),
+      error: null,
+      isLoading: false,
+    });
+
+    renderSafetyRoute('/safety/near-miss', {
+      formIds: ['SAF_F_002'],
+      id: 'dpa-near-miss',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    expect(await screen.findByText('DRAFT-YCF/2026/T024')).toBeInTheDocument();
+    expect(screen.getByTestId('near-miss-register-scroll-region')).toHaveClass(
+      'max-h-[65vh]',
+      'overflow-auto',
+      '[scrollbar-gutter:stable]'
+    );
+  });
+
   it('does_not_show_the_current_scope_card_on_the_incident_register', async () => {
     renderSafetyRoute('/safety/incidents', {
       formIds: ['SAF_F_001'],
@@ -1461,8 +1728,52 @@ describe('safety routes', () => {
       vesselIds: [],
     });
 
-    expect(await screen.findAllByText('SCM-007')).toHaveLength(2);
+    expect(
+      await screen.findByRole('link', { name: 'SCM-007' })
+    ).toBeInTheDocument();
     expect(screen.getByText('0 section(s)')).toBeInTheDocument();
+  });
+
+  it('filters_the_scm_register_by_selected_vessel', async () => {
+    safetyQueryMocks.useSafetyIncidentRegisterVessels.mockReturnValue({
+      data: [
+        {
+          id: 'vessel-ycf',
+          vessel_code: 'YCF',
+          vessel_name: 'YC FORTITUDE',
+        },
+        {
+          id: 'vessel-eat',
+          vessel_code: 'EAT',
+          vessel_name: 'EAST AYUTTHAYA',
+        },
+      ],
+      error: null,
+      isLoading: false,
+    });
+
+    renderSafetyRoute('/safety/scm', {
+      formIds: ['SAF_F_003'],
+      id: 'dpa-scm',
+      isGlobal: true,
+      processIds: [],
+      role: 'DPA',
+      vesselIds: [],
+    });
+
+    await screen.findByText('Safety Committee Meetings');
+
+    fireEvent.change(screen.getByLabelText('SCM vessel filter'), {
+      target: { value: 'vessel-ycf' },
+    });
+
+    await waitFor(() => {
+      expect(safetyQueryMocks.useSafetyScmMeetings).toHaveBeenLastCalledWith({
+        meeting_type: undefined,
+        state: undefined,
+        vessel_id: 'vessel-ycf',
+      });
+    });
   });
 
   it('renders_scm_detail_for_office_user_without_signoff_action', async () => {
@@ -1571,7 +1882,7 @@ describe('safety routes', () => {
     expect(screen.getByText('MV01 - Atlas')).toBeInTheDocument();
     expect(screen.getByText('Crew attendance sheet')).toBeInTheDocument();
     expect(
-      screen.getByText('Closed since previous SCM sign-off')
+      screen.getByText('Closed since previous SCM')
     ).toBeInTheDocument();
     expect(screen.getByText('Open previous action items')).toBeInTheDocument();
   });
@@ -2311,6 +2622,11 @@ describe('safety routes', () => {
       reporter_name: 'Test Reporter',
       state: 'OFFICE_COMMENTS_COMPLETED',
       vessel_id: 'vessel-1',
+      hod_review_summary: {
+        comment: 'Chief Engineer reviewed engine-room control measures.',
+        reviewed_by_role: 'CHIEF ENGINEER',
+        typed_name: 'Chief Engineer Test',
+      },
       vessel_review_summary: {
         comment: 'Master reviewed and submitted to office.',
         reviewed_by_role: 'MASTER',
@@ -2329,6 +2645,9 @@ describe('safety routes', () => {
 
     expect(await screen.findByText(/NM-BACKEND-0099/)).toBeInTheDocument();
     expect(
+      screen.getByText('Chief Engineer reviewed engine-room control measures.')
+    ).toBeInTheDocument();
+    expect(
       screen.getByText('Master reviewed and submitted to office.')
     ).toBeInTheDocument();
     expect(
@@ -2339,6 +2658,11 @@ describe('safety routes', () => {
     ).toBeInTheDocument();
     const pageText = document.body.textContent ?? '';
     expect(pageText.indexOf('Immediate action text for order check.')).toBeLessThan(
+      pageText.indexOf('Chief Engineer reviewed engine-room control measures.')
+    );
+    expect(
+      pageText.indexOf('Chief Engineer reviewed engine-room control measures.')
+    ).toBeLessThan(
       pageText.indexOf('Master reviewed and submitted to office.')
     );
     expect(pageText.indexOf('Preventive suggestion text for order check.')).toBeLessThan(

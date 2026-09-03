@@ -12,7 +12,7 @@ The `RESOLUTION_08-18.md` file identifies the Audit Gap 2 issues and proposes ne
 - Added authentication and process-ID checks.
 - Added validation for qualification dates, active organisations, and overlapping RO delegation periods.
 - Added focused tests and backend documentation.
-- No database migration, frontend master screen, or duplicate office/crew identity table was added.
+- No duplicate office/crew identity table was added. Later Maintain Mode work added the frontend master screen and the `aud_master_qual_body` qualifying-body master table.
 
 ## Still Pending From The Resolution
 
@@ -62,15 +62,16 @@ Evidence:
 Resolved locally under `CR-149`.
 
 - `/audit` now redirects to `/audit/dashboard`.
-- `/audit/dashboard` now renders a read-only Audit dashboard using the existing Audit Plan Register API.
+- `/audit/dashboard` now renders a read-only Audit dashboard using the existing Audit Plan Register API and, after `CR-166`, the registered-audit list from `GET /api/audit/audits/`.
 - The existing Audit sidebar group now includes an `Audit Dashboard` child link for Audit-authorized users.
-- No backend endpoint, database table, migration, or new permission ID was added.
+- No database table, migration, or new permission ID was added.
 
 Evidence:
 
 - `psc-frontend/src/App.tsx`
 - `psc-frontend/src/routes/audit/index.tsx`
 - `psc-frontend/src/routes/audit/dashboard.tsx`
+- `psc-frontend/src/routes/audit/masters/qualified-auditors.tsx`
 - `psc-frontend/src/routes/audit/dashboard.test.tsx`
 - `psc-frontend/src/components/layout/sidebar.tsx`
 - `psc-frontend/src/components/layout/sidebar.test.tsx`
@@ -87,11 +88,27 @@ Conclusion: the API surfaces exist locally, but real approved master data is sti
 
 ### Lead Auditor Selection And External Audit Registration
 
-Current local code stores Lead Auditor identity on the audit record via the registration payload. It does not automatically derive a selectable Lead Auditor list from active `master_audit_qualified_auditor` rows yet.
+Current local code provides a Lead Auditor dropdown from active, eligible `master_audit_qualified_auditor` rows in Audit plan create/edit, carries the selected Lead Auditor into registration snapshots, and exposes the `AUDIT_P_009` master screen at `/audit/masters/qualified-auditors`. That master screen now selects the auditor identity from active office users in `users` only when an active `mapping_role_user` -> `master_role` mapping exists, shows that mapped role, saves the selected `employee_id` into the qualified-auditor row, and uses active, non-deleted `aud_master_qual_body` rows for the Qualifying Body dropdown while saving the selected body name as the qualified-auditor text snapshot.
 
-External audit registration currently requires `external_audit_org_id` in the payload. The current registration service does not automatically resolve an organisation from `vessel_audit_ro_delegation`.
+External audit registration supports external organisation selection/defaulting from vessel RO delegation, while keeping the organisation mandatory by save time.
 
-These are implementation/data gaps to be addressed only after the required business/SSOT decision is clear.
+The remaining dependency is approved usable master data.
+
+## Pending Audit Blockers As Of 2026-08-20
+
+1. Real approved master data is still missing for qualified auditors, external audit organisations, and vessel RO delegations. Local tables contain only demo or non-usable rows.
+
+2. Official permission/profile configuration is still pending for the new Audit process IDs `AUDIT_P_019` and `AUDIT_P_020`. The code supports these gates, but production profile rows still need formal approval and configuration.
+
+3. Qualified Auditor maintenance UI and Qualifying Body master support exist, but approved active qualified-auditor data is still required before Lead Auditor dropdowns can show real users.
+
+4. Acting HoD route exists locally at `/admin/hod-coverage`; formal journey/UAT evidence is still pending.
+
+5. Formal journey/UAT evidence is still pending. The next UAT report must rerun the required journeys with route, account/persona, record IDs, raw output/logs, and screenshots or artifact hashes where applicable.
+
+6. External Audit close-out testing is blocked because no usable local external audit detail row exists.
+
+7. Release-side closure is still pending. A fresh full quality/restamp, deploy-method closure facts, and credential rotation confirmation are still required before release-level closure can be claimed.
 
 ## Conclusion
 

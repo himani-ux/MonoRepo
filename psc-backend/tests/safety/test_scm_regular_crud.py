@@ -549,6 +549,21 @@ class SCMRegularCrudTests(unittest.TestCase):
         self.assertEqual(str(meeting.latitude), "1.290270")
         self.assertEqual(str(meeting.longitude), "103.851959")
 
+    def test_regular_create_invalid_coordinate_explains_decimal_degrees_format(self) -> None:
+        payload = build_payload()
+        payload["latitude"] = "north"
+        request = self.factory.post("/api/safety/scm/", payload, format="json")
+        force_authenticate(request, user=build_user(role_name="CO", user_id="co-7"))
+
+        response = self.list_create_view(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            str(response.data["latitude"][0]),
+            "Latitude must be in decimal degrees, e.g. 1.290270. "
+            "Use a minus sign for south; do not enter N/S letters.",
+        )
+
     def test_create_accepts_structured_legacy_payload_and_renders_section_one(self) -> None:
         payload = build_payload()
         payload.update(

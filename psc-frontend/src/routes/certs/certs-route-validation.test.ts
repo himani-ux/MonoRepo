@@ -194,6 +194,14 @@ describe('Certs route validation guards', () => {
     expect(certsRouteSource).not.toContain('Confirm hard purge');
   });
 
+  it('test_catalog_writer_gate_checks_profile_role_before_generic_office_role', () => {
+    expect(certsRouteSource).toContain('function getCatalogWriterRoleCandidates');
+    expect(certsRouteSource).toContain('return [auth.user?.role_name, auth.user?.safety_role_name, auth.role]');
+    expect(certsRouteSource).toContain('function hasCatalogWriterRole');
+    expect(certsRouteSource).toContain('return hasEditPermission && hasCatalogWriterRole(auth);');
+    expect(certsRouteSource).toContain('return hasBulkPermission && hasCatalogWriterRole(auth);');
+  });
+
   it('test_print_and_share_forms_use_context_vessel_section_pickers_and_email_validation', () => {
     expect(certsRouteSource).toContain('function CertMultiSelectDropdown');
     expect(certsRouteSource).toContain('const contextVesselId = resolveContextVesselId(initialVesselId, auth.vesselId);');

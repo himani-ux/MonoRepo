@@ -19,6 +19,7 @@ from apps.inspection.audit.models import (
     CertWritebackOutbox,
     FlagStateNotificationLog,
 )
+from apps.inspection.audit.finding_types import is_nc_finding, is_observation_finding, normalize_nc_category
 from apps.inspection.audit.services.cert_reader import get_cert_snapshot
 from apps.inspection.audit.services.certs_writeback import enqueue_external_close_writebacks
 
@@ -233,17 +234,18 @@ def _apply_external_effrev_tiers(*, audit_detail: AuditDetail, user) -> None:
     findings = AuditFinding.objects.filter(audit_detail_id=audit_detail.id, is_external=True)
     now = timezone.now()
     for finding in findings:
-        if finding.finding_type == "OBSERVATION":
+        if is_observation_finding(finding.finding_type):
             AuditFindingOBS.objects.filter(audit_finding_id=finding.id).update(updated_by=_actor_id(user), updated_date=now)
             continue
-        if finding.finding_type != "NC":
+        if not is_nc_finding(finding.finding_type):
             continue
         nc, _created = AuditFindingNC.objects.get_or_create(
             audit_finding_id=finding.id,
             defaults={"created_by": _actor_id(user)},
         )
-        nc.is_external_tier = "MAJOR_MANDATORY" if finding.nc_category == "MAJOR_NC" else "MINOR_OPTIONAL"
-        if finding.nc_category == "MAJOR_NC" and nc.effectiveness_review_date is None:
+        nc_category = normalize_nc_category(finding.nc_category)
+        nc.is_external_tier = "MAJOR_MANDATORY" if nc_category == "MAJOR_NC" else "MINOR_OPTIONAL"
+        if nc_category == "MAJOR_NC" and nc.effectiveness_review_date is None:
             base_date = audit_detail.audit_end_date or audit_detail.audit_start_date
             nc.effectiveness_review_date = base_date + timedelta(days=90)
         nc.updated_by = _actor_id(user)

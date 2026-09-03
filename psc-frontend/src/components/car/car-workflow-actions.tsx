@@ -25,6 +25,23 @@ import { validateCarSubmission } from '@/lib/validations/car';
 import { CAR_STATUS, USER_ROLES, WORKFLOW_ACTIONS } from '@/lib/utils/constants';
 import type { AvailableAction } from '@/types';
 
+const CLIENT_REQUIRED_COMMENT_ACTIONS = new Set<string>([
+  WORKFLOW_ACTIONS.RETURN_FOR_REWORK,
+  WORKFLOW_ACTIONS.SUBMIT_TO_DPA,
+  WORKFLOW_ACTIONS.CLOSE_CAR,
+  WORKFLOW_ACTIONS.REOPEN_CAR,
+  WORKFLOW_ACTIONS.REQUEST_REWORK,
+  'SUBMIT_TO_LEAD_AUDITOR',
+  'LEAD_AUDITOR_CLOSE',
+  'AWAIT_EXTERNAL_CLOSE_OUT',
+  'CONFIRM_EXTERNAL_CLOSE',
+]);
+
+const actionRequiresComment = (action: AvailableAction | null): boolean => {
+  if (!action) return false;
+  return Boolean(action.comment_required) || CLIENT_REQUIRED_COMMENT_ACTIONS.has(action.action);
+};
+
 export interface CARWorkflowActionsProps {
   carId: string | number;
   onTransitioned?: () => void;
@@ -87,8 +104,7 @@ export const CARWorkflowActions: FC<CARWorkflowActionsProps> = ({
   };
 
   const isPICCommentRequired = (action: AvailableAction | null): boolean => {
-    if (!action) return false;
-    return Boolean(action.comment_required);
+    return actionRequiresComment(action);
   };
 
   const isMasterSubmitToPICAction = (action: AvailableAction): boolean => {
@@ -133,7 +149,7 @@ export const CARWorkflowActions: FC<CARWorkflowActionsProps> = ({
       return;
     }
 
-    if (action.comment_required) {
+    if (actionRequiresComment(action)) {
       setCommentDialogAction(action);
       setComment('');
       return;
@@ -146,7 +162,7 @@ export const CARWorkflowActions: FC<CARWorkflowActionsProps> = ({
     try {
       await transitionMutation.mutateAsync({
         action: actionName,
-        comment: actionComment || '',
+        comment: actionComment?.trim() || '',
       });
       queryClient.invalidateQueries({ queryKey: ['cars'] });
       onTransitioned?.();
@@ -202,7 +218,7 @@ export const CARWorkflowActions: FC<CARWorkflowActionsProps> = ({
               Send this CAR back to PIC for review?
             </DialogDescription>
           </DialogHeader>
-          {masterSubmitToPicAction?.comment_required && (
+          {actionRequiresComment(masterSubmitToPicAction) && (
             <div className="py-2">
               <Textarea
                 placeholder="Enter your comment (required)..."
@@ -226,7 +242,7 @@ export const CARWorkflowActions: FC<CARWorkflowActionsProps> = ({
             <Button
               disabled={
                 isPending ||
-                (masterSubmitToPicAction?.comment_required && !masterSubmitToPicComment.trim())
+                (actionRequiresComment(masterSubmitToPicAction) && !masterSubmitToPicComment.trim())
               }
               onClick={() => {
                 if (masterSubmitToPicAction) {
@@ -305,6 +321,9 @@ export const CARWorkflowActions: FC<CARWorkflowActionsProps> = ({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{commentDialogAction?.label}</DialogTitle>
+            <DialogDescription className="sr-only">
+              A workflow comment is required before this action can be submitted.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-2">
             <Textarea

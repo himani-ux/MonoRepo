@@ -12,6 +12,7 @@ import {
   useRetryAuditNotification,
 } from '@/hooks/audit/use-audit-notification';
 import { getErrorMessage } from '@/lib/api/client';
+import { formatEnumLabel } from '@/lib/utils/format-status';
 import {
   AUDIT_NOTIFICATION_OFFLINE_REASON_MIN,
   type AuditNotificationDelivery,
@@ -138,11 +139,11 @@ export function AuditFailedNotificationQueue() {
                     data.results.map((row) => (
                       <tr key={row.id}>
                         <td className="px-3 py-2">
-                          <div className="font-medium text-neutral-900">{row.notification_type || 'AUDIT_NOTIFICATION'}</div>
-                          <div className="text-xs text-neutral-500">{row.title || row.entity_type || row.psc_notification_id}</div>
+                          <div className="font-medium text-neutral-900">{formatEnumLabel(row.notification_type || 'AUDIT_NOTIFICATION')}</div>
+                          <div className="text-xs text-neutral-500">{row.title || formatEnumLabel(row.entity_type) || row.psc_notification_id}</div>
                         </td>
                         <td className="px-3 py-2">
-                          <Badge variant={channelVariant(row.channel)}>{row.channel}</Badge>
+                          <Badge variant={channelVariant(row.channel)}>{formatEnumLabel(row.channel)}</Badge>
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">
                           {row.recipient_address || row.recipient_id || '-'}
@@ -203,11 +204,11 @@ export function AuditFailedNotificationQueue() {
               <div className="grid gap-3 text-sm text-neutral-700 sm:grid-cols-3">
                 <div>
                   <p className="text-xs font-medium uppercase text-neutral-500">Notification</p>
-                  <p className="font-medium text-neutral-900">{offlineRow.notification_type || 'AUDIT_NOTIFICATION'}</p>
+                  <p className="font-medium text-neutral-900">{formatEnumLabel(offlineRow.notification_type || 'AUDIT_NOTIFICATION')}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase text-neutral-500">Channel</p>
-                  <p>{offlineRow.channel}</p>
+                  <p>{formatEnumLabel(offlineRow.channel)}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase text-neutral-500">Recipient</p>

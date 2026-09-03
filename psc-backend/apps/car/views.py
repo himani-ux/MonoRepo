@@ -1038,6 +1038,13 @@ class CARWorkflowView(APIView):
         old_status = car.status
         target_status = transition['target']
 
+        if transition.get('noop'):
+            action_label = ACTION_LABELS.get(action, action)
+            return Response({
+                'data': {'id': str(car.id), 'status': car.status, 'action': action},
+                'message': f'{action_label} already completed',
+            })
+
         car.status = target_status
         car.last_action = action
         car.last_action_by = str(request.user.id)
@@ -1078,6 +1085,9 @@ class CARWorkflowView(APIView):
             car.rework_requested_by = str(request.user.id)
             car.rework_requested_at = timezone.now()
             car.rework_count += 1
+
+        elif action == WorkflowAction.SUBMIT_TO_DPA:
+            car.pic_comment = comment if comment else None
 
         elif action == WorkflowAction.START_PIC_REVIEW:
             car.pic_comment = comment if comment else None

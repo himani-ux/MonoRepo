@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.inspection.audit.finding_types import is_nc_finding, is_observation_finding
 from apps.inspection.audit.services.detail import AuditDetailBundle, valid_audit_area_codes
 
 
@@ -58,8 +59,8 @@ class AuditDetailResponseSerializer(serializers.Serializer):
     def to_representation(self, instance: AuditDetailBundle):
         audit_detail = instance.audit_detail
         inspection = instance.inspection
-        nc_count = sum(1 for finding in instance.findings if finding["finding_type"] == "NC")
-        observation_count = sum(1 for finding in instance.findings if finding["finding_type"] == "OBSERVATION")
+        nc_count = sum(1 for finding in instance.findings if is_nc_finding(finding["finding_type"]))
+        observation_count = sum(1 for finding in instance.findings if is_observation_finding(finding["finding_type"]))
 
         return {
             "id": str(audit_detail.id),

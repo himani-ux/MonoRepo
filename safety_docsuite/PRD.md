@@ -808,6 +808,9 @@ Near miss is the reporting-culture pillar. The module uses the same underlying `
 **Acceptance criteria:**
 - Any rank may create a near miss (not top-4 limited) per D-RBAC-11.
 - `record_type='near_miss'` set at creation.
+- Vessel-side Near Miss creation issues a temporary `DRAFT-{VslCode}/{YYYY}/T{nnn}` reference while the record is pending vessel review.
+- When a Near Miss enters `READY_FOR_OFFICE_COMMENTS` through Master submit, Master rework resubmit, or direct Master create, the backend assigns the shared formal `{VslCode}/{YYYY}/{NNN}` number using the existing formal allocator.
+- Formal Near Miss numbers must not display `DRAFT-` or the `/T` draft marker; already formal numbers are preserved on retry.
 - The form captures place (`At Anchor`, `At Sea`, `At Port`), a single user-facing Category field that combines the previous Category and Possible Loss Type dropdown options, and factor-based causes. Near Miss Type is not used.
 - Category allows up to 3 selections and supports `Other - Specify`.
 - Cause analysis is captured through Human Factors, Vessel Factors, Management Factors, and Other Factors. Each factor requires an Immediate Cause and Root Cause dropdown value. Every factor/stage dropdown includes `Other` and `Not Applicable`; `Other` requires typed text.

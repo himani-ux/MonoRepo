@@ -250,6 +250,7 @@ Near-miss records share `vims_safety_incident` with `record_type='NEAR_MISS'`. A
 | V-NM-015 | Near Miss Fleet Alert issue has selected vessels without `VesselData.Email` or backend SMTP sender credentials are missing | server | "Email is not recorded in VesselData for: ..." or "Fleet Alert email sender credentials are not configured." | D-MAINT-CR083 |
 | V-NM-016 | Near Miss Fleet Alert email dispatch succeeds | server | Email is sent as one selected-vessel BCC batch with `HSSEQ@kaizenship.net` in CC, the Near Miss PDF attached, and a short prevention-focused body | D-MAINT-CR086 |
 | V-NM-017 | Office Comments save attempted after Near Miss is already `OFFICE_COMMENTS_COMPLETED` | client + server | Completed Office Comments are read-only; saved office and vessel review notes remain visible on the workspace. | D-GAP-R22 |
+| V-NM-018 | Near Miss enters `READY_FOR_OFFICE_COMMENTS` | server | Final `incident_number` must use formal `{VslCode}/{YYYY}/{NNN}` format, must not start with `DRAFT-`, must not contain `/T`, and already-formal numbers must not be reallocated. | D-MAINT-CR155 |
 
 ---
 
@@ -276,6 +277,7 @@ Active SCM state display:
 | V-SCM-008 | Vessel-side edit attempted after `office_comment_at` is set or state is `CLOSED` | server | "SCM meeting is closed after Office Comment. Editing is stopped." | D-GAP-M22 |
 | V-SCM-009 | Submit to Office clicked but meeting remains `DRAFT` after save | client + server | "SCM meeting must be submitted to office." | D-RBAC-06 revised 2026-06-09 |
 | V-SCM-014 | SCM Regular or Ad-Hoc creation attempted while ship-time config is missing, roster WRH data is unavailable, WRH lookup fails, or any roster crew is non-compliant | client + server | "SCM meeting cannot be hosted until all WRH warnings are cleared." | D-MAINT-CR014, D-GAP-M26 |
+| V-SCM-015 | SCM create/edit payload includes a nonblank latitude or longitude that is not in decimal-degree format | client + server | "Latitude must be in decimal degrees, e.g. 1.290270. Use a minus sign for south; do not enter N/S letters." / "Longitude must be in decimal degrees, e.g. 103.851959. Use a minus sign for west; do not enter E/W letters." | D-MAINT-CR175 |
 
 ### 4.2 Attendance (WRH Join)
 

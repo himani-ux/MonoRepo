@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 /**
- * Custom service worker for PSC Inspection Module.
+ * Custom service worker for VIMS.
  *
  * Source: IMPLEMENTATION_PLAN.md Step 8.3
  * Implements: TECH_STACK.md §1.10 (Workbox 7.1.0)

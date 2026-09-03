@@ -245,8 +245,9 @@ not modify the frozen SSOT.
 - `psc-frontend/src/App.tsx` now registers `/audit` and `/audit/dashboard`.
 - `/audit` redirects to `/audit/dashboard`.
 - `/audit/dashboard` renders a read-only Audit dashboard backed by the existing
-  audit-plan list query; no backend route, schema, or permission-ID change was
-  introduced.
+  audit-plan list query and the registered-audit list on `GET /api/audit/audits/`.
+  `CR-166` added the registered-audit list contract on the existing audit
+  registration endpoint; no schema or permission-ID change was introduced.
 - The existing Audit sidebar group now exposes an `Audit Dashboard` child link
   for users with Audit process access.
 - Remaining review note: route-level browser evidence should be included in the

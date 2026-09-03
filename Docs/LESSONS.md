@@ -483,3 +483,8 @@
 **What happened:** A Certs first-upload issue was fixed for unattached matching PDF blobs, but the user clarified that the duplicate-PDF error should not appear in any same-file upload case.
 **Why:** For users, uploading the same certificate PDF usually means "process this file again" or recover from a stale server record; blocking it creates a dead end.
 **Rule:** In Certs certificate upload flows, treat exact same-PDF uploads as successful reprocessing against the existing blob. Avoid user-facing duplicate-file errors unless the user explicitly asks for hard duplicate prevention.
+
+## L-091 - Workflow terminal actions must tolerate stale repeat requests
+**What happened:** The unified CAR workflow allowed idempotent stale retries for early actions like Start Review, but a repeat DPA `CLOSE_CAR` after the first successful close still returned a 400 because the CAR was already `CLOSED`.
+**Why:** Frontend cache invalidation, token refresh, double-clicks, or delayed UI refresh can replay the same completed terminal workflow action after the backend state has already advanced.
+**Rule:** For workflow actions that can be safely repeated after success, add an explicit no-op transition and regression coverage that proves the repeat call returns success without replaying audit, notification, or child-row side effects.

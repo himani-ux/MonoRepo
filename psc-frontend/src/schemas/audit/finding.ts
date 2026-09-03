@@ -5,7 +5,7 @@ export const NC_CATEGORIES = ['MAJOR_NC', 'MINOR_NC'] as const;
 export const OBSERVATION_CATEGORIES = ['OBSERVATION', 'IMPROVEMENT_SUGGESTION', 'OFI'] as const;
 export const RULE_BOOK_TYPES = ['ISM', 'ISPS', 'MLC', 'SOLAS', 'STCW', 'MARPOL', 'COLREG', 'KSM_SMS', 'FLAG', 'OTHER'] as const;
 export const FINDING_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
-export const CERTIFICATE_IMPACTS = ['NONE', 'CERT_VALID', 'RENEWAL_AT_RISK', 'SUSPENDED', 'WITHDRAWN'] as const;
+export const CERTIFICATES_AT_RISK = ['DOC', 'SMC', 'ISSC', 'MLC_DMLC', 'NONE'] as const;
 
 export interface AuditClauseMasterRow {
   id: string;
@@ -34,12 +34,11 @@ export const auditFindingCreateSchema = z
     observation_category: z.enum(OBSERVATION_CATEGORIES).or(z.literal('')).optional().default('OBSERVATION'),
     standard_code: z.string().max(20).optional().default('ISM'),
     description: z.string().min(1, 'Description is required'),
-    objective_evidence: z.string().optional().default(''),
-    def_code_id: z.string().min(1, 'DefCode is required').max(5),
+    objective_evidence: z.string().min(1, 'Objective Evidence is required'),
     checklist_item_id: z.string().uuid().or(z.literal('')).optional().default(''),
     priority: z.enum(FINDING_PRIORITIES).optional().default('MEDIUM'),
-    certificate_impact: z.enum(CERTIFICATE_IMPACTS).or(z.literal('')).optional().default(''),
-    certificates_at_risk: z.string().max(100).optional().default(''),
+    original_due_date: z.string().min(1, 'Target Closure Date is required'),
+    certificates_at_risk: z.enum(CERTIFICATES_AT_RISK).or(z.literal('')).optional().default(''),
     is_fleetwide_relevance: z.boolean().optional().default(false),
     clauses: z.array(auditFindingClauseSchema).min(1, 'At least one clause reference is required'),
   })
@@ -75,6 +74,9 @@ export const auditFindingCreateSchema = z
   );
 
 export type AuditFindingCreateFormData = z.infer<typeof auditFindingCreateSchema>;
+export type AuditFindingCreatePayload = AuditFindingCreateFormData & {
+  evidence_files?: File[];
+};
 
 export interface AuditFindingCreateResponse {
   id: string;
@@ -114,10 +116,9 @@ export function findingDefaults(checklistItemId?: string): AuditFindingCreateFor
     standard_code: 'ISM',
     description: '',
     objective_evidence: '',
-    def_code_id: '10101',
     checklist_item_id: checklistItemId || '',
     priority: 'MEDIUM',
-    certificate_impact: '',
+    original_due_date: '',
     certificates_at_risk: '',
     is_fleetwide_relevance: false,
     clauses: [

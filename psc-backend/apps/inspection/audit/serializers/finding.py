@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.db import connection
 from rest_framework import serializers
 
 from apps.inspection.audit.models import AuditFindingClause
@@ -36,12 +37,13 @@ class AuditFindingCreateSerializer(serializers.Serializer):
     standard_code = serializers.CharField(required=False, allow_blank=True, max_length=20)
     description = serializers.CharField()
     objective_evidence = serializers.CharField(required=False, allow_blank=True)
-    def_code_id = serializers.CharField(max_length=5)
+    def_code_id = serializers.CharField(required=False, allow_blank=True, max_length=5)
     def_code = serializers.CharField(required=False, allow_blank=True, max_length=10)
     checklist_item_id = serializers.UUIDField(required=False, allow_null=True)
     clauses = AuditFindingClauseSerializer(many=True)
     psc_deficiency_id = serializers.UUIDField(required=False, allow_null=True)
     priority = serializers.ChoiceField(choices=tuple(sorted(PRIORITIES)), required=False, allow_blank=True)
+    original_due_date = serializers.DateField(required=False, allow_null=True)
     certificate_impact = serializers.ChoiceField(
         choices=tuple(sorted(CERTIFICATE_IMPACTS)),
         required=False,
@@ -64,7 +66,7 @@ class AuditFindingResponseSerializer(serializers.Serializer):
         finding = instance.finding
         deficiency = instance.deficiency
         car = instance.car
-        clauses = AuditFindingClause.objects.filter(audit_finding_id=finding.id).order_by("-is_primary", "created_date", "id")
+        clauses = _finding_clauses_for_response(finding.id)
         return {
             "id": str(finding.id),
             "audit_detail_id": str(finding.audit_detail_id),
@@ -98,3 +100,24 @@ class AuditFindingResponseSerializer(serializers.Serializer):
                 for clause in clauses
             ],
         }
+
+
+def _finding_clauses_for_response(finding_id):
+    if connection.vendor == "microsoft":
+        return list(
+            AuditFindingClause.objects.raw(
+                f"""
+                SELECT *
+                FROM dbo.{AuditFindingClause._meta.db_table}
+                WHERE audit_finding_id = CAST(%s AS uniqueidentifier)
+                  AND is_deleted = 0
+                ORDER BY is_primary DESC, created_date ASC, id ASC
+                """,
+                [str(finding_id)],
+            )
+        )
+    return AuditFindingClause.objects.filter(audit_finding_id=finding_id).order_by(
+        "-is_primary",
+        "created_date",
+        "id",
+    )

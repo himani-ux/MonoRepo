@@ -331,7 +331,7 @@ pip install -r requirements.txt
 VITE_API_BASE_URL=http://localhost:8000/api/psc
 
 # PWA Configuration
-VITE_APP_NAME=PSC Inspection Module
+VITE_APP_NAME=VIMS
 VITE_APP_SHORT_NAME=PSC
 ```
 

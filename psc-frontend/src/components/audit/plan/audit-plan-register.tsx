@@ -10,6 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { PROCESS_IDS } from '@/lib/utils/permission-ids';
 import { getErrorMessage } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
+import { reloadAuditPlanRegisterPage } from '@/lib/audit/reload';
+import { formatDisplayDate } from '@/lib/utils/format-date';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
 import {
   AUDIT_PLAN_WRITABLE_STATUSES,
   auditPlanFormFromPlan,
@@ -32,6 +35,7 @@ import {
   useCancelAuditPlan,
   useCreateAdditionalAuditPlan,
   useCreateAuditPlan,
+  useAuditQualifiedAuditors,
   useDecideAuditPlanExtension,
   useRecordAuditPlanFlagNotification,
   useRequestAuditPlanExtension,
@@ -39,6 +43,7 @@ import {
 } from '@/hooks/audit/use-audit-plan';
 import { useAuditVessels } from '@/hooks/audit/use-audit-registration';
 import type { AuditVesselOption } from '@/lib/api/audit';
+import type { AuditQualifiedAuditor } from '@/lib/api/audit';
 
 const officeDepartments = ['', 'CREW', 'TECH', 'PURCHASE', 'IT', 'MARINE', 'SEQ', 'OTHER'] as const;
 const auditStandardOptions = ['ISM', 'ISPS', 'MLC', 'EMS'] as const;
@@ -47,10 +52,27 @@ type AuditStandardOption = (typeof auditStandardOptions)[number];
 type WorkflowMode = 'extension' | 'decision' | 'flag' | 'cancel' | null;
 
 function statusVariant(status: string) {
-  if (status === 'COMPLETED') return 'success';
-  if (status === 'OVERDUE' || status === 'EXTENDED' || status === 'EXTENSION_REQUESTED') return 'warning';
-  if (status === 'CRITICAL_OVERDUE' || status === 'CANCELLED') return 'destructive';
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'COMPLETED') return 'success';
+  if (normalized === 'IN_PROGRESS' || normalized === 'OVERDUE' || normalized === 'EXTENDED' || normalized === 'EXTENSION_REQUESTED') return 'warning';
+  if (normalized === 'CRITICAL_OVERDUE' || normalized === 'CANCELLED') return 'destructive';
   return 'secondary';
+}
+
+function formatOpmF713(plan: AuditPlan): string {
+  const reference = plan.extension_form_ref || '';
+  const extendedTo = formatDisplayDate(plan.extended_due_date);
+
+  if (reference && extendedTo) {
+    return `${reference} | Extended to ${extendedTo}`;
+  }
+  if (reference) {
+    return reference;
+  }
+  if (extendedTo) {
+    return `Extended to ${extendedTo}`;
+  }
+  return '-';
 }
 
 export function AuditPlanRegister() {
@@ -146,6 +168,7 @@ export function AuditPlanRegister() {
       }
       setSelectedPlan(null);
       setForm(emptyAuditPlanForm);
+      reloadAuditPlanRegisterPage();
     } catch (saveError) {
       toast({
         variant: 'destructive',
@@ -251,12 +274,12 @@ export function AuditPlanRegister() {
                         <td className="px-3 py-2 font-mono text-xs">
                           <div>{plan.window_label}</div>
                           {plan.extended_due_date && (
-                            <div className="mt-1 text-amber-700">Extended {plan.extended_due_date}</div>
+                            <div className="mt-1 text-amber-700">Extended to {formatDisplayDate(plan.extended_due_date)}</div>
                           )}
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs">{plan.extension_form_ref || '-'}</td>
+                        <td className="px-3 py-2 text-xs">{formatOpmF713(plan)}</td>
                         <td className="px-3 py-2">
-                          <Badge variant={statusVariant(plan.status)}>{plan.status}</Badge>
+                          <Badge variant={statusVariant(plan.status)}>{getStatusLabel(plan.status)}</Badge>
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-2">
@@ -343,8 +366,8 @@ export function AuditPlanRegister() {
                       onChange={(event) => setDecisionForm((current) => ({ ...current, decision: event.target.value as 'APPROVE' | 'REJECT' }))}
                       className="h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                     >
-                      <option value="APPROVE">APPROVE</option>
-                      <option value="REJECT">REJECT</option>
+                      <option value="APPROVE">{formatEnumLabel('APPROVE')}</option>
+                      <option value="REJECT">{formatEnumLabel('REJECT')}</option>
                     </select>
                   </div>
                   <FieldTextarea
@@ -469,7 +492,7 @@ export function AuditPlanRegister() {
                     className="h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
                   >
                     {triggerTypes.map((triggerType) => (
-                      <option key={triggerType} value={triggerType}>{triggerType}</option>
+                      <option key={triggerType} value={triggerType}>{formatEnumLabel(triggerType)}</option>
                     ))}
                   </select>
                 </div>
@@ -515,6 +538,9 @@ function PlanFields({
   vesselsLoading: boolean;
   statusDisabled?: boolean;
 }) {
+  const qualifiedAuditors = useAuditQualifiedAuditors(form.audit_standards_csv, form.target_office_dept);
+  const auditorOptions = qualifiedAuditors.data?.results ?? [];
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-2" data-eid="MOCKUP-PLAN-07:plan_form.target">
@@ -554,6 +580,13 @@ function PlanFields({
         value={form.audit_standards_csv}
         onChange={(value) => setField('audit_standards_csv', value)}
       />
+      <LeadAuditorSelect
+        id={`${idPrefix}lead_auditor_user_id`}
+        value={form.lead_auditor_user_id}
+        auditors={auditorOptions}
+        loading={qualifiedAuditors.isLoading}
+        onChange={(value) => setField('lead_auditor_user_id', value)}
+      />
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}status`}>Status</Label>
         <select
@@ -564,7 +597,7 @@ function PlanFields({
           className="h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:bg-neutral-100"
         >
           {AUDIT_PLAN_WRITABLE_STATUSES.map((status) => (
-            <option key={status} value={status}>{status}</option>
+            <option key={status} value={status}>{getStatusLabel(status)}</option>
           ))}
         </select>
       </div>
@@ -649,6 +682,53 @@ function StandardsDropdown({
       ) : null}
     </div>
   );
+}
+
+function LeadAuditorSelect({
+  id,
+  value,
+  auditors,
+  loading,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  auditors: AuditQualifiedAuditor[];
+  loading: boolean;
+  onChange: (value: string) => void;
+}) {
+  const placeholder = loading
+    ? 'Loading qualified auditors...'
+    : auditors.length
+      ? 'Select lead auditor'
+      : 'No qualified auditors found';
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Lead auditor</Label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={loading}
+        className="h-10 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:bg-neutral-100"
+      >
+        <option value="" disabled={!loading && auditors.length === 0}>{placeholder}</option>
+        {auditors.map((auditor) => (
+          <option key={auditor.id} value={auditor.user_id}>
+            {formatAuditorOption(auditor)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function formatAuditorOption(auditor: AuditQualifiedAuditor): string {
+  const details = [auditor.designation, auditor.qualification_text, `valid until ${auditor.expiry_date}`]
+    .filter(Boolean)
+    .join(' - ');
+  return details ? `${auditor.display_name} (${details})` : auditor.display_name || auditor.user_id;
 }
 
 function FieldInput({

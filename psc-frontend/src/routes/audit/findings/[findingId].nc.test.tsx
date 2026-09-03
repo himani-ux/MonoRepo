@@ -12,6 +12,7 @@ const ncRouteMocks = vi.hoisted(() => ({
   draftForVessel: vi.fn(),
   carWorkflow: vi.fn(),
   toast: vi.fn(),
+  useCLCHierarchy: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -27,6 +28,10 @@ vi.mock('@/hooks/audit/use-audit-finding', () => ({
 
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: ncRouteMocks.toast }),
+}));
+
+vi.mock('@/hooks/use-masters', () => ({
+  useCLCHierarchy: () => ncRouteMocks.useCLCHierarchy(),
 }));
 
 vi.mock('@/components/layout/root-layout', () => ({
@@ -98,6 +103,8 @@ function sampleClosure(overrides: Partial<AuditNcClosure> = {}): AuditNcClosure 
       why_5: '',
       root_cause_categories: [],
       root_cause_summary: '',
+      clc_item_ids: [],
+      custom_cause_text: '',
     },
     part_d: {
       corrective_action_text: '',
@@ -151,8 +158,26 @@ describe('AuditNcClosureRoute', () => {
     ncRouteMocks.draftForVessel.mockReset();
     ncRouteMocks.carWorkflow.mockReset();
     ncRouteMocks.toast.mockReset();
+    ncRouteMocks.useCLCHierarchy.mockReset();
 
     ncRouteMocks.useParams.mockReturnValue({ findingId: 'finding-1' });
+    ncRouteMocks.useCLCHierarchy.mockReturnValue({
+      data: {
+        immediate_causes: {
+          actions: {},
+          conditions: {},
+        },
+        root_causes: {
+          personal_factors: {
+            P1: { name: 'Personal Readiness', items: { P1: 'Training Gap' } },
+          },
+          job_factors: {
+            J7: { name: 'Job Planning', items: { J7: 'Procedure Gap' } },
+          },
+        },
+      },
+      isLoading: false,
+    });
     ncRouteMocks.updatePart.mockResolvedValue(sampleClosure());
     ncRouteMocks.draftForVessel.mockResolvedValue(sampleClosure({ car: { id: 'car-1', car_number: 'AUDIT-2026-001', status: 'OFFICE_DRAFTED', target_date: '2026-08-30' } }));
     ncRouteMocks.carWorkflow.mockResolvedValue({ id: 'car-1', status: 'SUBMITTED_TO_PIC', action: 'SUBMIT_TO_PIC' });
@@ -187,7 +212,7 @@ describe('AuditNcClosureRoute', () => {
     expect(screen.getAllByRole('button', { name: /save section/i })).toHaveLength(6);
   });
 
-  it('saves Part C with RCA method categories and root-cause summary', async () => {
+  it('saves Part C with CLC root-cause codes and root-cause summary', async () => {
     ncRouteMocks.useAuditNcClosure.mockReturnValue({
       data: sampleClosure(),
       isLoading: false,
@@ -197,8 +222,8 @@ describe('AuditNcClosureRoute', () => {
 
     render(<AuditNcClosureRoute />);
 
-    fireEvent.change(await screen.findByLabelText('RCA Method'), { target: { value: 'FIVE_WHY' } });
-    fireEvent.click(screen.getByLabelText('EQUIPMENT_FAILURE'));
+    fireEvent.click(await screen.findByLabelText(/Training Gap/));
+    fireEvent.click(screen.getByLabelText(/Procedure Gap/));
     fireEvent.change(screen.getByLabelText('Root Cause Summary'), {
       target: {
         value: 'The closer arm inspection was missed during weekly checks and the loose part remained undetected.',
@@ -210,8 +235,7 @@ describe('AuditNcClosureRoute', () => {
       expect(ncRouteMocks.updatePart).toHaveBeenCalledWith({
         part: 'part-c',
         data: expect.objectContaining({
-          rca_method: 'FIVE_WHY',
-          root_cause_categories: ['EQUIPMENT_FAILURE'],
+          clc_item_ids: ['P1', 'J7'],
           root_cause_summary: expect.stringContaining('closer arm inspection'),
         }),
       });
@@ -244,7 +268,7 @@ describe('AuditNcClosureRoute', () => {
     fireEvent.change(await screen.findByLabelText('Immediate Action'), {
       target: { value: 'Office drafted immediate containment for Master review.' },
     });
-    fireEvent.change(screen.getByLabelText('RCA Method'), { target: { value: 'FIVE_WHY' } });
+    fireEvent.click(screen.getByLabelText(/Training Gap/));
     fireEvent.change(screen.getByLabelText('Root Cause Summary'), {
       target: {
         value: 'Office drafted the RCA narrative because the vessel team needed a clear starting point.',
@@ -255,7 +279,7 @@ describe('AuditNcClosureRoute', () => {
     await waitFor(() => {
       expect(ncRouteMocks.draftForVessel).toHaveBeenCalledWith(expect.objectContaining({
         immediate_action_text: 'Office drafted immediate containment for Master review.',
-        rca_method: 'FIVE_WHY',
+        clc_item_ids: ['P1'],
         root_cause_summary: expect.stringContaining('vessel team needed'),
       }));
     });
@@ -318,5 +342,6 @@ describe('AuditNcClosureRoute', () => {
     render(<AuditNcClosureRoute />);
 
     expect(await screen.findByText('EffRev due 2026-09-30')).toBeInTheDocument();
+    expect(screen.getByLabelText('Further Action, If any')).toBeInTheDocument();
   });
 });

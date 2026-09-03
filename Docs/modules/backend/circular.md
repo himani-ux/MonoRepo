@@ -127,6 +127,7 @@ Delivery state is not driven by `publish_status` alone.
 - normalizes UUID-like inputs for type, priority, sub-category, second sub-category, and vessels
 - generates the next SR number as `KSM/{type}/{department}/{year}-{serial}`
 - generates a new circular PDF artifact even when no attachment is uploaded
+- validates uploaded attachments as PDF only, maximum 3 files, maximum 50 MB per PDF
 - merges the generated cover with the uploaded PDF only when an attachment is provided
 - inserts directly into `msc_data` using raw SQL
 - optionally records supersede metadata on the previous circular
@@ -237,6 +238,7 @@ Current trigger points:
 ## PDF and Attachment Flow
 
 - Uploaded PDFs are stored under `MEDIA_ROOT/circular/attachments/`.
+- Uploaded PDFs are rejected before storage when any file is non-PDF, when more than 3 files are submitted, or when any PDF exceeds 50 MB.
 - `attachment_path` stores the filesystem path.
 - Most APIs derive `attachment_url` from `attachment_name` and `MEDIA_URL`.
 - Cover pages are created with ReportLab.

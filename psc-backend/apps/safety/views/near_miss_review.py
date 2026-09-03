@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import generics, serializers, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -21,6 +22,7 @@ from apps.safety.identifiers import get_by_id_or_pk
 from apps.safety.serializers import NearMissSerializer, PhaseLogSerializer
 from apps.safety.serializers.near_miss import NEAR_MISS_OTHER_CATEGORY, NEAR_MISS_OTHER_PREFIX, resolve_near_miss_category
 from apps.safety.services import NotificationWriter, capture_model_state, record_field_changes
+from apps.safety.services.near_miss_numbering import formalize_near_miss_number_for_office
 from apps.safety.services.signature_chain import SignatureChainService
 from apps.safety.views.near_miss import NearMissViewMixin, _is_master_user, _normalized_role, _resolve_actor_id
 
@@ -406,46 +408,53 @@ class NearMissReviewView(NearMissViewMixin, generics.GenericAPIView):
             if decision == "SUBMIT_TO_OFFICE"
             else Incident.State.REWORK_REQUIRED
         )
-        old_state = capture_model_state(
-            near_miss,
-            field_names=("state", "updated_by", "updated_date"),
-        )
-        near_miss.state = next_state
-        near_miss.updated_by = actor_id
-        near_miss.updated_date = timezone.now()
-        near_miss.save(update_fields=("state", "updated_by", "updated_date"))
-        record_field_changes(
-            near_miss,
-            old_state,
-            user=request.user,
-            field_names=("state", "updated_by", "updated_date"),
-            change_reason=comment or f"Near-miss vessel review decision: {decision}.",
-        )
-        phase_log = IncidentPhaseLog.objects.create(
-            incident=near_miss,
-            phase_from=near_miss.current_phase,
-            phase_to=near_miss.current_phase,
-            transition_type=(
-                IncidentPhaseLog.TransitionType.REWORK
-                if decision == "SEND_BACK"
-                else IncidentPhaseLog.TransitionType.FORWARD
-            ),
-            loop_back_reason=comment or f"Near-miss vessel review decision: {decision}.",
-            actor_user_id=actor_id,
-            actor_role_code=actor_role,
-            device_fingerprint=signature.device_fingerprint,
-            signature_valid=True,
-            schema_version=near_miss.schema_version or 1,
-        )
-        self._record_review_signature(
-            near_miss=near_miss,
-            signature=signature,
-            actor_id=actor_id,
-            actor_role=actor_role,
-            decision=decision,
-            comment=comment,
-            field_name=VESSEL_REVIEW_FIELD,
-        )
+        with transaction.atomic():
+            old_state = capture_model_state(
+                near_miss,
+                field_names=("incident_number", "state", "updated_by", "updated_date"),
+            )
+            near_miss.state = next_state
+            near_miss.updated_by = actor_id
+            near_miss.updated_date = timezone.now()
+            update_fields = ["state", "updated_by", "updated_date"]
+            if formalize_near_miss_number_for_office(
+                near_miss,
+                repository=self.get_incident_repository(),
+            ):
+                update_fields.append("incident_number")
+            near_miss.save(update_fields=tuple(update_fields))
+            record_field_changes(
+                near_miss,
+                old_state,
+                user=request.user,
+                field_names=tuple(update_fields),
+                change_reason=comment or f"Near-miss vessel review decision: {decision}.",
+            )
+            phase_log = IncidentPhaseLog.objects.create(
+                incident=near_miss,
+                phase_from=near_miss.current_phase,
+                phase_to=near_miss.current_phase,
+                transition_type=(
+                    IncidentPhaseLog.TransitionType.REWORK
+                    if decision == "SEND_BACK"
+                    else IncidentPhaseLog.TransitionType.FORWARD
+                ),
+                loop_back_reason=comment or f"Near-miss vessel review decision: {decision}.",
+                actor_user_id=actor_id,
+                actor_role_code=actor_role,
+                device_fingerprint=signature.device_fingerprint,
+                signature_valid=True,
+                schema_version=near_miss.schema_version or 1,
+            )
+            self._record_review_signature(
+                near_miss=near_miss,
+                signature=signature,
+                actor_id=actor_id,
+                actor_role=actor_role,
+                decision=decision,
+                comment=comment,
+                field_name=VESSEL_REVIEW_FIELD,
+            )
         if decision == "SEND_BACK":
             self.get_notification_writer().dispatch_notification(
                 record_id=near_miss.pk,
@@ -453,7 +462,11 @@ class NearMissReviewView(NearMissViewMixin, generics.GenericAPIView):
                 kind="NEAR_MISS_REWORK_REQUIRED",
                 title="Near miss sent back for rework",
                 message=comment,
-                payload={"near_miss_id": near_miss.pk, "state": near_miss.state},
+                payload={
+                    "near_miss_id": near_miss.pk,
+                    "incident_number": near_miss.incident_number,
+                    "state": near_miss.state,
+                },
                 send_slack=True,
             )
         else:
@@ -463,7 +476,11 @@ class NearMissReviewView(NearMissViewMixin, generics.GenericAPIView):
                 kind="NEAR_MISS_READY_FOR_OFFICE_COMMENTS",
                 title="Near miss ready for office comments",
                 message=f"Near miss {near_miss.incident_number} completed vessel review.",
-                payload={"near_miss_id": near_miss.pk, "state": near_miss.state},
+                payload={
+                    "near_miss_id": near_miss.pk,
+                    "incident_number": near_miss.incident_number,
+                    "state": near_miss.state,
+                },
                 send_slack=True,
             )
 
@@ -526,52 +543,65 @@ class NearMissReworkSubmitView(NearMissViewMixin, generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         actor_id = _resolve_actor_id(request.user)
         actor_role = _normalized_role(request.user) or "REPORTER"
-        old_state = capture_model_state(
-            near_miss,
-            field_names=(*self.rework_update_fields, "state", "updated_by", "updated_date"),
-        )
-        self._apply_rework_updates(near_miss, serializer.validated_data)
-        near_miss.state = (
-            Incident.State.READY_FOR_OFFICE_COMMENTS
-            if _is_master_user(request.user)
-            else Incident.State.PENDING_VESSEL_REVIEW
-        )
-        near_miss.updated_by = actor_id
-        near_miss.updated_date = timezone.now()
-        near_miss.save(update_fields=(*self.rework_update_fields, "state", "updated_by", "updated_date"))
-        record_field_changes(
-            near_miss,
-            old_state,
-            user=request.user,
-            field_names=(*self.rework_update_fields, "state", "updated_by", "updated_date"),
-            change_reason=serializer.validated_data["comment"],
-        )
-        SafetyFieldHistory.objects.create(
-            parent_table=near_miss._meta.db_table,
-            parent_id=near_miss.pk,
-            field_name=REWORK_RESUBMISSION_FIELD,
-            old_value=None,
-            new_value={
-                "comment": serializer.validated_data["comment"],
-                "submitted_by": actor_id,
-                "submitted_role": actor_role,
-            },
-            change_reason=serializer.validated_data["comment"],
-            actor_user_id=actor_id,
-            actor_role_code=actor_role,
-            schema_version=near_miss.schema_version or 1,
-        )
-        phase_log = IncidentPhaseLog.objects.create(
-            incident=near_miss,
-            phase_from=near_miss.current_phase,
-            phase_to=near_miss.current_phase,
-            transition_type=IncidentPhaseLog.TransitionType.REWORK,
-            loop_back_reason=serializer.validated_data["comment"],
-            actor_user_id=actor_id,
-            actor_role_code=actor_role,
-            device_fingerprint=getattr(near_miss, "reporter_device_fingerprint", None),
-            schema_version=near_miss.schema_version or 1,
-        )
+        with transaction.atomic():
+            old_state = capture_model_state(
+                near_miss,
+                field_names=(
+                    *self.rework_update_fields,
+                    "incident_number",
+                    "state",
+                    "updated_by",
+                    "updated_date",
+                ),
+            )
+            self._apply_rework_updates(near_miss, serializer.validated_data)
+            near_miss.state = (
+                Incident.State.READY_FOR_OFFICE_COMMENTS
+                if _is_master_user(request.user)
+                else Incident.State.PENDING_VESSEL_REVIEW
+            )
+            near_miss.updated_by = actor_id
+            near_miss.updated_date = timezone.now()
+            update_fields = [*self.rework_update_fields, "state", "updated_by", "updated_date"]
+            if formalize_near_miss_number_for_office(
+                near_miss,
+                repository=self.get_incident_repository(),
+            ):
+                update_fields.append("incident_number")
+            near_miss.save(update_fields=tuple(update_fields))
+            record_field_changes(
+                near_miss,
+                old_state,
+                user=request.user,
+                field_names=tuple(update_fields),
+                change_reason=serializer.validated_data["comment"],
+            )
+            SafetyFieldHistory.objects.create(
+                parent_table=near_miss._meta.db_table,
+                parent_id=near_miss.pk,
+                field_name=REWORK_RESUBMISSION_FIELD,
+                old_value=None,
+                new_value={
+                    "comment": serializer.validated_data["comment"],
+                    "submitted_by": actor_id,
+                    "submitted_role": actor_role,
+                },
+                change_reason=serializer.validated_data["comment"],
+                actor_user_id=actor_id,
+                actor_role_code=actor_role,
+                schema_version=near_miss.schema_version or 1,
+            )
+            phase_log = IncidentPhaseLog.objects.create(
+                incident=near_miss,
+                phase_from=near_miss.current_phase,
+                phase_to=near_miss.current_phase,
+                transition_type=IncidentPhaseLog.TransitionType.REWORK,
+                loop_back_reason=serializer.validated_data["comment"],
+                actor_user_id=actor_id,
+                actor_role_code=actor_role,
+                device_fingerprint=getattr(near_miss, "reporter_device_fingerprint", None),
+                schema_version=near_miss.schema_version or 1,
+            )
         payload = NearMissSerializer(near_miss, context=self.get_serializer_context()).data
         payload["rework_phase_log"] = PhaseLogSerializer(phase_log).data
         return Response(payload, status=status.HTTP_200_OK)

@@ -14,6 +14,7 @@ from .audit_legacy_inspection_tag import AuditLegacyInspectionTag
 from .audit_signature import AuditFindingSignEvent, AuditFindingSignature, AuditSignature
 from .external import CertWritebackOutbox, FlagStateNotificationLog
 from .masters import (
+    AuditQualifyingBody,
     MasterAuditArea,
     MasterAuditChecklist,
     MasterAuditChecklistItem,
@@ -54,6 +55,7 @@ __all__ = [
     "AuditFindingSignature",
     "AuditMeetingAttendee",
     "AuditPdfGeneration",
+    "AuditQualifyingBody",
     "AuditScheduleBlock",
     "AuditSignature",
     "AuditStandard",

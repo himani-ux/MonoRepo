@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from apps.inspection.audit.finding_types import (
+    is_nc_finding,
+    is_observation_finding,
+    normalize_finding_type,
+    normalize_nc_category,
+    normalize_observation_category,
+)
 from apps.inspection.audit.models import AuditAreaSummary, AuditDetail, AuditFinding, MasterAuditArea, MasterAuditPlan
 from apps.inspection.audit.pdf.audit_plan_pdf import _auditee_label, _plan_for_detail
 from apps.inspection.audit.pdf.common import (
@@ -33,8 +40,8 @@ def generate_audit_report_pdf(audit_detail: AuditDetail, *, generated_by=None) -
     inspection = bundle.inspection
     plan = _plan_for_detail(audit_detail)
     findings = list(AuditFinding.objects.filter(audit_detail_id=audit_detail.id).order_by("created_date", "id"))
-    nc_count = sum(1 for finding in findings if finding.finding_type == "NC")
-    obs_count = sum(1 for finding in findings if finding.finding_type == "OBSERVATION")
+    nc_count = sum(1 for finding in findings if is_nc_finding(finding.finding_type))
+    obs_count = sum(1 for finding in findings if is_observation_finding(finding.finding_type))
 
     def story_factory() -> list:
         story = [
@@ -83,8 +90,10 @@ def generate_audit_report_pdf(audit_detail: AuditDetail, *, generated_by=None) -
                 [
                     [
                         index,
-                        finding.nc_category or finding.observation_category or "-",
-                        finding.finding_type,
+                        normalize_nc_category(finding.nc_category)
+                        or normalize_observation_category(finding.observation_category)
+                        or "-",
+                        normalize_finding_type(finding.finding_type),
                         finding.clause_ref_text or finding.standard_code or "-",
                         format_date(finding.extended_due_date or finding.original_due_date),
                     ]

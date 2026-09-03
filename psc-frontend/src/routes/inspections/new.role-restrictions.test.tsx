@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   useCreateInspection: vi.fn(),
   useCreateAuditRegistration: vi.fn(),
   useAuditVessels: vi.fn(),
+  useAuditPlans: vi.fn(),
   createMutateAsync: vi.fn(),
   createAuditMutateAsync: vi.fn(),
   uploadInspectionReport: vi.fn(),
@@ -36,6 +37,10 @@ vi.mock('@/hooks/use-inspections', () => ({
 vi.mock('@/hooks/audit/use-audit-registration', () => ({
   useCreateAuditRegistration: () => mocks.useCreateAuditRegistration(),
   useAuditVessels: () => mocks.useAuditVessels(),
+}));
+
+vi.mock('@/hooks/audit/use-audit-plan', () => ({
+  useAuditPlans: () => mocks.useAuditPlans(),
 }));
 
 vi.mock('@/lib/api/inspections', () => ({
@@ -181,6 +186,7 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
     mocks.useCreateInspection.mockReset();
     mocks.useCreateAuditRegistration.mockReset();
     mocks.useAuditVessels.mockReset();
+    mocks.useAuditPlans.mockReset();
     mocks.createMutateAsync.mockReset();
     mocks.createAuditMutateAsync.mockReset();
     mocks.uploadInspectionReport.mockReset();
@@ -207,6 +213,13 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
       ],
       isLoading: false,
     });
+    mocks.useAuditPlans.mockReturnValue({
+      data: {
+        count: 0,
+        results: [],
+      },
+      isLoading: false,
+    });
   });
 
   it('office user sees the audit registration form with auditee type controls', async () => {
@@ -224,7 +237,71 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
     expect(screen.getByLabelText('Auditee Type')).toBeInTheDocument();
     expect(mocks.inspectionFormProps).toBeNull();
     expect(mocks.auditRegistrationFormProps.vesselOptions).toHaveLength(1);
+    expect(mocks.auditRegistrationFormProps.auditPlanOptions).toEqual([]);
     expect(mocks.auditRegistrationFormProps.defaultLeadAuditorName).toBe('Office Auditor');
+  });
+
+  it('passes distinct registerable audit plans to prevent same-vessel registration confusion', () => {
+    mocks.useAuth.mockReturnValue({
+      user: {
+        role: USER_ROLES.OFFICE_PIC,
+        vessel_id: 'vessel-1',
+        full_name: 'Office Auditor',
+      },
+    });
+    mocks.useAuditPlans.mockReturnValue({
+      data: {
+        count: 4,
+        results: [
+          auditPlan({
+            id: 'aaaaaaaa-1111-4111-8111-111111111111',
+            target_label: 'SFC - SF CHALISA',
+            planned_window_start: '2026-08-22',
+            planned_window_end: '2026-08-31',
+            window_label: '2026-08-22 -> 2026-08-31',
+            status: 'CONFIRMED',
+          }),
+          auditPlan({
+            id: 'bbbbbbbb-2222-4222-8222-222222222222',
+            target_label: 'SFC - SF CHALISA',
+            planned_window_start: '2026-09-15',
+            planned_window_end: '2026-09-20',
+            window_label: '2026-09-15 -> 2026-09-20',
+            status: 'EXTENDED',
+          }),
+          auditPlan({
+            id: 'cccccccc-3333-4333-8333-333333333333',
+            target_label: 'SFC - SF CHALISA',
+            planned_window_start: '2026-10-01',
+            planned_window_end: '2026-10-05',
+            window_label: '2026-10-01 -> 2026-10-05',
+            status: 'PLANNED',
+          }),
+          auditPlan({
+            id: 'dddddddd-4444-4444-8444-444444444444',
+            lead_auditor_user_id: '',
+            target_label: 'Office - TECH',
+            status: 'CRITICAL_OVERDUE',
+          }),
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<CreateInspectionPage />);
+
+    expect(mocks.auditRegistrationFormProps.auditPlanOptions).toEqual([
+      expect.objectContaining({
+        id: 'aaaaaaaa-1111-4111-8111-111111111111',
+        target_label: 'SFC - SF CHALISA',
+        window_label: '2026-08-22 -> 2026-08-31',
+      }),
+      expect.objectContaining({
+        id: 'bbbbbbbb-2222-4222-8222-222222222222',
+        target_label: 'SFC - SF CHALISA',
+        window_label: '2026-09-15 -> 2026-09-20',
+      }),
+    ]);
   });
 
   it('office user submits through the audit registration endpoint', async () => {
@@ -284,3 +361,44 @@ describe('CreateInspectionPage RBAC type restrictions', () => {
     });
   });
 });
+
+function auditPlan(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'aaaaaaaa-1111-4111-8111-111111111111',
+    target_vessel_id: '11111111-1111-4111-8111-111111111111',
+    target_office_dept: null,
+    target_label: 'EAT - EAST AYUTTHAYA',
+    audit_classification: 'INTERNAL',
+    audit_standards_csv: 'ISM,ISPS',
+    lead_auditor_user_id: 'auditor-1',
+    planned_window_start: '2026-08-01',
+    planned_window_end: '2026-08-31',
+    window_label: '2026-08-01 -> 2026-08-31',
+    extended_due_date: null,
+    extension_form_ref: null,
+    extension_requested_at: null,
+    extension_requested_by: null,
+    extension_requested_reason: null,
+    extension_approved_at: null,
+    extension_approved_by: null,
+    extension_approved_reason: null,
+    flag_notified: false,
+    flag_notification_date: null,
+    flag_notification_ref: null,
+    flag_notification_attachment: null,
+    is_additional: false,
+    additional_reason: null,
+    trigger_event_type: null,
+    trigger_event_ref: null,
+    cancellation_reason: null,
+    next_planned_date: null,
+    cancelled_by: null,
+    cancelled_at: null,
+    status: 'CONFIRMED',
+    created_by: null,
+    created_date: null,
+    updated_by: null,
+    updated_date: null,
+    ...overrides,
+  };
+}

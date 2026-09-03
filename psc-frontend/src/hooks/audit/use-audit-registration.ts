@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { auditApi, type AuditRegistrationResponse, type AuditVesselOption } from '@/lib/api/audit';
+import {
+  auditApi,
+  type AuditExternalAuditOrg,
+  type AuditMasterList,
+  type AuditRegistrationResponse,
+  type AuditVesselOption,
+  type RegisteredAuditList,
+} from '@/lib/api/audit';
 import type { ExternalAuditCloseoutPayload, ExternalCertLinkPayload } from '@/lib/api/audit';
 import type { AuditDetail, AuditDetailEditableFields, AuditScorecardRow } from '@/schemas/audit/detail';
 import type { AuditRegistrationPayload } from '@/schemas/audit/registration';
@@ -9,6 +16,7 @@ export const auditKeys = {
   audits: () => [...auditKeys.all, 'audits'] as const,
   detail: (id: string | undefined) => [...auditKeys.audits(), id || 'unknown'] as const,
   vessels: () => [...auditKeys.all, 'vessels'] as const,
+  externalOrgs: () => [...auditKeys.all, 'masters', 'external-audit-orgs'] as const,
 };
 
 export function useCreateAuditRegistration() {
@@ -27,6 +35,20 @@ export function useAuditVessels() {
   return useQuery<AuditVesselOption[], Error>({
     queryKey: auditKeys.vessels(),
     queryFn: auditApi.getAuditVessels,
+  });
+}
+
+export function useRegisteredAudits() {
+  return useQuery<RegisteredAuditList, Error>({
+    queryKey: auditKeys.audits(),
+    queryFn: auditApi.getRegisteredAudits,
+  });
+}
+
+export function useAuditExternalAuditOrgs() {
+  return useQuery<AuditMasterList<AuditExternalAuditOrg>, Error>({
+    queryKey: auditKeys.externalOrgs(),
+    queryFn: auditApi.getAuditExternalAuditOrgs,
   });
 }
 

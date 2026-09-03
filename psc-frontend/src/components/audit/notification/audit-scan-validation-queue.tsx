@@ -11,6 +11,7 @@ import {
   useAuditScanValidationQueue,
 } from '@/hooks/audit/use-audit-scan-validation';
 import { getErrorMessage } from '@/lib/api/client';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
 import {
   AUDIT_SCAN_ACCEPT_REASON_MIN,
   type AuditScanValidationAttachment,
@@ -130,14 +131,14 @@ export function AuditScanValidationQueue() {
                       <tr key={row.id}>
                         <td className="px-3 py-2">
                           <div className="font-medium text-neutral-900">{row.file_name}</div>
-                          <div className="font-mono text-xs text-neutral-500">{row.category}</div>
+                          <div className="text-xs text-neutral-500">{formatEnumLabel(row.category)}</div>
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">
                           {row.audit_finding_id || row.audit_detail_id}
                         </td>
                         <td className="px-3 py-2">
                           <Badge variant={statusVariant(row.pdf_hash_validation_status)}>
-                            {row.pdf_hash_validation_status || 'UNVALIDATED'}
+                            {getStatusLabel(row.pdf_hash_validation_status || 'UNVALIDATED')}
                           </Badge>
                         </td>
                         <td className="px-3 py-2 text-xs text-neutral-600">
@@ -197,7 +198,7 @@ export function AuditScanValidationQueue() {
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase text-neutral-500">Status</p>
-                  <p>{selectedRow.pdf_hash_validation_status || 'UNVALIDATED'}</p>
+                  <p>{getStatusLabel(selectedRow.pdf_hash_validation_status || 'UNVALIDATED')}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase text-neutral-500">Uploaded by</p>

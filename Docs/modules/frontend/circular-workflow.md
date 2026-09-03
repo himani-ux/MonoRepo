@@ -82,7 +82,9 @@ This module renders the legacy circular system inside the modern React shell. It
 - pending edit and draft edit prefill
 - vessel popup and rank popup
 - approval and rejection comment modal
-- optional attachment upload with generated-PDF fallback messaging
+- optional attachment upload with generated-PDF fallback messaging, PDF-only selection, maximum 3 PDFs, and a 50 MB per-PDF browser guard
+
+Circular office/admin runtime calls now use same-origin `/api/circular/...` paths instead of a developer-only `http://localhost:8000` origin, so deployed builds call the active server host. Local Vite development proxies `/api` requests to `http://localhost:8000` from `vite.config.ts`.
 
 Both files still mix create, review, publish, and edit behavior instead of splitting them into focused screens or hooks.
 
@@ -159,7 +161,7 @@ Circular workflow notifications are rendered inside the same shared notification
 - non-masters call `/api/crew/notifications/`
 - masters can open crew list and send reminders
 
-The circular PDF viewer and standalone PDF viewer fetch the PDF URL and submit read acknowledgement through `http://localhost:8000/api/circular/` paths for the current server patch scope.
+The circular PDF viewer and standalone PDF viewer fetch the PDF URL and submit read acknowledgement through same-origin `/api/circular/` paths for the current server patch scope.
 
 `PdfViewer.jsx` fetches the attachment URL, renders the PDF with PDF.js, and only exposes the acknowledge button once the viewer is scrolled to the bottom. Both circular PDF viewer entry points use a Vite-bundled PDF.js worker instance so production does not depend on the server MIME type for a separate `.mjs` worker asset.
 
@@ -210,9 +212,9 @@ That affects:
 
 Draft edit, pending edit, supersede, and approval all persist ephemeral state into `localStorage`. That makes flows brittle across tabs, reloads, and stale-session scenarios.
 
-### 5. Hard-coded backend URLs are everywhere
+### 5. Circular URL handling is still fragmented
 
-Most requests point directly at `http://localhost:8000/api/circular/...` instead of using a shared API client. This makes environment changes and testing harder.
+The legacy circular pages still issue direct `fetch` and `window.open` calls in many components instead of using a shared API client. Circular runtime files now use same-origin `/api/circular/...` paths instead of pinning to `http://localhost:8000`, but the lack of a shared client still makes environment changes and testing harder.
 
 ### 6. There are duplicate approval implementations
 
@@ -226,7 +228,7 @@ They do similar work but are not cleanly consolidated, so behavior can drift.
 
 ### 7. New shell integration is still only partial
 
-The circular module lives inside the modern shell, but most of the logic still uses legacy hooks, legacy routes, hard-coded URLs, ad hoc state transfer, and direct `fetch` calls to `http://localhost:8000`.
+The circular module lives inside the modern shell, but most of the logic still uses legacy hooks, legacy routes, direct `fetch` calls, ad hoc URL handling, and ad hoc state transfer.
 
 The newer pieces added around it are shell wrappers, not a full modernization:
 

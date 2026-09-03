@@ -354,6 +354,26 @@ class AuditCarWorkflowProxyTests(unittest.TestCase):
         self.assertEqual(response.data["error"], "LEAD_AUDITOR_PIC_DENIED")
         self.assertEqual(car.status, CARStatus.SUBMITTED_TO_PIC)
 
+    def test_first_pic_review_captures_pic_and_starts_closure_progress(self) -> None:
+        audit_detail, finding, _deficiency, car = self._create_audit_finding()
+        audit_detail.status = "VESSEL_ACKNOWLEDGED"
+        audit_detail.save(update_fields=["status"])
+        car.status = CARStatus.SUBMITTED_TO_PIC
+        car.save(update_fields=["status"])
+
+        response = self._post_proxy(
+            finding.id,
+            {"action": WorkflowAction.START_PIC_REVIEW, "comment": "Starting PIC review."},
+            self.office_supt,
+        )
+
+        audit_detail.refresh_from_db()
+        car.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(car.status, CARStatus.PIC_REVIEW)
+        self.assertEqual(audit_detail.pic_user_id_resolved, "supt-1")
+        self.assertEqual(audit_detail.status, "CLOSURE_IN_PROGRESS")
+
     def test_missing_part_f_signature_blocks_lead_auditor_close(self) -> None:
         _audit_detail, finding, _deficiency, car = self._create_audit_finding()
         car.status = CARStatus.SUBMITTED_TO_LEAD_AUDITOR

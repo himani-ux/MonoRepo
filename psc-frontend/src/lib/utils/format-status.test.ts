@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getStatusVariant, getStatusLabel } from './format-status';
+import { formatEnumLabel, getStatusVariant, getStatusLabel } from './format-status';
 
 // ============================================================================
 // getStatusVariant
@@ -75,7 +75,32 @@ describe('getStatusLabel', () => {
     }
   });
 
-  it('test_util_edge_case_unknown_status_returns_raw_value', () => {
-    expect(getStatusLabel('UNKNOWN' as 'DRAFT')).toBe('UNKNOWN');
+  it('test_util_edge_case_unknown_status_is_humanized', () => {
+    expect(getStatusLabel('EXTENSION_REQUESTED' as 'DRAFT')).toBe('Extension Requested');
+  });
+
+  it('test_util_happy_path_known_acronym_status_keeps_acronyms', () => {
+    expect(getStatusLabel('SUBMITTED_TO_PIC')).toBe('Submitted to PIC');
+  });
+});
+
+// ============================================================================
+// formatEnumLabel
+// ============================================================================
+
+describe('formatEnumLabel', () => {
+  it('test_util_happy_path_formats_external_audit_enums', () => {
+    expect(formatEnumLabel('CLASS_SOCIETY')).toBe('Class Society');
+    expect(formatEnumLabel('SMC_RENEWAL')).toBe('SMC Renewal');
+    expect(formatEnumLabel('OFI')).toBe('OFI');
+  });
+
+  it('test_util_happy_path_formats_multiword_values_without_raw_underscores', () => {
+    expect(formatEnumLabel('PENDING_EXTERNAL_CLOSE')).toBe('Pending External Close');
+    expect(formatEnumLabel('RENEWAL_AT_RISK')).toBe('Renewal at Risk');
+  });
+
+  it('test_util_edge_case_empty_value_returns_empty_label', () => {
+    expect(formatEnumLabel(null)).toBe('');
   });
 });

@@ -13,16 +13,20 @@
  * PRD Reference: FEAT-INS-001, FEAT-INS-002
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RootLayout } from '@/components/layout/root-layout';
 import { PageHeader } from '@/components/layout/page-header';
 import { InspectionForm } from '@/components/inspection/inspection-form';
-import { AuditRegistrationForm } from '@/components/audit/registration/audit-registration-form';
+import {
+  AuditRegistrationForm,
+  type AuditRegistrationPlanOption,
+} from '@/components/audit/registration/audit-registration-form';
 import { ConfirmDialog } from '@/components/shared';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { useCreateInspection } from '@/hooks/use-inspections';
+import { useAuditPlans } from '@/hooks/audit/use-audit-plan';
 import { useAuditVessels, useCreateAuditRegistration } from '@/hooks/audit/use-audit-registration';
 import { inspectionsApi } from '@/lib/api/inspections';
 import { INSPECTION_TYPES, ROUTES, USER_ROLES } from '@/lib/utils/constants';
@@ -208,6 +212,11 @@ function OfficeAuditRegistrationSection({
   const { toast } = useToast();
   const createAuditRegistration = useCreateAuditRegistration();
   const vesselQuery = useAuditVessels();
+  const planQuery = useAuditPlans();
+  const auditPlanOptions = useMemo(
+    () => (planQuery.data?.results ?? []).filter(isRegisterableAuditPlan),
+    [planQuery.data]
+  );
 
   const handleAuditRegistrationSubmit = useCallback(
     async (data: AuditRegistrationFormData) => {
@@ -235,10 +244,18 @@ function OfficeAuditRegistrationSection({
       onCancel={onCancel}
       isSubmitting={createAuditRegistration.isPending}
       vesselOptions={vesselQuery.data ?? []}
+      auditPlanOptions={auditPlanOptions}
       defaultVesselId={getUserVesselId(user)}
       defaultLeadAuditorName={getUserDisplayName(user)}
     />
   );
+}
+
+const REGISTERABLE_AUDIT_PLAN_STATUSES = new Set(['CONFIRMED', 'EXTENDED', 'CRITICAL_OVERDUE']);
+
+function isRegisterableAuditPlan(plan: AuditRegistrationPlanOption): boolean {
+  const status = String(plan.status || '').toUpperCase();
+  return REGISTERABLE_AUDIT_PLAN_STATUSES.has(status) && Boolean(plan.lead_auditor_user_id);
 }
 
 function getUserVesselId(user: unknown): string | null {

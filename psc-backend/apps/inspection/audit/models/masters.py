@@ -19,6 +19,7 @@ class MasterAuditPlan(MasterUpdatedMixin):
     target_office_dept = models.CharField(max_length=40, null=True, blank=True)
     audit_classification = models.CharField(max_length=30)
     audit_standards_csv = models.CharField(max_length=100)
+    lead_auditor_user_id = models.CharField(max_length=100, null=True, blank=True)
     planned_window_start = models.DateField(null=True, blank=True)
     planned_window_end = models.DateField(null=True, blank=True)
     extended_due_date = models.DateField(null=True, blank=True)
@@ -138,6 +139,15 @@ class MasterAuditQualifiedAuditor(MasterUpdatedMixin):
 
     class Meta:
         db_table = "master_audit_qualified_auditor"
+
+
+class AuditQualifyingBody(MasterUpdatedMixin):
+    body_name = models.CharField(max_length=200, unique=True)
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "aud_master_qual_body"
 
 
 class MasterHodAssignment(AuditCreatedMixin):

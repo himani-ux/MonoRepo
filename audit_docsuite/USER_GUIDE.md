@@ -17,9 +17,11 @@ The items below were added or changed later on after the original guide baseline
 - CAR workflow now uses the unified operational statuses shown in the status section at the end of this guide
 - Audit plan and registration forms show vessel dropdowns; users select the vessel name/code and the system saves the correct vessel ID behind the scenes
 - Audit plan Standards are selected from fixed options, so users no longer type comma-separated standard codes
-- Register Audit shows a Selected Audit Plan picker. Choose the exact plan by `PLAN-XXXXXXXX`, target vessel/department, standards, status, audit window, and planned lead auditor before saving the audit.
+- Register Audit opens an Internal / External chooser. Internal audit registration then shows the Selected Audit Plan picker; choose the exact plan by `PLAN-XXXXXXXX`, target vessel/department, standards, status, audit window, and planned lead auditor before saving the audit.
 - After a selected audit plan is registered, that plan becomes `IN_PROGRESS` and cannot be selected again for another audit registration.
 - Qualified Auditors maintenance uses dropdowns for Employee/User ID and Qualifying Body. Qualifying Body choices come from active master rows in `aud_master_qual_body`, and the screen does not ask users to manually enter attachment UUIDs.
+- Audit NC findings open the dense NC closure form only. Audit Observation findings open the guided wizard only.
+- External Audit registration asks users to attach the report PDF; file path, MIME type, file size, and certificate links are not entered on the registration screen.
 
 ---
 
@@ -33,7 +35,7 @@ Your role determines what you can see and do:
 
 | Role | Access |
 |------|--------|
-| **Vessel Master** | Create inspections, submit CARs, register follow-ups |
+| **Vessel Master** | Create inspections, register vessel-side external audits, submit vessel-side CAR/closure actions, register follow-ups |
 | **Crew** | View assigned actions, upload evidence |
 | **Office (PIC/SSQE/Supt)** | Review, start PIC review, submit to DPA, edit-assist, request rework |
 | **DPA** | Final closure, rework, reopen, and global reviewer access when mapped |
@@ -81,16 +83,76 @@ Reports access:
 
 ### Register an Internal Audit
 
-Office users register internal audits from **Register Audit**.
+Office users register internal audits from **Register Audit** by choosing **Internal Audit** first.
 
 1. Select the exact audit plan first.
 2. Check the plan reference, target, standards, status, and audit window shown on screen.
 3. If two plans are for the same vessel, use the plan reference and window to choose the correct one.
-4. Complete the common header, team, attendees, dates, scope, and plan blocks. The Lead Auditor fields are filled from the selected audit plan and cannot be edited during planned audit registration.
+4. Complete the common header, team, attendees, dates, scope, and plan blocks. For vessel audits, Personnel Present can suggest the vessel's Master, Chief Officer, Chief Engineer, and Second Engineer; selecting a suggested person fills the Rank field. The Lead Auditor fields are filled from the selected audit plan and cannot be edited during planned audit registration.
 5. Click **Register Audit**.
 
 When registerable audit plans exist, the screen requires a selected plan before saving.
 The server also checks the plan status and previous usage, so a stale browser session cannot reuse or submit the wrong plan.
+After saving, the audit opens immediately. Later, users can return to **Audit Dashboard** and use **Registered Audits** to reopen audits they are allowed to access.
+
+### Register an External Audit
+
+Vessel Masters register completed vessel-side external audits from **Register Audit** by choosing **External Audit**. Authorised office audit users register completed office-side external audits from the same flow.
+
+1. Select the vessel and enter the completion date, audit dates, and port/place.
+2. Select the external audit subtype, standards, lead auditor, auditor credential, and organisation type. Select an external audit organisation if it is available.
+3. If the audit is for DOC, enter the flag state and DOC cycle year.
+4. Optionally enter the report reference if the class society, flag state, or auditor supplied a report number.
+5. Attach the external audit report PDF. Users do not type report file path, MIME type, or file size.
+6. Add a late-registration reason if the completed audit is being registered more than 30 days after completion.
+7. Click **Register External Audit**.
+
+The audit is created at `SUBMITTED` status and the attached PDF is saved as the external audit report attachment.
+If the External Audit Organisation dropdown says no organisations are available, the audit can still be registered without selecting one.
+The visible External Audit actions come from the user's authenticated Audit process gates. Vessel Master and Acting Master logins receive the documented vessel-side registration gate when their session is refreshed.
+
+### Complete the Audit Scorecard
+
+Open a registered internal audit and use **14-Area Inspection Summary** on Audit Detail.
+
+1. Set the status for each of the 14 operational audit areas.
+2. Add remarks where needed.
+3. Click **Save Scorecard**.
+
+After saving, the same status and remarks controls remain editable, so authorised users can correct and save the scorecard again. Demo or non-required master-area rows are not shown in the working 14-area grid and do not count toward submit readiness.
+
+### Walk an Audit Checklist
+
+Open a registered audit and click **Walk Checklist**.
+
+1. Review each checklist item and its rule/manual references.
+2. Use the item status radio choices:
+   - **Not reviewed** when the row has not been checked yet.
+   - **Compliant** when the item is checked and acceptable.
+   - **Findings** when the row needs an NC or observation finding.
+3. Add remarks for evidence or context.
+4. When **Findings** is selected, use **Add Finding** to record the finding details.
+5. In **Create Audit Finding**, enter the finding description, clause, mandatory objective-evidence text, target closure date, and certificate-at-risk scope.
+6. Attach objective-evidence files when available. Accepted finding-evidence uploads are images, PDF, DOCX, and XLSX files.
+
+Audit findings do not ask users to select PSC DefCode or Action Code. The system creates the required audit CAR automatically with an Audit CAR number such as `EAT-AUDIT-2026-001` for vessel audits or `KSM-AUDIT-2026-001` for office audits.
+
+### Close an Audit NC
+
+Open the audit detail and use the NC finding row in **Findings**.
+
+- The NC closure action opens the dense NC form. The old NC wizard URL is retained only as a compatibility route to the dense form.
+- Part C root-cause selection uses the same CLC category/item structure used in PSC CARs, plus the root-cause summary text.
+- Certificates at Risk is taken from the finding header and is not repeated as an editable field in Parts E and F.
+- In **Audit Detail**, previous corrective-action verification fields are shown as **Prev Internal CAR Verified** and **Prev External CAR Verified**.
+- In Part E, use **Further Action, If any** only when the effectiveness review needs extra follow-up after the assessment.
+
+### Close an Audit Observation
+
+Open the audit detail and use the Observation finding row in **Findings**.
+
+- The Observation closure action opens the guided wizard with three steps: Responder, Action Plan, and Master Close.
+- Users are not asked to choose between dense and wizard modes for observations.
 
 ### Add Deficiencies
 

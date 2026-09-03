@@ -138,10 +138,19 @@ class CAR(models.Model):
         """
         Generate next CAR number.
 
-        New auto-created CARs use: <VESSEL_CODE>-PSC-{YEAR}-{SEQ}
+        PSC auto-created CARs use: <VESSEL_CODE>-PSC-{YEAR}-{SEQ}
+        Audit auto-created CARs use: <SCOPE>-AUDIT-{YEAR}-{SEQ}
         Legacy no-context callers keep the historical PSC-{YEAR}-{SEQ} format.
         """
         current_year = timezone.now().year
+        inspection_type = str(getattr(inspection, "inspection_type", "") or "").upper()
+        if inspection_type == "AUDIT":
+            return cls._generate_audit_car_number(
+                year=current_year,
+                vessel_id=getattr(inspection, "vessel_id", None),
+                vessel_code=vessel_code or _lookup_vessel_code(getattr(inspection, "vessel_id", None)),
+            )
+
         if inspection is not None or vessel_code:
             return cls._generate_vessel_car_number(
                 year=current_year,
@@ -175,6 +184,16 @@ class CAR(models.Model):
     def _generate_vessel_car_number(cls, *, year: int, vessel_id: object, vessel_code: str | None) -> str:
         normalized_code = _normalize_vessel_code(vessel_code, vessel_id=vessel_id)
         prefix = f"{normalized_code}-PSC-{year}-"
+        return cls._generate_scoped_car_number(prefix=prefix)
+
+    @classmethod
+    def _generate_audit_car_number(cls, *, year: int, vessel_id: object, vessel_code: str | None) -> str:
+        scope = _normalize_audit_scope(vessel_code, vessel_id=vessel_id)
+        prefix = f"{scope}-AUDIT-{year}-"
+        return cls._generate_scoped_car_number(prefix=prefix)
+
+    @classmethod
+    def _generate_scoped_car_number(cls, *, prefix: str) -> str:
         queryset = cls.objects.filter(car_number__startswith=prefix)
 
         last_seq = 0
@@ -189,7 +208,7 @@ class CAR(models.Model):
         if len(candidate) > max_length:
             raise ValueError(
                 "Generated CAR number exceeds psc_car.car_number length. "
-                "A database datatype change is required before this vessel code/sequence can be used."
+                "A database datatype change is required before this scope/sequence can be used."
             )
         return candidate
 
@@ -205,6 +224,23 @@ def _normalize_vessel_code(value: str | None, *, vessel_id: object = None) -> st
         raise ValueError(
             "Vessel code is too long for the current psc_car.car_number length. "
             "A database datatype change is required before this code can be used."
+        )
+    return normalized
+
+
+def _normalize_audit_scope(value: str | None, *, vessel_id: object = None) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]", "", str(value or "")).upper()
+    if not normalized:
+        if vessel_id:
+            raise ValueError(
+                "Vessel code is required for Audit CAR numbering. "
+                "Check VesselData.vesselCode for this vessel before creating an Audit CAR."
+            )
+        return "KSM"
+    if len(normalized) > 5:
+        raise ValueError(
+            "Audit CAR scope is too long for the approved {SCOPE}-AUDIT-{YYYY}-{NNN} format. "
+            "Use a vessel or office scope code of 5 characters or less."
         )
     return normalized
 

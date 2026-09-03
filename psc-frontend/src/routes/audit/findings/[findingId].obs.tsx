@@ -3,5 +3,5 @@ import { AuditObsClosurePage } from '@/components/audit/finding/audit-obs-closur
 
 export default function AuditObsClosureRoute() {
   const { findingId } = useParams<{ findingId: string }>();
-  return <AuditObsClosurePage findingId={findingId || ''} />;
+  return <AuditObsClosurePage findingId={findingId || ''} mode="dense" />;
 }

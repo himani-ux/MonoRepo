@@ -6,9 +6,19 @@ from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
-from apps.inspection.audit.models import AuditDetail
-from apps.inspection.audit.services.registration import register_internal_audit
+from apps.inspection.audit.models import AuditDetail, MasterAuditPlan
+from apps.inspection.audit.services.auditor_selection import (
+    auditor_snapshot,
+    get_external_org_by_id,
+    resolve_external_org_for_vessel_standard,
+)
+from apps.inspection.audit.services.registration import (
+    get_audit_plan_by_id,
+    register_internal_audit,
+    validate_registerable_audit_plan,
+)
 
 
 STANDARD_CHOICES = ("ISM", "ISPS", "MLC", "EMS", "DOC")
@@ -136,6 +146,12 @@ class AuditRegistrationSerializer(serializers.Serializer):
     external_report_file_size = serializers.IntegerField(required=False, allow_null=True)
     late_registration_reason = serializers.CharField(required=False, allow_blank=True)
 
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, "copy") else dict(data)
+        if data.get("external_audit_org_id") == "":
+            data.pop("external_audit_org_id", None)
+        return super().to_internal_value(data)
+
     def validate_standards(self, value):
         if len(set(value)) != len(value):
             raise serializers.ValidationError("Standards cannot contain duplicates.")
@@ -149,6 +165,7 @@ class AuditRegistrationSerializer(serializers.Serializer):
         return data
 
     def _validate_internal(self, data):
+        self._apply_internal_plan_lead_auditor(data)
         required_fields = ("audit_subtype", "lead_auditor_name", "lead_auditor_company", "trigger_reason")
         errors = {field: "This field is required for internal audit registration." for field in required_fields if not data.get(field)}
         if errors:
@@ -166,8 +183,9 @@ class AuditRegistrationSerializer(serializers.Serializer):
     def _validate_external(self, data):
         errors = {}
         subtypes = data.get("external_audit_subtypes") or []
+        completed_on = data.get("audit_end_date") or data["audit_start_date"]
+        self._apply_external_org_default(data, subtypes, completed_on, errors)
         required_fields = (
-            "external_audit_org_id",
             "external_audit_org_type",
             "external_lead_auditor_name",
             "external_lead_auditor_credential",
@@ -198,7 +216,6 @@ class AuditRegistrationSerializer(serializers.Serializer):
         if has_doc and data.get("cycle_year") is None:
             errors["cycle_year"] = "DOC cycle year is required for DOC external audits."
 
-        completed_on = data.get("audit_end_date") or data["audit_start_date"]
         if completed_on < timezone.localdate() - timedelta(days=30):
             reason = (data.get("late_registration_reason") or "").strip()
             if len(reason) < 50:
@@ -209,6 +226,75 @@ class AuditRegistrationSerializer(serializers.Serializer):
 
         if errors:
             raise serializers.ValidationError(errors)
+
+    def _apply_internal_plan_lead_auditor(self, data):
+        plan_id = data.get("audit_plan_id")
+        if not plan_id:
+            return
+        try:
+            plan = get_audit_plan_by_id(plan_id)
+        except MasterAuditPlan.DoesNotExist as exc:
+            raise serializers.ValidationError({"audit_plan_id": "Audit plan was not found."}) from exc
+
+        try:
+            validate_registerable_audit_plan(plan)
+        except ValidationError as exc:
+            raise serializers.ValidationError(exc.detail) from exc
+
+        self._validate_internal_plan_target(plan, data)
+        if not plan.lead_auditor_user_id:
+            raise serializers.ValidationError(
+                {"lead_auditor_user_id": "Selected audit plan does not have a lead auditor assigned."}
+            )
+
+        snapshot = auditor_snapshot(
+            plan.lead_auditor_user_id,
+            standards=plan.audit_standards_csv,
+            target_office_dept=plan.target_office_dept,
+        )
+        if snapshot is None:
+            raise serializers.ValidationError(
+                {"lead_auditor_user_id": "Plan lead auditor is not active or no longer qualified."}
+            )
+
+        data["lead_auditor_user_id"] = snapshot.user_id
+        data["lead_auditor_name"] = snapshot.name
+        data["lead_auditor_designation"] = snapshot.designation
+        data["lead_auditor_company"] = snapshot.company
+        data["lead_auditor_qual"] = snapshot.qualification
+
+    def _validate_internal_plan_target(self, plan: MasterAuditPlan, data):
+        auditee_type = data.get("auditee_type")
+        if plan.target_vessel_id:
+            if auditee_type != "VESSEL":
+                raise serializers.ValidationError({"audit_plan_id": "Selected audit plan is for a vessel audit."})
+            if str(plan.target_vessel_id).lower() != str(data.get("vessel_id")).lower():
+                raise serializers.ValidationError({"audit_plan_id": "Selected audit plan belongs to another vessel."})
+            return
+
+        if plan.target_office_dept:
+            if auditee_type != "OFFICE_DEPT":
+                raise serializers.ValidationError({"audit_plan_id": "Selected audit plan is for an office department audit."})
+            if plan.target_office_dept != data.get("auditee_office_dept"):
+                raise serializers.ValidationError({"audit_plan_id": "Selected audit plan belongs to another office department."})
+
+    def _apply_external_org_default(self, data, subtypes, completed_on, errors):
+        if not data.get("external_audit_org_id"):
+            organisation = resolve_external_org_for_vessel_standard(
+                vessel_id=data.get("vessel_id"),
+                standards=_external_standards_for_subtypes(subtypes),
+                effective_on=completed_on,
+            )
+            if organisation is not None:
+                data["external_audit_org_id"] = organisation.id
+                data["external_audit_org_type"] = organisation.org_type
+
+        if data.get("external_audit_org_id"):
+            organisation = get_external_org_by_id(data["external_audit_org_id"])
+            if organisation is None:
+                errors["external_audit_org_id"] = "An active external audit organisation is required."
+            elif not data.get("external_audit_org_type"):
+                data["external_audit_org_type"] = organisation.org_type
 
     def _open_doc_exists(self, data) -> bool:
         return AuditDetail.objects.filter(
@@ -222,9 +308,55 @@ class AuditRegistrationSerializer(serializers.Serializer):
         return register_internal_audit(data=validated_data, user=self.context["request"].user)
 
 
+def _external_standards_for_subtypes(subtypes) -> list[str]:
+    standards: list[str] = []
+    for subtype in subtypes:
+        text = str(subtype or "").strip().upper()
+        if text.startswith(("DOC_", "SMC_")):
+            standard = "ISM"
+        elif text.startswith("ISPS_"):
+            standard = "ISPS"
+        elif text.startswith("MLC_"):
+            standard = "MLC"
+        else:
+            continue
+        if standard not in standards:
+            standards.append(standard)
+    return standards
+
+
 class AuditRegistrationResponseSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="audit_detail.id")
     inspection_id = serializers.UUIDField(source="inspection.id")
     status = serializers.CharField(source="audit_detail.status")
     audit_classification = serializers.CharField(source="audit_detail.audit_classification")
     auditee_type = serializers.CharField(source="audit_detail.auditee_type")
+
+
+class RegisteredAuditListItemSerializer(serializers.Serializer):
+    def to_representation(self, instance: AuditDetail):
+        vessel_label_map = self.context.get("vessel_label_map") or {}
+        vessel_id = str(instance.vessel_id or "").strip()
+        auditee_type = str(instance.auditee_type or "").strip().upper()
+
+        if auditee_type == "OFFICE_DEPT":
+            target_label = f"Office - {instance.auditee_office_dept or 'Not set'}"
+        else:
+            target_label = vessel_label_map.get(vessel_id.lower()) or f"Vessel {vessel_id or 'Not set'}"
+
+        return {
+            "id": str(instance.id),
+            "audit_plan_id": str(instance.audit_plan_id) if instance.audit_plan_id else None,
+            "target_label": target_label,
+            "vessel_id": vessel_id or None,
+            "audit_classification": instance.audit_classification,
+            "auditee_type": instance.auditee_type,
+            "auditee_office_dept": instance.auditee_office_dept,
+            "audit_subtype": instance.audit_subtype,
+            "lead_auditor_name": instance.lead_auditor_name,
+            "lead_auditor_designation": instance.lead_auditor_designation or "",
+            "audit_start_date": instance.audit_start_date.isoformat(),
+            "audit_end_date": instance.audit_end_date.isoformat() if instance.audit_end_date else None,
+            "status": instance.status,
+            "created_date": instance.created_date.isoformat() if instance.created_date else None,
+        }

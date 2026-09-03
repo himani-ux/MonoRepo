@@ -18,7 +18,7 @@ import type { AuditChecklistItem } from '@/schemas/audit/checklist';
 import {
   FINDING_TYPES,
   FINDING_PRIORITIES,
-  CERTIFICATE_IMPACTS,
+  CERTIFICATES_AT_RISK,
   NC_CATEGORIES,
   OBSERVATION_CATEGORIES,
   RULE_BOOK_TYPES,
@@ -27,6 +27,7 @@ import {
   type AuditFindingCreateFormData,
 } from '@/schemas/audit/finding';
 import { cn } from '@/lib/utils';
+import { formatEnumLabel } from '@/lib/utils/format-status';
 
 interface AuditFindingCreateModalProps {
   auditId: string;
@@ -42,6 +43,7 @@ export function AuditFindingCreateModal({
   onOpenChange,
 }: AuditFindingCreateModalProps) {
   const [form, setForm] = useState<AuditFindingCreateFormData>(() => findingDefaults());
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const createFinding = useCreateAuditFinding(auditId);
   const { toast } = useToast();
@@ -49,6 +51,7 @@ export function AuditFindingCreateModal({
   useEffect(() => {
     if (!open) return;
     setForm(findingDefaults(checklistItem?.id));
+    setEvidenceFiles([]);
     setError(null);
   }, [checklistItem, open]);
 
@@ -72,7 +75,10 @@ export function AuditFindingCreateModal({
     }
 
     try {
-      const result = await createFinding.mutateAsync(parsed.data);
+      const result = await createFinding.mutateAsync({
+        ...parsed.data,
+        evidence_files: evidenceFiles,
+      });
       toast({ title: `Finding created: ${result.car_number}` });
       onOpenChange(false);
     } catch (caught) {
@@ -84,13 +90,13 @@ export function AuditFindingCreateModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="h-[94vh] w-[98vw] max-w-[1680px] p-8">
         <DialogHeader>
           <DialogTitle>Create Audit Finding</DialogTitle>
           <DialogDescription>{contextText}</DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-5" onSubmit={handleSubmit}>
           {error ? (
             <div className="rounded-md border border-error-100 bg-error-50 p-3 text-sm text-error-700" role="alert">
               {error}
@@ -102,7 +108,7 @@ export function AuditFindingCreateModal({
               id="finding_type"
               label="Finding Type"
               value={form.finding_type}
-              options={FINDING_TYPES.map((value) => ({ value, label: value }))}
+              options={FINDING_TYPES.map((value) => ({ value, label: formatEnumLabel(value) }))}
               onChange={(value) =>
                 setForm((current) => ({
                   ...current,
@@ -116,7 +122,7 @@ export function AuditFindingCreateModal({
                 id="nc_category"
                 label="NC Category"
                 value={form.nc_category || ''}
-                options={NC_CATEGORIES.map((value) => ({ value, label: value.replace('_', ' ') }))}
+                options={NC_CATEGORIES.map((value) => ({ value, label: formatEnumLabel(value) }))}
                 onChange={(value) => setForm((current) => ({ ...current, nc_category: value as typeof NC_CATEGORIES[number] }))}
               />
             ) : (
@@ -124,7 +130,7 @@ export function AuditFindingCreateModal({
                 id="observation_category"
                 label="Observation Category"
                 value={form.observation_category || ''}
-                options={OBSERVATION_CATEGORIES.map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
+                options={OBSERVATION_CATEGORIES.map((value) => ({ value, label: formatEnumLabel(value) }))}
                 onChange={(value) =>
                   setForm((current) => ({
                     ...current,
@@ -133,15 +139,6 @@ export function AuditFindingCreateModal({
                 }
               />
             )}
-            <div className="space-y-2">
-              <Label htmlFor="def_code_id">DefCode</Label>
-              <Input
-                id="def_code_id"
-                maxLength={5}
-                value={form.def_code_id}
-                onChange={(event) => setForm((current) => ({ ...current, def_code_id: event.target.value }))}
-              />
-            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
@@ -149,7 +146,7 @@ export function AuditFindingCreateModal({
               id="priority"
               label="Priority"
               value={form.priority || 'MEDIUM'}
-              options={FINDING_PRIORITIES.map((value) => ({ value, label: value }))}
+              options={FINDING_PRIORITIES.map((value) => ({ value, label: formatEnumLabel(value) }))}
               onChange={(value) =>
                 setForm((current) => ({
                   ...current,
@@ -158,15 +155,37 @@ export function AuditFindingCreateModal({
               }
             />
             <SelectField
-              id="certificate_impact"
-              label="Certificate Impact"
-              value={form.certificate_impact || ''}
+              id="certificates_at_risk"
+              label="Certificates at Risk"
+              value={form.certificates_at_risk || ''}
               options={[
                 { value: '', label: 'Not set' },
-                ...CERTIFICATE_IMPACTS.map((value) => ({ value, label: value.replaceAll('_', ' ') })),
+                ...CERTIFICATES_AT_RISK.map((value) => ({ value, label: formatEnumLabel(value) })),
               ]}
-              onChange={(value) => setForm((current) => ({ ...current, certificate_impact: value as AuditFindingCreateFormData['certificate_impact'] }))}
+              onChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  certificates_at_risk: value as AuditFindingCreateFormData['certificates_at_risk'],
+                }))
+              }
             />
+            <div className="space-y-2">
+              <Label htmlFor="original_due_date">Target Closure Date</Label>
+              <Input
+                id="original_due_date"
+                type="date"
+                value={form.original_due_date || ''}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    original_due_date: event.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
             {form.finding_type === 'NC' ? (
               <label className="flex min-h-10 items-center gap-3 rounded-md border border-neutral-200 px-3 py-2 text-sm text-neutral-800">
                 <input
@@ -194,7 +213,7 @@ export function AuditFindingCreateModal({
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                rows={5}
+                rows={6}
                 value={form.description}
                 onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
               />
@@ -203,14 +222,30 @@ export function AuditFindingCreateModal({
               <Label htmlFor="objective_evidence">Objective Evidence</Label>
               <Textarea
                 id="objective_evidence"
-                rows={5}
+                rows={6}
                 value={form.objective_evidence}
                 onChange={(event) => setForm((current) => ({ ...current, objective_evidence: event.target.value }))}
               />
             </div>
           </div>
 
-          <div className="space-y-3 rounded-md border border-neutral-200 p-3">
+          <div className="space-y-2">
+            <Label htmlFor="evidence_files">Objective Evidence Attachments</Label>
+            <Input
+              id="evidence_files"
+              type="file"
+              multiple
+              accept="image/*,.pdf,.docx,.xlsx"
+              onChange={(event) => setEvidenceFiles(Array.from(event.target.files || []))}
+            />
+            {evidenceFiles.length ? (
+              <p className="text-xs text-neutral-500">
+                {evidenceFiles.length} file{evidenceFiles.length === 1 ? '' : 's'} selected.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-3 rounded-md border border-neutral-200 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-900">Clause References</p>
@@ -299,7 +334,7 @@ function ClauseFields({
         id={`rule_book_type_${index}`}
         label={`${prefix} Book`}
         value={clause.rule_book_type}
-        options={RULE_BOOK_TYPES.map((value) => ({ value, label: value }))}
+        options={RULE_BOOK_TYPES.map((value) => ({ value, label: formatEnumLabel(value) }))}
         onChange={(value) =>
           updateClause(onChange, index, {
             rule_book_type: value as typeof RULE_BOOK_TYPES[number],

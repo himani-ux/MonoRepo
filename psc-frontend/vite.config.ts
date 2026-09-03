@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 
 /**
- * Vite configuration for PSC Inspection Module.
+ * Vite configuration for VIMS.
  *
  * Source: TECH_STACK.md §1.1 (Vite 5.4.0)
  * PWA: TECH_STACK.md §1.10 (vite-plugin-pwa 0.20.0)
@@ -20,9 +20,9 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: false,
       manifest: {
-        name: 'PSC Inspection Module',
-        short_name: 'PSC',
-        description: 'Port State Control, RightShip, and Audit inspection management',
+        name: 'VIMS',
+        short_name: 'VIMS',
+        description: 'Vessel Inspection Management System',
         theme_color: '#3B82F6',
         background_color: '#FFFFFF',
         display: 'standalone',
@@ -30,19 +30,19 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/icons/icon-192x192.svg',
+            src: '/icons/ksm-icon-192x192.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
           },
           {
-            src: '/icons/icon-512x512.svg',
+            src: '/icons/ksm-icon-512x512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
           },
           {
-            src: '/icons/icon-512x512.svg',
+            src: '/icons/ksm-icon-512x512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any maskable',
           },
         ],
@@ -59,6 +59,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {

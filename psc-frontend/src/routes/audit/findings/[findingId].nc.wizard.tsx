@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
-import { AuditNcWizard } from '@/components/audit/finding/audit-nc-wizard';
+import { AuditNcClosurePage } from '@/components/audit/finding/audit-nc-closure-page';
 
 export default function AuditNcWizardRoute() {
   const { findingId } = useParams<{ findingId: string }>();
-  return <AuditNcWizard findingId={findingId || ''} />;
+  return <AuditNcClosurePage findingId={findingId || ''} />;
 }

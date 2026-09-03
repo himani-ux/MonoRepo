@@ -134,6 +134,30 @@ def parse_id_list(value: Optional[str]) -> List[str]:
     return [part.strip() for part in raw.split(',') if part.strip()]
 
 
+def merge_audit_default_process_ids(process_ids: Optional[List[str]], *designations: Optional[str]) -> List[str]:
+    merged: List[str] = []
+    seen: set[str] = set()
+
+    for process_id in process_ids or []:
+        normalized = str(process_id or "").strip().upper()
+        if not normalized or normalized in seen:
+            continue
+        merged.append(normalized)
+        seen.add(normalized)
+
+    from apps.inspection.audit.permissions import default_audit_gates_for_designation
+
+    for designation in designations:
+        for process_id in sorted(default_audit_gates_for_designation(designation)):
+            normalized = str(process_id or "").strip().upper()
+            if not normalized or normalized in seen:
+                continue
+            merged.append(normalized)
+            seen.add(normalized)
+
+    return merged
+
+
 def get_profile_permissions(profile_name: Optional[str], work_side: bool) -> Tuple[List[str], List[str]]:
     if not profile_name:
         return [], []
@@ -151,7 +175,7 @@ def get_profile_permissions(profile_name: Optional[str], work_side: bool) -> Tup
         return [], []
     return (
         parse_id_list(profile.form_ids),
-        parse_id_list(profile.process_ids),
+        merge_audit_default_process_ids(parse_id_list(profile.process_ids), profile.profile_name),
     )
 
 
@@ -329,10 +353,11 @@ def get_office_profile_bundle_by_mapping(
             row = cursor.fetchone()
         if row:
             role_name, form_ids, process_ids = row
+            resolved_role_name = str(role_name).strip() if role_name not in (None, "") else None
             return (
-                str(role_name).strip() if role_name not in (None, "") else None,
+                resolved_role_name,
                 parse_id_list(form_ids),
-                parse_id_list(process_ids),
+                merge_audit_default_process_ids(parse_id_list(process_ids), resolved_role_name),
             )
 
     return None, [], []
@@ -425,7 +450,7 @@ def resolve_safety_role_name(
     normalized_profile = str(profile_name or "").strip().upper()
 
     if normalized_user_type == "VESSEL":
-        if normalized_rank in {"MASTER", "CAPTAIN"}:
+        if normalized_rank in {"MASTER", "CAPTAIN", "ACTING MASTER"}:
             return "MASTER"
         if normalized_rank in {"CHIEF OFFICER", "CHIEF MATE", "C/O", "CO"}:
             return "CO"
@@ -524,6 +549,8 @@ def resolve_current_office_permission_snapshot(
         role=role,
         profile_name=profile_name,
     )
+    role_default = role if role == RoleCodes.DPA else None
+    process_ids = merge_audit_default_process_ids(process_ids, profile_name, role_default)
 
     return {
         'role': role,
@@ -549,6 +576,7 @@ def resolve_current_vessel_permission_snapshot(
     department: Optional[str] = None,
 ) -> dict:
     form_ids, process_ids = get_profile_permissions(rank, work_side=True)
+    process_ids = merge_audit_default_process_ids(process_ids, rank, role)
     return {
         'rank': rank,
         'role_name': rank or role,

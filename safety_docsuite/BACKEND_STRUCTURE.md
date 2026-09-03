@@ -44,6 +44,8 @@
 
 > **Near Miss backend update (2026-06-15):** Near Miss no longer uses the Incident M-SCAT picker for Immediate Cause. Deploy migration `0039_near_miss_factor_causes.py` before deploying the Near Miss create/rework UI. The migration adds `vims_safety_incident.near_miss_factor_causes`, creates `vims_safety_near_miss_cause_option`, and seeds Human/Vessel/Management/Other factor options for Immediate Cause and Root Cause.
 
+> **Near Miss numbering update (2026-08-21):** No schema change is required. Near Miss uses the same `vims_safety_incident.incident_number` column as Incident. Vessel-side Near Miss records keep `DRAFT-{VslCode}/{YYYY}/T{nnn}` until they enter `READY_FOR_OFFICE_COMMENTS`; that state transition assigns the shared formal `{VslCode}/{YYYY}/{NNN}` number with no `DRAFT-` prefix or `/T` draft marker.
+
 ---
 
 ## Table of Contents
@@ -434,7 +436,7 @@ Single-table design. `record_type` discriminator covers Near Miss (SSOT §4.3). 
 ```sql
 CREATE TABLE vims_safety_incident (
   id                          BIGINT        IDENTITY(1,1) NOT NULL,
-  incident_number             NVARCHAR(32)  NOT NULL,          -- Format {VslCode}/{YYYY}/{NNN} (FEAT-SAF-INC-040, D-GAP-C1). DRAFT series separate.
+  incident_number             NVARCHAR(32)  NOT NULL,          -- Incident/Near Miss visible reference. Draft format DRAFT-{VslCode}/{YYYY}/T{nnn}; formal format {VslCode}/{YYYY}/{NNN}.
   vessel_id                   UNIQUEIDENTIFIER NOT NULL,
   record_type                 VARCHAR(16)   NOT NULL,          -- CHECK IN ('INCIDENT','NEAR_MISS') — SSOT §4.3 discriminator
   state                       VARCHAR(48)   NOT NULL,          -- Phase 1..8 + 'CLOSED' + 'DRAFT' (deferral #1 locks exact set)
@@ -1700,7 +1702,7 @@ Emit D-PDF-01 internal 10-section report. Near-miss → D-PDF-03a lighter templa
 - **Auth:** `SAF_P_023`.
 - **Query:** optional `sections`, accepted as repeated values or comma-separated keys. Current Phase 6 frontend sends the compulsory report keys `summary`, `reporter_details`, `injury_details`, `root_cause`, `evidence_documents`, `corrective_preventive_actions`, and `signature`; it adds `estimated_cost` only when the user checks **Print Loss Evaluation**. The legacy backend key `lessons_learned` remains accepted for old/direct exports only. Omitted or empty `sections` renders all allowed backend sections for compatibility.
 - **Response 200:** `application/pdf` binary. Near-miss PDFs show reporter details for authorized users and must not print anonymous/masked-reporter wording. Incident PDFs are available before Phase 7 acceptance. Current Incident PDFs print Reporter signature and PIC / DPA office signature only; Master and HOD signature rows are not printed. Incident `office_comment` prints in the final Closure area as one single-column full-width **Office comments/ lesson learnt** block before Signature; it is passed through as one text block with typed line breaks and repeated spaces preserved and no artificial chunk rows. Stored closure reason and a separate Comment row are not printed. Corrective and Preventive action PDF blocks render before Evidence (Documents); each action is a full-width bordered row/box without a left-side `Description` label column, with description first and any saved linked due date second as `Due Date: YYYY-MM-DD`. Location of Vessel prints once with any In Port / At Anchorage detail appended in the same value. Witness Statement blocks use the witness display in the heading, show downloadable attachment links without repeating a Witness name row, and suppress the old free-text `What the witness said` value. Immediate/Root Cause blocks are grouped once per layer.
-- **Near Miss review comments:** Vessel review comment and Office comments print as separate full-width labelled text blocks under **Review Comments**. They are not rendered in a two-column label/value table, so long comments preserve line breaks and continue across pages normally.
+- **Near Miss review comments:** Master vessel-review comment and Office comments print as separate full-width labelled text blocks under **Review Comments**. They are not rendered in a two-column label/value table, so long comments preserve line breaks and continue across pages normally.
 
 #### 9.2.11 `POST /api/safety/incidents/{id}/link/`
 
@@ -1945,6 +1947,8 @@ Physical verification record (Q45 pattern).
 ### 9.10 Circular integration
 
 `POST /api/safety/circular/from-incident/{id}/` — writes to **existing VIMS Circular module** (per D-GAP-R17 lock; see TECH_STACK §7). Safety module emits a draft; VIMS Circular approval chain runs independently.
+
+Near Miss create/review/rework endpoints use `incident_number` as the only persisted Near Miss reference. `POST /api/safety/near-miss/` keeps a draft reference for normal vessel users, while direct Master-created office-ready records receive a formal reference immediately. `POST /api/safety/near-miss/{id}/review/` and `POST /api/safety/near-miss/{id}/rework/` assign the formal `{VslCode}/{YYYY}/{NNN}` reference in the same transaction as any move to `READY_FOR_OFFICE_COMMENTS`; already formal numbers are left unchanged. Near Miss detail responses include additive `hod_review_summary` and `vessel_review_summary` objects, sourced from the latest `near_miss_hod_review_signature` and `near_miss_vessel_review_signature` field-history rows respectively.
 
 Near Miss Office Comments are handled through `/api/safety/near-miss/{id}/office-comments/` with the legacy `/triage/` route retained as a compatibility alias. `Accept` saves priority, category tag, factor causes, and office comment; `Send to Rework` moves the record back to vessel rework with a required reason. PIC/office PIC accepts LOW/MEDIUM cases; DPA accepts HIGH cases.
 

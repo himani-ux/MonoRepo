@@ -11,12 +11,21 @@ import {
   type AuditRegistrationFormData,
 } from '@/schemas/audit/registration';
 import { Button, Checkbox, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@/components/ui';
+import { formatEnumLabel, getStatusLabel } from '@/lib/utils/format-status';
 
 export interface AuditVesselOption {
   id: string;
   label?: string;
   vessel_code?: string;
   vessel_name?: string;
+  top_rank_personnel?: AuditVesselPersonnelOption[];
+}
+
+export interface AuditVesselPersonnelOption {
+  crew_id?: string | null;
+  crew_name: string;
+  rank_code: string;
+  rank_name: string;
 }
 
 export interface AuditRegistrationPlanOption {
@@ -95,6 +104,35 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
     () => auditPlanOptions.find((plan) => plan.id === selectedAuditPlanId) ?? null,
     [auditPlanOptions, selectedAuditPlanId]
   );
+  const displayedVesselOptions = useMemo(() => {
+    if (!selectedAuditPlan?.target_vessel_id) {
+      return vesselOptions;
+    }
+    const hasPlanVessel = vesselOptions.some(
+      (vessel) => vessel.id.toLowerCase() === selectedAuditPlan.target_vessel_id?.toLowerCase()
+    );
+    if (hasPlanVessel) {
+      return vesselOptions;
+    }
+    return [
+      {
+        id: selectedAuditPlan.target_vessel_id,
+        label: selectedAuditPlan.target_label || selectedAuditPlan.target_vessel_id,
+      },
+      ...vesselOptions,
+    ];
+  }, [selectedAuditPlan, vesselOptions]);
+  const selectedVesselPersonnelOptions = useMemo(() => {
+    if (auditeeType !== 'VESSEL') {
+      return [];
+    }
+    const selectedVessel = findSelectedVesselOption(displayedVesselOptions, selectedVesselId);
+    return (selectedVessel?.top_rank_personnel ?? []).filter(isUsableTopRankPersonnel);
+  }, [auditeeType, displayedVesselOptions, selectedVesselId]);
+  const hasVesselPersonnelOptions = selectedVesselPersonnelOptions.length > 0;
+  const selectedPlanVesselLabel = selectedAuditPlan?.target_vessel_id
+    ? selectedAuditPlan.target_label || selectedAuditPlan.target_vessel_id
+    : '';
   const lockLeadAuditorFields = Boolean(selectedAuditPlan);
 
   useEffect(() => {
@@ -102,6 +140,12 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
       setValue('vessel_id', vesselOptions[0].id, { shouldValidate: true });
     }
   }, [selectedVesselId, setValue, vesselOptions]);
+
+  useEffect(() => {
+    if (selectedAuditPlan?.target_vessel_id && selectedVesselId !== selectedAuditPlan.target_vessel_id) {
+      setValue('vessel_id', selectedAuditPlan.target_vessel_id, { shouldValidate: true });
+    }
+  }, [selectedAuditPlan, selectedVesselId, setValue]);
 
   const toggleStandard = (standard: (typeof AUDIT_STANDARDS)[number], checked: boolean) => {
     const next = checked
@@ -162,6 +206,10 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
       });
       return;
     }
+    if (selectedAuditPlan?.target_vessel_id) {
+      onSubmit({ ...data, vessel_id: selectedAuditPlan.target_vessel_id });
+      return;
+    }
     onSubmit(data);
   };
 
@@ -217,7 +265,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
           <dl className="grid gap-3 rounded-md border border-primary-100 bg-primary-50 p-3 text-sm md:grid-cols-3">
             <SummaryItem label="Plan Ref" value={shortAuditPlanRef(selectedAuditPlan.id)} />
             <SummaryItem label="Target" value={selectedAuditPlan.target_label || '-'} />
-            <SummaryItem label="Status" value={selectedAuditPlan.status || '-'} />
+            <SummaryItem label="Status" value={getStatusLabel(selectedAuditPlan.status) || '-'} />
             <SummaryItem label="Standards" value={selectedAuditPlan.audit_standards_csv || '-'} />
             <SummaryItem label="Window" value={formatAuditPlanWindow(selectedAuditPlan)} />
             <SummaryItem label="OPM F 713" value={selectedAuditPlan.extension_form_ref || '-'} />
@@ -233,24 +281,28 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
         <div className={gridClass}>
           <div className="space-y-2">
             <Label htmlFor="vessel_id">Vessel <span className="text-error-500">*</span></Label>
-            <Controller
-              control={control}
-              name="vessel_id"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting || vesselOptions.length === 0 || Boolean(selectedAuditPlan)}>
-                  <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
-                    <SelectValue placeholder={vesselOptions.length > 0 ? 'Select vessel' : 'No vessels available'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vesselOptions.map((vessel) => (
-                      <SelectItem key={vessel.id} value={vessel.id}>
-                        {formatVesselOption(vessel)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
+            {selectedAuditPlan?.target_vessel_id ? (
+              <Input id="vessel_id" value={selectedPlanVesselLabel} readOnly disabled={isSubmitting} />
+            ) : (
+              <Controller
+                control={control}
+                name="vessel_id"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange} disabled={isSubmitting || displayedVesselOptions.length === 0}>
+                    <SelectTrigger id="vessel_id" error={!!errors.vessel_id}>
+                      <SelectValue placeholder={displayedVesselOptions.length > 0 ? 'Select vessel' : 'No vessels available'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {displayedVesselOptions.map((vessel) => (
+                        <SelectItem key={vessel.id} value={vessel.id}>
+                          {formatVesselOption(vessel)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            )}
             {errors.vessel_id && <p className="text-sm text-error-500">{errors.vessel_id.message}</p>}
           </div>
 
@@ -413,7 +465,7 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
                     <SelectContent>
                       {AUDIT_TEAM_ROLES.map((role) => (
                         <SelectItem key={role} value={role}>
-                          {role}
+                          {formatEnumLabel(role)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -444,8 +496,45 @@ export const AuditRegistrationForm: FC<AuditRegistrationFormProps> = ({
         <div className="space-y-3">
           {attendees.fields.map((field, index) => (
             <div key={field.id} className="grid gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[1fr_1fr_160px_160px_auto]">
-              <Input aria-label="Attendee name" placeholder="Name" disabled={isSubmitting} {...register(`attendees.${index}.attendee_name`)} />
-              <Input aria-label="Attendee rank" placeholder="Rank" disabled={isSubmitting} {...register(`attendees.${index}.attendee_rank`)} />
+              {hasVesselPersonnelOptions ? (
+                <Controller
+                  control={control}
+                  name={`attendees.${index}.attendee_name`}
+                  render={({ field: nameField }) => (
+                    <Select
+                      value={attendeePersonnelValueForName(nameField.value, selectedVesselPersonnelOptions)}
+                      onValueChange={(value) => {
+                        const selectedPerson = findAttendeePersonnelByValue(value, selectedVesselPersonnelOptions);
+                        nameField.onChange(selectedPerson?.crew_name || '');
+                        setValue(`attendees.${index}.attendee_rank`, selectedPerson?.rank_name || '', {
+                          shouldValidate: true,
+                        });
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger aria-label="Attendee name">
+                        <SelectValue placeholder="Name" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedVesselPersonnelOptions.map((person) => (
+                          <SelectItem key={attendeePersonnelValue(person)} value={attendeePersonnelValue(person)}>
+                            {person.rank_name} - {person.crew_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              ) : (
+                <Input aria-label="Attendee name" placeholder="Name" disabled={isSubmitting} {...register(`attendees.${index}.attendee_name`)} />
+              )}
+              <Input
+                aria-label="Attendee rank"
+                placeholder="Rank"
+                readOnly={hasVesselPersonnelOptions}
+                disabled={isSubmitting}
+                {...register(`attendees.${index}.attendee_rank`)}
+              />
               <label className="flex items-center gap-2 text-sm text-neutral-700">
                 <Controller control={control} name={`attendees.${index}.opening_present`} render={({ field: presentField }) => (
                   <Checkbox checked={presentField.value} onCheckedChange={presentField.onChange} disabled={isSubmitting} />
@@ -604,10 +693,45 @@ export function formatAuditPlanOption(plan: AuditRegistrationPlanOption): string
     plan.target_label || 'Target not set',
     plan.audit_standards_csv || 'Standards not set',
     formatAuditPlanWindow(plan),
-    plan.status || 'Status not set',
+    getStatusLabel(plan.status) || 'Status not set',
   ];
   if (plan.is_additional) {
     parts.push('Additional');
   }
   return parts.join(' | ');
+}
+
+function findSelectedVesselOption(vessels: AuditVesselOption[], vesselId: string | undefined): AuditVesselOption | undefined {
+  const normalizedVesselId = String(vesselId || '').toLowerCase();
+  if (!normalizedVesselId) {
+    return undefined;
+  }
+  return vessels.find((vessel) => vessel.id.toLowerCase() === normalizedVesselId);
+}
+
+function isUsableTopRankPersonnel(person: AuditVesselPersonnelOption): boolean {
+  return Boolean(person.crew_name?.trim() && person.rank_name?.trim());
+}
+
+function attendeePersonnelValue(person: AuditVesselPersonnelOption): string {
+  return person.crew_id?.trim() || `${person.rank_code}:${person.crew_name}`;
+}
+
+function findAttendeePersonnelByValue(
+  value: string,
+  options: AuditVesselPersonnelOption[]
+): AuditVesselPersonnelOption | undefined {
+  return options.find((person) => attendeePersonnelValue(person) === value);
+}
+
+function attendeePersonnelValueForName(
+  name: string | undefined,
+  options: AuditVesselPersonnelOption[]
+): string | undefined {
+  const normalizedName = String(name || '').trim().toLowerCase();
+  if (!normalizedName) {
+    return undefined;
+  }
+  const selectedPerson = options.find((person) => person.crew_name.trim().toLowerCase() === normalizedName);
+  return selectedPerson ? attendeePersonnelValue(selectedPerson) : undefined;
 }

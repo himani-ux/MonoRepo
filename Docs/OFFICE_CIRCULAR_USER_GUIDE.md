@@ -81,7 +81,7 @@ Main fields on the form
 - Title: main heading
 - Body / Instructions: the full message or instruction
 - Hashtags: search tags
-- Attachments: add supporting files
+- Attachments: add up to 3 supporting PDF files. Each PDF must not exceed 50 MB.
 
 Main buttons on the form
 

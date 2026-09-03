@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from apps.inspection.audit.models import MasterAuditPlan
 from apps.inspection.audit.services.audit_window import add_months
+from apps.inspection.audit.services.plan_persistence import save_plan_update
 
 
 MIN_EXTENSION_REASON_LENGTH = 50
@@ -58,8 +59,9 @@ def request_plan_extension(
     plan.extension_requested_at = timezone.now()
     plan.updated_by = actor
     plan.updated_date = timezone.now()
-    plan.save(
-        update_fields=[
+    return save_plan_update(
+        plan,
+        [
             "status",
             "extended_due_date",
             "extension_requested_reason",
@@ -67,9 +69,8 @@ def request_plan_extension(
             "extension_requested_at",
             "updated_by",
             "updated_date",
-        ]
+        ],
     )
-    return plan
 
 
 def decide_plan_extension(
@@ -123,7 +124,7 @@ def decide_plan_extension(
         plan.updated_by = actor
         plan.updated_date = timezone.now()
         update_fields.extend(["updated_by", "updated_date"])
-        plan.save(update_fields=update_fields)
+        plan = save_plan_update(plan, update_fields)
 
     return ExtensionDecisionResult(plan=plan, approved=approved)
 
@@ -149,17 +150,17 @@ def record_flag_notification(
     plan.flag_notification_attachment = attachment
     plan.updated_by = actor
     plan.updated_date = timezone.now()
-    plan.save(
-        update_fields=[
+    return save_plan_update(
+        plan,
+        [
             "flag_notified",
             "flag_notification_date",
             "flag_notification_ref",
             "flag_notification_attachment",
             "updated_by",
             "updated_date",
-        ]
+        ],
     )
-    return plan
 
 
 def _next_extension_form_ref() -> str:

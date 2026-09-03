@@ -220,7 +220,7 @@ describe('Sidebar', () => {
       canAccessReports: false,
       hasForm: vi.fn(() => false),
       hasProcess: vi.fn((processId: string) =>
-        ['AUDIT_P_001', 'AUDIT_P_002', 'AUDIT_P_003'].includes(processId),
+        ['AUDIT_P_001', 'AUDIT_P_002', 'AUDIT_P_003', 'AUDIT_P_009'].includes(processId),
       ),
     });
 
@@ -229,6 +229,7 @@ describe('Sidebar', () => {
     const auditButton = screen.getByRole('button', { name: /audit/i });
     const auditDashboardLink = screen.getByRole('link', { name: 'Audit Dashboard' });
     const auditPlansLink = screen.getByRole('link', { name: 'Audit Plans' });
+    const qualifiedAuditorsLink = screen.getByRole('link', { name: 'Qualified Auditors' });
     const registerAuditLink = screen.getByRole('link', { name: 'Register Audit' });
 
     expect(auditButton).toHaveAttribute('aria-expanded', 'true');
@@ -237,6 +238,8 @@ describe('Sidebar', () => {
     expect(auditDashboardLink.querySelector('svg')).toBeInTheDocument();
     expect(auditPlansLink).toHaveAttribute('href', '/audit/plans');
     expect(auditPlansLink.querySelector('svg')).toBeInTheDocument();
+    expect(qualifiedAuditorsLink).toHaveAttribute('href', '/audit/masters/qualified-auditors');
+    expect(qualifiedAuditorsLink.querySelector('svg')).toBeInTheDocument();
     expect(registerAuditLink).toHaveAttribute('href', '/inspections/new');
     expect(registerAuditLink.querySelector('svg')).toBeInTheDocument();
   });

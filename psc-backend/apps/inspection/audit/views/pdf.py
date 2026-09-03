@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inspection.audit.finding_types import is_nc_finding, is_observation_finding
 from apps.inspection.audit.models import AuditDetail, AuditFinding
 from apps.inspection.audit.pdf import (
     generate_audit_nc_pdf,
@@ -51,7 +52,7 @@ class AuditFindingNcPdfView(APIView):
 
     def get(self, request, id):
         finding = _get_finding(id)
-        if finding.finding_type != "NC":
+        if not is_nc_finding(finding.finding_type):
             return Response(
                 {"error": "VALIDATION_ERROR", "message": "Finding is not an NC finding."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -70,7 +71,7 @@ class AuditFindingObsPdfView(APIView):
 
     def get(self, request, id):
         finding = _get_finding(id)
-        if finding.finding_type != "OBSERVATION":
+        if not is_observation_finding(finding.finding_type):
             return Response(
                 {"error": "VALIDATION_ERROR", "message": "Finding is not an Observation finding."},
                 status=status.HTTP_400_BAD_REQUEST,

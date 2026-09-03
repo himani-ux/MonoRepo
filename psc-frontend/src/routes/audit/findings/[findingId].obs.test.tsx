@@ -12,12 +12,17 @@ const obsRouteMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('react-router-dom', () => ({
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
   useParams: () => obsRouteMocks.useParams(),
 }));
 
 vi.mock('@/hooks/audit/use-audit-finding', () => ({
-  useAuditObsClosure: (id: string | undefined) => obsRouteMocks.useAuditObsClosure(id),
-  useUpdateAuditObsPart: (id: string | undefined) => obsRouteMocks.useUpdateAuditObsPart(id),
+  useAuditObsClosure: (id: string | undefined) =>
+    obsRouteMocks.useAuditObsClosure(id),
+  useUpdateAuditObsPart: (id: string | undefined) =>
+    obsRouteMocks.useUpdateAuditObsPart(id),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -25,11 +30,19 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 vi.mock('@/components/layout/root-layout', () => ({
-  RootLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  RootLayout: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock('@/components/layout/page-header', () => ({
-  PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => (
+  PageHeader: ({
+    title,
+    actions,
+  }: {
+    title: string;
+    actions?: React.ReactNode;
+  }) => (
     <header>
       <h1>{title}</h1>
       {actions}
@@ -46,8 +59,11 @@ vi.mock('@/components/shared/loading-skeleton', () => ({
 }));
 
 import AuditObsClosureRoute from './[findingId].obs';
+import AuditObsWizardRoute from './[findingId].obs.wizard';
 
-function sampleClosure(overrides: Partial<AuditObsClosure> = {}): AuditObsClosure {
+function sampleClosure(
+  overrides: Partial<AuditObsClosure> = {}
+): AuditObsClosure {
   return {
     id: 'obs-1',
     finding_id: 'finding-1',
@@ -119,7 +135,9 @@ describe('AuditObsClosureRoute', () => {
 
     useObsWizardStore.setState({ findingId: null, stepIndex: 0 });
     obsRouteMocks.useParams.mockReturnValue({ findingId: 'finding-1' });
-    obsRouteMocks.updatePart.mockResolvedValue(sampleClosure({ state: 'MASTER_CLOSED' }));
+    obsRouteMocks.updatePart.mockResolvedValue(
+      sampleClosure({ state: 'MASTER_CLOSED' })
+    );
     obsRouteMocks.useUpdateAuditObsPart.mockReturnValue({
       mutateAsync: obsRouteMocks.updatePart,
       isPending: false,
@@ -138,10 +156,19 @@ describe('AuditObsClosureRoute', () => {
 
     expect(await screen.findAllByText('AUDIT-2026-002')).not.toHaveLength(0);
     expect(screen.getByText('Part A - Auditor Issuance')).toBeInTheDocument();
-    expect(screen.getByText('Part B - Master / HOD Response')).toBeInTheDocument();
+    expect(
+      screen.getByText('Part B - Master / HOD Response')
+    ).toBeInTheDocument();
     expect(screen.getByText('Part C - DPA Review')).toBeInTheDocument();
-    expect(screen.getByText('Part D - Auditor Verification')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /save section/i })).toHaveLength(3);
+    expect(
+      screen.getByText('Part D - Auditor Verification')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('obs-dense-layout')).toBeInTheDocument();
+    expect(screen.queryByTestId('obs-wizard-layout')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /wizard/i })).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole('button', { name: /save section/i })
+    ).toHaveLength(3);
   });
 
   it('saves wizard drafts on advance through the three Observation questions', async () => {
@@ -152,12 +179,22 @@ describe('AuditObsClosureRoute', () => {
       refetch: vi.fn(),
     });
 
-    render(<AuditObsClosureRoute />);
+    render(<AuditObsWizardRoute />);
 
-    expect(await screen.findByRole('heading', { name: 'Responder' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Responder name'), { target: { value: 'R. Okafor' } });
-    fireEvent.change(screen.getByLabelText('Responder rank'), { target: { value: 'Master' } });
-    fireEvent.change(screen.getByLabelText('Target closure date'), { target: { value: '2026-08-12' } });
+    expect(
+      await screen.findByRole('heading', { name: 'Responder' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('obs-wizard-layout')).toBeInTheDocument();
+    expect(screen.queryByTestId('obs-dense-layout')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Responder name'), {
+      target: { value: 'R. Okafor' },
+    });
+    fireEvent.change(screen.getByLabelText('Responder rank'), {
+      target: { value: 'Master' },
+    });
+    fireEvent.change(screen.getByLabelText('Target closure date'), {
+      target: { value: '2026-08-12' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /save and continue/i }));
 
     await waitFor(() => {
@@ -169,7 +206,9 @@ describe('AuditObsClosureRoute', () => {
           target_closure_date: '2026-08-12',
         }),
       });
-      expect(screen.getByRole('heading', { name: 'Action Plan' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Action Plan' })
+      ).toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByLabelText('Immediate action'), {
@@ -182,7 +221,9 @@ describe('AuditObsClosureRoute', () => {
       target: { value: 'The current format was issued to the department.' },
     });
     fireEvent.change(screen.getByLabelText('Preventive action'), {
-      target: { value: 'A sample completed form was posted near the records file.' },
+      target: {
+        value: 'A sample completed form was posted near the records file.',
+      },
     });
     fireEvent.click(screen.getByRole('button', { name: /save and continue/i }));
 
@@ -193,10 +234,14 @@ describe('AuditObsClosureRoute', () => {
           immediate_action_text: expect.stringContaining('watch team'),
           root_cause_text: expect.stringContaining('old work-rest-hour'),
           corrective_action_text: expect.stringContaining('current format'),
-          preventive_action_text: expect.stringContaining('sample completed form'),
+          preventive_action_text: expect.stringContaining(
+            'sample completed form'
+          ),
         }),
       });
-      expect(screen.getByRole('heading', { name: 'Master Close' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Master Close' })
+      ).toBeInTheDocument();
     });
   });
 
@@ -223,11 +268,15 @@ describe('AuditObsClosureRoute', () => {
       refetch: vi.fn(),
     });
 
-    render(<AuditObsClosureRoute />);
+    render(<AuditObsWizardRoute />);
 
-    expect(await screen.findByRole('heading', { name: 'Master Close' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Master Close' })
+    ).toBeInTheDocument();
     expect(screen.getByText('Observation Context')).toBeInTheDocument();
-    expect(screen.getByTestId('obs-wizard-layout')).toHaveClass('lg:grid-cols-[3fr_2fr]');
+    expect(screen.getByTestId('obs-wizard-layout')).toHaveClass(
+      'lg:grid-cols-[3fr_2fr]'
+    );
   });
 
   it('saves the current wizard step with Ctrl+S and shows online-only API denial', async () => {
@@ -246,10 +295,15 @@ describe('AuditObsClosureRoute', () => {
       refetch: vi.fn(),
     });
 
-    render(<AuditObsClosureRoute />);
+    render(<AuditObsWizardRoute />);
 
-    fireEvent.change(await screen.findByLabelText('Responder name'), { target: { value: 'R. Okafor' } });
-    fireEvent.keyDown(screen.getByLabelText('Responder name'), { key: 's', ctrlKey: true });
+    fireEvent.change(await screen.findByLabelText('Responder name'), {
+      target: { value: 'R. Okafor' },
+    });
+    fireEvent.keyDown(screen.getByLabelText('Responder name'), {
+      key: 's',
+      ctrlKey: true,
+    });
 
     await waitFor(() => {
       expect(obsRouteMocks.updatePart).toHaveBeenCalledWith({
@@ -258,7 +312,9 @@ describe('AuditObsClosureRoute', () => {
           responded_by_name: 'R. Okafor',
         }),
       });
-      expect(screen.getByText('Connection lost. Save was not queued offline.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Connection lost. Save was not queued offline.')
+      ).toBeInTheDocument();
     });
   });
 
@@ -286,11 +342,14 @@ describe('AuditObsClosureRoute', () => {
       refetch: vi.fn(),
     });
 
-    render(<AuditObsClosureRoute />);
+    render(<AuditObsWizardRoute />);
 
-    fireEvent.change(await screen.findByLabelText('Wizard actual closure date'), {
-      target: { value: '2026-08-15' },
-    });
+    fireEvent.change(
+      await screen.findByLabelText('Wizard actual closure date'),
+      {
+        target: { value: '2026-08-15' },
+      }
+    );
     fireEvent.change(screen.getByLabelText('Wizard master signer'), {
       target: { value: 'R. Okafor' },
     });
@@ -321,14 +380,24 @@ describe('AuditObsClosureRoute', () => {
 
     render(<AuditObsClosureRoute />);
 
-    fireEvent.change(await screen.findByLabelText('Responded By Name'), { target: { value: 'Chief Officer' } });
+    fireEvent.change(await screen.findByLabelText('Responded By Name'), {
+      target: { value: 'Chief Officer' },
+    });
     fireEvent.change(screen.getByLabelText('Immediate Action'), {
       target: { value: 'Crew briefed and checklist owner assigned.' },
     });
-    fireEvent.change(screen.getByLabelText('Actual Closure Date'), { target: { value: '2026-08-10' } });
-    fireEvent.change(screen.getByLabelText('Master Signer'), { target: { value: 'Vessel Master' } });
-    fireEvent.change(screen.getByLabelText('Master Signature Time'), { target: { value: '2026-08-10T10:00' } });
-    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[0]);
+    fireEvent.change(screen.getByLabelText('Actual Closure Date'), {
+      target: { value: '2026-08-10' },
+    });
+    fireEvent.change(screen.getByLabelText('Master Signer'), {
+      target: { value: 'Vessel Master' },
+    });
+    fireEvent.change(screen.getByLabelText('Master Signature Time'), {
+      target: { value: '2026-08-10T10:00' },
+    });
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /save section/i })[0]
+    );
 
     await waitFor(() => {
       expect(obsRouteMocks.updatePart).toHaveBeenCalledWith({
@@ -354,12 +423,19 @@ describe('AuditObsClosureRoute', () => {
 
     render(<AuditObsClosureRoute />);
 
-    expect(await screen.findAllByText('MASTER_CLOSED')).not.toHaveLength(0);
-    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'ACCEPTED' } });
-    fireEvent.change(screen.getByLabelText('Adequacy Review'), {
-      target: { value: 'DPA reviewed the closure evidence after Master signature.' },
+    expect(await screen.findAllByText('Master Closed')).not.toHaveLength(0);
+    expect(screen.queryByText('MASTER_CLOSED')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Decision'), {
+      target: { value: 'ACCEPTED' },
     });
-    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[0]);
+    fireEvent.change(screen.getByLabelText('Adequacy Review'), {
+      target: {
+        value: 'DPA reviewed the closure evidence after Master signature.',
+      },
+    });
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /save section/i })[0]
+    );
 
     await waitFor(() => {
       expect(obsRouteMocks.updatePart).toHaveBeenCalledWith({
@@ -382,10 +458,18 @@ describe('AuditObsClosureRoute', () => {
 
     render(<AuditObsClosureRoute />);
 
-    fireEvent.change(await screen.findByLabelText('Verifying Auditor'), { target: { value: 'Lead Auditor' } });
-    fireEvent.change(screen.getByLabelText('Verification Method'), { target: { value: 'DOCUMENT_REVIEW' } });
-    fireEvent.change(screen.getByLabelText('Closure Status'), { target: { value: 'CLOSED' } });
-    fireEvent.click(screen.getAllByRole('button', { name: /save section/i })[1]);
+    fireEvent.change(await screen.findByLabelText('Verifying Auditor'), {
+      target: { value: 'Lead Auditor' },
+    });
+    fireEvent.change(screen.getByLabelText('Verification Method'), {
+      target: { value: 'DOCUMENT_REVIEW' },
+    });
+    fireEvent.change(screen.getByLabelText('Closure Status'), {
+      target: { value: 'CLOSED' },
+    });
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /save section/i })[1]
+    );
 
     await waitFor(() => {
       expect(obsRouteMocks.updatePart).toHaveBeenCalledWith({
@@ -409,6 +493,8 @@ describe('AuditObsClosureRoute', () => {
 
     render(<AuditObsClosureRoute />);
 
-    expect(screen.getByText('Observation closure not found')).toBeInTheDocument();
+    expect(
+      screen.getByText('Observation closure not found')
+    ).toBeInTheDocument();
   });
 });

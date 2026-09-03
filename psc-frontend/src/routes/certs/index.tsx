@@ -173,7 +173,19 @@ import { getErrorMessage } from '@/lib/api/client';
 
 import './certs-theme.css';
 
-const CATALOG_WRITER_ROLES = new Set(['DPA', 'SEQ MANAGER', 'ADMIN', 'SUPER ADMIN', 'SYSTEM ADMIN']);
+const CATALOG_WRITER_ROLES = new Set([
+  'DPA',
+  'SEQ MANAGER',
+  'MARINE SUPERINTENDENT',
+  "MARINE SUP'TT",
+  'MARINE SUPT',
+  'ADMIN',
+  'SUPER ADMIN',
+  'SYSTEM ADMIN',
+  'TECHNICAL SUPERINTENDENT',
+  "TECH SUP'TT",
+  'TECH SUPT',
+]);
 const PARSER_OPS_DEV_ENABLED = import.meta.env.DEV && import.meta.env.VITE_CERTS_PARSER_OPS_ENABLED !== 'false';
 const SHIP_TYPE_OPTIONS = [
   { value: 'all', label: 'All ships' },
@@ -260,6 +272,16 @@ type CertAuthContext = {
 
 function normalizeAuthRole(auth: CertAuthContext): string {
   return String(auth.role ?? auth.user?.role_name ?? auth.user?.safety_role_name ?? '').trim().toUpperCase();
+}
+
+function getCatalogWriterRoleCandidates(auth: CertAuthContext): string[] {
+  return [auth.user?.role_name, auth.user?.safety_role_name, auth.role]
+    .map((value) => String(value ?? '').trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function hasCatalogWriterRole(auth: CertAuthContext): boolean {
+  return getCatalogWriterRoleCandidates(auth).some((role) => CATALOG_WRITER_ROLES.has(role));
 }
 
 function isParserOpsRole(role: string): boolean {
@@ -5882,8 +5904,7 @@ function CertStatusBadge({ status }: { status: string }) {
 function useCanWriteCatalog() {
   const auth = useAuth();
   const hasEditPermission = useCertsPermission(FORM_IDS.CERTS_CATALOG, PROCESS_IDS.CERTS_CATALOG_EDIT);
-  const role = String(auth.role ?? auth.user?.role_name ?? auth.user?.safety_role_name ?? '').trim().toUpperCase();
-  return hasEditPermission && CATALOG_WRITER_ROLES.has(role);
+  return hasEditPermission && hasCatalogWriterRole(auth);
 }
 
 function useCanWriteAuditorAccess() {
@@ -5896,8 +5917,7 @@ function useCanWriteAuditorAccess() {
 function useCanBulkActionCatalog() {
   const auth = useAuth();
   const hasBulkPermission = useCertsPermission(FORM_IDS.CERTS_CATALOG, PROCESS_IDS.CERTS_BULK_ACTION);
-  const role = String(auth.role ?? auth.user?.role_name ?? auth.user?.safety_role_name ?? '').trim().toUpperCase();
-  return hasBulkPermission && CATALOG_WRITER_ROLES.has(role);
+  return hasBulkPermission && hasCatalogWriterRole(auth);
 }
 
 function CertCatalogLoading() {

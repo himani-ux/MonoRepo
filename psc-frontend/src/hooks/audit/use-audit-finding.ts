@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { auditApi } from '@/lib/api/audit';
 import type {
   AuditClauseMaster,
-  AuditFindingCreateFormData,
+  AuditFindingCreatePayload,
   AuditFindingCreateResponse,
   AuditIssueCircularResponse,
 } from '@/schemas/audit/finding';
@@ -50,7 +50,7 @@ export function useAuditClauseMaster(book: string | undefined) {
 export function useCreateAuditFinding(auditId: string | undefined) {
   const queryClient = useQueryClient();
 
-  return useMutation<AuditFindingCreateResponse, Error, AuditFindingCreateFormData>({
+  return useMutation<AuditFindingCreateResponse, Error, AuditFindingCreatePayload>({
     mutationFn: (data) => auditApi.createAuditFinding(auditId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: auditKeys.detail(auditId) });

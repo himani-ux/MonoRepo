@@ -178,10 +178,12 @@ describe('AuditChecklistRoute', () => {
       'href',
       '/audit/audits/audit-1'
     );
+    expect(screen.getAllByRole('radiogroup', { name: /status/i })[0]).toHaveAccessibleName('001 status');
+    expect(screen.getByLabelText('001 Not reviewed')).toBeChecked();
+    expect(screen.getByLabelText('001 Compliant')).toBeInTheDocument();
+    expect(screen.getByLabelText('001 Findings')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('001 status'), {
-      target: { value: 'COMPLIANT' },
-    });
+    fireEvent.click(screen.getByLabelText('001 Compliant'));
     fireEvent.change(screen.getByLabelText('001 remarks'), {
       target: { value: 'Checked during bridge round.' },
     });
@@ -218,9 +220,7 @@ describe('AuditChecklistRoute', () => {
     const addFindingButtons = await screen.findAllByRole('button', { name: /^add finding$/i });
     expect(addFindingButtons[0]).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText('001 status'), {
-      target: { value: 'ADD_FINDING' },
-    });
+    fireEvent.click(screen.getByLabelText('001 Findings'));
 
     expect(addFindingButtons[0]).not.toBeDisabled();
   });
@@ -235,9 +235,7 @@ describe('AuditChecklistRoute', () => {
 
     render(<AuditChecklistRoute />);
 
-    fireEvent.change(await screen.findByLabelText('001 status'), {
-      target: { value: 'ADD_FINDING' },
-    });
+    fireEvent.click(await screen.findByLabelText('001 Findings'));
     fireEvent.click(screen.getAllByRole('button', { name: /^add finding$/i })[0]);
 
     expect(await screen.findByRole('heading', { name: 'Create Audit Finding' })).toBeInTheDocument();
@@ -252,6 +250,9 @@ describe('AuditChecklistRoute', () => {
     fireEvent.change(screen.getByLabelText('Objective Evidence'), {
       target: { value: 'Observed during accommodation walk.' },
     });
+    fireEvent.change(screen.getByLabelText('Target Closure Date'), {
+      target: { value: '2026-08-30' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /save finding/i }));
 
     expect(checklistRouteMocks.createFinding).toHaveBeenCalledWith(
@@ -262,6 +263,7 @@ describe('AuditChecklistRoute', () => {
         checklist_item_id: '22222222-2222-4222-8222-222222222222',
         description: 'Fire door self-closing device was not functioning.',
         objective_evidence: 'Observed during accommodation walk.',
+        original_due_date: '2026-08-30',
         clauses: [
           expect.objectContaining({
             rule_book_type: 'ISM',
@@ -273,7 +275,7 @@ describe('AuditChecklistRoute', () => {
     );
   });
 
-  it('submits priority certificate impact and fleet-wide relevance from the modal', async () => {
+  it('submits priority certificate scope and fleet-wide relevance from the modal', async () => {
     checklistRouteMocks.useAuditChecklist.mockReturnValue({
       data: sampleChecklist(),
       isLoading: false,
@@ -290,8 +292,8 @@ describe('AuditChecklistRoute', () => {
     fireEvent.change(screen.getByLabelText('Priority'), {
       target: { value: 'LOW' },
     });
-    fireEvent.change(screen.getByLabelText('Certificate Impact'), {
-      target: { value: 'SUSPENDED' },
+    fireEvent.change(screen.getByLabelText('Certificates at Risk'), {
+      target: { value: 'DOC' },
     });
     fireEvent.click(screen.getByLabelText('Fleet-wide relevance'));
     fireEvent.change(screen.getByLabelText('Seeded Clause'), {
@@ -303,6 +305,9 @@ describe('AuditChecklistRoute', () => {
     fireEvent.change(screen.getByLabelText('Objective Evidence'), {
       target: { value: 'Same finding sampled on sister vessels.' },
     });
+    fireEvent.change(screen.getByLabelText('Target Closure Date'), {
+      target: { value: '2026-08-30' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /save finding/i }));
 
     expect(checklistRouteMocks.createFinding).toHaveBeenCalledWith(
@@ -310,7 +315,8 @@ describe('AuditChecklistRoute', () => {
         finding_type: 'NC',
         nc_category: 'MAJOR_NC',
         priority: 'LOW',
-        certificate_impact: 'SUSPENDED',
+        certificates_at_risk: 'DOC',
+        original_due_date: '2026-08-30',
         is_fleetwide_relevance: true,
       })
     );
@@ -357,6 +363,12 @@ describe('AuditChecklistRoute', () => {
     });
     fireEvent.change(screen.getByLabelText('Description'), {
       target: { value: 'Emergent finding.' },
+    });
+    fireEvent.change(screen.getByLabelText('Objective Evidence'), {
+      target: { value: 'Observed during audit walkdown.' },
+    });
+    fireEvent.change(screen.getByLabelText('Target Closure Date'), {
+      target: { value: '2026-08-30' },
     });
     fireEvent.click(screen.getByRole('button', { name: /save finding/i }));
 

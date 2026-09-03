@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
@@ -6,9 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/page-header';
 import { RootLayout } from '@/components/layout/root-layout';
 import { Button, Checkbox, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@/components/ui';
-import { useAuditVessels, useCreateAuditRegistration } from '@/hooks/audit/use-audit-registration';
+import {
+  useAuditExternalAuditOrgs,
+  useAuditVessels,
+  useCreateAuditRegistration,
+} from '@/hooks/audit/use-audit-registration';
 import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/lib/api/client';
+import { formatEnumLabel } from '@/lib/utils/format-status';
 import {
   EXTERNAL_AUDIT_ORG_TYPES,
   EXTERNAL_AUDIT_STANDARDS,
@@ -50,7 +55,6 @@ const defaults: ExternalAuditRegistrationFormData = {
   external_lead_auditor_credential: '',
   flag_state_code: '',
   cycle_year: null,
-  linked_cert_ids: [],
   external_report_file_name: '',
   external_report_file_path: '',
   external_report_mime_type: 'application/pdf',
@@ -58,19 +62,14 @@ const defaults: ExternalAuditRegistrationFormData = {
   late_registration_reason: '',
 };
 
-function parseUuidList(value: string): string[] {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export function ExternalAuditRegistrationPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const mutation = useCreateAuditRegistration();
   const vesselQuery = useAuditVessels();
-  const [linkedCertText, setLinkedCertText] = useState('');
+  const externalOrgQuery = useAuditExternalAuditOrgs();
+  const [selectedReportFile, setSelectedReportFile] = useState<File | null>(null);
+  const [reportFileError, setReportFileError] = useState('');
   const {
     control,
     register,
@@ -87,6 +86,9 @@ export function ExternalAuditRegistrationPage() {
   const subtypes = watch('external_audit_subtypes');
   const selectedVesselId = watch('vessel_id');
   const hasDocSubtype = subtypes.some((subtype) => subtype.startsWith('DOC_'));
+  const externalOrgRows = externalOrgQuery.data?.results ?? [];
+  const externalOrgUnavailable =
+    !externalOrgQuery.isLoading && !externalOrgQuery.isError && externalOrgRows.length === 0;
 
   useEffect(() => {
     if (!selectedVesselId && vesselQuery.data?.[0]?.id) {
@@ -108,16 +110,57 @@ export function ExternalAuditRegistrationPage() {
     setValue('external_audit_subtypes', next, { shouldValidate: true });
   };
 
+  const handleReportFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0] ?? null;
+      if (!file) {
+        setSelectedReportFile(null);
+        setReportFileError('');
+        setValue('external_report_file_name', '', { shouldValidate: true });
+        setValue('external_report_file_path', '', { shouldValidate: true });
+        setValue('external_report_mime_type', 'application/pdf', { shouldValidate: true });
+        setValue('external_report_file_size', null, { shouldValidate: true });
+        return;
+      }
+
+      const isPdf =
+        (file.type || '').toLowerCase() === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (!isPdf) {
+        event.target.value = '';
+        setSelectedReportFile(null);
+        setReportFileError('Attach a PDF file.');
+        setValue('external_report_file_name', '', { shouldValidate: true });
+        setValue('external_report_file_path', '', { shouldValidate: true });
+        setValue('external_report_mime_type', 'application/pdf', { shouldValidate: true });
+        setValue('external_report_file_size', null, { shouldValidate: true });
+        return;
+      }
+
+      setSelectedReportFile(file);
+      setReportFileError('');
+      setValue('external_report_file_name', file.name, { shouldValidate: true });
+      setValue('external_report_file_path', file.name, { shouldValidate: true });
+      setValue('external_report_mime_type', file.type || 'application/pdf', { shouldValidate: true });
+      setValue('external_report_file_size', file.size || null, { shouldValidate: true });
+    },
+    [setValue]
+  );
+
   const onSubmit = useCallback(
     async (data: ExternalAuditRegistrationFormData) => {
+      if (!selectedReportFile) {
+        setReportFileError('Attach the external audit report PDF before registering.');
+        return;
+      }
+
       try {
         const created = await mutation.mutateAsync({
           ...data,
-          linked_cert_ids: parseUuidList(linkedCertText),
+          external_report_file: selectedReportFile,
         });
         toast({
           title: 'External audit registered',
-          description: 'The audit was created at SUBMITTED status.',
+          description: 'The audit was created at Submitted status.',
         });
         navigate(`/audit/external/${created.id}`);
       } catch (error) {
@@ -128,7 +171,7 @@ export function ExternalAuditRegistrationPage() {
         });
       }
     },
-    [linkedCertText, mutation, navigate, toast]
+    [mutation, navigate, selectedReportFile, toast]
   );
 
   return (
@@ -138,7 +181,10 @@ export function ExternalAuditRegistrationPage() {
       <form className="mx-auto max-w-5xl space-y-6 pb-8" onSubmit={handleSubmit(onSubmit)} noValidate>
         <input type="hidden" {...register('audit_classification')} />
         <input type="hidden" {...register('auditee_type')} />
+        <input type="hidden" {...register('external_report_file_name')} />
+        <input type="hidden" {...register('external_report_file_path')} />
         <input type="hidden" {...register('external_report_mime_type')} />
+        <input type="hidden" {...register('external_report_file_size', { setValueAs: optionalPositiveNumber })} />
         <section className="space-y-4">
           <h2 className={sectionTitleClass}>Post-Facto Registration</h2>
           <div className={gridClass}>
@@ -180,7 +226,7 @@ export function ExternalAuditRegistrationPage() {
               {errors.port_place && <p className="text-sm text-error-500">{errors.port_place.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="report_reference">Report Reference <span className="text-error-500">*</span></Label>
+              <Label htmlFor="report_reference">Report Reference</Label>
               <Input id="report_reference" disabled={mutation.isPending} {...register('report_reference')} />
               {errors.report_reference && <p className="text-sm text-error-500">{errors.report_reference.message}</p>}
             </div>
@@ -209,7 +255,7 @@ export function ExternalAuditRegistrationPage() {
                     onCheckedChange={(checked) => toggleSubtype(subtype, Boolean(checked))}
                     disabled={mutation.isPending}
                   />
-                  {subtype}
+                  {formatEnumLabel(subtype)}
                 </label>
               ))}
             </div>
@@ -234,8 +280,43 @@ export function ExternalAuditRegistrationPage() {
 
           <div className={gridClass}>
             <div className="space-y-2">
-              <Label htmlFor="external_audit_org_id">External Audit Org UUID <span className="text-error-500">*</span></Label>
-              <Input id="external_audit_org_id" disabled={mutation.isPending} {...register('external_audit_org_id')} />
+              <Label htmlFor="external_audit_org_id">External audit organisation</Label>
+              <Controller
+                control={control}
+                name="external_audit_org_id"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      const organisation = externalOrgRows.find((org) => org.id === value);
+                      if (organisation?.org_type) {
+                        setValue('external_audit_org_type', organisation.org_type as ExternalAuditRegistrationFormData['external_audit_org_type'], {
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
+                    disabled={mutation.isPending || externalOrgQuery.isLoading || externalOrgRows.length === 0}
+                  >
+                    <SelectTrigger id="external_audit_org_id" error={!!errors.external_audit_org_id}>
+                      <SelectValue placeholder={externalOrgPlaceholder(externalOrgQuery.isLoading, externalOrgRows.length)} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {externalOrgRows.map((organisation) => (
+                        <SelectItem key={organisation.id} value={organisation.id}>
+                          {organisation.name} - {formatEnumLabel(organisation.org_type)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {externalOrgQuery.isError && <p className="text-sm text-error-500">Could not load external audit organisations.</p>}
+              {externalOrgUnavailable && (
+                <p className="text-sm text-neutral-500">
+                  No active external audit organisations are configured. You can register without selecting one.
+                </p>
+              )}
               {errors.external_audit_org_id && <p className="text-sm text-error-500">{errors.external_audit_org_id.message}</p>}
             </div>
             <div className="space-y-2">
@@ -251,7 +332,7 @@ export function ExternalAuditRegistrationPage() {
                     <SelectContent>
                       {EXTERNAL_AUDIT_ORG_TYPES.map((type) => (
                         <SelectItem key={type} value={type}>
-                          {type}
+                          {formatEnumLabel(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -287,35 +368,25 @@ export function ExternalAuditRegistrationPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className={sectionTitleClass}>Certs Link And Report</h2>
+          <h2 className={sectionTitleClass}>External Audit Report</h2>
           <div className={gridClass}>
-            <div className="space-y-2">
-              <Label htmlFor="linked_cert_ids">Linked Certificate UUIDs</Label>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="external_report_file">Attach External Audit Report PDF <span className="text-error-500">*</span></Label>
               <Input
-                id="linked_cert_ids"
-                value={linkedCertText}
-                onChange={(event) => setLinkedCertText(event.target.value)}
+                id="external_report_file"
+                type="file"
+                accept="application/pdf,.pdf"
                 disabled={mutation.isPending}
-                placeholder="comma-separated certificate ids"
+                error={Boolean(reportFileError || errors.external_report_file_name)}
+                onChange={handleReportFileChange}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="external_report_file_name">External Audit Report PDF <span className="text-error-500">*</span></Label>
-              <Input id="external_report_file_name" disabled={mutation.isPending} {...register('external_report_file_name')} />
-              {errors.external_report_file_name && <p className="text-sm text-error-500">{errors.external_report_file_name.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="external_report_file_path">Report File Path <span className="text-error-500">*</span></Label>
-              <Input id="external_report_file_path" disabled={mutation.isPending} {...register('external_report_file_path')} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="external_report_file_size">Report File Size</Label>
-              <Input
-                id="external_report_file_size"
-                type="number"
-                disabled={mutation.isPending}
-                {...register('external_report_file_size', { setValueAs: optionalPositiveNumber })}
-              />
+              {selectedReportFile && (
+                <p className="text-sm text-neutral-600">Selected PDF: {selectedReportFile.name}</p>
+              )}
+              {reportFileError && <p className="text-sm text-error-500">{reportFileError}</p>}
+              {errors.external_report_file_name && (
+                <p className="text-sm text-error-500">{errors.external_report_file_name.message}</p>
+              )}
             </div>
           </div>
         </section>
@@ -363,4 +434,11 @@ function vesselPlaceholder(vesselQuery: { isLoading: boolean; data?: unknown[] }
     return 'Loading vessels...';
   }
   return vesselQuery.data?.length ? 'Select vessel' : 'No vessels available';
+}
+
+function externalOrgPlaceholder(isLoading: boolean, rowCount: number): string {
+  if (isLoading) {
+    return 'Loading organisations...';
+  }
+  return rowCount > 0 ? 'Select organisation' : 'No organisations available';
 }

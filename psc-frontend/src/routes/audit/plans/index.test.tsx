@@ -8,6 +8,7 @@ const planRouteMocks = vi.hoisted(() => ({
   useCreateAdditionalAuditPlan: vi.fn(),
   useCreateAuditPlan: vi.fn(),
   useDecideAuditPlanExtension: vi.fn(),
+  useAuditQualifiedAuditors: vi.fn(),
   useRecordAuditPlanFlagNotification: vi.fn(),
   useRequestAuditPlanExtension: vi.fn(),
   useUpdateAuditPlan: vi.fn(),
@@ -21,6 +22,7 @@ const planRouteMocks = vi.hoisted(() => ({
   toast: vi.fn(),
   hasProcess: vi.fn(),
   useAuditVessels: vi.fn(),
+  reloadAuditPlanRegisterPage: vi.fn(),
 }));
 
 vi.mock('@/hooks/audit/use-audit-plan', () => ({
@@ -29,6 +31,8 @@ vi.mock('@/hooks/audit/use-audit-plan', () => ({
   useCreateAdditionalAuditPlan: () => planRouteMocks.useCreateAdditionalAuditPlan(),
   useCreateAuditPlan: () => planRouteMocks.useCreateAuditPlan(),
   useDecideAuditPlanExtension: (id: string | undefined) => planRouteMocks.useDecideAuditPlanExtension(id),
+  useAuditQualifiedAuditors: (standards: string, targetOfficeDept: string) =>
+    planRouteMocks.useAuditQualifiedAuditors(standards, targetOfficeDept),
   useRecordAuditPlanFlagNotification: (id: string | undefined) => planRouteMocks.useRecordAuditPlanFlagNotification(id),
   useRequestAuditPlanExtension: (id: string | undefined) => planRouteMocks.useRequestAuditPlanExtension(id),
   useUpdateAuditPlan: (id: string | undefined) => planRouteMocks.useUpdateAuditPlan(id),
@@ -46,6 +50,10 @@ vi.mock('@/hooks/audit/use-audit-registration', () => ({
 
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: planRouteMocks.toast }),
+}));
+
+vi.mock('@/lib/audit/reload', () => ({
+  reloadAuditPlanRegisterPage: () => planRouteMocks.reloadAuditPlanRegisterPage(),
 }));
 
 vi.mock('@/components/layout/root-layout', () => ({
@@ -78,6 +86,7 @@ function samplePlan(overrides: Partial<AuditPlan> = {}): AuditPlan {
     target_label: '22222222-2222-4222-8222-222222222222',
     audit_classification: 'INTERNAL',
     audit_standards_csv: 'ISM,ISPS',
+    lead_auditor_user_id: 'lead-1',
     planned_window_start: '2026-05-01',
     planned_window_end: '2026-09-01',
     window_label: '2026-05-01 -> 2026-09-01',
@@ -129,6 +138,7 @@ describe('AuditPlanRegisterRoute', () => {
     planRouteMocks.useCreateAdditionalAuditPlan.mockReset();
     planRouteMocks.useCreateAuditPlan.mockReset();
     planRouteMocks.useDecideAuditPlanExtension.mockReset();
+    planRouteMocks.useAuditQualifiedAuditors.mockReset();
     planRouteMocks.useRecordAuditPlanFlagNotification.mockReset();
     planRouteMocks.useRequestAuditPlanExtension.mockReset();
     planRouteMocks.useUpdateAuditPlan.mockReset();
@@ -142,6 +152,7 @@ describe('AuditPlanRegisterRoute', () => {
     planRouteMocks.toast.mockReset();
     planRouteMocks.hasProcess.mockReset();
     planRouteMocks.useAuditVessels.mockReset();
+    planRouteMocks.reloadAuditPlanRegisterPage.mockReset();
 
     planRouteMocks.hasProcess.mockImplementation((processId: string) =>
       ['AUDIT_P_001', 'AUDIT_P_002'].includes(processId)
@@ -156,6 +167,30 @@ describe('AuditPlanRegisterRoute', () => {
       ],
       isLoading: false,
       isError: false,
+    });
+    planRouteMocks.useAuditQualifiedAuditors.mockReturnValue({
+      data: {
+        count: 1,
+        results: [
+          {
+            id: 'qualified-auditor-1',
+            user_id: 'lead-1',
+            display_name: 'Capt. Harman Sandhu',
+            designation: 'Marine Auditor',
+            company: 'KSM',
+            identity_source: 'OFFICE_USER',
+            qualification_text: 'ISM Lead Auditor',
+            qualification_date: '2026-01-01',
+            expiry_date: '2027-01-01',
+            scope_standards_csv: 'ISM,ISPS,MLC,EMS',
+            qualifying_body: null,
+            auditor_scope: 'INTERNAL',
+            qualified_for_seq: true,
+            is_active: true,
+          },
+        ],
+      },
+      isLoading: false,
     });
     planRouteMocks.createPlan.mockResolvedValue(samplePlan());
     planRouteMocks.createAdditional.mockResolvedValue(samplePlan({ is_additional: true }));
@@ -217,7 +252,8 @@ describe('AuditPlanRegisterRoute', () => {
 
     expect(await screen.findByRole('heading', { name: 'Audit Plan Register' })).toBeInTheDocument();
     expect(screen.getAllByText('2026-05-01 -> 2026-09-01')).toHaveLength(2);
-    expect(screen.getAllByText('CONFIRMED').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Confirmed').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('CONFIRMED')).not.toBeInTheDocument();
     expect(screen.getByText('OPM-F-713-2026-003')).toBeInTheDocument();
     expect(screen.getByText('Additional')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
@@ -254,6 +290,7 @@ describe('AuditPlanRegisterRoute', () => {
       target: { value: '22222222-2222-4222-8222-222222222222' },
     });
     addPlanStandard(0, 'MLC');
+    fireEvent.change(screen.getAllByLabelText('Lead auditor')[0], { target: { value: 'lead-1' } });
     fireEvent.change(screen.getAllByLabelText('Planned window start')[0], { target: { value: '2026-05-01' } });
     fireEvent.change(screen.getAllByLabelText('Planned window end')[0], { target: { value: '2026-09-01' } });
     fireEvent.click(screen.getByRole('button', { name: /new plan entry/i }));
@@ -264,11 +301,13 @@ describe('AuditPlanRegisterRoute', () => {
         target_office_dept: '',
         audit_classification: 'INTERNAL',
         audit_standards_csv: 'ISM,MLC',
+        lead_auditor_user_id: 'lead-1',
         planned_window_start: '2026-05-01',
         planned_window_end: '2026-09-01',
         status: 'PLANNED',
       });
       expect(planRouteMocks.toast).toHaveBeenCalledWith({ title: 'Audit plan created' });
+      expect(planRouteMocks.reloadAuditPlanRegisterPage).toHaveBeenCalled();
     });
   });
 
@@ -291,6 +330,21 @@ describe('AuditPlanRegisterRoute', () => {
     expect(screen.queryByLabelText('DOC')).not.toBeInTheDocument();
   });
 
+  it('renders lead auditor dropdowns in routine and additional plan cards', async () => {
+    planRouteMocks.useAuditPlans.mockReturnValue({
+      data: sampleList([]),
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AuditPlanRegisterRoute />);
+
+    const leadAuditorFields = await screen.findAllByLabelText('Lead auditor');
+    expect(leadAuditorFields).toHaveLength(2);
+    expect(screen.getAllByText(/Capt\. Harman Sandhu/)).toHaveLength(2);
+  });
+
   it('JOURNEY-1 validates DPA plan creation and confirmation from the plan register', async () => {
     planRouteMocks.hasProcess.mockImplementation((processId: string) =>
       ['AUDIT_P_001', 'AUDIT_P_002', 'AUDIT_P_005', 'AUDIT_P_006'].includes(processId)
@@ -311,6 +365,7 @@ describe('AuditPlanRegisterRoute', () => {
       target: { value: '22222222-2222-4222-8222-222222222222' },
     });
     addPlanStandard(0, 'ISPS');
+    fireEvent.change(screen.getAllByLabelText('Lead auditor')[0], { target: { value: 'lead-1' } });
     fireEvent.change(screen.getAllByLabelText('Planned window start')[0], { target: { value: '2026-05-01' } });
     fireEvent.change(screen.getAllByLabelText('Planned window end')[0], { target: { value: '2026-09-01' } });
     fireEvent.click(screen.getByRole('button', { name: /new plan entry/i }));
@@ -321,6 +376,7 @@ describe('AuditPlanRegisterRoute', () => {
         target_office_dept: '',
         audit_classification: 'INTERNAL',
         audit_standards_csv: 'ISM,ISPS',
+        lead_auditor_user_id: 'lead-1',
         planned_window_start: '2026-05-01',
         planned_window_end: '2026-09-01',
         status: 'PLANNED',
@@ -355,8 +411,9 @@ describe('AuditPlanRegisterRoute', () => {
     fireEvent.click(screen.getByRole('button', { name: /save plan/i }));
 
     await waitFor(() => {
-      expect(planRouteMocks.useUpdateAuditPlan).toHaveBeenLastCalledWith('11111111-1111-4111-8111-111111111111');
+      expect(planRouteMocks.useUpdateAuditPlan).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
       expect(planRouteMocks.updatePlan).toHaveBeenCalledWith(expect.objectContaining({ status: 'CONFIRMED' }));
+      expect(planRouteMocks.reloadAuditPlanRegisterPage).toHaveBeenCalled();
     });
   });
 
@@ -461,6 +518,7 @@ describe('AuditPlanRegisterRoute', () => {
     fireEvent.change(await screen.findAllByLabelText('Target vessel').then((fields) => fields[1]), {
       target: { value: '22222222-2222-4222-8222-222222222222' },
     });
+    fireEvent.change(screen.getAllByLabelText('Lead auditor')[1], { target: { value: 'lead-1' } });
     fireEvent.change(screen.getAllByLabelText('Planned window start')[1], { target: { value: '2026-09-01' } });
     fireEvent.change(screen.getAllByLabelText('Planned window end')[1], { target: { value: '2026-09-10' } });
     fireEvent.change(screen.getByLabelText('Trigger reference'), {
@@ -475,6 +533,7 @@ describe('AuditPlanRegisterRoute', () => {
     await waitFor(() => {
       expect(planRouteMocks.createAdditional).toHaveBeenCalledWith(expect.objectContaining({
         target_vessel_id: '22222222-2222-4222-8222-222222222222',
+        lead_auditor_user_id: 'lead-1',
         trigger_event_type: 'FLAG_LETTER',
         trigger_event_ref: 'FLAG-LETTER-2026-09-10;TRIGGER_EVIDENCE=attachment-123',
       }));

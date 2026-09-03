@@ -27,6 +27,15 @@ export const OFFICE_DEPARTMENTS = ['CREW', 'TECH', 'PURCHASE', 'IT', 'MARINE', '
 export const AUDIT_TEAM_ROLES = ['CO_AUDITOR', 'OBSERVER', 'TRAINEE', 'OTHER'] as const;
 
 const optionalText = (max: number) => z.string().max(max).optional().default('');
+const optionalUuidText = (message: string) =>
+  z
+    .string()
+    .trim()
+    .optional()
+    .default('')
+    .refine((value) => !value || z.string().uuid().safeParse(value).success, {
+      message,
+    });
 
 export const auditRegistrationSchema = z
   .object({
@@ -102,7 +111,7 @@ export const externalAuditRegistrationSchema = z
     country: optionalText(100),
     authority: optionalText(200),
     inspector_name: optionalText(200),
-    report_reference: z.string().min(1, 'Report reference is required').max(100),
+    report_reference: optionalText(100),
     audit_classification: z.literal('EXTERNAL'),
     auditee_type: z.enum(AUDITEE_TYPES),
     auditee_office_dept: z.enum(OFFICE_DEPARTMENTS).or(z.literal('')).optional().default(''),
@@ -110,15 +119,14 @@ export const externalAuditRegistrationSchema = z
     audit_end_date: z.string().optional().default(''),
     standards: z.array(z.enum(EXTERNAL_AUDIT_STANDARDS)).min(1, 'Select at least one standard'),
     external_audit_subtypes: z.array(z.enum(EXTERNAL_AUDIT_SUBTYPES)).min(1, 'Select at least one subtype'),
-    external_audit_org_id: z.string().uuid('External audit organisation is required'),
+    external_audit_org_id: optionalUuidText('Select a valid external audit organisation'),
     external_audit_org_type: z.enum(EXTERNAL_AUDIT_ORG_TYPES),
     external_lead_auditor_name: z.string().min(1, 'External lead auditor is required').max(200),
     external_lead_auditor_credential: z.string().min(1, 'External auditor credential is required').max(200),
     flag_state_code: optionalText(10),
     cycle_year: z.number().int().positive().nullable().optional(),
-    linked_cert_ids: z.array(z.string().uuid()).optional().default([]),
-    external_report_file_name: z.string().min(1, 'External report PDF name is required').max(255),
-    external_report_file_path: z.string().min(1, 'External report PDF path is required').max(500),
+    external_report_file_name: z.string().min(1, 'External audit report PDF is required').max(255),
+    external_report_file_path: z.string().min(1, 'External audit report PDF is required').max(500),
     external_report_mime_type: z.string().min(1, 'External report MIME type is required').max(100),
     external_report_file_size: z.number().int().positive().nullable().optional(),
     late_registration_reason: z.string().optional().default(''),
@@ -138,7 +146,10 @@ export const externalAuditRegistrationSchema = z
   );
 
 export type ExternalAuditRegistrationFormData = z.infer<typeof externalAuditRegistrationSchema>;
-export type AuditRegistrationPayload = AuditRegistrationFormData | ExternalAuditRegistrationFormData;
+export type ExternalAuditRegistrationSubmitPayload = ExternalAuditRegistrationFormData & {
+  external_report_file?: File;
+};
+export type AuditRegistrationPayload = AuditRegistrationFormData | ExternalAuditRegistrationSubmitPayload;
 
 export const auditRegistrationDefaults: AuditRegistrationFormData = {
   vessel_id: '',

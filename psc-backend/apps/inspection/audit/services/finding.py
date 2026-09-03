@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.inspection.audit.models import (
@@ -22,6 +22,7 @@ from apps.inspection.audit.models import (
     MasterSolasChapter,
     MasterStcwSection,
 )
+from apps.inspection.audit.services.detail import get_audit_detail_by_id
 from apps.inspection.deficiency_models import CAR, Deficiency
 from apps.inspection.models import Inspection
 
@@ -32,6 +33,8 @@ NC_CATEGORIES = {"MAJOR_NC", "MINOR_NC"}
 OBSERVATION_CATEGORIES = {"OBSERVATION", "IMPROVEMENT_SUGGESTION", "OFI"}
 PRIORITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 CRITICAL_CERTIFICATE_IMPACTS = {"SUSPENDED", "WITHDRAWN"}
+AUDIT_SENTINEL_DEF_CODE_ID = "00000"
+AUDIT_SENTINEL_DEF_CODE = "00000"
 RULE_BOOK_MASTER_MODELS = {
     "ISM": MasterIsmClause,
     "ISPS": MasterIspsClause,
@@ -80,7 +83,7 @@ def create_audit_finding(
     audit_detail_id: uuid.UUID | str,
     finding_type: str,
     description: str,
-    def_code_id: str,
+    def_code_id: str | None = None,
     def_code: str | None = None,
     psc_deficiency_id: uuid.UUID | str | None = None,
     nc_category: str | None = None,
@@ -128,16 +131,15 @@ def create_audit_finding(
     if is_fleetwide_relevance and finding_type != "NC":
         raise AuditFindingValidationError("is_fleetwide_relevance is valid only for NC findings.")
     description = _required_text("description", description)
-    def_code_id = _required_text("def_code_id", def_code_id)
-    def_code = def_code or def_code_id
+    def_code_id = AUDIT_SENTINEL_DEF_CODE_ID
+    def_code = AUDIT_SENTINEL_DEF_CODE
+    action_code_id = None
+    action_code = None
     deficiency_uuid = _coerce_uuid(psc_deficiency_id) if psc_deficiency_id else uuid.uuid4()
     legacy_deficiency_key = deficiency_uuid.hex
 
     with transaction.atomic():
-        audit_detail = (
-            AuditDetail.objects.select_for_update()
-            .get(id=_coerce_uuid(audit_detail_id))
-        )
+        audit_detail = get_audit_detail_by_id(audit_detail_id, for_update=True)
         _assert_audit_accepts_findings(audit_detail)
         clause_inputs = _normalize_clause_inputs(
             rule_book_type=rule_book_type,
@@ -182,7 +184,7 @@ def create_audit_finding(
             )
 
         deficiency.refresh_from_db()
-        finding = AuditFinding.objects.create(
+        finding = _create_audit_finding_row(
             psc_deficiency_id=legacy_deficiency_key,
             audit_detail_id=audit_detail.id,
             audit_classification=audit_detail.audit_classification,
@@ -214,7 +216,7 @@ def create_audit_finding(
             created_by=created_by,
         )
         for clause_input in clause_inputs:
-            AuditFindingClause.objects.create(
+            _create_audit_finding_clause_row(
                 audit_finding_id=finding.id,
                 rule_book_type=clause_input.rule_book_type,
                 rule_clause_id=clause_input.rule_clause_id,
@@ -245,6 +247,203 @@ def _get_audit_inspection(audit_detail: AuditDetail) -> Inspection:
     if inspection.inspection_type != "AUDIT":
         raise AuditFindingValidationError("Audit detail must reference an AUDIT psc_inspection row.")
     return inspection
+
+
+def _create_audit_finding_row(**values) -> AuditFinding:
+    if connection.vendor != "microsoft":
+        return AuditFinding.objects.create(**values)
+
+    finding_id = values.get("id") or uuid.uuid4()
+    created_date = values.get("created_date") or timezone.now()
+    insert_values = {
+        "id": finding_id,
+        "psc_deficiency_id": values["psc_deficiency_id"],
+        "audit_detail_id": _uuid_text_or_none(values["audit_detail_id"]),
+        "audit_classification": values["audit_classification"],
+        "finding_type": values["finding_type"],
+        "nc_category": values.get("nc_category"),
+        "observation_category": values.get("observation_category"),
+        "standard_code": values.get("standard_code"),
+        "rule_book_type": values.get("rule_book_type"),
+        "rule_clause_id": _uuid_text_or_none(values.get("rule_clause_id")),
+        "clause_ref_text": values.get("clause_ref_text"),
+        "objective_evidence": values.get("objective_evidence"),
+        "description": values.get("description"),
+        "checklist_item_id": _uuid_text_or_none(values.get("checklist_item_id")),
+        "priority": values.get("priority") or "MEDIUM",
+        "original_due_date": values.get("original_due_date"),
+        "extended_due_date": values.get("extended_due_date"),
+        "extension_reason": values.get("extension_reason"),
+        "is_overdue": bool(values.get("is_overdue", False)),
+        "certificates_at_risk": values.get("certificates_at_risk"),
+        "is_fleetwide_relevance": bool(values.get("is_fleetwide_relevance", False)),
+        "linked_circular_id": _uuid_text_or_none(values.get("linked_circular_id")),
+        "is_external": bool(values.get("is_external", False)),
+        "applies_to_cert_ids_csv": values.get("applies_to_cert_ids_csv"),
+        "created_by": values.get("created_by"),
+        "created_date": created_date,
+        "is_deleted": bool(values.get("is_deleted", False)),
+    }
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO dbo.{AuditFinding._meta.db_table} (
+                [id],
+                [psc_deficiency_id],
+                [audit_detail_id],
+                [audit_classification],
+                [finding_type],
+                [nc_category],
+                [observation_category],
+                [standard_code],
+                [rule_book_type],
+                [rule_clause_id],
+                [clause_ref_text],
+                [objective_evidence],
+                [description],
+                [checklist_item_id],
+                [priority],
+                [original_due_date],
+                [extended_due_date],
+                [extension_reason],
+                [is_overdue],
+                [certificates_at_risk],
+                [is_fleetwide_relevance],
+                [linked_circular_id],
+                [is_external],
+                [applies_to_cert_ids_csv],
+                [created_by],
+                [created_date],
+                [is_deleted]
+            )
+            VALUES (
+                CAST(%s AS uniqueidentifier),
+                %s,
+                CAST(%s AS uniqueidentifier),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                CAST(%s AS uniqueidentifier),
+                %s,
+                %s,
+                %s,
+                CAST(%s AS uniqueidentifier),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                CAST(%s AS uniqueidentifier),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+            )
+            """,
+            [
+                str(insert_values["id"]),
+                insert_values["psc_deficiency_id"],
+                insert_values["audit_detail_id"],
+                insert_values["audit_classification"],
+                insert_values["finding_type"],
+                insert_values["nc_category"],
+                insert_values["observation_category"],
+                insert_values["standard_code"],
+                insert_values["rule_book_type"],
+                insert_values["rule_clause_id"],
+                insert_values["clause_ref_text"],
+                insert_values["objective_evidence"],
+                insert_values["description"],
+                insert_values["checklist_item_id"],
+                insert_values["priority"],
+                insert_values["original_due_date"],
+                insert_values["extended_due_date"],
+                insert_values["extension_reason"],
+                insert_values["is_overdue"],
+                insert_values["certificates_at_risk"],
+                insert_values["is_fleetwide_relevance"],
+                insert_values["linked_circular_id"],
+                insert_values["is_external"],
+                insert_values["applies_to_cert_ids_csv"],
+                insert_values["created_by"],
+                insert_values["created_date"],
+                insert_values["is_deleted"],
+            ],
+        )
+
+    return _fetch_sql_server_audit_finding(finding_id)
+
+
+def _fetch_sql_server_audit_finding(finding_id: uuid.UUID) -> AuditFinding:
+    rows = list(
+        AuditFinding.all_objects.raw(
+            f"""
+            SELECT *
+            FROM dbo.{AuditFinding._meta.db_table}
+            WHERE id = CAST(%s AS uniqueidentifier)
+            """,
+            [str(finding_id)],
+        )
+    )
+    if not rows:
+        raise AuditFinding.DoesNotExist("Audit finding was saved but could not be reloaded.")
+    return rows[0]
+
+
+def _create_audit_finding_clause_row(**values) -> None:
+    if connection.vendor != "microsoft":
+        AuditFindingClause.objects.create(**values)
+        return
+
+    clause_id = values.get("id") or uuid.uuid4()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            INSERT INTO dbo.{AuditFindingClause._meta.db_table} (
+                [id],
+                [audit_finding_id],
+                [rule_book_type],
+                [rule_clause_id],
+                [clause_ref_text],
+                [clause_subref_text],
+                [is_primary],
+                [created_by],
+                [created_date],
+                [is_deleted]
+            )
+            VALUES (
+                CAST(%s AS uniqueidentifier),
+                CAST(%s AS uniqueidentifier),
+                %s,
+                CAST(%s AS uniqueidentifier),
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+            )
+            """,
+            [
+                str(clause_id),
+                _uuid_text_or_none(values["audit_finding_id"]),
+                values["rule_book_type"],
+                _uuid_text_or_none(values.get("rule_clause_id")),
+                values.get("clause_ref_text"),
+                values.get("clause_subref_text"),
+                bool(values.get("is_primary", False)),
+                values.get("created_by"),
+                values.get("created_date") or timezone.now(),
+                bool(values.get("is_deleted", False)),
+            ],
+        )
 
 
 def _assert_deficiency_matches_audit(deficiency: Deficiency, inspection: Inspection) -> None:
@@ -373,16 +572,33 @@ def _normalize_clause_input(clause: dict) -> AuditFindingClauseInput:
 
     rule_clause_id = _coerce_uuid(clause.get("rule_clause_id"))
     master_model = RULE_BOOK_MASTER_MODELS[rule_book_type]
-    if not master_model.objects.filter(id=rule_clause_id).exists():
+    master_row = _get_rule_clause_by_id(master_model, rule_clause_id)
+    if master_row is None:
         raise AuditFindingValidationError(f"rule_clause_id is not valid for {rule_book_type}.")
 
     return AuditFindingClauseInput(
         rule_book_type=rule_book_type,
         rule_clause_id=rule_clause_id,
-        clause_ref_text=clause_ref_text or _clause_display(master_model.objects.get(id=rule_clause_id), rule_book_type),
+        clause_ref_text=clause_ref_text or _clause_display(master_row, rule_book_type),
         clause_subref_text=clause_subref_text,
         is_primary=bool(clause.get("is_primary")),
     )
+
+
+def _get_rule_clause_by_id(master_model, rule_clause_id: uuid.UUID):
+    if connection.vendor == "microsoft":
+        rows = list(
+            master_model.objects.raw(
+                f"""
+                SELECT *
+                FROM dbo.{master_model._meta.db_table}
+                WHERE id = CAST(%s AS uniqueidentifier)
+                """,
+                [str(rule_clause_id)],
+            )
+        )
+        return rows[0] if rows else None
+    return master_model.objects.filter(id=rule_clause_id).first()
 
 
 def _primary_clause(clause_inputs: list[AuditFindingClauseInput]) -> AuditFindingClauseInput | None:
@@ -455,3 +671,9 @@ def _coerce_uuid(value: uuid.UUID | str) -> uuid.UUID:
         return uuid.UUID(str(value))
     except (TypeError, ValueError) as exc:
         raise AuditFindingValidationError("Expected a valid UUID value.") from exc
+
+
+def _uuid_text_or_none(value: uuid.UUID | str | None) -> str | None:
+    if value in (None, ""):
+        return None
+    return str(_coerce_uuid(value))

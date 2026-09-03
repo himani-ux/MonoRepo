@@ -39,6 +39,7 @@ from apps.inspection.audit.models.base import AuditActiveManager  # noqa: E402
 
 
 EXPECTED_TABLES = {
+    "aud_master_qual_body",
     "audit_area_summary",
     "audit_attachment",
     "audit_detail",
@@ -114,12 +115,12 @@ def audit_model_classes() -> list[type[models.Model]]:
 
 
 class AuditModelContractTests(unittest.TestCase):
-    def test_exports_cover_exactly_the_43_audit_owned_tables(self) -> None:
+    def test_exports_cover_exactly_the_44_audit_owned_tables(self) -> None:
         model_tables = {model._meta.db_table for model in audit_model_classes()}
 
         self.assertEqual(model_tables, EXPECTED_TABLES)
-        self.assertEqual(len(model_tables), 43)
-        self.assertEqual(len(audit_models.__all__), 43)
+        self.assertEqual(len(model_tables), 44)
+        self.assertEqual(len(audit_models.__all__), 44)
 
     def test_all_audit_models_use_uuid_primary_key(self) -> None:
         for model in audit_model_classes():

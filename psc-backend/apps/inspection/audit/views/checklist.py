@@ -10,6 +10,7 @@ from apps.inspection.audit.models import AuditDetail
 from apps.inspection.audit.permissions import user_can_access_audit_detail
 from apps.inspection.audit.serializers.checklist import AuditChecklistResponseSerializer
 from apps.inspection.audit.services.checklist import get_audit_checklist_bundle
+from apps.inspection.audit.services.detail import get_audit_detail_by_id
 
 
 class AuditChecklistMasterView(APIView):
@@ -26,10 +27,10 @@ class AuditChecklistMasterView(APIView):
                     "message": "audit_id query parameter is required.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
-            )
+        )
 
         try:
-            audit_detail = AuditDetail.objects.get(id=audit_id)
+            audit_detail = get_audit_detail_by_id(audit_id)
         except (AuditDetail.DoesNotExist, ValueError) as exc:
             raise Http404("Audit not found.") from exc
 

@@ -810,6 +810,14 @@ def _parse_compact_certificate_dates(raw_text: str) -> dict[str, str]:
         labels=(r"date\s*of\s*issue", r"issue\s*date", r"issued\s*at\s*(?:on)?"),
         window_size=180,
     )
+    if not issue_date:
+        issue_date = _extract_partial_issue_date_with_nearby_year(readable_text)
+    if not issue_date:
+        issue_date = _extract_date_after_label(
+            (readable_text, compact_text),
+            labels=(r"printed\s*on", r"print\s*on", r"printed\s*date", r"print\s*date"),
+            window_size=120,
+        )
     if issue_date:
         fields["issue_date"] = issue_date
 
@@ -848,6 +856,35 @@ def _extract_date_after_label(texts: tuple[str, ...], *, labels: tuple[str, ...]
                 date_value = _extract_first_ocr_date(window)
                 if date_value:
                     return date_value
+    return None
+
+
+def _extract_partial_issue_date_with_nearby_year(text: str) -> str | None:
+    issue_label = re.compile(
+        r"\bdate\s*of\s*issue\s*[:.]?\s*"
+        r"(?P<day>\d{1,2})(?:st|nd|rd|th)?\s+"
+        r"(?P<month>[A-Za-z]{3,9})\.?(?!\s*,?\s*\d{4})",
+        re.IGNORECASE,
+    )
+    readable_text = re.sub(r"\s+", " ", text)
+    for match in issue_label.finditer(readable_text):
+        month = _MONTH_ALIASES.get(match.group("month").lower())
+        if not month:
+            continue
+        day = int(match.group("day"))
+        window = readable_text[max(0, match.start() - 220) : match.end() + 220]
+        for date_match in re.finditer(_ocr_date_regex_fragment(), window, re.IGNORECASE):
+            normalized = _normalize_ocr_date_text(date_match.group(0))
+            normalized_match = re.search(
+                r"\b(?P<day>\d{1,2})\s+(?P<month>[A-Za-z]{3,9})\s+(?P<year>\d{4})\b",
+                normalized,
+                re.IGNORECASE,
+            )
+            if not normalized_match:
+                continue
+            normalized_month = _MONTH_ALIASES.get(normalized_match.group("month").lower())
+            if int(normalized_match.group("day")) == day and normalized_month == month:
+                return normalized
     return None
 
 

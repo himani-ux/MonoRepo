@@ -48,12 +48,14 @@ The route block above is the original v1.0 baseline. The live application was ch
 /audit                      -> Redirect to Audit Dashboard
 /audit/dashboard            -> Audit Dashboard
 /audit/plans                -> Audit Plan Register
-/audit/external/new         -> External Audit Registration
+/audit/register             -> Register Audit Chooser
+/audit/external/new         -> External Audit Registration (opened from chooser)
 /audit/audits/:id           -> Audit Detail
 /audit/audits/:id/checklist -> Audit Checklist Walk
 /audit/findings/:id/nc      -> Audit NC Closure
-/audit/findings/:id/nc/wizard -> Audit NC Wizard
-/audit/findings/:id/obs     -> Audit Observation Closure
+/audit/findings/:id/nc/wizard -> Legacy route to Audit NC Closure
+/audit/findings/:id/obs     -> Legacy route to Audit Observation Wizard
+/audit/findings/:id/obs/wizard -> Audit Observation Wizard
 /dpa/notifications/failed   -> Audit Failed Notification Queue
 /dpa/scan-validation-queue  -> Audit Scan Validation Queue
 ```
@@ -66,14 +68,22 @@ These changes were made later on after the original v1.0 screen inventory:
 - `/deficiencies` was added as a dedicated workflow screen for deficiency allocation and review
 - `/reports` was expanded into a real DefIntel/OpenSource workspace
 - `/settings` now includes company logo management for PDF reports
-- Audit plan and registration forms use vessel dropdowns backed by `GET /api/audit/vessels/`; users select vessel names/codes while the saved payload still sends the matching vessel UUID
+- Audit plan and registration forms use vessel dropdowns backed by `GET /api/audit/vessels/`; users select vessel names/codes while the saved payload still sends the matching vessel UUID. For vessel audits, registration can also use that vessel payload to suggest Master, Chief Officer, Chief Engineer, and Second Engineer personnel in the Personnel Present section.
 - Audit Plan Register Standards now use selectable options while preserving the same saved CSV value used by the backend
-- Audit registration now begins with a Selected Audit Plan picker backed by the existing Audit Plan Register API; each registerable assigned plan shows a derived `PLAN-XXXXXXXX` reference, target, standards, status, audit window, and planned lead-auditor snapshot before the audit can be registered
+- Audit registration now begins with a permission-filtered Internal / External chooser at `/audit/register`; the Internal path then requires a Selected Audit Plan picker backed by the existing Audit Plan Register API. Each registerable assigned plan shows a derived `PLAN-XXXXXXXX` reference, target, standards, status, audit window, and planned lead-auditor snapshot before the audit can be registered.
 - The backend enforces registerable plan status (`CONFIRMED`, `EXTENDED`, or `CRITICAL_OVERDUE`) and blocks reuse of an audit plan that already has an `audit_detail`; successful registration moves the source plan to `IN_PROGRESS`
+- Audit finding capture no longer exposes PSC DefCode or Action Code input. The UI collects finding type, description, clause, mandatory objective-evidence text, optional evidence attachments, target closure date, and certificate-at-risk scope; the backend writes the legacy bridge row with sentinel DefCode `00000`, null Action Code, and finding attachments under `FINDING_OBJECTIVE_EVIDENCE`.
+- Audit CAR numbers use `{SCOPE}-AUDIT-{YYYY}-{NNN}`. Vessel audits use the vessel code as scope; office audits use `KSM`. PSC CAR numbering remains separate.
+- Audit NC closure has a single dense presentation. The legacy `/audit/findings/:id/nc/wizard` URL is retained as a compatibility route to the dense NC page, not as a second user choice.
+- Audit Observation closure has a single wizard presentation. Both `/audit/findings/:id/obs` and `/audit/findings/:id/obs/wizard` resolve to the wizard flow, so users are not asked to choose dense versus wizard mode.
+- Audit NC root-cause capture uses the PSC CAR CLC category/item selection plus the root-cause summary minimum-length rule. Certificates at Risk is captured once on the finding and is no longer repeated as editable controls in Parts E and F.
+- Audit Plan Register renders OPM F 713 values as readable form status/reference/date text instead of raw database strings or dates.
 - Audit finding rows are returned in deterministic order by created date, finding type, and id so NC/OBS display does not depend on UUID ordering
+- Audit Detail treats the scorecard as a fixed 14-area operational grid: non-required or demo `master_audit_area` rows are excluded from the editable grid, populated count, save payload, and submit-gate calculation
 - The first successful audit NC `START_PIC_REVIEW` action stores the PIC of record in `audit_detail.pic_user_id_resolved`; if the audit was already `VESSEL_ACKNOWLEDGED`, NC or OBS closure activity moves the audit header to `CLOSURE_IN_PROGRESS`
-- `/audit` now redirects to `/audit/dashboard`, and `/audit/dashboard` is a read-only Audit landing page backed by the existing Audit Plan Register API
+- `/audit` now redirects to `/audit/dashboard`; `/audit/dashboard` is a read-only Audit landing page backed by the Audit Plan Register API plus `GET /api/audit/audits/` for registered audits that can be reopened through `/audit/audits/:id`; vessel users receive plan rows scoped to their assigned vessel only
 - The Audit sidebar group now exposes `Audit Dashboard` for users with existing Audit process access
+- Authentication snapshots merge Audit default process gates by resolved role or rank before returning `process_ids`, so vessel Master and Acting Master sessions expose vessel-side Audit actions such as External Audit registration and acknowledgement/closure controls even when the shared profile row does not explicitly store those Audit gates
 - older v1.0 journey examples that mention legacy CAR states such as `DRAFT` and `PIC_ACCEPTED` should be read as historical baseline text; the live CAR workflow now uses the unified workflow documented in `docs/LATER_CHANGES.md`
 
 ---

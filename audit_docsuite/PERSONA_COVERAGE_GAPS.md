@@ -15,7 +15,7 @@ Reviewer values are `PENDING-PRINCE` until confirmed at final review.
 ## GAP-P1
 source_id: FEAT-AUD-1401
 source_type: FEAT
-reason: build-time infrastructure (additive Django migration creating the 43 Audit-owned tables, zero DDL against any shared legacy table per D-AUDRS-288/289/290) — there is no screen, route or interaction for any persona to perform; validated by the Phase-1 migration up/down test on a copy of ksm_cms_live plus the pre/post schema-fingerprint probe (IMPLEMENTATION_PLAN 1.6, TEST_PLAN K-12/K-13), never by a persona journey
+reason: build-time infrastructure (additive Django migrations creating the 44 Audit-owned tables, zero DDL against any shared legacy table per D-AUDRS-288/289/290) — there is no screen, route or interaction for any persona to perform; validated by the Phase-1 migration up/down test on a copy of ksm_cms_live plus the pre/post schema-fingerprint probe (IMPLEMENTATION_PLAN 1.6, TEST_PLAN K-12/K-13), never by a persona journey
 owner: product-owner
 reviewer: PENDING-PRINCE
 expires: 2026-10-12

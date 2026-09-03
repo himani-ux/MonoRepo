@@ -20,6 +20,7 @@ from apps.inspection.audit.serializers.detail import (
     AuditScorecardSerializer,
 )
 from apps.inspection.audit.services.detail import (
+    get_audit_detail_by_id,
     get_audit_detail_bundle,
     update_audit_detail_fields,
     upsert_scorecard_rows,
@@ -34,6 +35,13 @@ def _forbidden(message: str) -> Response:
         },
         status=status.HTTP_403_FORBIDDEN,
     )
+
+
+def _get_audit_detail_or_404(id) -> AuditDetail:
+    try:
+        return get_audit_detail_by_id(id)
+    except AuditDetail.DoesNotExist as exc:
+        raise Http404("Audit not found.") from exc
 
 
 class AuditDetailView(APIView):
@@ -68,10 +76,7 @@ class AuditDetailView(APIView):
         return self._detail_response(audit_detail, request)
 
     def _get_audit_detail(self, id):
-        try:
-            return AuditDetail.objects.get(id=id)
-        except AuditDetail.DoesNotExist as exc:
-            raise Http404("Audit not found.") from exc
+        return _get_audit_detail_or_404(id)
 
     def _detail_response(self, audit_detail: AuditDetail, request) -> Response:
         bundle = get_audit_detail_bundle(audit_detail.id)
@@ -86,10 +91,7 @@ class AuditScorecardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def put(self, request, id):
-        try:
-            audit_detail = AuditDetail.objects.get(id=id)
-        except AuditDetail.DoesNotExist as exc:
-            raise Http404("Audit not found.") from exc
+        audit_detail = _get_audit_detail_or_404(id)
 
         if not user_can_access_audit_detail(request.user, audit_detail):
             return _forbidden("You do not have access to this audit.")

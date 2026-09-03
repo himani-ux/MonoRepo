@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.inspection.audit.models import MasterAuditPlan
 from apps.inspection.audit.services.extension import AuditPlanWorkflowError
+from apps.inspection.audit.services.plan_persistence import save_plan_update
 
 
 MIN_CANCELLATION_REASON_LENGTH = 50
@@ -39,8 +40,9 @@ def cancel_audit_plan(
         plan.cancelled_at = timezone.now()
         plan.updated_by = actor
         plan.updated_date = timezone.now()
-        plan.save(
-            update_fields=[
+        plan = save_plan_update(
+            plan,
+            [
                 "status",
                 "cancellation_reason",
                 "next_planned_date",
@@ -48,7 +50,7 @@ def cancel_audit_plan(
                 "cancelled_at",
                 "updated_by",
                 "updated_date",
-            ]
+            ],
         )
         replacement = _ensure_replacement_plan(plan, next_planned_date=next_planned_date, actor=actor)
 
