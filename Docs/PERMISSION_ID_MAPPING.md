@@ -140,12 +140,11 @@ Auth resolution paths:
 
 ### 4.2 Circular
 
-There are two Circular permission surfaces in the repo:
+The active Circular permission surface in the repo is:
 
-- `psc-frontend/src/legacy/vims-basic/pages/circular_old/*`
 - `psc-frontend/src/legacy/vims-basic/pages/circular/*`
 
-The older pages use the broader admin/approval set below, and the newer dashboard bridge uses the filter/notification set.
+The dashboard bridge uses the filter/notification set below.
 
 | Form ID | Process ID | Functionality |
 |---|---|---|
